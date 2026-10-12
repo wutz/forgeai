@@ -1,0 +1,57 @@
+# forgeai platform config for bz1-dev1, derived from scc-k8s-settings-v3-2.
+releaseVersion: 0.1.0
+rootDomain: dev1.bz1.paratera.com
+extraDomains:
+- dev1.bz1.blsc.cn
+ingressClass: nginx
+ssh:
+  piperService: pod-prod/sshpiper
+  domains:
+    10.243.147.247:
+    - ssh.dev1.bz1.paratera.com
+    - ssh.dev1.bz1.blsc.cn
+defaultQueue: forgeai-queue
+serviceAccount: pod-default
+baseToolsHostPath: /opt/pod-shared-tools/base
+ephemeralStorage: 50Gi
+extraResources:
+  nextflow.io/fuse: "1"
+multiNode:
+  fullNodeGPUs: 0
+  env:
+    NCCL_DEBUG: WARN
+  # rdma/hca is not in gpu-cluster-queue's covered resources on dev, so
+  # multi-node jobs run over the pod network here (no RDMA profile).
+  podSetTopology:
+    kueue.x-k8s.io/podset-preferred-topology: kubernetes.io/hostname
+userNetworkPolicy: false
+resources:
+- id: rtx5090.xeon6530.xlarge
+  gpu: {count: 1, model: NVIDIA GeForce RTX 5090}
+  cpu: {cores: 7, model: Intel Xeon Gold 6530}
+  memory: {sizeGB: 100}
+  labels: {scclabs.dev/cpu: xeon-gold, scclabs.dev/gpu: rtx-5090}
+- id: rtx5090.xeon6530.2xlarge
+  gpu: {count: 2, model: NVIDIA GeForce RTX 5090}
+  cpu: {cores: 14, model: Intel Xeon Gold 6530}
+  memory: {sizeGB: 200}
+  labels: {scclabs.dev/cpu: xeon-gold, scclabs.dev/gpu: rtx-5090}
+- id: rtx5090.xeon6530.4xlarge
+  gpu: {count: 4, model: NVIDIA GeForce RTX 5090}
+  cpu: {cores: 28, model: Intel Xeon Gold 6530}
+  memory: {sizeGB: 400}
+  labels: {scclabs.dev/cpu: xeon-gold, scclabs.dev/gpu: rtx-5090}
+- id: rtx5090.xeon6530.8xlarge
+  gpu: {count: 8, model: NVIDIA GeForce RTX 5090}
+  cpu: {cores: 56, model: Intel Xeon Gold 6530}
+  memory: {sizeGB: 800}
+  labels: {scclabs.dev/cpu: xeon-gold, scclabs.dev/gpu: rtx-5090}
+- id: rtx5090.xeon6530.8xlarge.52c750g.256g
+  gpu: {count: 8, model: NVIDIA GeForce RTX 5090}
+  cpu: {cores: 52, model: Intel Xeon Gold 6530}
+  memory: {sizeGB: 750}
+  labels: {scclabs.dev/cpu: xeon-gold, scclabs.dev/gpu: rtx-5090}
+- id: xeon6530.xlarge.4c16g
+  cpu: {cores: 4, model: Intel Xeon Gold 6530}
+  memory: {sizeGB: 16}
+  labels: {scclabs.dev/cpu: xeon-gold, scclabs.dev/gpu: rtx-5090}

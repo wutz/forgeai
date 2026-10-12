@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: forgeai-compat-api
+  namespace: forgeai-system
+---
+# Job namespace: manage TrainingJobs, read SSH secrets and the sshpiper service.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: forgeai-compat-api
+  namespace: pod-prod
+rules:
+- apiGroups: [forgeai.scclabs.dev]
+  resources: [trainingjobs]
+  verbs: [get, list, watch, create, update, patch, delete]
+- apiGroups: [""]
+  resources: [secrets, services]
+  verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: forgeai-compat-api
+  namespace: pod-prod
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: forgeai-compat-api
+subjects:
+- kind: ServiceAccount
+  name: forgeai-compat-api
+  namespace: forgeai-system
+---
+# Platform namespace: read the platform ConfigMap.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: forgeai-compat-api-config
+  namespace: forgeai-system
+rules:
+- apiGroups: [""]
+  resources: [configmaps]
+  resourceNames: [forgeai-platform]
+  verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: forgeai-compat-api-config
+  namespace: forgeai-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: forgeai-compat-api-config
+subjects:
+- kind: ServiceAccount
+  name: forgeai-compat-api
+  namespace: forgeai-system

@@ -53,7 +53,7 @@ The compat API serves the scc-k8s-v2 paths with the same request and response sh
 POST   /apis/job/v1alpha2/users/{userID}/jobs?jobID=&method=create|start
 GET    /apis/job/v1alpha2/users/{userID}/jobs[?jobID=]
 GET    /apis/job/v1alpha2/users/{userID}/jobs/{jobID}
-PUT    /apis/job/v1alpha2/users/{userID}/jobs/{jobID}/stop | /restart
+POST   /apis/job/v1alpha2/users/{userID}/jobs/{jobID}/stop | /restart
 DELETE /apis/job/v1alpha2/users/{userID}/jobs/{jobID}
 GET    /apis/job/v1alpha2/users/{userID}/jobs/{jobID}/ssh
 ```

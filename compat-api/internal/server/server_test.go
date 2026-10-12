@@ -19,9 +19,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	v1 "github.com/scclabs/forgeai/api/v1alpha1"
+	"github.com/scclabs/forgeai/pkg/capacity"
+	"github.com/scclabs/forgeai/pkg/images"
 	"github.com/scclabs/forgeai/pkg/jobs"
 	"github.com/scclabs/forgeai/pkg/naming"
 	"github.com/scclabs/forgeai/pkg/platform"
+	"github.com/scclabs/forgeai/pkg/pools"
+	"github.com/scclabs/forgeai/pkg/volumes"
 )
 
 const (
@@ -29,25 +33,34 @@ const (
 	user   = "SELF-Y7bM92P1CRvbTeCDmb2jSdzF7KhEQNSPyEeVELNgHGg"
 )
 
-func newServer(t *testing.T) (*Server, client.Client) {
+const testConfig = `
+storageTypes:
+  high-perf: {storageClass: shared-vast-cs}
+imageWarmup: {ttl: 1h}
+resources:
+  - {id: g1, gpu: {count: 1}, cpu: {cores: 7}, memory: {sizeGB: 100}}
+`
+
+func newServer(t *testing.T, objs ...client.Object) (*Server, client.Client) {
 	t.Helper()
 	s := runtime.NewScheme()
 	_ = clientgoscheme.AddToScheme(s)
 	_ = v1.AddToScheme(s)
 	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: platform.ConfigMapName, Namespace: "forgeai-system"},
-		Data: map[string]string{platform.ConfigKey: `
-rootDomain: dev1.example.com
-resources:
-  - {id: g1, gpu: {count: 1}, cpu: {cores: 7}, memory: {sizeGB: 100}}
-`},
+		Data:       map[string]string{platform.ConfigKey: testConfig},
 	}
-	k := fake.NewClientBuilder().WithScheme(s).WithObjects(cm).WithStatusSubresource(&v1.TrainingJob{}).Build()
+	k := fake.NewClientBuilder().WithScheme(s).WithObjects(append(objs, cm)...).
+		WithStatusSubresource(&v1.TrainingJob{}, &v1.PoolRequest{}).Build()
 	return &Server{
-		Jobs:    &jobs.Client{K8s: k, Namespace: "pod-prod", ConfigNamespace: "forgeai-system"},
-		APIKeys: []string{apiKey},
-		Now:     func() time.Time { return time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC) },
-		Log:     slog.New(slog.NewTextHandler(io.Discard, nil)),
+		Jobs:     &jobs.Client{K8s: k, Namespace: "pod-prod", ConfigNamespace: "forgeai-system"},
+		Volumes:  &volumes.Client{K8s: k, Namespace: "pod-prod"},
+		Pools:    &pools.Client{K8s: k, Namespace: "pod-prod"},
+		Capacity: &capacity.Client{K8s: k},
+		Warmer:   &images.Warmer{K8s: k, Namespace: "pod-prod"},
+		APIKeys:  []string{apiKey},
+		Now:      func() time.Time { return time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC) },
+		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}, k
 }
 
@@ -86,8 +99,15 @@ func TestAuth(t *testing.T) {
 	if code, _ := do(t, h, "GET", "/healthz", "", nil); code != 200 {
 		t.Errorf("healthz: %d", code)
 	}
-	if code, _ := do(t, h, "GET", "/ngc/apis/openapi.json", "", nil); code != 200 {
-		t.Errorf("openapi: %d", code)
+	for _, p := range []string{"/ngc/apis/openapi.json", "/apis/openapi.yaml", "/apis/docs"} {
+		if code, _ := do(t, h, "GET", p, "", nil); code != 200 {
+			t.Errorf("%s: %d", p, code)
+		}
+	}
+	for _, p := range []string{"/apis/pod/v1alpha2/resources", "/apis/pool/v1alpha2/pools", "/apis/pod/v1alpha2/users/u1/volumes"} {
+		if code, _ := do(t, h, "GET", p, "wrong", nil); code != 401 {
+			t.Errorf("%s without a valid key: %d", p, code)
+		}
 	}
 }
 
@@ -104,6 +124,9 @@ func TestJobLifecycle(t *testing.T) {
 	code, out := do(t, h, "POST", base+"?jobID=ackjob-001", apiKey, body)
 	if code != 200 {
 		t.Fatalf("create: %d %v", code, out)
+	}
+	if _, ok := out["$schema"]; ok {
+		t.Fatalf("$schema in response: %v", out)
 	}
 	if out["id"] != "ackjob-001" || out["status"] != "Pending" || out["cmd"] != "" || out["pool_id"] != "default" || out["userGroup"] != "bj8" {
 		t.Fatalf("create out: %v", out)

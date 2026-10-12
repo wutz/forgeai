@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react'
-import {DeleteJob, Logs, RestartJob, SSH, StartJob, StopJob} from '../wailsjs/go/main/App'
-import {jobs, main} from '../wailsjs/go/models'
+import {DeleteJob, Logs, RestartJob, StartJob, StopJob} from '../wailsjs/go/main/App'
+import {main} from '../wailsjs/go/models'
 import {errText, Status} from './util'
 
 type Props = {
@@ -13,10 +13,8 @@ type Props = {
 const active = ['Pending', 'Queued', 'Running', 'Restarting']
 
 export function JobDetail({job, onClose, onChanged, onDeleted}: Props) {
-  const [tab, setTab] = useState<'logs' | 'ssh'>('logs')
   const [worker, setWorker] = useState(0)
   const [logs, setLogs] = useState('')
-  const [ssh, setSSH] = useState<jobs.SSHConnection[]>([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -26,21 +24,16 @@ export function JobDetail({job, onClose, onChanged, onDeleted}: Props) {
     let stop = false
     const load = async () => {
       try {
-        if (tab === 'logs') {
-          const text = await Logs(job.name, worker, 500)
-          if (!stop) setLogs(text)
-        } else {
-          const conns = await SSH(job.name)
-          if (!stop) setSSH(conns)
-        }
+        const text = await Logs(job.name, worker, 500)
+        if (!stop) setLogs(text)
       } catch (e) {
-        if (!stop) tab === 'logs' ? setLogs(errText(e)) : setSSH([])
+        if (!stop) setLogs(errText(e))
       }
     }
     load()
     const t = setInterval(load, 5000)
     return () => { stop = true; clearInterval(t) }
-  }, [job.name, tab, worker])
+  }, [job.name, worker])
 
   const run = async (fn: (name: string) => Promise<unknown>, after = onChanged) => {
     setBusy(true)
@@ -56,7 +49,7 @@ export function JobDetail({job, onClose, onChanged, onDeleted}: Props) {
   }
 
   const remove = () => {
-    if (confirm(`Delete job ${job.jobID}? This removes its pods and access endpoints.`)) run(DeleteJob, onDeleted)
+    if (confirm(`Delete job ${job.jobID}? This removes its pods.`)) run(DeleteJob, onDeleted)
   }
 
   const isActive = active.includes(job.phase)
@@ -100,7 +93,6 @@ export function JobDetail({job, onClose, onChanged, onDeleted}: Props) {
                 <dt>worker-{w.index}</dt>
                 <dd>
                   <Status phase={w.phase || 'Pending'}/> <span className="muted mono">{w.nodeName}</span>
-                  {w.jupyterURLs.map(u => <div key={u}><a href={u} target="_blank" rel="noreferrer">{u.replace(/\?.*$/, '')}</a></div>)}
                 </dd>
               </div>
             ))}
@@ -108,28 +100,16 @@ export function JobDetail({job, onClose, onChanged, onDeleted}: Props) {
         )}
       </div>
       <div className="section">
-        <div className="tabs" role="tablist">
-          <button className="tab" role="tab" aria-selected={tab === 'logs'} onClick={() => setTab('logs')}>Logs</button>
-          <button className="tab" role="tab" aria-selected={tab === 'ssh'} onClick={() => setTab('ssh')}>SSH</button>
+        <div className="tabs">
+          <h4>Logs</h4>
           <span className="spacer"/>
-          {tab === 'logs' && job.workers > 1 && (
+          {job.workers > 1 && (
             <select className="select" aria-label="Worker" value={worker} onChange={e => setWorker(Number(e.target.value))}>
               {Array.from({length: job.workers}, (_, i) => <option key={i} value={i}>worker-{i}</option>)}
             </select>
           )}
         </div>
-        {tab === 'logs' ? <pre className="logs">{logs || 'No output.'}</pre> : (
-          <div className="ssh">
-            {ssh.length === 0 ? <div className="muted">SSH is available once workers are running.</div> : ssh.map(c => (
-              <div className="ssh-item mono" key={c.id}>
-                <div><b>{c.id}</b></div>
-                <div>{c.url}</div>
-                <div className="muted">password: {c.password}</div>
-                <button className="btn btn-sm" style={{marginTop: 6}} onClick={() => navigator.clipboard.writeText(c.password)}>Copy password</button>
-              </div>
-            ))}
-          </div>
-        )}
+        <pre className="logs">{logs || 'No output.'}</pre>
       </div>
     </aside>
   )

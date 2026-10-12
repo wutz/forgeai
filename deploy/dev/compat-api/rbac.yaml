@@ -4,7 +4,8 @@ metadata:
   name: forgeai-compat-api
   namespace: forgeai-system
 ---
-# Job namespace: manage TrainingJobs, read SSH secrets and the sshpiper service.
+# Job namespace: TrainingJobs, PoolRequests, volumes (PVCs), image warmups.
+# No pods/exec, secrets or services: users can not reach into pods.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -12,11 +13,14 @@ metadata:
   namespace: pod-prod
 rules:
 - apiGroups: [forgeai.scclabs.dev]
-  resources: [trainingjobs]
+  resources: [trainingjobs, poolrequests]
   verbs: [get, list, watch, create, update, patch, delete]
 - apiGroups: [""]
-  resources: [secrets, services]
-  verbs: [get]
+  resources: [persistentvolumeclaims]
+  verbs: [get, list, create, patch, delete]
+- apiGroups: [apps]
+  resources: [daemonsets]
+  verbs: [get, create, patch]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -53,6 +57,32 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: forgeai-compat-api-config
+subjects:
+- kind: ServiceAccount
+  name: forgeai-compat-api
+  namespace: forgeai-system
+---
+# Cluster-wide: node pools and capacity (node allocatable minus pod requests).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: forgeai-compat-api
+rules:
+- apiGroups: [""]
+  resources: [nodes]
+  verbs: [get, list, patch]
+- apiGroups: [""]
+  resources: [pods]
+  verbs: [list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: forgeai-compat-api
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: forgeai-compat-api
 subjects:
 - kind: ServiceAccount
   name: forgeai-compat-api

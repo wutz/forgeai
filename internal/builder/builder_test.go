@@ -15,12 +15,8 @@ import (
 
 const testConfig = `
 releaseVersion: 0.1.0
-rootDomain: dev1.example.com
-extraDomains: [dev1.example.cn]
-ingressClass: nginx
 defaultQueue: forgeai-queue
 serviceAccount: pod-default
-baseToolsHostPath: /dev/shm/local-pod-share/base
 extraResources: {nextflow.io/fuse: "1"}
 multiNode:
   fullNodeGPUs: 8
@@ -94,8 +90,27 @@ func TestSingleWorker(t *testing.T) {
 	if _, ok := pod.Annotations[kf.AnnotationNetworks]; ok {
 		t.Error("single worker must not attach RDMA networks")
 	}
-	if !strings.Contains(c.Args[0], "user_entrypoint.sh") || !strings.HasSuffix(strings.TrimSpace(c.Args[0]), "python train.py") {
-		t.Errorf("args=%q", c.Args)
+	if len(c.Command) != 2 || c.Args[0] != "python train.py" {
+		t.Errorf("command=%q args=%q", c.Command, c.Args)
+	}
+	if len(c.Ports) != 0 {
+		t.Errorf("ports=%v: workers must not expose endpoints", c.Ports)
+	}
+	if sc := c.SecurityContext; sc == nil || sc.Capabilities != nil || sc.AllowPrivilegeEscalation == nil || *sc.AllowPrivilegeEscalation {
+		t.Errorf("securityContext=%+v", sc)
+	}
+	for _, e := range c.Env {
+		if e.ValueFrom != nil || strings.Contains(e.Name, "SSH") || strings.Contains(e.Name, "JUPYTER") {
+			t.Errorf("unexpected env %s", e.Name)
+		}
+	}
+	for _, v := range pod.Spec.Volumes {
+		if v.HostPath != nil {
+			t.Errorf("hostPath volume %s", v.Name)
+		}
+	}
+	if pod.Labels[naming.LabelComponent] != naming.ComponentTraining {
+		t.Errorf("component label missing: %v", pod.Labels)
 	}
 	if env := envMap(c); env["FOO"] != "bar" || env["NCCL_IB_HCA"] != "" {
 		t.Errorf("env=%v", env)
@@ -110,7 +125,7 @@ func TestSingleWorker(t *testing.T) {
 			}
 		}
 	}
-	if claims != 1 || len(c.VolumeMounts) != 4 {
+	if claims != 1 || len(c.VolumeMounts) != 3 {
 		t.Errorf("claims=%d mounts=%d", claims, len(c.VolumeMounts))
 	}
 
@@ -149,19 +164,6 @@ func TestMultiWorker(t *testing.T) {
 		t.Error("numProcPerNode/numNodes")
 	}
 
-	svcs, ings, pipes := b.AccessObjects()
-	if len(svcs) != 4 || len(ings) != 2 || len(pipes) != 2 {
-		t.Fatalf("svcs=%d ings=%d pipes=%d", len(svcs), len(ings), len(pipes))
-	}
-	if pipes[1].Spec.From[0].Username != "root@ackjob-1-1" || pipes[1].Spec.To.Host != naming.SSHServiceName(b.Job.Name, 1) {
-		t.Errorf("pipe=%+v", pipes[1].Spec)
-	}
-	if svcs[0].Spec.Selector[naming.LabelCompletion] != "0" || svcs[0].Spec.Selector[naming.LabelTrainingJob] != b.Job.Name {
-		t.Errorf("selector=%v", svcs[0].Spec.Selector)
-	}
-	if got := ings[0].Spec.Rules[1].Host; got != b.Job.Name+"-0.dev1.example.cn" {
-		t.Errorf("host=%s", got)
-	}
 }
 
 func TestCPUMultiWorker(t *testing.T) {
@@ -176,22 +178,6 @@ func TestCPUMultiWorker(t *testing.T) {
 	}
 	if b.TrainJob().Spec.Trainer != nil {
 		t.Error("cpu job sets numProcPerNode")
-	}
-}
-
-func TestAccessDisabled(t *testing.T) {
-	job := newJob(1, "g1")
-	off := false
-	job.Spec.Access = v1.AccessSpec{SSH: &off, Jupyter: &off}
-	job.Spec.Command = "echo hi"
-	b, rt := build(t, job)
-	_, c := container(rt)
-	if c.Args[0] != "echo hi" {
-		t.Errorf("args=%q", c.Args)
-	}
-	svcs, ings, pipes := b.AccessObjects()
-	if len(svcs)+len(ings)+len(pipes) != 0 {
-		t.Error("access objects rendered while disabled")
 	}
 }
 

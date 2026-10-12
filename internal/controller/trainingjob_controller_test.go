@@ -23,7 +23,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -37,9 +36,8 @@ import (
 
 const testPlatformConfig = `
 releaseVersion: test
-rootDomain: dev1.example.com
-ingressClass: nginx
 defaultQueue: forgeai-queue
+poolPlaceholderImage: pause:test
 resources:
   - {id: g1, gpu: {count: 1}, cpu: {cores: 7}, memory: {sizeGB: 100}, labels: {scclabs.dev/gpu: rtx-5090}}
 `
@@ -91,33 +89,13 @@ func phaseOf(key types.NamespacedName) func() v1.TrainingJobPhase {
 	}
 }
 
-func countOwned(list client.ObjectList, name string) int {
-	ExpectWithOffset(1, k8sClient.List(ctx, list, client.InNamespace(jobNamespace),
-		client.MatchingLabels{naming.LabelTrainingJob: name})).To(Succeed())
-	switch l := list.(type) {
-	case *corev1.ServiceList:
-		return len(l.Items)
-	case *networkingv1.IngressList:
-		return len(l.Items)
-	case *unstructured.UnstructuredList:
-		return len(l.Items)
-	}
-	return -1
-}
-
-func pipeList() *unstructured.UnstructuredList {
-	l := &unstructured.UnstructuredList{}
-	l.SetGroupVersionKind(kf.PipeGVK.GroupVersion().WithKind("PipeList"))
-	return l
-}
-
 var _ = Describe("TrainingJob Controller", func() {
 	It("creates, completes, restarts and stops a job", func() {
 		job := newTrainingJob("user-a", "ackjob-1", "g1")
 		key := client.ObjectKeyFromObject(job)
 		Expect(k8sClient.Create(ctx, job)).To(Succeed())
 
-		By("rendering the TrainJob, runtime, secret and access objects")
+		By("rendering the TrainJob and runtime")
 		var firstUID types.UID
 		Eventually(func(g Gomega) {
 			u, err := getTJ(job.Name)
@@ -132,22 +110,19 @@ var _ = Describe("TrainingJob Controller", func() {
 		nodes, _, _ := unstructured.NestedInt64(rt.Object, "spec", "mlPolicy", "numNodes")
 		Expect(nodes).To(BeEquivalentTo(2))
 
-		secret := &corev1.Secret{}
-		Eventually(func() error {
-			return k8sClient.Get(ctx, types.NamespacedName{Namespace: jobNamespace, Name: naming.SecretName(job.Name)}, secret)
-		}, timeout, interval).Should(Succeed())
-		password := string(secret.Data["SSH_PASSWORD"])
-		Expect(password).To(HaveLen(32))
-
-		Eventually(func() int { return countOwned(&corev1.ServiceList{}, job.Name) }, timeout, interval).Should(Equal(4))
-		Eventually(func() int { return countOwned(&networkingv1.IngressList{}, job.Name) }, timeout, interval).Should(Equal(2))
-		Eventually(func() int { return countOwned(pipeList(), job.Name) }, timeout, interval).Should(Equal(2))
 		Eventually(phaseOf(key), timeout, interval).Should(Equal(v1.PhasePending))
+
+		By("exposing no endpoints: no services, ingresses or secrets")
+		svcs := &corev1.ServiceList{}
+		Expect(k8sClient.List(ctx, svcs, client.InNamespace(jobNamespace))).To(Succeed())
+		Expect(svcs.Items).To(BeEmpty())
+		secrets := &corev1.SecretList{}
+		Expect(k8sClient.List(ctx, secrets, client.InNamespace(jobNamespace))).To(Succeed())
+		Expect(secrets.Items).To(BeEmpty())
 
 		got := &v1.TrainingJob{}
 		Expect(k8sClient.Get(ctx, key, got)).To(Succeed())
 		Expect(got.Status.Workers).To(HaveLen(2))
-		Expect(got.Status.Workers[1].SSHUser).To(Equal("root@ackjob-1-1"))
 
 		By("mirroring TrainJob completion")
 		u, err := getTJ(job.Name)
@@ -177,24 +152,20 @@ var _ = Describe("TrainingJob Controller", func() {
 		}, timeout, interval).Should(BeEquivalentTo(1))
 		Eventually(phaseOf(key), timeout, interval).Should(Equal(v1.PhasePending))
 
-		By("stopping: TrainJob and access objects go away, secret is kept")
+		By("stopping: the TrainJob goes away, the spec is kept")
 		Expect(k8sClient.Get(ctx, key, got)).To(Succeed())
 		got.Spec.Suspend = true
 		Expect(k8sClient.Update(ctx, got)).To(Succeed())
 		finishDeletion(job.Name)
 		Eventually(phaseOf(key), timeout, interval).Should(Equal(v1.PhaseStopped))
-		Eventually(func() int { return countOwned(&corev1.ServiceList{}, job.Name) }, timeout, interval).Should(Equal(0))
-		Eventually(func() int { return countOwned(pipeList(), job.Name) }, timeout, interval).Should(Equal(0))
-		Expect(countOwned(&networkingv1.IngressList{}, job.Name)).To(Equal(0))
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Namespace: jobNamespace, Name: naming.SecretName(job.Name)}, secret)).To(Succeed())
-		Expect(string(secret.Data["SSH_PASSWORD"])).To(Equal(password))
+		_, err = getTJ(job.Name)
+		Expect(apierrors.IsNotFound(err)).To(BeTrue())
 
 		By("starting again")
 		Expect(k8sClient.Get(ctx, key, got)).To(Succeed())
 		got.Spec.Suspend = false
 		Expect(k8sClient.Update(ctx, got)).To(Succeed())
 		Eventually(func() error { _, err := getTJ(job.Name); return err }, timeout, interval).Should(Succeed())
-		Eventually(func() int { return countOwned(pipeList(), job.Name) }, timeout, interval).Should(Equal(2))
 	})
 
 	It("reports an unknown resource model", func() {

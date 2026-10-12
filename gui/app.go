@@ -71,13 +71,11 @@ type ResourceInfo struct {
 
 // Worker is one worker pod of a job.
 type Worker struct {
-	Index       int32    `json:"index"`
-	PodName     string   `json:"podName"`
-	NodeName    string   `json:"nodeName"`
-	PodIP       string   `json:"podIP"`
-	Phase       string   `json:"phase"`
-	SSHUser     string   `json:"sshUser"`
-	JupyterURLs []string `json:"jupyterURLs"`
+	Index    int32  `json:"index"`
+	PodName  string `json:"podName"`
+	NodeName string `json:"nodeName"`
+	PodIP    string `json:"podIP"`
+	Phase    string `json:"phase"`
 }
 
 // Job is the view model of a TrainingJob.
@@ -105,8 +103,6 @@ type Job struct {
 	Suspended   bool              `json:"suspended"`
 	RestartGen  int64             `json:"restartGeneration"`
 	TrainJob    string            `json:"trainJob"`
-	SSHEnabled  bool              `json:"sshEnabled"`
-	JupyterOn   bool              `json:"jupyterEnabled"`
 	VolumeCount int               `json:"volumeCount"`
 }
 
@@ -120,8 +116,6 @@ type JobForm struct {
 	PoolID     string            `json:"poolID"`
 	Workers    int32             `json:"workers"`
 	Env        map[string]string `json:"env"`
-	SSH        bool              `json:"ssh"`
-	Jupyter    bool              `json:"jupyter"`
 }
 
 var errNotConnected = errors.New("not connected: select a kubeconfig context first")
@@ -283,7 +277,6 @@ func (a *App) CreateJob(f JobForm) (Job, error) {
 	if f.Workers < 1 {
 		f.Workers = 1
 	}
-	ssh, jupyter := f.SSH, f.Jupyter
 	spec := v1.TrainingJobSpec{
 		UserID:     f.UserID,
 		JobID:      f.JobID,
@@ -292,7 +285,6 @@ func (a *App) CreateJob(f JobForm) (Job, error) {
 		Command:    f.Command,
 		ResourceID: f.ResourceID,
 		Workers:    f.Workers,
-		Access:     v1.AccessSpec{SSH: &ssh, Jupyter: &jupyter},
 	}
 	keys := make([]string, 0, len(f.Env))
 	for k := range f.Env {
@@ -359,25 +351,6 @@ func (a *App) DeleteJob(name string) error {
 	return err
 }
 
-// SSH returns SSH endpoints of running workers.
-func (a *App) SSH(name string) ([]jobs.SSHConnection, error) {
-	c, err := a.current()
-	if err != nil {
-		return nil, err
-	}
-	ctx, cancel := a.call()
-	defer cancel()
-	j, err := c.jobs.GetByName(ctx, name)
-	if err != nil {
-		return nil, err
-	}
-	cfg, err := c.jobs.Config(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return c.jobs.SSH(ctx, j, cfg)
-}
-
 // Logs returns the last tailLines of a worker pod log.
 func (a *App) Logs(name string, worker int32, tailLines int64) (string, error) {
 	c, err := a.current()
@@ -433,8 +406,6 @@ func toJob(j *v1.TrainingJob) Job {
 		Suspended:   s.Suspend,
 		RestartGen:  s.RestartGeneration,
 		TrainJob:    j.Status.TrainJobName,
-		SSHEnabled:  s.Access.SSH == nil || *s.Access.SSH,
-		JupyterOn:   s.Access.Jupyter == nil || *s.Access.Jupyter,
 		VolumeCount: len(s.VolumeMounts),
 		WorkerPods:  []Worker{},
 	}
@@ -456,13 +427,9 @@ func toJob(j *v1.TrainingJob) Job {
 		out.Completed = t.Format(time.RFC3339)
 	}
 	for _, w := range j.Status.Workers {
-		urls := w.JupyterURLs
-		if urls == nil {
-			urls = []string{}
-		}
 		out.WorkerPods = append(out.WorkerPods, Worker{
 			Index: w.Index, PodName: w.PodName, NodeName: w.NodeName, PodIP: w.PodIP,
-			Phase: w.Phase, SSHUser: w.SSHUser, JupyterURLs: urls,
+			Phase: w.Phase,
 		})
 	}
 	return out

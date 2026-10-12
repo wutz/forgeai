@@ -34,6 +34,11 @@ spec:
         # Every APIKEY* entry is an accepted API key.
         - secretRef:
             name: forgeai-compat-api-keys
+        # REGISTRY_USER, REGISTRY_PASSWORD (Harbor) and VOLUME_USAGE_TOKEN
+        # (scc-monitor-querier); created out of band, optional.
+        - secretRef:
+            name: forgeai-compat-api-credentials
+            optional: true
         ports:
         - name: http
           containerPort: 8000

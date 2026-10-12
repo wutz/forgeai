@@ -88,7 +88,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .field .hint { font-size: 12px; color: var(--mute); }
 .row { display: flex; gap: 12px; }
 .row > * { flex: 1; }
-.check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 
 /* Card / table */
 .card { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius-md); }
@@ -126,11 +125,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
   margin: 0; height: 280px; overflow: auto; padding: 12px; border-radius: var(--radius-sm);
   background: var(--ink); color: #ededed; font-family: var(--mono); font-size: 12px; line-height: 18px; white-space: pre-wrap;
 }
-.ssh { display: flex; flex-direction: column; gap: 8px; }
-.ssh-item { border: 1px solid var(--hairline); border-radius: var(--radius-sm); padding: 8px 10px; font-size: 12px; }
-.tabs { display: flex; gap: 4px; margin-bottom: 10px; }
-.tab { height: 28px; padding: 0 10px; border-radius: var(--radius-sm); border: 1px solid transparent; background: none; cursor: pointer; font-size: 13px; color: var(--body); }
-.tab[aria-selected="true"] { border-color: var(--hairline); background: var(--surface); color: var(--ink); font-weight: 500; }
+.tabs { display: flex; align-items: center; gap: 4px; margin-bottom: 10px; }
+.tabs h4 { margin: 0; }
 
 /* Banner / empty */
 .banner { padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 16px; }

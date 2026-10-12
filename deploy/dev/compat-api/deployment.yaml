@@ -16,8 +16,6 @@ spec:
         app.kubernetes.io/name: forgeai-compat-api
     spec:
       serviceAccountName: forgeai-compat-api
-      imagePullSecrets:
-      - name: forgeai-registry
       securityContext:
         runAsNonRoot: true
         seccompProfile:

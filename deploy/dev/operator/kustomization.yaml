@@ -19,9 +19,6 @@ patches:
         requests: {cpu: 50m, memory: 128Mi}
         limits: {cpu: "1", memory: 512Mi}
     - op: add
-      path: /spec/template/spec/imagePullSecrets
-      value: [{name: forgeai-registry}]
-    - op: add
       path: /spec/template/spec/containers/0/env
       value:
       - name: FORGEAI_NAMESPACE

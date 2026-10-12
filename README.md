@@ -74,9 +74,8 @@ make gui                       # gui/build/bin/forgeai.app (needs wails CLI buil
 
 ```sh
 kubectl create ns forgeai-system
-kubectl -n forgeai-system create secret docker-registry forgeai-registry ...
 kubectl -n forgeai-system create secret generic forgeai-compat-api-keys --from-literal=APIKEY=<key>
-make deploy-dev                # ko build -> cr.dev1.bz1.paratera.com:7443/forgeai, kubectl apply
+make deploy-dev                # ko build -> ghcr.io/scclabs/forgeai (public), kubectl apply
 ```
 
 Prerequisites:

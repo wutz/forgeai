@@ -1,60 +1,36 @@
-# forgeai platform config for bz1-dev1, derived from scc-k8s-settings-v3-2.
-releaseVersion: 0.1.0
-defaultQueue: forgeai-queue
-serviceAccount: pod-default
-ephemeralStorage: 50Gi
-extraResources:
-  nextflow.io/fuse: "1"
-multiNode:
-  fullNodeGPUs: 0
-  env:
-    NCCL_DEBUG: WARN
-  # rdma/hca is not in gpu-cluster-queue's covered resources on dev, so
-  # multi-node jobs run over the pod network here (no RDMA profile).
-  podSetTopology:
-    kueue.x-k8s.io/podset-preferred-topology: kubernetes.io/hostname
-userNetworkPolicy: false
-# scc-k8s-settings-v3-2 names shared-nvme-cache, which does not exist on dev;
-# existing pod-prod volumes use shared-vast-cs.
-storageTypes:
-  high-perf: {storageClass: shared-vast-cs, defaultAccessMode: ReadWriteMany}
+# forgeai platform config for bz1-dev1.
+namespacePrefix: forge-
+apiServer: https://219.146.211.38:6443
+# ingress-nginx is reachable from outside on 7443; *.dev1.bz1.paratera.com has
+# wildcard DNS and a default wildcard certificate.
+ingress:
+  className: nginx
+  domain: dev1.bz1.paratera.com
+  port: 7443
 registry:
   domain: cr.dev1.bz1.paratera.com:7443
   insecure: true
-volumeUsage:
-  baseURL: http://scc-m-q-agent.mon.svc.cluster.local:8003
-imageWarmup:
-  nodeSelector: {scclabs.dev/gpu: rtx-5090}
-  ttl: 2h
-resources:
-- id: rtx5090.xeon6530.xlarge
-  gpu: {count: 1, model: NVIDIA GeForce RTX 5090}
-  cpu: {cores: 7, model: Intel Xeon Gold 6530}
-  memory: {sizeGB: 100}
-  labels: {scclabs.dev/cpu: xeon-gold, scclabs.dev/gpu: rtx-5090}
-- id: rtx5090.xeon6530.2xlarge
-  gpu: {count: 2, model: NVIDIA GeForce RTX 5090}
-  cpu: {cores: 14, model: Intel Xeon Gold 6530}
-  memory: {sizeGB: 200}
-  labels: {scclabs.dev/cpu: xeon-gold, scclabs.dev/gpu: rtx-5090}
-- id: rtx5090.xeon6530.4xlarge
-  gpu: {count: 4, model: NVIDIA GeForce RTX 5090}
-  cpu: {cores: 28, model: Intel Xeon Gold 6530}
-  memory: {sizeGB: 400}
-  labels: {scclabs.dev/cpu: xeon-gold, scclabs.dev/gpu: rtx-5090}
-- id: rtx5090.xeon6530.8xlarge
-  gpu: {count: 8, model: NVIDIA GeForce RTX 5090}
-  cpu: {cores: 56, model: Intel Xeon Gold 6530}
-  memory: {sizeGB: 800}
-  labels: {scclabs.dev/cpu: xeon-gold, scclabs.dev/gpu: rtx-5090}
-- id: rtx5090.xeon6530.8xlarge.52c750g.256g
-  gpu: {count: 8, model: NVIDIA GeForce RTX 5090}
-  cpu: {cores: 52, model: Intel Xeon Gold 6530}
-  memory: {sizeGB: 750}
-  labels: {scclabs.dev/cpu: xeon-gold, scclabs.dev/gpu: rtx-5090}
-- id: xeon6530.xlarge.4c16g
-  cpu: {cores: 4, model: Intel Xeon Gold 6530}
-  memory: {sizeGB: 16}
-  labels: {scclabs.dev/cpu: xeon-gold, scclabs.dev/gpu: rtx-5090}
-  # Runs on GPU nodes next to full-node jobs; reported like scc-k8s-v2 did.
-  usageFrom: rtx5090.xeon6530.8xlarge.52c750g.256g
+  adminSecret: forgeai-harbor
+storageTypes:
+  shared: {storageClass: shared-vast-cs, description: VAST shared filesystem}
+  juicefs: {storageClass: shared-juice, description: JuiceFS shared filesystem}
+defaultStorageType: shared
+instanceTypes:
+  reserved: {cpu: "8", memory: 64Gi}
+  sizes: [1, 2, 4, 8]
+defaultQuota:
+  gpus: {"*": 8}
+  storage: 2Ti
+  volumes: 20
+  pods: 100
+  headroom: {cpu: "4", memory: 8Gi}
+network:
+  systemNamespaces: [ingress-nginx, ingress-nginx-cs, forgeai-system, kube-system, gpu-operator]
+fileServer:
+  idleTimeout: 30m
+training:
+  defaultRuntime: torch-distributed
+  shmSize: 16Gi
+  stuckTimeout: 15m
+  maxRetries: 0
+trashRetention: 168h

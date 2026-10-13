@@ -1,11 +1,10 @@
 # Dev cluster (bz1-dev1) deployment.
-#   make deploy-dev        # ko builds images and applies this overlay
-# Images are public on ghcr.io/scclabs/forgeai. The compat-api API key secret
-# is created out of band:
-#   kubectl -n forgeai-system create secret generic forgeai-compat-api-keys --from-literal=APIKEY=<key>
+#   make deploy-dev        # ko builds the operator image and applies this overlay
+# The Harbor admin secret is created out of band:
+#   kubectl -n forgeai-system create secret generic forgeai-harbor \
+#     --from-literal=username=admin --from-literal=password=<password>
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
 - operator
 - platform
-- compat-api

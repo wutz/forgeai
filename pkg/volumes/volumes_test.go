@@ -20,12 +20,14 @@ import (
 	"github.com/scclabs/forgeai/pkg/platform"
 )
 
+const testNS = "pod-prod"
+
 func newClient(t *testing.T, objs ...runtime.Object) *Client {
 	t.Helper()
 	s := runtime.NewScheme()
 	_ = clientgoscheme.AddToScheme(s)
 	_ = v1.AddToScheme(s)
-	return &Client{K8s: fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...).Build(), Namespace: "pod-prod"}
+	return &Client{K8s: fake.NewClientBuilder().WithScheme(s).WithRuntimeObjects(objs...).Build(), Namespace: testNS}
 }
 
 func testConfig(t *testing.T) *platform.Config {
@@ -61,9 +63,9 @@ func TestLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	name := naming.VolumeClaimName("pod-prod", "u1", "data")
+	name := naming.VolumeClaimName(testNS, "u1", "data")
 	pvc := &corev1.PersistentVolumeClaim{}
-	if err := c.K8s.Get(ctx, types.NamespacedName{Namespace: "pod-prod", Name: name}, pvc); err != nil {
+	if err := c.K8s.Get(ctx, types.NamespacedName{Namespace: testNS, Name: name}, pvc); err != nil {
 		t.Fatal(err)
 	}
 	if *pvc.Spec.StorageClassName != "shared-vast-cs" || pvc.Spec.AccessModes[0] != corev1.ReadWriteMany {
@@ -89,7 +91,7 @@ func TestLifecycle(t *testing.T) {
 	if _, err := c.Resize(ctx, "u1", "data", 20); err != nil {
 		t.Fatal(err)
 	}
-	_ = c.K8s.Get(ctx, types.NamespacedName{Namespace: "pod-prod", Name: name}, pvc)
+	_ = c.K8s.Get(ctx, types.NamespacedName{Namespace: testNS, Name: name}, pvc)
 	if q := pvc.Spec.Resources.Requests[corev1.ResourceStorage]; q.Value() != 20<<30 {
 		t.Fatalf("resized=%s", q.String())
 	}
@@ -107,10 +109,10 @@ func TestLifecycle(t *testing.T) {
 
 func TestDeleteInUse(t *testing.T) {
 	ctx := context.Background()
-	name := naming.VolumeClaimName("pod-prod", "u1", "data")
-	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "pod-prod"}}
+	name := naming.VolumeClaimName(testNS, "u1", "data")
+	pvc := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: testNS}}
 	job := &v1.TrainingJob{
-		ObjectMeta: metav1.ObjectMeta{Name: "j1", Namespace: "pod-prod"},
+		ObjectMeta: metav1.ObjectMeta{Name: "j1", Namespace: testNS},
 		Spec:       v1.TrainingJobSpec{UserID: "u1", VolumeMounts: []v1.VolumeMount{{VolumeID: "data", MountPath: "/data"}}},
 	}
 	c := newClient(t, pvc, job)
@@ -119,7 +121,7 @@ func TestDeleteInUse(t *testing.T) {
 	}
 
 	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{Name: "p1", Namespace: "pod-prod"},
+		ObjectMeta: metav1.ObjectMeta{Name: "p1", Namespace: testNS},
 		Spec: corev1.PodSpec{Volumes: []corev1.Volume{{Name: "v", VolumeSource: corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: name},
 		}}}},
@@ -153,11 +155,12 @@ func TestUsage(t *testing.T) {
 	defer srv.Close()
 
 	u := &UsageClient{BaseURL: srv.URL, Token: "tok"}
-	info, err := u.Usage(context.Background(), "pod-prod", "u1", "data")
+	info, err := u.Usage(context.Background(), testNS, "u1", "data")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.TotalGB != 10 || info.UsedGB != 3 || info.UsedPercentage != 30 || len(lookbacks) != 2 || lookbacks[1] != "30d" {
+	if info.TotalGB != 10 || info.UsedGB != 3 || info.UsedPercentage != 30 ||
+		len(lookbacks) != 2 || lookbacks[1] != "30d" {
 		t.Fatalf("info=%+v lookbacks=%v", info, lookbacks)
 	}
 
@@ -166,7 +169,7 @@ func TestUsage(t *testing.T) {
 	}))
 	defer empty.Close()
 	u.BaseURL = empty.URL
-	if _, err := u.Usage(context.Background(), "pod-prod", "u1", "data"); !errors.Is(err, ErrNotFound) {
+	if _, err := u.Usage(context.Background(), testNS, "u1", "data"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("err=%v", err)
 	}
 }

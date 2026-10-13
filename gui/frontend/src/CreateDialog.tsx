@@ -23,7 +23,7 @@ export function CreateDialog({resources, userID, onClose, onCreated}: Props) {
   const [form, setForm] = useState({
     jobID: '', userID, image: 'pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime',
     command: 'nvidia-smi && sleep infinity', resourceID: resources[0]?.id || '',
-    poolID: 'default', workers: 1, env: '',
+    workers: 1, env: '',
   })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -90,10 +90,6 @@ export function CreateDialog({resources, userID, onClose, onCreated}: Props) {
             <div className="field">
               <label htmlFor="f-workers">Workers</label>
               <input id="f-workers" className="input" type="number" min={1} max={64} value={form.workers} onChange={e => set('workers', e.target.value)}/>
-            </div>
-            <div className="field">
-              <label htmlFor="f-pool">Pool</label>
-              <input id="f-pool" className="input" value={form.poolID} onChange={e => set('poolID', e.target.value)}/>
             </div>
           </div>
           <div className="field">

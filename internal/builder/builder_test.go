@@ -33,7 +33,7 @@ func newJob(workers int32, resourceID string) *v1.TrainingJob {
 	return &v1.TrainingJob{
 		ObjectMeta: metav1.ObjectMeta{Name: naming.JobName("pod-prod", "u1", "ackjob-1"), Namespace: "pod-prod"},
 		Spec: v1.TrainingJobSpec{
-			UserID: "u1", JobID: "ackjob-1", PoolID: "pool-a", Image: "img:1",
+			UserID: "u1", JobID: "ackjob-1", Image: "img:1",
 			Command: "python train.py", ResourceID: resourceID, Workers: workers,
 			Env:          []v1.EnvVar{{Name: "FOO", Value: "bar"}},
 			VolumeMounts: []v1.VolumeMount{{VolumeID: "data", MountPath: "/data"}, {VolumeID: "data", MountPath: "/data2", SubPath: "x", ReadOnly: true}},
@@ -84,7 +84,7 @@ func TestSingleWorker(t *testing.T) {
 	if _, ok := c.Resources.Limits["rdma/hca"]; ok {
 		t.Error("single worker must not request rdma")
 	}
-	if pod.Spec.NodeSelector[naming.LabelNodePool] != "pool-a" || pod.Spec.NodeSelector[naming.LabelGPU] != "rtx-5090" {
+	if _, ok := pod.Spec.NodeSelector["scclabs.dev/pool"]; ok || pod.Spec.NodeSelector[naming.LabelGPU] != "rtx-5090" {
 		t.Errorf("nodeSelector=%v", pod.Spec.NodeSelector)
 	}
 	if _, ok := pod.Annotations[kf.AnnotationNetworks]; ok {
@@ -92,22 +92,6 @@ func TestSingleWorker(t *testing.T) {
 	}
 	if len(c.Command) != 2 || c.Args[0] != "python train.py" {
 		t.Errorf("command=%q args=%q", c.Command, c.Args)
-	}
-	if len(c.Ports) != 0 {
-		t.Errorf("ports=%v: workers must not expose endpoints", c.Ports)
-	}
-	if sc := c.SecurityContext; sc == nil || sc.Capabilities != nil || sc.AllowPrivilegeEscalation == nil || *sc.AllowPrivilegeEscalation {
-		t.Errorf("securityContext=%+v", sc)
-	}
-	for _, e := range c.Env {
-		if e.ValueFrom != nil || strings.Contains(e.Name, "SSH") || strings.Contains(e.Name, "JUPYTER") {
-			t.Errorf("unexpected env %s", e.Name)
-		}
-	}
-	for _, v := range pod.Spec.Volumes {
-		if v.HostPath != nil {
-			t.Errorf("hostPath volume %s", v.Name)
-		}
 	}
 	if pod.Labels[naming.LabelComponent] != naming.ComponentTraining {
 		t.Errorf("component label missing: %v", pod.Labels)
@@ -138,6 +122,29 @@ func TestSingleWorker(t *testing.T) {
 	}
 	if tj.Spec.RuntimeRef.Name != rt.Name || *rt.Spec.MLPolicy.NumNodes != 1 {
 		t.Errorf("runtimeRef=%v numNodes=%d", tj.Spec.RuntimeRef, *rt.Spec.MLPolicy.NumNodes)
+	}
+}
+
+// TestNoPodAccess checks workers expose nothing users could use to get into a pod.
+func TestNoPodAccess(t *testing.T) {
+	_, rt := build(t, newJob(1, "g1"))
+	pod, c := container(rt)
+
+	if len(c.Ports) != 0 {
+		t.Errorf("ports=%v: workers must not expose endpoints", c.Ports)
+	}
+	if sc := c.SecurityContext; sc == nil || sc.Capabilities != nil || sc.AllowPrivilegeEscalation == nil || *sc.AllowPrivilegeEscalation {
+		t.Errorf("securityContext=%+v", sc)
+	}
+	for _, e := range c.Env {
+		if e.ValueFrom != nil || strings.Contains(e.Name, "SSH") || strings.Contains(e.Name, "JUPYTER") {
+			t.Errorf("unexpected env %s", e.Name)
+		}
+	}
+	for _, v := range pod.Spec.Volumes {
+		if v.HostPath != nil {
+			t.Errorf("hostPath volume %s", v.Name)
+		}
 	}
 }
 

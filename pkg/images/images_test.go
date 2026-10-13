@@ -18,6 +18,8 @@ import (
 	"github.com/scclabs/forgeai/pkg/platform"
 )
 
+const testImage = "img:1"
+
 func TestList(t *testing.T) {
 	project := naming.UserHash("pod-prod", "u1")
 	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +35,8 @@ func TestList(t *testing.T) {
 		case "/api/v2.0/projects/" + project + "/repositories":
 			_ = json.NewEncoder(w).Encode([]map[string]string{{"name": project + "/team/train"}})
 		case "/api/v2.0/projects/" + project + "/repositories/team%252Ftrain/artifacts":
-			_, _ = w.Write([]byte(`[{"digest":"sha256:abc","push_time":"2026-01-01T00:00:00Z","size":42,"tags":[{"name":"v1"}]}]`))
+			_, _ = w.Write([]byte(`[{"digest":"sha256:abc","push_time":"2026-01-01T00:00:00Z",` +
+				`"size":42,"tags":[{"name":"v1"}]}]`))
 		default:
 			http.NotFound(w, r)
 		}
@@ -68,17 +71,17 @@ imageWarmup: {nodeSelector: {scclabs.dev/gpu: rtx-5090}, ttl: 1h}
 		t.Fatal(err)
 	}
 	w := &Warmer{K8s: fake.NewClientBuilder().Build(), Namespace: "pod-prod"}
-	if err := w.Warmup(ctx, cfg, []string{"img:1", " ", "img:1"}); err != nil {
+	if err := w.Warmup(ctx, cfg, []string{testImage, " ", testImage}); err != nil {
 		t.Fatal(err)
 	}
 	ds := &appsv1.DaemonSet{}
-	key := types.NamespacedName{Namespace: "pod-prod", Name: naming.ImageWarmupName("img:1")}
+	key := types.NamespacedName{Namespace: "pod-prod", Name: naming.ImageWarmupName(testImage)}
 	if err := w.K8s.Get(ctx, key, ds); err != nil {
 		t.Fatal(err)
 	}
 	spec := ds.Spec.Template.Spec
 	c := spec.Containers[0]
-	if c.Image != "img:1" || spec.NodeSelector["scclabs.dev/gpu"] != "rtx-5090" || *spec.AutomountServiceAccountToken ||
+	if c.Image != testImage || spec.NodeSelector["scclabs.dev/gpu"] != "rtx-5090" || *spec.AutomountServiceAccountToken ||
 		*c.SecurityContext.AllowPrivilegeEscalation || len(c.Ports) != 0 {
 		t.Fatalf("spec=%+v", spec)
 	}

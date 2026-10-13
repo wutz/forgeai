@@ -4,7 +4,7 @@ metadata:
   name: forgeai-compat-api
   namespace: forgeai-system
 ---
-# Job namespace: TrainingJobs, PoolRequests, volumes (PVCs), image warmups.
+# Job namespace: TrainingJobs, volumes (PVCs), image warmups.
 # No pods/exec, secrets or services: users can not reach into pods.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -13,7 +13,7 @@ metadata:
   namespace: pod-prod
 rules:
 - apiGroups: [forgeai.scclabs.dev]
-  resources: [trainingjobs, poolrequests]
+  resources: [trainingjobs]
   verbs: [get, list, watch, create, update, patch, delete]
 - apiGroups: [""]
   resources: [persistentvolumeclaims]
@@ -62,7 +62,7 @@ subjects:
   name: forgeai-compat-api
   namespace: forgeai-system
 ---
-# Cluster-wide: node pools and capacity (node allocatable minus pod requests).
+# Cluster-wide: capacity (node allocatable minus pod requests).
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -70,7 +70,7 @@ metadata:
 rules:
 - apiGroups: [""]
   resources: [nodes]
-  verbs: [get, list, patch]
+  verbs: [list]
 - apiGroups: [""]
   resources: [pods]
   verbs: [list]

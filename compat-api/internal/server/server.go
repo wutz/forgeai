@@ -1,5 +1,5 @@
 // Package server implements the scc-k8s-v2 compatible API (jobs, images,
-// volumes, pools and resources) on top of forgeai.
+// volumes and resources) on top of forgeai.
 package server
 
 import (
@@ -24,7 +24,6 @@ import (
 	"github.com/scclabs/forgeai/pkg/capacity"
 	"github.com/scclabs/forgeai/pkg/images"
 	"github.com/scclabs/forgeai/pkg/jobs"
-	"github.com/scclabs/forgeai/pkg/pools"
 	"github.com/scclabs/forgeai/pkg/volumes"
 )
 
@@ -42,6 +41,9 @@ type msgError struct {
 func (e *msgError) Error() string  { return e.Msg }
 func (e *msgError) GetStatus() int { return e.Status }
 
+// securityScheme is the OpenAPI security scheme of the X-API-Key header.
+const securityScheme = "apiKey"
+
 func notFound(jobID string) error {
 	return &msgError{Status: http.StatusNotFound, Msg: fmt.Sprintf("Job '%s' was not found", jobID)}
 }
@@ -50,7 +52,6 @@ func notFound(jobID string) error {
 type Server struct {
 	Jobs     *jobs.Client
 	Volumes  *volumes.Client
-	Pools    *pools.Client
 	Capacity *capacity.Client
 	Warmer   *images.Warmer
 	// Harbor credentials for listing user images.
@@ -109,7 +110,7 @@ func (s *Server) Handler() http.Handler {
 	// No $schema field in responses: keep bodies identical to scc-k8s-v2.
 	cfg.CreateHooks = nil
 	cfg.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
-		"apiKey": {Type: "apiKey", In: "header", Name: "X-API-Key"},
+		securityScheme: {Type: "apiKey", In: "header", Name: "X-API-Key"},
 	}
 	api := humago.New(mux, cfg)
 	s.register(api)
@@ -194,7 +195,7 @@ func (s *Server) internal(err error) error {
 }
 
 func (s *Server) register(api huma.API) {
-	security := []map[string][]string{{"apiKey": {}}}
+	security := []map[string][]string{{securityScheme: {}}}
 	tags := []string{"jobs"}
 
 	huma.Register(api, huma.Operation{
@@ -273,7 +274,7 @@ func (s *Server) createJob(ctx context.Context, in *createInput) (*jobOutput, er
 // created renders a freshly submitted job the way scc-k8s-v2 did: status Pending.
 func (s *Server) created(job *v1.TrainingJob) *jobOutput {
 	out := toJobOut(job, s.now())
-	out.Status = strp("Pending")
+	out.Status = new("Pending")
 	if job.CreationTimestamp.IsZero() {
 		out.CreateTime = s.now().Format("2006-01-02 15:04:05")
 	}

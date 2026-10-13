@@ -2,7 +2,7 @@ package server
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/duration"
@@ -26,7 +26,6 @@ type JobIn struct {
 	_            struct{}        `additionalProperties:"true"`
 	Image        string          `json:"image" minLength:"1" example:"cr.zw1.paratera.com/pod/pytorch:latest"`
 	ResourceID   string          `json:"resourceID" minLength:"1" example:"rtx5090.xeon6530.xlarge"`
-	PoolID       string          `json:"pool_id,omitempty" default:"default"`
 	UserGroup    string          `json:"userGroup,omitempty" default:"bj8"`
 	Workers      int32           `json:"workers,omitempty" default:"1" minimum:"1"`
 	VolumeMounts []VolumeMountIn `json:"volumeMounts,omitempty" nullable:"false"`
@@ -57,7 +56,6 @@ type WorkerPodInfo struct {
 type JobOut struct {
 	Image          string           `json:"image"`
 	ResourceID     string           `json:"resourceID"`
-	PoolID         string           `json:"pool_id"`
 	UserGroup      string           `json:"userGroup"`
 	Workers        int32            `json:"workers"`
 	VolumeMounts   []VolumeMountOut `json:"volumeMounts"`
@@ -103,8 +101,6 @@ func legacyStatus(p v1.TrainingJobPhase) string {
 	}
 }
 
-func strp(s string) *string { return &s }
-
 func optStr(s string) *string {
 	if s == "" {
 		return nil
@@ -114,7 +110,7 @@ func optStr(s string) *string {
 
 func spec(userID, jobID string, in *JobIn) v1.TrainingJobSpec {
 	s := v1.TrainingJobSpec{
-		UserID: userID, JobID: jobID, UserGroup: in.UserGroup, PoolID: in.PoolID,
+		UserID: userID, JobID: jobID, UserGroup: in.UserGroup,
 		Image: in.Image, ResourceID: in.ResourceID, Workers: in.Workers,
 	}
 	if in.Cmd != nil {
@@ -124,7 +120,7 @@ func spec(userID, jobID string, in *JobIn) v1.TrainingJobSpec {
 	for k := range in.Envs {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	for _, k := range keys {
 		s.Env = append(s.Env, v1.EnvVar{Name: k, Value: fmt.Sprint(in.Envs[k])})
 	}
@@ -148,20 +144,20 @@ func spec(userID, jobID string, in *JobIn) v1.TrainingJobSpec {
 func toJobOut(j *v1.TrainingJob, now time.Time) JobOut {
 	st := j.Status
 	out := JobOut{
-		Image: j.Spec.Image, ResourceID: j.Spec.ResourceID, PoolID: j.Spec.PoolID,
+		Image: j.Spec.Image, ResourceID: j.Spec.ResourceID,
 		UserGroup: j.Spec.UserGroup, Workers: j.Spec.Workers, VolumeMounts: []VolumeMountOut{},
 		ID: j.Spec.JobID, UserID: j.Spec.UserID, Message: st.Message,
-		Status:         strp(legacyStatus(st.Phase)),
+		Status:         new(legacyStatus(st.Phase)),
 		CreateTime:     j.CreationTimestamp.Local().Format("2006-01-02 15:04:05"),
-		Active:         strp(fmt.Sprint(st.Active)),
-		Ready:          strp(fmt.Sprint(st.Ready)),
-		Succeeded:      strp(fmt.Sprint(st.Succeeded)),
-		Failed:         strp(fmt.Sprint(st.Failed)),
-		Completions:    strp(fmt.Sprintf("%d/%d", st.Succeeded, max(j.Spec.Workers, 1))),
-		Age:            strp(duration.HumanDuration(now.Sub(j.CreationTimestamp.Time))),
-		StartTime:      strp(""),
-		CompletionTime: strp(""),
-		Duration:       strp(""),
+		Active:         new(fmt.Sprint(st.Active)),
+		Ready:          new(fmt.Sprint(st.Ready)),
+		Succeeded:      new(fmt.Sprint(st.Succeeded)),
+		Failed:         new(fmt.Sprint(st.Failed)),
+		Completions:    new(fmt.Sprintf("%d/%d", st.Succeeded, max(j.Spec.Workers, 1))),
+		Age:            new(duration.HumanDuration(now.Sub(j.CreationTimestamp.Time))),
+		StartTime:      new(""),
+		CompletionTime: new(""),
+		Duration:       new(""),
 	}
 	for _, m := range j.Spec.VolumeMounts {
 		out.VolumeMounts = append(out.VolumeMounts, VolumeMountOut{
@@ -170,15 +166,15 @@ func toJobOut(j *v1.TrainingJob, now time.Time) JobOut {
 		})
 	}
 	if st.StartTime != nil {
-		out.StartTime = strp(st.StartTime.UTC().Format(time.RFC3339))
+		out.StartTime = new(st.StartTime.UTC().Format(time.RFC3339))
 		end := now
 		if st.CompletionTime != nil {
 			end = st.CompletionTime.Time
 		}
-		out.Duration = strp(duration.HumanDuration(end.Sub(st.StartTime.Time)))
+		out.Duration = new(duration.HumanDuration(end.Sub(st.StartTime.Time)))
 	}
 	if st.CompletionTime != nil {
-		out.CompletionTime = strp(st.CompletionTime.UTC().Format(time.RFC3339))
+		out.CompletionTime = new(st.CompletionTime.UTC().Format(time.RFC3339))
 	}
 	for _, w := range st.Workers {
 		if w.PodName == "" {
@@ -186,7 +182,7 @@ func toJobOut(j *v1.TrainingJob, now time.Time) JobOut {
 		}
 		out.WorkersInfo = append(out.WorkersInfo, WorkerPodInfo{
 			PodName: w.PodName, NodeName: optStr(w.NodeName), PodIP: optStr(w.PodIP),
-			NodeIP: optStr(w.NodeIP), Status: optStr(w.Phase), WorkerIndex: strp(fmt.Sprint(w.Index)),
+			NodeIP: optStr(w.NodeIP), Status: optStr(w.Phase), WorkerIndex: new(fmt.Sprint(w.Index)),
 		})
 	}
 	return out

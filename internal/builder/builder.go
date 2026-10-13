@@ -5,7 +5,8 @@ package builder
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -110,13 +111,9 @@ func (b *Builder) resources() (corev1.ResourceRequirements, error) {
 	}
 	rl[corev1.ResourceMemory] = mem
 	extra := map[string]string{"ephemeral-storage": b.Config.EphemeralStorage}
-	for k, v := range b.Config.ExtraResources {
-		extra[k] = v
-	}
+	maps.Copy(extra, b.Config.ExtraResources)
 	if p, ok := b.rdma(); ok {
-		for k, v := range p.Resources {
-			extra[k] = v
-		}
+		maps.Copy(extra, p.Resources)
 	}
 	if g := b.GPUs(); g > 0 {
 		extra["nvidia.com/gpu"] = fmt.Sprint(g)
@@ -138,7 +135,7 @@ func (b *Builder) env() []corev1.EnvVar {
 		for k := range b.Config.MultiNode.Env {
 			keys = append(keys, k)
 		}
-		sort.Strings(keys)
+		slices.Sort(keys)
 		for _, k := range keys {
 			env = append(env, corev1.EnvVar{Name: k, Value: b.Config.MultiNode.Env[k]})
 		}
@@ -151,7 +148,7 @@ func (b *Builder) env() []corev1.EnvVar {
 
 func (b *Builder) volumes() ([]corev1.Volume, []corev1.VolumeMount) {
 	var vols []corev1.Volume
-	var mounts []corev1.VolumeMount
+	mounts := make([]corev1.VolumeMount, 0, len(b.Job.Spec.VolumeMounts)+1)
 	seen := map[string]bool{}
 	for _, m := range b.Job.Spec.VolumeMounts {
 		if !seen[m.VolumeID] {
@@ -196,12 +193,7 @@ func (b *Builder) TrainingRuntime() (*kf.TrainingRuntime, error) {
 	cmd, args := b.command()
 
 	nodeSelector := map[string]string{}
-	for k, v := range b.Resource.Labels {
-		nodeSelector[k] = v
-	}
-	if b.Job.Spec.PoolID != "" {
-		nodeSelector[naming.LabelNodePool] = b.Job.Spec.PoolID
-	}
+	maps.Copy(nodeSelector, b.Resource.Labels)
 
 	labels := b.Labels()
 	podAnno := map[string]string{}
@@ -211,9 +203,7 @@ func (b *Builder) TrainingRuntime() (*kf.TrainingRuntime, error) {
 			nets, _ := json.Marshal(p.Networks)
 			podAnno[kf.AnnotationNetworks] = string(nets)
 		}
-		for k, v := range b.Config.MultiNode.PodSetTopology {
-			podAnno[k] = v
-		}
+		maps.Copy(podAnno, b.Config.MultiNode.PodSetTopology)
 		if key := b.Config.MultiNode.LeafTopologyKey; key != "" {
 			affinity = &corev1.Affinity{PodAffinity: &corev1.PodAffinity{
 				PreferredDuringSchedulingIgnoredDuringExecution: []corev1.WeightedPodAffinityTerm{{
@@ -239,14 +229,14 @@ func (b *Builder) TrainingRuntime() (*kf.TrainingRuntime, error) {
 				Env:     b.env(),
 				// No extra capabilities: the pod network is shared between users.
 				SecurityContext: &corev1.SecurityContext{
-					AllowPrivilegeEscalation: ptr.To(false),
+					AllowPrivilegeEscalation: new(false),
 				},
 				Resources:    res,
 				VolumeMounts: mounts,
 			}},
 			Affinity:                      affinity,
 			NodeSelector:                  nodeSelector,
-			EnableServiceLinks:            ptr.To(false),
+			EnableServiceLinks:            new(false),
 			ServiceAccountName:            b.Config.ServiceAccount,
 			Volumes:                       vols,
 			Tolerations:                   []corev1.Toleration{{Key: "nvidia.com/gpu", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule}},
@@ -265,7 +255,7 @@ func (b *Builder) TrainingRuntime() (*kf.TrainingRuntime, error) {
 		TypeMeta:   metav1.TypeMeta{APIVersion: kf.TrainingRuntimeGVK.GroupVersion().String(), Kind: kf.TrainingRuntimeGVK.Kind},
 		ObjectMeta: b.meta(naming.RuntimeName(b.Job.Name), rtLabels),
 		Spec: kf.TrainingRuntimeSpec{
-			MLPolicy: &kf.MLPolicy{NumNodes: ptr.To(b.workers()), Torch: &struct{}{}},
+			MLPolicy: &kf.MLPolicy{NumNodes: new(b.workers()), Torch: &struct{}{}},
 			Template: kf.JobSetTemplateSpec{Spec: kf.JobSetSpec{
 				ReplicatedJobs: []kf.ReplicatedJob{{
 					Name:     containerName,
@@ -295,7 +285,7 @@ func (b *Builder) TrainJob() *kf.TrainJob {
 	labels[kf.LabelKueueQueue] = queue
 	var trainer *kf.Trainer
 	if g := b.GPUs(); g > 0 {
-		trainer = &kf.Trainer{NumProcPerNode: ptr.To(int32(g))}
+		trainer = &kf.Trainer{NumProcPerNode: new(int32(g))}
 	}
 	m := b.meta(b.Job.Name, labels)
 	m.Annotations = map[string]string{naming.AnnotationRestartGeneration: fmt.Sprint(b.Job.Spec.RestartGeneration)}

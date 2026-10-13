@@ -25,7 +25,6 @@ import (
 	"github.com/scclabs/forgeai/pkg/images"
 	"github.com/scclabs/forgeai/pkg/jobs"
 	"github.com/scclabs/forgeai/pkg/platform"
-	"github.com/scclabs/forgeai/pkg/pools"
 	"github.com/scclabs/forgeai/pkg/volumes"
 )
 
@@ -62,7 +61,6 @@ func main() {
 	s := &server.Server{
 		Jobs:     &jobs.Client{K8s: k8s, Namespace: ns, ConfigNamespace: platform.Namespace()},
 		Volumes:  &volumes.Client{K8s: k8s, Namespace: ns},
-		Pools:    &pools.Client{K8s: k8s, Namespace: ns},
 		Capacity: &capacity.Client{K8s: k8s},
 		Warmer:   &images.Warmer{K8s: k8s, Namespace: ns},
 		// Optional: without them image listing returns [] and usage 404.

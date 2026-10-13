@@ -24,14 +24,20 @@ import (
 	"github.com/scclabs/forgeai/pkg/jobs"
 	"github.com/scclabs/forgeai/pkg/naming"
 	"github.com/scclabs/forgeai/pkg/platform"
-	"github.com/scclabs/forgeai/pkg/pools"
 	"github.com/scclabs/forgeai/pkg/volumes"
 )
 
 const (
-	apiKey = "secret-key"
-	user   = "SELF-Y7bM92P1CRvbTeCDmb2jSdzF7KhEQNSPyEeVELNgHGg"
+	apiKey   = "secret-key"
+	user     = "SELF-Y7bM92P1CRvbTeCDmb2jSdzF7KhEQNSPyEeVELNgHGg"
+	ns       = "pod-prod"
+	volumeID = "data"
 )
+
+// jobBody is a minimal create request.
+func jobBody(image, resourceID string) map[string]any {
+	return map[string]any{"image": image, "resourceID": resourceID}
+}
 
 const testConfig = `
 storageTypes:
@@ -47,17 +53,16 @@ func newServer(t *testing.T, objs ...client.Object) (*Server, client.Client) {
 	_ = clientgoscheme.AddToScheme(s)
 	_ = v1.AddToScheme(s)
 	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{Name: platform.ConfigMapName, Namespace: "forgeai-system"},
-		Data:       map[string]string{platform.ConfigKey: testConfig},
+		Name: platform.ConfigMapName, Namespace: "forgeai-system",
+		Data: map[string]string{platform.ConfigKey: testConfig},
 	}
 	k := fake.NewClientBuilder().WithScheme(s).WithObjects(append(objs, cm)...).
-		WithStatusSubresource(&v1.TrainingJob{}, &v1.PoolRequest{}).Build()
+		WithStatusSubresource(&v1.TrainingJob{}).Build()
 	return &Server{
-		Jobs:     &jobs.Client{K8s: k, Namespace: "pod-prod", ConfigNamespace: "forgeai-system"},
-		Volumes:  &volumes.Client{K8s: k, Namespace: "pod-prod"},
-		Pools:    &pools.Client{K8s: k, Namespace: "pod-prod"},
+		Jobs:     &jobs.Client{K8s: k, Namespace: ns, ConfigNamespace: "forgeai-system"},
+		Volumes:  &volumes.Client{K8s: k, Namespace: ns},
 		Capacity: &capacity.Client{K8s: k},
-		Warmer:   &images.Warmer{K8s: k, Namespace: "pod-prod"},
+		Warmer:   &images.Warmer{K8s: k, Namespace: ns},
 		APIKeys:  []string{apiKey},
 		Now:      func() time.Time { return time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC) },
 		Log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
@@ -104,7 +109,7 @@ func TestAuth(t *testing.T) {
 			t.Errorf("%s: %d", p, code)
 		}
 	}
-	for _, p := range []string{"/apis/pod/v1alpha2/resources", "/apis/pool/v1alpha2/pools", "/apis/pod/v1alpha2/users/u1/volumes"} {
+	for _, p := range []string{"/apis/pod/v1alpha2/resources", "/apis/pod/v1alpha2/users/u1/volumes"} {
 		if code, _ := do(t, h, "GET", p, "wrong", nil); code != 401 {
 			t.Errorf("%s without a valid key: %d", p, code)
 		}
@@ -114,12 +119,13 @@ func TestAuth(t *testing.T) {
 func TestJobLifecycle(t *testing.T) {
 	s, k := newServer(t)
 	h := s.Handler()
-	body := map[string]any{
-		"image": "img:1", "resourceID": "g1", "cmd": "python train.py", "workers": 2,
-		"envs":         map[string]any{"A": "1", "B": 2},
-		"volumeMounts": []any{map[string]any{"volumeID": "data", "userID": nil, "mountPath": "/data", "subPath": nil, "readOnly": false}},
-		"id":           "ignored-extra-field",
-	}
+	body := jobBody("img:1", "g1")
+	body["cmd"], body["workers"] = "python train.py", 2
+	body["envs"] = map[string]any{"A": "1", "B": 2}
+	body["volumeMounts"] = []any{map[string]any{
+		"volumeID": volumeID, "userID": nil, "mountPath": "/data", "subPath": nil, "readOnly": false,
+	}}
+	body["id"] = "ignored-extra-field"
 
 	code, out := do(t, h, "POST", base+"?jobID=ackjob-001", apiKey, body)
 	if code != 200 {
@@ -128,13 +134,13 @@ func TestJobLifecycle(t *testing.T) {
 	if _, ok := out["$schema"]; ok {
 		t.Fatalf("$schema in response: %v", out)
 	}
-	if out["id"] != "ackjob-001" || out["status"] != "Pending" || out["cmd"] != "" || out["pool_id"] != "default" || out["userGroup"] != "bj8" {
+	if out["id"] != "ackjob-001" || out["status"] != "Pending" || out["cmd"] != "" || out["userGroup"] != "bj8" {
 		t.Fatalf("create out: %v", out)
 	}
 
 	job := &v1.TrainingJob{}
-	name := naming.JobName("pod-prod", user, "ackjob-001")
-	if err := k.Get(context.Background(), client.ObjectKey{Namespace: "pod-prod", Name: name}, job); err != nil {
+	name := naming.JobName(ns, user, "ackjob-001")
+	if err := k.Get(context.Background(), client.ObjectKey{Namespace: ns, Name: name}, job); err != nil {
 		t.Fatal(err)
 	}
 	if job.Spec.Command != "python train.py" || len(job.Spec.Env) != 2 || job.Spec.Env[1].Value != "2" || job.Spec.Workers != 2 {
@@ -170,31 +176,37 @@ func TestJobLifecycle(t *testing.T) {
 	if code, out = do(t, h, "GET", base+"/nope", apiKey, nil); code != 200 || len(out) != 0 {
 		t.Fatalf("get missing: %d %v", code, out)
 	}
+	checkJobActions(t, h, k, name, body)
+}
 
-	if code, _ = do(t, h, "POST", base+"/ackjob-001/stop", apiKey, nil); code != 200 {
+// checkJobActions runs stop, start, restart and delete on ackjob-001.
+func checkJobActions(t *testing.T, h http.Handler, k client.Client, name string, body map[string]any) {
+	t.Helper()
+	job := &v1.TrainingJob{}
+	if code, _ := do(t, h, "POST", base+"/ackjob-001/stop", apiKey, nil); code != 200 {
 		t.Fatalf("stop: %d", code)
 	}
-	_ = k.Get(context.Background(), client.ObjectKey{Namespace: "pod-prod", Name: name}, job)
+	_ = k.Get(context.Background(), client.ObjectKey{Namespace: ns, Name: name}, job)
 	if !job.Spec.Suspend {
 		t.Fatal("not suspended")
 	}
-	if code, _ = do(t, h, "POST", base+"?jobID=ackjob-001&method=start", apiKey, body); code != 200 {
+	if code, _ := do(t, h, "POST", base+"?jobID=ackjob-001&method=start", apiKey, body); code != 200 {
 		t.Fatalf("start: %d", code)
 	}
-	_ = k.Get(context.Background(), client.ObjectKey{Namespace: "pod-prod", Name: name}, job)
+	_ = k.Get(context.Background(), client.ObjectKey{Namespace: ns, Name: name}, job)
 	if job.Spec.Suspend {
 		t.Fatal("still suspended")
 	}
-	if code, _ = do(t, h, "POST", base+"/ackjob-001/restart", apiKey, nil); code != 200 {
+	if code, _ := do(t, h, "POST", base+"/ackjob-001/restart", apiKey, nil); code != 200 {
 		t.Fatalf("restart: %d", code)
 	}
-	if code, out = do(t, h, "POST", base+"/nope/stop", apiKey, nil); code != 404 || out["msg"] != "Job 'nope' was not found" {
+	if code, out := do(t, h, "POST", base+"/nope/stop", apiKey, nil); code != 404 || out["msg"] != "Job 'nope' was not found" {
 		t.Fatalf("stop missing: %d %v", code, out)
 	}
-	if code, _ = do(t, h, "DELETE", base+"/ackjob-001", apiKey, nil); code != 200 {
+	if code, _ := do(t, h, "DELETE", base+"/ackjob-001", apiKey, nil); code != 200 {
 		t.Fatalf("delete: %d", code)
 	}
-	if code, out = do(t, h, "GET", base, apiKey, nil); code != 200 || len(out["jobs"].([]any)) != 0 {
+	if code, out := do(t, h, "GET", base, apiKey, nil); code != 200 || len(out["jobs"].([]any)) != 0 {
 		t.Fatalf("list after delete: %v", out)
 	}
 }
@@ -202,14 +214,14 @@ func TestJobLifecycle(t *testing.T) {
 func TestCreateValidation(t *testing.T) {
 	s, _ := newServer(t)
 	h := s.Handler()
-	if code, out := do(t, h, "POST", base, apiKey, map[string]any{"image": "img", "resourceID": "nope"}); code != 400 {
+	if code, out := do(t, h, "POST", base, apiKey, jobBody("img", "nope")); code != 400 {
 		t.Fatalf("unknown resource: %d %v", code, out)
 	}
 	if code, _ := do(t, h, "POST", base, apiKey, map[string]any{"resourceID": "g1"}); code != 422 {
 		t.Fatalf("missing image: %d", code)
 	}
 	// Generated job ID, no prefix.
-	code, out := do(t, h, "POST", "/apis/job/v1alpha2/users/"+user+"/jobs", apiKey, map[string]any{"image": "img", "resourceID": "g1"})
+	code, out := do(t, h, "POST", "/apis/job/v1alpha2/users/"+user+"/jobs", apiKey, jobBody("img", "g1"))
 	if code != 200 || len(out["id"].(string)) != 6 {
 		t.Fatalf("generated id: %d %v", code, out)
 	}

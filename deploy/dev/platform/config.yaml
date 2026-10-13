@@ -26,7 +26,6 @@ volumeUsage:
 imageWarmup:
   nodeSelector: {scclabs.dev/gpu: rtx-5090}
   ttl: 2h
-poolPlaceholderImage: cr.dev1.bz1.paratera.com:7443/prod/pause:3.2
 resources:
 - id: rtx5090.xeon6530.xlarge
   gpu: {count: 1, model: NVIDIA GeForce RTX 5090}

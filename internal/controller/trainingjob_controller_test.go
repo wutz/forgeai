@@ -37,7 +37,6 @@ import (
 const testPlatformConfig = `
 releaseVersion: test
 defaultQueue: forgeai-queue
-poolPlaceholderImage: pause:test
 resources:
   - {id: g1, gpu: {count: 1}, cpu: {cores: 7}, memory: {sizeGB: 100}, labels: {scclabs.dev/gpu: rtx-5090}}
 `

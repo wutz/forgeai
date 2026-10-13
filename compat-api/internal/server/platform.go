@@ -11,16 +11,13 @@ import (
 	"github.com/scclabs/forgeai/pkg/capacity"
 	"github.com/scclabs/forgeai/pkg/images"
 	"github.com/scclabs/forgeai/pkg/naming"
-	"github.com/scclabs/forgeai/pkg/pools"
 	"github.com/scclabs/forgeai/pkg/volumes"
 )
 
 // scc-k8s-v2 route prefixes besides jobsPrefix.
 const (
-	podPrefix         = "/apis/pod/v1alpha2"
-	podUsersPrefix    = podPrefix + "/users"
-	poolPrefix        = "/apis/pool/v1alpha2"
-	poolRequestPrefix = "/apis/node/v1alpha2/users"
+	podPrefix      = "/apis/pod/v1alpha2"
+	podUsersPrefix = podPrefix + "/users"
 )
 
 func msgErr(status int, format string, args ...any) error {
@@ -162,7 +159,8 @@ func (s *Server) deleteVolume(ctx context.Context, in *volumeRef) (*statusOutput
 	err := s.Volumes.Delete(ctx, in.UserID, in.VolumeID)
 	if errors.Is(err, volumes.ErrInUse) {
 		s.Log.Info("volume in use", "error", err)
-		return nil, msgErr(http.StatusConflict, "Volume %s were refered by pods",
+		// Same (misspelt) message as scc-k8s-v2; clients may match on it.
+		return nil, msgErr(http.StatusConflict, "Volume %s were refered by pods", //nolint:misspell
 			naming.VolumeClaimName(s.Volumes.Namespace, in.UserID, in.VolumeID))
 	}
 	if err != nil {
@@ -198,155 +196,14 @@ func (s *Server) volumeUsage(ctx context.Context, in *volumeRef) (*usageOutput, 
 	return &usageOutput{Body: *info}, nil
 }
 
-// --- pools ---
-
-type PoolList struct {
-	Pools map[string]pools.Pool `json:"pools"`
-}
-type poolsOutput struct{ Body PoolList }
-
-type poolInput struct {
-	PoolID string `path:"pool_id"`
-}
-
-type PoolPods struct {
-	PoolID string          `json:"pool_id"`
-	Pods   []pools.PodInfo `json:"pods"`
-}
-type poolPodsOutput struct{ Body PoolPods }
-
-func (s *Server) listPools(ctx context.Context, _ *struct{}) (*poolsOutput, error) {
-	ps, err := s.Pools.List(ctx)
-	if err != nil {
-		return nil, msgErr(http.StatusInternalServerError, "Failed to list pools: %v", err)
-	}
-	return &poolsOutput{Body: PoolList{Pools: ps}}, nil
-}
-
-func (s *Server) poolPods(ctx context.Context, in *poolInput) (*poolPodsOutput, error) {
-	pods, err := s.Pools.Pods(ctx, in.PoolID)
-	if err != nil {
-		return nil, msgErr(http.StatusInternalServerError, "Failed to list pods in pool '%s': %v", in.PoolID, err)
-	}
-	return &poolPodsOutput{Body: PoolPods{PoolID: in.PoolID, Pods: pods}}, nil
-}
-
-// --- pool requests ---
-
-type PoolRequestIn struct {
-	SrcPool    string `json:"src_pool,omitempty" doc:"Source pool, default 'default'"`
-	DstPool    string `json:"dst_pool,omitempty" doc:"Destination pool, default 'default'"`
-	ResourceID string `json:"resourceID"`
-	NNodes     int32  `json:"nnodes,omitempty" default:"1" minimum:"1"`
-}
-
-type createPoolRequestInput struct {
-	UserID    string `path:"userID"`
-	RequestID string `query:"request_id" required:"true"`
-	Body      PoolRequestIn
-}
-
-type poolRequestRef struct {
-	UserID    string `path:"userID"`
-	RequestID string `path:"request_id"`
-}
-
-type poolRequestOutput struct{ Body pools.Request }
-
-// poolRequestGetOutput is a pools.Request, or {} when it does not exist.
-type poolRequestGetOutput struct{ Body any }
-
-type RequestMsg struct {
-	RequestID string `json:"request_id"`
-	Msg       string `json:"msg"`
-}
-
-type requestMsgOutput struct {
-	Status int
-	Body   RequestMsg
-}
-
-type deletePoolInput struct {
-	UserID string `path:"userID"`
-	PoolID string `path:"poolID"`
-}
-
-type MsgBody struct {
-	Msg string `json:"msg"`
-}
-
-type msgOutput struct {
-	Status int
-	Body   MsgBody
-}
-
-func (s *Server) createPoolRequest(ctx context.Context, in *createPoolRequestInput) (*poolRequestOutput, error) {
-	cfg, err := s.Jobs.Config(ctx)
-	if err != nil {
-		return nil, s.internal(err)
-	}
-	r, err := s.Pools.CreateRequest(ctx, cfg, pools.RequestSpec{
-		UserID: in.UserID, RequestID: in.RequestID, SrcPool: in.Body.SrcPool, DstPool: in.Body.DstPool,
-		ResourceID: in.Body.ResourceID, NNodes: in.Body.NNodes,
-	})
-	if errors.Is(err, pools.ErrConflict) {
-		return nil, msgErr(http.StatusConflict, "Pool request '%s' already exists with a different spec", in.RequestID)
-	}
-	if err != nil {
-		return nil, msgErr(http.StatusBadRequest, "%v", err)
-	}
-	return &poolRequestOutput{Body: *r}, nil
-}
-
-func (s *Server) getPoolRequest(ctx context.Context, in *poolRequestRef) (*poolRequestGetOutput, error) {
-	r, err := s.Pools.GetRequest(ctx, in.UserID, in.RequestID)
-	if errors.Is(err, pools.ErrNotFound) {
-		return &poolRequestGetOutput{Body: map[string]any{}}, nil
-	}
-	if err != nil {
-		return nil, s.internal(err)
-	}
-	return &poolRequestGetOutput{Body: r}, nil
-}
-
-func (s *Server) deletePoolRequest(ctx context.Context, in *poolRequestRef) (*requestMsgOutput, error) {
-	out := &requestMsgOutput{Status: http.StatusOK, Body: RequestMsg{RequestID: in.RequestID, Msg: "Pool request was deleted successfully"}}
-	switch err := s.Pools.DeleteRequest(ctx, in.UserID, in.RequestID); {
-	case errors.Is(err, pools.ErrNotFound):
-		out.Status, out.Body.Msg = http.StatusNotFound, "Pool request was not found"
-	case errors.Is(err, pools.ErrCompleted):
-		out.Status, out.Body.Msg = http.StatusForbidden, "Pool request was already completed, Could not be deleted"
-	case err != nil:
-		s.Log.Error("delete pool request", "error", err)
-		out.Status, out.Body.Msg = http.StatusInternalServerError, err.Error()
-	}
-	return out, nil
-}
-
-// deletePool moves every node of the pool back to the default pool.
-func (s *Server) deletePool(ctx context.Context, in *deletePoolInput) (*msgOutput, error) {
-	out := &msgOutput{Status: http.StatusOK, Body: MsgBody{Msg: fmt.Sprintf("Pool '%s' was deleted successfully", in.PoolID)}}
-	if _, err := s.Pools.DeletePool(ctx, in.PoolID); err != nil {
-		s.Log.Error("delete pool", "pool", in.PoolID, "error", err)
-		out.Status = http.StatusInternalServerError
-		if in.PoolID == naming.DefaultPool || in.PoolID == pools.NoPool {
-			out.Status = http.StatusBadRequest
-		}
-		out.Body.Msg = fmt.Sprintf("Pool '%s' was deleted failed, error: %v", in.PoolID, err)
-	}
-	return out, nil
-}
-
 // --- resources ---
 
 type resourcesInput struct {
-	PoolID         string `query:"pool_id"`
-	IncludeDetails bool   `query:"include_details"`
+	IncludeDetails bool `query:"include_details"`
 }
 
 type resourceInput struct {
 	ResourceID     string `path:"resourceID"`
-	PoolID         string `query:"pool_id"`
 	IncludeDetails bool   `query:"include_details"`
 }
 
@@ -355,12 +212,12 @@ type ResourceList struct {
 }
 type resourcesOutput struct{ Body ResourceList }
 
-func (s *Server) resources(ctx context.Context, resourceID, pool string, details bool) (*resourcesOutput, error) {
+func (s *Server) resources(ctx context.Context, resourceID string, details bool) (*resourcesOutput, error) {
 	cfg, err := s.Jobs.Config(ctx)
 	if err != nil {
 		return nil, s.internal(err)
 	}
-	nodes, err := s.Capacity.Nodes(ctx, pool)
+	nodes, err := s.Capacity.Nodes(ctx)
 	if err != nil {
 		return nil, s.internal(err)
 	}
@@ -368,9 +225,11 @@ func (s *Server) resources(ctx context.Context, resourceID, pool string, details
 }
 
 func (s *Server) registerPlatform(api huma.API) {
-	security := []map[string][]string{{"apiKey": {}}}
+	security := []map[string][]string{{securityScheme: {}}}
 	op := func(id, method, path, summary string, tag string) huma.Operation {
-		return huma.Operation{OperationID: id, Method: method, Path: path, Summary: summary, Tags: []string{tag}, Security: security}
+		return huma.Operation{
+			OperationID: id, Method: method, Path: path, Summary: summary, Tags: []string{tag}, Security: security,
+		}
 	}
 
 	huma.Register(api, op("warmup-images", http.MethodPost, podPrefix+"/images/warmup",
@@ -386,28 +245,14 @@ func (s *Server) registerPlatform(api huma.API) {
 	huma.Register(api, op("resize-volume", http.MethodPost, vol+"/{volumeID}/resize", "Resize a volume", "volumes"), s.resizeVolume)
 	huma.Register(api, op("get-volume-usage", http.MethodGet, vol+"/{volumeID}/usage", "Get volume usage", "volumes"), s.volumeUsage)
 
-	huma.Register(api, op("list-pools", http.MethodGet, poolPrefix+"/pools", "List all available pools", "pools"), s.listPools)
-	huma.Register(api, op("list-pool-pods", http.MethodGet, poolPrefix+"/{pool_id}/pods",
-		"List all pods and jobs in a pool", "pools"), s.poolPods)
-
-	req := poolRequestPrefix + "/{userID}/pools/requests"
-	huma.Register(api, op("create-pool-request", http.MethodPost, req,
-		"Request to move nodes into a pool", "pool requests"), s.createPoolRequest)
-	huma.Register(api, op("get-pool-request", http.MethodGet, req+"/{request_id}",
-		"Get the status of a pool request", "pool requests"), s.getPoolRequest)
-	huma.Register(api, op("delete-pool-request", http.MethodDelete, req+"/{request_id}",
-		"Delete a pending pool request", "pool requests"), s.deletePoolRequest)
-	huma.Register(api, op("delete-pool", http.MethodDelete, poolRequestPrefix+"/{userID}/pools/{poolID}",
-		"Delete a pool (move its nodes back to default)", "pool requests"), s.deletePool)
-
 	huma.Register(api, op("list-resources", http.MethodGet, podPrefix+"/resources",
 		"List availability of all resource models", "resources"),
 		func(ctx context.Context, in *resourcesInput) (*resourcesOutput, error) {
-			return s.resources(ctx, "", in.PoolID, in.IncludeDetails)
+			return s.resources(ctx, "", in.IncludeDetails)
 		})
 	huma.Register(api, op("get-resource", http.MethodGet, podPrefix+"/resources/{resourceID}",
 		"Get availability of one resource model", "resources"),
 		func(ctx context.Context, in *resourceInput) (*resourcesOutput, error) {
-			return s.resources(ctx, in.ResourceID, in.PoolID, in.IncludeDetails)
+			return s.resources(ctx, in.ResourceID, in.IncludeDetails)
 		})
 }

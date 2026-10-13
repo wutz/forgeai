@@ -45,7 +45,6 @@ export namespace main {
 	    image: string;
 	    command: string;
 	    resourceID: string;
-	    poolID: string;
 	    workers: number;
 	    env: Record<string, string>;
 	    phase: string;
@@ -76,7 +75,6 @@ export namespace main {
 	        this.image = source["image"];
 	        this.command = source["command"];
 	        this.resourceID = source["resourceID"];
-	        this.poolID = source["poolID"];
 	        this.workers = source["workers"];
 	        this.env = source["env"];
 	        this.phase = source["phase"];
@@ -120,7 +118,6 @@ export namespace main {
 	    image: string;
 	    command: string;
 	    resourceID: string;
-	    poolID: string;
 	    workers: number;
 	    env: Record<string, string>;
 	
@@ -135,7 +132,6 @@ export namespace main {
 	        this.image = source["image"];
 	        this.command = source["command"];
 	        this.resourceID = source["resourceID"];
-	        this.poolID = source["poolID"];
 	        this.workers = source["workers"];
 	        this.env = source["env"];
 	    }

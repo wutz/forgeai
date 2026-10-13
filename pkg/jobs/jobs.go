@@ -142,9 +142,6 @@ func (c *Client) Apply(ctx context.Context, spec v1.TrainingJobSpec) (*v1.Traini
 
 // normalize clears API server defaults so specs submitted by clients compare equal.
 func normalize(s v1.TrainingJobSpec) v1.TrainingJobSpec {
-	if s.PoolID == "" {
-		s.PoolID = "default"
-	}
 	if s.Workers < 1 {
 		s.Workers = 1
 	}

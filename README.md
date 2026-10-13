@@ -4,10 +4,10 @@ forgeai is a Kubernetes-native AI platform covering development, training, RL an
 
 | Component | Path | Description |
 |---|---|---|
-| Operator | `api/`, `internal/`, `cmd/` | `TrainingJob` CRD (short name `ftj`) on Kubeflow Trainer v2 (`TrainJob` + per-job `TrainingRuntime`) with Kueue admission; `PoolRequest` CRD (`fpr`) for node pool transfers; image warmup cleanup |
-| Compat API | `compat-api/` | [huma](https://github.com/danielgtaylor/huma) service compatible with scc-k8s-v2 (jobs, images, volumes, pools, resources) for third-party integration |
+| Operator | `api/`, `internal/`, `cmd/` | `TrainingJob` CRD (short name `ftj`) on Kubeflow Trainer v2 (`TrainJob` + per-job `TrainingRuntime`) with Kueue admission; image warmup cleanup |
+| Compat API | `compat-api/` | [huma](https://github.com/danielgtaylor/huma) service compatible with scc-k8s-v2 (jobs, images, volumes, resources) for third-party integration |
 | GUI | `gui/` | [Wails](https://wails.io) desktop client that talks to Kubernetes directly through a kubeconfig context |
-| Shared library | `pkg/` | Naming (scc-k8s-v2 compatible hashes), platform config, jobs, volumes, pools, capacity, images |
+| Shared library | `pkg/` | Naming (scc-k8s-v2 compatible hashes), platform config, jobs, volumes, capacity, images |
 
 ## TrainingJob
 
@@ -20,7 +20,6 @@ metadata:
 spec:
   userID: NMPHONE-xxxx
   jobID: demo
-  poolID: ackpool-00000f0v
   image: pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime
   command: torchrun train.py
   resourceID: rtx5090.xeon6530.xlarge   # from the platform config
@@ -66,21 +65,14 @@ DELETE /apis/pod/v1alpha2/users/{userID}/volumes/{volumeID}   409 while a job or
 POST   /apis/pod/v1alpha2/users/{userID}/volumes/{volumeID}/resize
 GET    /apis/pod/v1alpha2/users/{userID}/volumes/{volumeID}/usage
 
-GET    /apis/pool/v1alpha2/pools
-GET    /apis/pool/v1alpha2/{pool_id}/pods
-POST   /apis/node/v1alpha2/users/{userID}/pools/requests?request_id=   {"src_pool", "dst_pool", "resourceID", "nnodes"}
-GET    /apis/node/v1alpha2/users/{userID}/pools/requests/{request_id}
-DELETE /apis/node/v1alpha2/users/{userID}/pools/requests/{request_id}
-DELETE /apis/node/v1alpha2/users/{userID}/pools/{poolID}       nodes go back to "default"
-
-GET    /apis/pod/v1alpha2/resources[?pool_id=&include_details=]
+GET    /apis/pod/v1alpha2/resources[?include_details=]
 GET    /apis/pod/v1alpha2/resources/{resourceID}
 ```
 
 Differences from scc-k8s-v2:
 
 - No SSH, Jupyter, port-forward or development container (pod) endpoints.
-- A pool request is a `PoolRequest`. The operator holds `nnodes` matching nodes of `src_pool` with a placeholder Job, relabels them to `dst_pool`, then releases the Job. This replaces the readiness callback.
+- No node pools: no pool or pool request endpoints, and jobs have no `pool_id`. Jobs are placed by resource model labels and Kueue quota; availability covers all nodes.
 - Image warmup creates one DaemonSet per image. The operator deletes it once every selected node has the image or `imageWarmup.ttl` expires.
 - Resource availability is computed live from node allocatable minus pod requests, with no Redis cache. `usageFrom` replaces the hard-coded 4c16g duplication.
 
@@ -94,7 +86,7 @@ Differences from scc-k8s-v2:
 ```sh
 make test                      # operator + envtest
 (cd compat-api && go test ./...)
-make gui                       # gui/build/bin/forgeai.app (needs wails CLI built with a recent golang.org/x/tools)
+make gui                       # gui/build/bin/forgeai.app (needs a wails CLI built with golang.org/x/tools >= v0.52 first on PATH)
 ```
 
 ## Deploy (dev cluster)

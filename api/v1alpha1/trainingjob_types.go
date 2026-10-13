@@ -71,11 +71,6 @@ type TrainingJobSpec struct {
 	// +optional
 	UserGroup string `json:"userGroup,omitempty"`
 
-	// poolID selects the node pool (scclabs.dev/pool label).
-	// +optional
-	// +kubebuilder:default=default
-	PoolID string `json:"poolID,omitempty"`
-
 	// image is the container image for every worker.
 	// +required
 	// +kubebuilder:validation:MinLength=1

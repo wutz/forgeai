@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -86,7 +86,6 @@ type Job struct {
 	Image       string            `json:"image"`
 	Command     string            `json:"command"`
 	ResourceID  string            `json:"resourceID"`
-	PoolID      string            `json:"poolID"`
 	Workers     int32             `json:"workers"`
 	Env         map[string]string `json:"env"`
 	Phase       string            `json:"phase"`
@@ -113,7 +112,6 @@ type JobForm struct {
 	Image      string            `json:"image"`
 	Command    string            `json:"command"`
 	ResourceID string            `json:"resourceID"`
-	PoolID     string            `json:"poolID"`
 	Workers    int32             `json:"workers"`
 	Env        map[string]string `json:"env"`
 }
@@ -132,9 +130,11 @@ func (a *App) Contexts() ([]KubeContext, error) {
 	}
 	out := make([]KubeContext, 0, len(raw.Contexts))
 	for name, c := range raw.Contexts {
-		out = append(out, KubeContext{Name: name, Cluster: c.Cluster, Namespace: c.Namespace, Current: name == raw.CurrentContext})
+		out = append(out, KubeContext{
+			Name: name, Cluster: c.Cluster, Namespace: c.Namespace, Current: name == raw.CurrentContext,
+		})
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	slices.SortFunc(out, func(a, b KubeContext) int { return strings.Compare(a.Name, b.Name) })
 	return out, nil
 }
 
@@ -232,8 +232,9 @@ func (a *App) ListJobs() ([]Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	sort.Slice(items, func(i, j int) bool {
-		return items[j].CreationTimestamp.Before(&items[i].CreationTimestamp)
+	// Newest first.
+	slices.SortFunc(items, func(a, b v1.TrainingJob) int {
+		return b.CreationTimestamp.Compare(a.CreationTimestamp.Time)
 	})
 	out := make([]Job, 0, len(items))
 	for i := range items {
@@ -271,16 +272,12 @@ func (a *App) CreateJob(f JobForm) (Job, error) {
 		_, _ = rand.Read(b)
 		f.JobID = hex.EncodeToString(b)
 	}
-	if f.PoolID == "" {
-		f.PoolID = "default"
-	}
 	if f.Workers < 1 {
 		f.Workers = 1
 	}
 	spec := v1.TrainingJobSpec{
 		UserID:     f.UserID,
 		JobID:      f.JobID,
-		PoolID:     f.PoolID,
 		Image:      f.Image,
 		Command:    f.Command,
 		ResourceID: f.ResourceID,
@@ -290,7 +287,7 @@ func (a *App) CreateJob(f JobForm) (Job, error) {
 	for k := range f.Env {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	for _, k := range keys {
 		if strings.TrimSpace(k) != "" {
 			spec.Env = append(spec.Env, v1.EnvVar{Name: k, Value: f.Env[k]})
@@ -316,7 +313,9 @@ func (a *App) CreateJob(f JobForm) (Job, error) {
 	return toJob(j), nil
 }
 
-func (a *App) mutate(name string, fn func(*jobs.Client, context.Context, string) (*v1.TrainingJob, error)) (Job, error) {
+func (a *App) mutate(
+	name string, fn func(*jobs.Client, context.Context, string) (*v1.TrainingJob, error),
+) (Job, error) {
 	c, err := a.current()
 	if err != nil {
 		return Job{}, err
@@ -379,7 +378,7 @@ func (a *App) Logs(name string, worker int32, tailLines int64) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 	b, err := io.ReadAll(io.LimitReader(rc, 4<<20))
 	return string(b), err
 }
@@ -393,7 +392,6 @@ func toJob(j *v1.TrainingJob) Job {
 		Image:       s.Image,
 		Command:     s.Command,
 		ResourceID:  s.ResourceID,
-		PoolID:      s.PoolID,
 		Workers:     s.Workers,
 		Env:         map[string]string{},
 		Phase:       string(j.Status.Phase),

@@ -10,7 +10,6 @@ import (
 	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/scclabs/forgeai/pkg/naming"
 	"github.com/scclabs/forgeai/pkg/platform"
 )
 
@@ -78,7 +77,7 @@ func TestModels(t *testing.T) {
 		t.Fatal(err)
 	}
 	ms := Models(cfg, []Node{gpuNode()}, "", true)
-	ids := []string{}
+	ids := make([]string, 0, len(ms))
 	for _, m := range ms {
 		ids = append(ids, m.ID)
 	}
@@ -133,7 +132,7 @@ func TestNodes(t *testing.T) {
 	}
 	k := fake.NewClientBuilder().WithObjects(
 		&corev1.Node{
-			ObjectMeta: metav1.ObjectMeta{Name: "n1", Labels: map[string]string{naming.LabelNodePool: "p1"}},
+			ObjectMeta: metav1.ObjectMeta{Name: "n1"},
 			Spec:       corev1.NodeSpec{Taints: []corev1.Taint{{Key: "nvidia.com/gpu", Effect: corev1.TaintEffectNoSchedule}}},
 			Status:     corev1.NodeStatus{Allocatable: alloc},
 		},
@@ -144,18 +143,16 @@ func TestNodes(t *testing.T) {
 	).Build()
 	c := &Client{K8s: k}
 
-	nodes, err := c.Nodes(context.Background(), "p1")
+	nodes, err := c.Nodes(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(nodes) != 1 || nodes[0].Name != "n1" {
+	if len(nodes) != 2 || nodes[0].Name != "n1" {
 		t.Fatalf("nodes=%+v", nodes)
 	}
 	n := nodes[0]
-	if n.Requested.GPU != 1 || n.Requested.MilliCPU != 8000 || n.Allocatable.GPU != 8 || n.Taints[0] != "nvidia.com/gpu:NoSchedule" {
+	if n.Requested.GPU != 1 || n.Requested.MilliCPU != 8000 || n.Allocatable.GPU != 8 ||
+		n.Taints[0] != "nvidia.com/gpu:NoSchedule" {
 		t.Fatalf("node=%+v", n)
-	}
-	if all, _ := c.Nodes(context.Background(), ""); len(all) != 2 {
-		t.Fatalf("all=%d", len(all))
 	}
 }

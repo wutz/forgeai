@@ -259,7 +259,7 @@ func (r *TrainingJobReconciler) apply(ctx context.Context, job *v1.TrainingJob, 
 	if err := controllerutil.SetControllerReference(job, u, r.Scheme); err != nil {
 		return err
 	}
-	return r.Client.Apply(ctx, client.ApplyConfigurationFromUnstructured(u), fieldOwner, client.ForceOwnership)
+	return r.Apply(ctx, client.ApplyConfigurationFromUnstructured(u), fieldOwner, client.ForceOwnership)
 }
 
 func (r *TrainingJobReconciler) create(ctx context.Context, job *v1.TrainingJob, obj any, gvk schema.GroupVersionKind) error {

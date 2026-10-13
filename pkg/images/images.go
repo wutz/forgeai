@@ -49,7 +49,8 @@ type Registry struct {
 func NewRegistry(cfg platform.Registry, username, password string) *Registry {
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 	if cfg.Insecure {
-		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // Harbor with a private CA, as in scc-k8s-v2.
+		// Harbor with a private CA, as in scc-k8s-v2.
+		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec
 	}
 	return &Registry{
 		Domain: cfg.Domain, Username: username, Password: password,
@@ -72,7 +73,7 @@ func (r *Registry) get(ctx context.Context, path string, query url.Values, out a
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("harbor %s: HTTP %d", path, resp.StatusCode)
 	}
@@ -170,16 +171,20 @@ func DaemonSet(namespace, image string, cfg *platform.Config, expires time.Time)
 			},
 		},
 		Spec: appsv1.DaemonSetSpec{
-			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{naming.LabelImageWarmup: naming.ImageWarmupID(image)}},
+			Selector: &metav1.LabelSelector{
+				MatchLabels: map[string]string{naming.LabelImageWarmup: naming.ImageWarmupID(image)},
+			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: labels},
 				Spec: corev1.PodSpec{
 					NodeSelector:                  cfg.ImageWarmup.NodeSelector,
 					ServiceAccountName:            cfg.ServiceAccount,
-					AutomountServiceAccountToken:  ptr.To(false),
-					EnableServiceLinks:            ptr.To(false),
+					AutomountServiceAccountToken:  new(false),
+					EnableServiceLinks:            new(false),
 					TerminationGracePeriodSeconds: ptr.To[int64](0),
-					Tolerations:                   []corev1.Toleration{{Key: "nvidia.com/gpu", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule}},
+					Tolerations: []corev1.Toleration{{
+						Key: "nvidia.com/gpu", Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule,
+					}},
 					Containers: []corev1.Container{{
 						Name:    "pull",
 						Image:   image,
@@ -188,7 +193,7 @@ func DaemonSet(namespace, image string, cfg *platform.Config, expires time.Time)
 						ImagePullPolicy: corev1.PullIfNotPresent,
 						Resources:       corev1.ResourceRequirements{Requests: res, Limits: res},
 						SecurityContext: &corev1.SecurityContext{
-							AllowPrivilegeEscalation: ptr.To(false),
+							AllowPrivilegeEscalation: new(false),
 							Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 						},
 					}},

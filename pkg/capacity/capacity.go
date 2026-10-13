@@ -6,12 +6,12 @@ package capacity
 import (
 	"context"
 	"math"
-	"sort"
+	"slices"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/scclabs/forgeai/pkg/naming"
 	"github.com/scclabs/forgeai/pkg/platform"
 )
 
@@ -124,14 +124,10 @@ type Client struct {
 	K8s client.Reader
 }
 
-// Nodes returns the scheduling view of nodes, optionally limited to one pool.
-func (c *Client) Nodes(ctx context.Context, pool string) ([]Node, error) {
-	var opts []client.ListOption
-	if pool != "" {
-		opts = append(opts, client.MatchingLabels{naming.LabelNodePool: pool})
-	}
+// Nodes returns the scheduling view of all nodes.
+func (c *Client) Nodes(ctx context.Context) ([]Node, error) {
 	nodes := &corev1.NodeList{}
-	if err := c.K8s.List(ctx, nodes, opts...); err != nil {
+	if err := c.K8s.List(ctx, nodes); err != nil {
 		return nil, err
 	}
 	pods := &corev1.PodList{}
@@ -173,7 +169,7 @@ func (c *Client) Nodes(ctx context.Context, pool string) ([]Node, error) {
 		}
 		out = append(out, node)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	slices.SortFunc(out, func(a, b Node) int { return strings.Compare(a.Name, b.Name) })
 	return out, nil
 }
 

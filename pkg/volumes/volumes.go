@@ -65,7 +65,9 @@ func Validate(volumeID string, sizeGB int64) error {
 
 // Create creates the PVC; an existing volume is left unchanged (kubectl apply
 // in scc-k8s-v2 was idempotent too).
-func (c *Client) Create(ctx context.Context, cfg *platform.Config, userID, volumeID, volType string, sizeGB int64) (*Volume, error) {
+func (c *Client) Create(
+	ctx context.Context, cfg *platform.Config, userID, volumeID, volType string, sizeGB int64,
+) (*Volume, error) {
 	if err := Validate(volumeID, sizeGB); err != nil {
 		return nil, err
 	}
@@ -229,7 +231,7 @@ func (c *Client) Delete(ctx context.Context, userID, volumeID string) error {
 		return err
 	}
 	if len(users) > 0 {
-		return fmt.Errorf("%w: %s were refered by %v", ErrInUse, pvc.Name, users)
+		return fmt.Errorf("%w: %s were referred by %v", ErrInUse, pvc.Name, users)
 	}
 	if err := c.K8s.Delete(ctx, pvc); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -287,7 +289,7 @@ func (u *UsageClient) query(ctx context.Context, claim, namespace, lookback stri
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("volume usage query: HTTP %d", resp.StatusCode)
 	}

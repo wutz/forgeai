@@ -1,7 +1,7 @@
 # Dev cluster (bz1-dev1) deployment.
 #   make deploy-dev        # ko builds images and applies this overlay
-# Secrets are created out of band: the registry pull secret forgeai-registry and
-# the compat-api API keys:
+# Images are public on ghcr.io/scclabs/forgeai. The compat-api API key secret
+# is created out of band:
 #   kubectl -n forgeai-system create secret generic forgeai-compat-api-keys --from-literal=APIKEY=<key>
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization

@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"strings"
 
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
@@ -26,7 +25,7 @@ var ErrNotFound = errors.New("job not found")
 // Client operates on TrainingJobs in one namespace.
 type Client struct {
 	K8s client.Client
-	// Namespace holds the jobs (and sshpiper Pipes).
+	// Namespace holds the jobs.
 	Namespace string
 	// ConfigNamespace holds the platform ConfigMap.
 	ConfigNamespace string
@@ -149,13 +148,6 @@ func normalize(s v1.TrainingJobSpec) v1.TrainingJobSpec {
 	if s.Workers < 1 {
 		s.Workers = 1
 	}
-	t := true
-	if s.Access.SSH == nil {
-		s.Access.SSH = &t
-	}
-	if s.Access.Jupyter == nil {
-		s.Access.Jupyter = &t
-	}
 	if len(s.Env) == 0 {
 		s.Env = nil
 	}
@@ -182,7 +174,7 @@ func (c *Client) mutate(ctx context.Context, name string, fn func(*v1.TrainingJo
 	return out, err
 }
 
-// Stop releases the job's pods but keeps its spec, secret and volumes.
+// Stop releases the job's pods but keeps its spec and volumes.
 func (c *Client) Stop(ctx context.Context, name string) (*v1.TrainingJob, error) {
 	return c.mutate(ctx, name, func(j *v1.TrainingJob) { j.Spec.Suspend = true })
 }
@@ -218,91 +210,4 @@ func (c *Client) Delete(ctx context.Context, name string) (*v1.TrainingJob, erro
 		return nil, err
 	}
 	return job, nil
-}
-
-// SSHConnection is a ready-to-use SSH endpoint of a running worker.
-type SSHConnection struct {
-	ID          string `json:"id"`
-	URL         string `json:"url"`
-	RefactorURL string `json:"refactorURL"`
-	Password    string `json:"password"`
-}
-
-// ErrSSHUnavailable means sshpiper is not ready.
-var ErrSSHUnavailable = errors.New("sshpiper service is not ready")
-
-// SSH returns SSH endpoints for running workers, using the same host selection
-// as scc-k8s-v2: the sshpiper LoadBalancer IP mapped to root / extra domains.
-func (c *Client) SSH(ctx context.Context, job *v1.TrainingJob, cfg *platform.Config) ([]SSHConnection, error) {
-	conns := []SSHConnection{}
-	var running []v1.WorkerStatus
-	for _, w := range job.Status.Workers {
-		if w.Phase == string(corev1.PodRunning) && w.SSHUser != "" {
-			running = append(running, w)
-		}
-	}
-	if len(running) == 0 {
-		return conns, nil
-	}
-
-	ns, name, ok := strings.Cut(cfg.SSH.PiperService, "/")
-	if !ok {
-		ns, name = c.Namespace, cfg.SSH.PiperService
-	}
-	svc := &corev1.Service{}
-	if err := c.K8s.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, svc); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrSSHUnavailable, err)
-	}
-	if len(svc.Status.LoadBalancer.Ingress) == 0 || len(svc.Spec.Ports) == 0 {
-		return nil, ErrSSHUnavailable
-	}
-	ip := svc.Status.LoadBalancer.Ingress[0].IP
-	rootHost, extraHost := ip, ip
-	if domains := cfg.SSH.Domains[ip]; len(domains) > 0 {
-		root := firstContaining(domains, cfg.RootDomain)
-		extra := ""
-		if len(cfg.ExtraDomains) > 0 {
-			extra = firstContaining(domains, cfg.ExtraDomains[0])
-		}
-		if root != "" {
-			rootHost = root
-		}
-		if extra != "" {
-			extraHost = extra
-		}
-		if root == "" && extra == "" {
-			rootHost, extraHost = domains[0], domains[0]
-		}
-	}
-	if port := svc.Spec.Ports[0].Port; port != 22 {
-		rootHost = fmt.Sprintf("%s:%d", rootHost, port)
-		extraHost = fmt.Sprintf("%s:%d", extraHost, port)
-	}
-
-	secret := &corev1.Secret{}
-	if err := c.K8s.Get(ctx, types.NamespacedName{Namespace: job.Namespace, Name: naming.SecretName(job.Name)}, secret); err != nil {
-		return nil, fmt.Errorf("get ssh secret: %w", err)
-	}
-	password := string(secret.Data["SSH_PASSWORD"])
-	for _, w := range running {
-		conns = append(conns, SSHConnection{
-			ID:          fmt.Sprintf("worker-%d", w.Index),
-			URL:         fmt.Sprintf("ssh://%s@%s", w.SSHUser, rootHost),
-			RefactorURL: fmt.Sprintf("ssh://%s@%s", w.SSHUser, extraHost),
-			Password:    password,
-		})
-	}
-	return conns, nil
-}
-
-func firstContaining(items []string, sub string) string {
-	if sub == "" {
-		return ""
-	}
-	for _, it := range items {
-		if strings.Contains(it, sub) {
-			return it
-		}
-	}
-	return ""
 }

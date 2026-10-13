@@ -23,7 +23,7 @@ export function CreateDialog({resources, userID, onClose, onCreated}: Props) {
   const [form, setForm] = useState({
     jobID: '', userID, image: 'pytorch/pytorch:2.10.0-cuda12.8-cudnn9-runtime',
     command: 'nvidia-smi && sleep infinity', resourceID: resources[0]?.id || '',
-    poolID: 'default', workers: 1, env: '', ssh: true, jupyter: true,
+    poolID: 'default', workers: 1, env: '',
   })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -99,10 +99,6 @@ export function CreateDialog({resources, userID, onClose, onCreated}: Props) {
           <div className="field">
             <label htmlFor="f-env">Environment</label>
             <textarea id="f-env" className="textarea" rows={3} placeholder="KEY=value, one per line" value={form.env} onChange={e => set('env', e.target.value)}/>
-          </div>
-          <div className="row" style={{flex: 'none'}}>
-            <label className="check"><input type="checkbox" checked={form.ssh} onChange={e => set('ssh', e.target.checked)}/>SSH access</label>
-            <label className="check"><input type="checkbox" checked={form.jupyter} onChange={e => set('jupyter', e.target.checked)}/>Jupyter access</label>
           </div>
         </form>
         <div className="dialog-foot">

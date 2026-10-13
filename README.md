@@ -4,10 +4,10 @@ forgeai is a Kubernetes-native AI platform covering development, training, RL an
 
 | Component | Path | Description |
 |---|---|---|
-| Operator | `api/`, `internal/`, `cmd/` | `TrainingJob` CRD (`forgeai.scclabs.dev/v1alpha1`, short name `ftj`). Built on Kubeflow Trainer v2 (`TrainJob` + per-job `TrainingRuntime`), Kueue admission, and per-worker SSH (sshpiper), Jupyter (Ingress) and secrets |
-| Compat API | `compat-api/` | [huma](https://github.com/danielgtaylor/huma) service compatible with scc-k8s-v2 `/apis/job/v1alpha2` for third-party integration |
+| Operator | `api/`, `internal/`, `cmd/` | `TrainingJob` CRD (short name `ftj`) on Kubeflow Trainer v2 (`TrainJob` + per-job `TrainingRuntime`) with Kueue admission; `PoolRequest` CRD (`fpr`) for node pool transfers; image warmup cleanup |
+| Compat API | `compat-api/` | [huma](https://github.com/danielgtaylor/huma) service compatible with scc-k8s-v2 (jobs, images, volumes, pools, resources) for third-party integration |
 | GUI | `gui/` | [Wails](https://wails.io) desktop client that talks to Kubernetes directly through a kubeconfig context |
-| Shared library | `pkg/` | Naming (scc-k8s-v2 compatible hashes), platform config, job operations |
+| Shared library | `pkg/` | Naming (scc-k8s-v2 compatible hashes), platform config, jobs, volumes, pools, capacity, images |
 
 ## TrainingJob
 
@@ -30,8 +30,8 @@ spec:
 The operator renders:
 
 - a `TrainingRuntime` and a `TrainJob`, queued through Kueue with LocalQueue `forgeai-queue`
-- a per-job secret holding `JUPYTER_TOKEN` and `SSH_PASSWORD`
-- for each worker: a Service, an Ingress, an SSH Service and an sshpiper `Pipe` (`root@{jobID}-{i}`)
+
+Workers expose no endpoints: there is no SSH, Jupyter or exec access, because the pod network is not isolated between users. Use logs and mounted volumes instead.
 
 Lifecycle:
 
@@ -41,9 +41,9 @@ Lifecycle:
 | Start | `spec.suspend: false` |
 | Restart | bump `spec.restartGeneration` |
 
-`status` reports phase, workers, pod and node placement, SSH users and Jupyter URLs.
+`status` reports phase, workers, and pod and node placement.
 
-Platform settings live in the ConfigMap `forgeai-system/forgeai-platform` (`config.yaml`): resource models, domains, sshpiper, queue and multi-node RDMA. See `deploy/dev/platform/config.yaml`.
+Platform settings live in the ConfigMap `forgeai-system/forgeai-platform` (`config.yaml`): resource models, storage types, registry, volume usage endpoint, image warmup, queue and multi-node RDMA. See `deploy/dev/platform/config.yaml`.
 
 ## Compat API
 
@@ -55,10 +55,37 @@ GET    /apis/job/v1alpha2/users/{userID}/jobs[?jobID=]
 GET    /apis/job/v1alpha2/users/{userID}/jobs/{jobID}
 POST   /apis/job/v1alpha2/users/{userID}/jobs/{jobID}/stop | /restart
 DELETE /apis/job/v1alpha2/users/{userID}/jobs/{jobID}
-GET    /apis/job/v1alpha2/users/{userID}/jobs/{jobID}/ssh
+
+POST   /apis/pod/v1alpha2/images/warmup                       [{"id": "<image>"}]
+GET    /apis/pod/v1alpha2/users/{userID}/images               Harbor project p-{userHash}
+
+POST   /apis/pod/v1alpha2/users/{userID}/volumes?volumeID=    {"sizeGB", "type"}
+GET    /apis/pod/v1alpha2/users/{userID}/volumes[?volumeID=]
+GET    /apis/pod/v1alpha2/users/{userID}/volumes/{volumeID}
+DELETE /apis/pod/v1alpha2/users/{userID}/volumes/{volumeID}   409 while a job or pod uses it
+POST   /apis/pod/v1alpha2/users/{userID}/volumes/{volumeID}/resize
+GET    /apis/pod/v1alpha2/users/{userID}/volumes/{volumeID}/usage
+
+GET    /apis/pool/v1alpha2/pools
+GET    /apis/pool/v1alpha2/{pool_id}/pods
+POST   /apis/node/v1alpha2/users/{userID}/pools/requests?request_id=   {"src_pool", "dst_pool", "resourceID", "nnodes"}
+GET    /apis/node/v1alpha2/users/{userID}/pools/requests/{request_id}
+DELETE /apis/node/v1alpha2/users/{userID}/pools/requests/{request_id}
+DELETE /apis/node/v1alpha2/users/{userID}/pools/{poolID}       nodes go back to "default"
+
+GET    /apis/pod/v1alpha2/resources[?pool_id=&include_details=]
+GET    /apis/pod/v1alpha2/resources/{resourceID}
 ```
 
-- Auth: `x-api-key` header. Accepted keys are taken from every `APIKEY*` env var.
+Differences from scc-k8s-v2:
+
+- No SSH, Jupyter, port-forward or development container (pod) endpoints.
+- A pool request is a `PoolRequest`. The operator holds `nnodes` matching nodes of `src_pool` with a placeholder Job, relabels them to `dst_pool`, then releases the Job. This replaces the readiness callback.
+- Image warmup creates one DaemonSet per image. The operator deletes it once every selected node has the image or `imageWarmup.ttl` expires.
+- Resource availability is computed live from node allocatable minus pod requests, with no Redis cache. `usageFrom` replaces the hard-coded 4c16g duplication.
+
+- Auth: `x-api-key` header on every `/apis/` route except the docs. Accepted keys are taken from every `APIKEY*` env var.
+- Optional env: `REGISTRY_USER`, `REGISTRY_PASSWORD` (image list) and `VOLUME_USAGE_TOKEN` (volume usage), from the secret `forgeai-compat-api-credentials`.
 - Also served under the `/ngc` prefix.
 - OpenAPI: `/apis/openapi.json`. Docs: `/apis/docs`.
 
@@ -74,14 +101,11 @@ make gui                       # gui/build/bin/forgeai.app (needs wails CLI buil
 
 ```sh
 kubectl create ns forgeai-system
-kubectl -n forgeai-system create secret docker-registry forgeai-registry ...
 kubectl -n forgeai-system create secret generic forgeai-compat-api-keys --from-literal=APIKEY=<key>
-make deploy-dev                # ko build -> cr.dev1.bz1.paratera.com:7443/forgeai, kubectl apply
+make deploy-dev                # ko build -> ghcr.io/scclabs/forgeai (public), kubectl apply
 ```
 
 Prerequisites:
 
 - Kubeflow Trainer v2
 - Kueue, with the `trainjob` integration enabled
-- sshpiper (CRD `pipes.sshpiper.com`)
-- ingress-nginx

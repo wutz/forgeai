@@ -1,26 +1,3 @@
-export namespace jobs {
-	
-	export class SSHConnection {
-	    id: string;
-	    url: string;
-	    refactorURL: string;
-	    password: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new SSHConnection(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.url = source["url"];
-	        this.refactorURL = source["refactorURL"];
-	        this.password = source["password"];
-	    }
-	}
-
-}
-
 export namespace main {
 	
 	export class ConnInfo {
@@ -47,8 +24,6 @@ export namespace main {
 	    nodeName: string;
 	    podIP: string;
 	    phase: string;
-	    sshUser: string;
-	    jupyterURLs: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Worker(source);
@@ -61,8 +36,6 @@ export namespace main {
 	        this.nodeName = source["nodeName"];
 	        this.podIP = source["podIP"];
 	        this.phase = source["phase"];
-	        this.sshUser = source["sshUser"];
-	        this.jupyterURLs = source["jupyterURLs"];
 	    }
 	}
 	export class Job {
@@ -89,8 +62,6 @@ export namespace main {
 	    suspended: boolean;
 	    restartGeneration: number;
 	    trainJob: string;
-	    sshEnabled: boolean;
-	    jupyterEnabled: boolean;
 	    volumeCount: number;
 	
 	    static createFrom(source: any = {}) {
@@ -122,8 +93,6 @@ export namespace main {
 	        this.suspended = source["suspended"];
 	        this.restartGeneration = source["restartGeneration"];
 	        this.trainJob = source["trainJob"];
-	        this.sshEnabled = source["sshEnabled"];
-	        this.jupyterEnabled = source["jupyterEnabled"];
 	        this.volumeCount = source["volumeCount"];
 	    }
 	
@@ -154,8 +123,6 @@ export namespace main {
 	    poolID: string;
 	    workers: number;
 	    env: Record<string, string>;
-	    ssh: boolean;
-	    jupyter: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new JobForm(source);
@@ -171,8 +138,6 @@ export namespace main {
 	        this.poolID = source["poolID"];
 	        this.workers = source["workers"];
 	        this.env = source["env"];
-	        this.ssh = source["ssh"];
-	        this.jupyter = source["jupyter"];
 	    }
 	}
 	export class KubeContext {

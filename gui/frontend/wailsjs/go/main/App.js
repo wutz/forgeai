@@ -38,10 +38,6 @@ export function RestartJob(arg1) {
   return window['go']['main']['App']['RestartJob'](arg1);
 }
 
-export function SSH(arg1) {
-  return window['go']['main']['App']['SSH'](arg1);
-}
-
 export function StartJob(arg1) {
   return window['go']['main']['App']['StartJob'](arg1);
 }

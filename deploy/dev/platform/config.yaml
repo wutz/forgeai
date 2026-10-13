@@ -1,18 +1,7 @@
 # forgeai platform config for bz1-dev1, derived from scc-k8s-settings-v3-2.
 releaseVersion: 0.1.0
-rootDomain: dev1.bz1.paratera.com
-extraDomains:
-- dev1.bz1.blsc.cn
-ingressClass: nginx
-ssh:
-  piperService: pod-prod/sshpiper
-  domains:
-    10.243.147.247:
-    - ssh.dev1.bz1.paratera.com
-    - ssh.dev1.bz1.blsc.cn
 defaultQueue: forgeai-queue
 serviceAccount: pod-default
-baseToolsHostPath: /opt/pod-shared-tools/base
 ephemeralStorage: 50Gi
 extraResources:
   nextflow.io/fuse: "1"
@@ -25,6 +14,19 @@ multiNode:
   podSetTopology:
     kueue.x-k8s.io/podset-preferred-topology: kubernetes.io/hostname
 userNetworkPolicy: false
+# scc-k8s-settings-v3-2 names shared-nvme-cache, which does not exist on dev;
+# existing pod-prod volumes use shared-vast-cs.
+storageTypes:
+  high-perf: {storageClass: shared-vast-cs, defaultAccessMode: ReadWriteMany}
+registry:
+  domain: cr.dev1.bz1.paratera.com:7443
+  insecure: true
+volumeUsage:
+  baseURL: http://scc-m-q-agent.mon.svc.cluster.local:8003
+imageWarmup:
+  nodeSelector: {scclabs.dev/gpu: rtx-5090}
+  ttl: 2h
+poolPlaceholderImage: cr.dev1.bz1.paratera.com:7443/prod/pause:3.2
 resources:
 - id: rtx5090.xeon6530.xlarge
   gpu: {count: 1, model: NVIDIA GeForce RTX 5090}
@@ -55,3 +57,5 @@ resources:
   cpu: {cores: 4, model: Intel Xeon Gold 6530}
   memory: {sizeGB: 16}
   labels: {scclabs.dev/cpu: xeon-gold, scclabs.dev/gpu: rtx-5090}
+  # Runs on GPU nodes next to full-node jobs; reported like scc-k8s-v2 did.
+  usageFrom: rtx5090.xeon6530.8xlarge.52c750g.256g

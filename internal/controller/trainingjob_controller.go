@@ -18,8 +18,6 @@ package controller
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"strconv"
 	"sync"
@@ -27,7 +25,6 @@ import (
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -71,11 +68,9 @@ type TrainingJobReconciler struct {
 // +kubebuilder:rbac:groups=forgeai.scclabs.dev,resources=trainingjobs/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=forgeai.scclabs.dev,resources=trainingjobs/finalizers,verbs=update
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs;trainingruntimes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=sshpiper.com,resources=pipes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=services;secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=pods;configmaps,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
-// +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses;networkpolicies,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=networking.k8s.io,resources=networkpolicies,verbs=get;list;watch;create
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch
 // +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=workloads,verbs=get;list;watch
 
@@ -94,9 +89,9 @@ func (r *TrainingJobReconciler) config(ctx context.Context) (*platform.Config, e
 }
 
 // Reconcile drives a TrainingJob towards its desired state:
-//   - suspend: delete the TrainJob and access objects, keep the spec and secret
+//   - suspend: delete the TrainJob, keep the spec
 //   - restartGeneration bumped: delete the TrainJob, then recreate it
-//   - otherwise: ensure secret, runtime, TrainJob and per-worker access objects exist
+//   - otherwise: ensure the runtime and TrainJob exist
 func (r *TrainingJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
@@ -128,9 +123,6 @@ func (r *TrainingJobReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Stop.
 	if job.Spec.Suspend {
-		if err := r.pruneAccess(ctx, job, nil); err != nil {
-			return ctrl.Result{}, err
-		}
 		if tj != nil {
 			if err := r.deleteTrainJob(ctx, tj); err != nil {
 				return ctrl.Result{}, err
@@ -169,9 +161,6 @@ func (r *TrainingJobReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			return ctrl.Result{}, err
 		}
 	}
-	if err := r.ensureSecret(ctx, job, b); err != nil {
-		return ctrl.Result{}, err
-	}
 	if tj == nil {
 		rt, err := b.TrainingRuntime()
 		if err != nil {
@@ -190,11 +179,7 @@ func (r *TrainingJobReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		}
 	}
 
-	if err := r.ensureAccess(ctx, job, b); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	if err := r.updateStatus(ctx, job, b, tj); err != nil {
+	if err := r.updateStatus(ctx, job, tj); err != nil {
 		return ctrl.Result{}, err
 	}
 	if err := r.patchStatus(ctx, orig, job); err != nil {
@@ -288,29 +273,6 @@ func (r *TrainingJobReconciler) create(ctx context.Context, job *v1.TrainingJob,
 	return r.Create(ctx, u, fieldOwner)
 }
 
-func randomToken() string {
-	buf := make([]byte, 16)
-	_, _ = rand.Read(buf)
-	return hex.EncodeToString(buf)
-}
-
-// ensureSecret creates credentials once; existing values are never rotated.
-func (r *TrainingJobReconciler) ensureSecret(ctx context.Context, job *v1.TrainingJob, b *builder.Builder) error {
-	s := &corev1.Secret{}
-	err := r.Get(ctx, types.NamespacedName{Namespace: job.Namespace, Name: naming.SecretName(job.Name)}, s)
-	if err == nil || !apierrors.IsNotFound(err) {
-		return err
-	}
-	secret := b.Secret(randomToken(), randomToken())
-	if err := controllerutil.SetControllerReference(job, secret, r.Scheme); err != nil {
-		return err
-	}
-	if err := r.Create(ctx, secret, fieldOwner); err != nil && !apierrors.IsAlreadyExists(err) {
-		return err
-	}
-	return nil
-}
-
 func (r *TrainingJobReconciler) ensureNetworkPolicy(ctx context.Context, job *v1.TrainingJob) error {
 	// Shared by all jobs of the user, so it is not owned by this TrainingJob.
 	np := builder.UserNetworkPolicy(job.Namespace, job.Spec.UserID)
@@ -320,77 +282,8 @@ func (r *TrainingJobReconciler) ensureNetworkPolicy(ctx context.Context, job *v1
 	return nil
 }
 
-func (r *TrainingJobReconciler) ensureAccess(ctx context.Context, job *v1.TrainingJob, b *builder.Builder) error {
-	services, ingresses, pipes := b.AccessObjects()
-	keep := map[string]bool{}
-	for _, s := range services {
-		keep["Service/"+s.Name] = true
-		if err := r.apply(ctx, job, s, corev1.SchemeGroupVersion.WithKind("Service")); err != nil {
-			return fmt.Errorf("apply service %s: %w", s.Name, err)
-		}
-	}
-	for _, i := range ingresses {
-		keep["Ingress/"+i.Name] = true
-		if err := r.apply(ctx, job, i, networkingv1.SchemeGroupVersion.WithKind("Ingress")); err != nil {
-			return fmt.Errorf("apply ingress %s: %w", i.Name, err)
-		}
-	}
-	for _, p := range pipes {
-		keep["Pipe/"+p.Name] = true
-		if err := r.apply(ctx, job, p, kf.PipeGVK); err != nil {
-			return fmt.Errorf("apply pipe %s: %w", p.Name, err)
-		}
-	}
-	return r.pruneAccess(ctx, job, keep)
-}
-
-// pruneAccess deletes owned Services, Ingresses and Pipes not in keep.
-func (r *TrainingJobReconciler) pruneAccess(ctx context.Context, job *v1.TrainingJob, keep map[string]bool) error {
-	sel := client.MatchingLabels{naming.LabelTrainingJob: job.Name}
-	ns := client.InNamespace(job.Namespace)
-	var objs []client.Object
-
-	svcs := &corev1.ServiceList{}
-	if err := r.List(ctx, svcs, ns, sel); err != nil {
-		return err
-	}
-	for i := range svcs.Items {
-		if !keep["Service/"+svcs.Items[i].Name] {
-			objs = append(objs, &svcs.Items[i])
-		}
-	}
-	ings := &networkingv1.IngressList{}
-	if err := r.List(ctx, ings, ns, sel); err != nil {
-		return err
-	}
-	for i := range ings.Items {
-		if !keep["Ingress/"+ings.Items[i].Name] {
-			objs = append(objs, &ings.Items[i])
-		}
-	}
-	pipes := &unstructured.UnstructuredList{}
-	pipes.SetGroupVersionKind(kf.PipeGVK.GroupVersion().WithKind("PipeList"))
-	if err := r.List(ctx, pipes, ns, sel); err != nil {
-		return err
-	}
-	for i := range pipes.Items {
-		if !keep["Pipe/"+pipes.Items[i].GetName()] {
-			objs = append(objs, &pipes.Items[i])
-		}
-	}
-	for _, o := range objs {
-		if !metav1.IsControlledBy(o, job) {
-			continue
-		}
-		if err := r.Delete(ctx, o); client.IgnoreNotFound(err) != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // updateStatus summarises the TrainJob, its batch Jobs and pods.
-func (r *TrainingJobReconciler) updateStatus(ctx context.Context, job *v1.TrainingJob, b *builder.Builder, tj *unstructured.Unstructured) error {
+func (r *TrainingJobReconciler) updateStatus(ctx context.Context, job *v1.TrainingJob, tj *unstructured.Unstructured) error {
 	job.Status.TrainJobName = job.Name
 	if tj != nil {
 		job.Status.ObservedRestartGeneration = trainJobRestartGeneration(tj)
@@ -460,14 +353,6 @@ func (r *TrainingJobReconciler) updateStatus(ctx context.Context, job *v1.Traini
 	podMsg := ""
 	for i := int32(0); i < max(job.Spec.Workers, 1); i++ {
 		w := v1.WorkerStatus{Index: i}
-		if b.SSHEnabled() {
-			w.SSHUser = naming.SSHUser(job.Spec.JobID, i)
-		}
-		if b.JupyterEnabled() {
-			for _, h := range b.JupyterHosts(i) {
-				w.JupyterURLs = append(w.JupyterURLs, "https://"+h)
-			}
-		}
 		if p, ok := byIndex[fmt.Sprint(i)]; ok {
 			w.PodName, w.NodeName = p.Name, p.Spec.NodeName
 			w.PodIP, w.NodeIP = p.Status.PodIP, p.Status.HostIP
@@ -576,14 +461,9 @@ func mapByLabel(_ context.Context, obj client.Object) []reconcile.Request {
 func (r *TrainingJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	tj := &unstructured.Unstructured{}
 	tj.SetGroupVersionKind(kf.TrainJobGVK)
-	pipe := &unstructured.Unstructured{}
-	pipe.SetGroupVersionKind(kf.PipeGVK)
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.TrainingJob{}).
 		Owns(tj).
-		Owns(pipe).
-		Owns(&corev1.Service{}).
-		Owns(&networkingv1.Ingress{}).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(mapByLabel)).
 		Watches(&batchv1.Job{}, handler.EnqueueRequestsFromMapFunc(mapByLabel)).
 		Named("trainingjob").

@@ -84,10 +84,6 @@ type JobList struct {
 	Jobs []JobOut `json:"jobs"`
 }
 
-type SSHList struct {
-	SSHConnections any `json:"ssh_connections"`
-}
-
 // legacyStatus maps the TrainingJob phase to the batch Job STATUS values that
 // scc-k8s-v2 returned from `kubectl get jobs -o wide`.
 func legacyStatus(p v1.TrainingJobPhase) string {
@@ -155,17 +151,17 @@ func toJobOut(j *v1.TrainingJob, now time.Time) JobOut {
 		Image: j.Spec.Image, ResourceID: j.Spec.ResourceID, PoolID: j.Spec.PoolID,
 		UserGroup: j.Spec.UserGroup, Workers: j.Spec.Workers, VolumeMounts: []VolumeMountOut{},
 		ID: j.Spec.JobID, UserID: j.Spec.UserID, Message: st.Message,
-		Status:     strp(legacyStatus(st.Phase)),
-		CreateTime: j.CreationTimestamp.Local().Format("2006-01-02 15:04:05"),
-		Active:     strp(fmt.Sprint(st.Active)),
-		Ready:      strp(fmt.Sprint(st.Ready)),
-		Succeeded:  strp(fmt.Sprint(st.Succeeded)),
-		Failed:     strp(fmt.Sprint(st.Failed)),
-		Completions: strp(fmt.Sprintf("%d/%d", st.Succeeded, max(j.Spec.Workers, 1))),
-		Age:        strp(duration.HumanDuration(now.Sub(j.CreationTimestamp.Time))),
-		StartTime:  strp(""),
+		Status:         strp(legacyStatus(st.Phase)),
+		CreateTime:     j.CreationTimestamp.Local().Format("2006-01-02 15:04:05"),
+		Active:         strp(fmt.Sprint(st.Active)),
+		Ready:          strp(fmt.Sprint(st.Ready)),
+		Succeeded:      strp(fmt.Sprint(st.Succeeded)),
+		Failed:         strp(fmt.Sprint(st.Failed)),
+		Completions:    strp(fmt.Sprintf("%d/%d", st.Succeeded, max(j.Spec.Workers, 1))),
+		Age:            strp(duration.HumanDuration(now.Sub(j.CreationTimestamp.Time))),
+		StartTime:      strp(""),
 		CompletionTime: strp(""),
-		Duration:   strp(""),
+		Duration:       strp(""),
 	}
 	for _, m := range j.Spec.VolumeMounts {
 		out.VolumeMounts = append(out.VolumeMounts, VolumeMountOut{

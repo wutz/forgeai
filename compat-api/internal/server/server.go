@@ -1,5 +1,5 @@
-// Package server implements the scc-k8s-v2 compatible job API on top of
-// forgeai TrainingJobs.
+// Package server implements the scc-k8s-v2 compatible API (jobs, images,
+// volumes, pools and resources) on top of forgeai.
 package server
 
 import (
@@ -21,7 +21,11 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 
 	v1 "github.com/scclabs/forgeai/api/v1alpha1"
+	"github.com/scclabs/forgeai/pkg/capacity"
+	"github.com/scclabs/forgeai/pkg/images"
 	"github.com/scclabs/forgeai/pkg/jobs"
+	"github.com/scclabs/forgeai/pkg/pools"
+	"github.com/scclabs/forgeai/pkg/volumes"
 )
 
 // RootPath is the proxy prefix scc-k8s-v2 was served under (FastAPI root_path).
@@ -44,7 +48,15 @@ func notFound(jobID string) error {
 
 // Server holds dependencies of the handlers.
 type Server struct {
-	Jobs *jobs.Client
+	Jobs     *jobs.Client
+	Volumes  *volumes.Client
+	Pools    *pools.Client
+	Capacity *capacity.Client
+	Warmer   *images.Warmer
+	// Harbor credentials for listing user images.
+	RegistryUser, RegistryPassword string
+	// VolumeUsageToken authenticates to scc-monitor-querier.
+	VolumeUsageToken string
 	// APIKeys are accepted X-API-Key values.
 	APIKeys []string
 	Now     func() time.Time
@@ -90,15 +102,18 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	cfg := huma.DefaultConfig("forgeai scc-k8s compat API", "0.1.0")
-	cfg.Info.Description = "scc-k8s-v2 compatible job API backed by forgeai TrainingJobs."
+	cfg.Info.Description = "scc-k8s-v2 compatible API backed by forgeai. Interactive access to pods (SSH, Jupyter, exec) is not offered."
 	cfg.DocsPath = "/apis/docs"
 	cfg.OpenAPIPath = "/apis/openapi"
 	cfg.Servers = []*huma.Server{{URL: RootPath}}
+	// No $schema field in responses: keep bodies identical to scc-k8s-v2.
+	cfg.CreateHooks = nil
 	cfg.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
 		"apiKey": {Type: "apiKey", In: "header", Name: "X-API-Key"},
 	}
 	api := humago.New(mux, cfg)
 	s.register(api)
+	s.registerPlatform(api)
 
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -109,7 +124,7 @@ func (s *Server) Handler() http.Handler {
 			r.URL.Path = p
 			r.URL.RawPath = ""
 		}
-		if strings.HasPrefix(r.URL.Path, jobsPrefix) {
+		if protected(r.URL.Path) {
 			key := r.Header.Get("X-API-Key")
 			if key == "" {
 				// FastAPI's response for a missing required header.
@@ -125,6 +140,20 @@ func (s *Server) Handler() http.Handler {
 		}
 		mux.ServeHTTP(w, r)
 	})
+}
+
+// protected reports whether a path requires an API key: every /apis/ route
+// except the OpenAPI docs.
+func protected(path string) bool {
+	if !strings.HasPrefix(path, "/apis/") {
+		return false
+	}
+	for _, p := range []string{"/apis/docs", "/apis/openapi"} {
+		if path == p || strings.HasPrefix(path, p+".") || strings.HasPrefix(path, p+"/") {
+			return false
+		}
+	}
+	return true
 }
 
 var jobIDPattern = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
@@ -152,8 +181,6 @@ type listOutput struct{ Body JobList }
 
 // getOutput is a JobOut, or {} when the job does not exist (scc-k8s-v2 behaviour).
 type getOutput struct{ Body any }
-
-type sshOutput struct{ Body SSHList }
 
 func randomJobID() string {
 	b := make([]byte, 3)
@@ -206,11 +233,6 @@ func (s *Server) register(api huma.API) {
 		Summary: "Get one job of a user", Tags: tags, Security: security,
 		Description: "Returns the job, or {} when it does not exist.",
 	}, s.getJob)
-
-	huma.Register(api, huma.Operation{
-		OperationID: "get-job-ssh", Method: http.MethodGet, Path: jobsPrefix + "/{userID}/jobs/{jobID}/ssh",
-		Summary: "Get SSH connections for the specified job", Tags: tags, Security: security,
-	}, s.getSSH)
 }
 
 func (s *Server) createJob(ctx context.Context, in *createInput) (*jobOutput, error) {
@@ -304,27 +326,4 @@ func (s *Server) getJob(ctx context.Context, in *jobRef) (*getOutput, error) {
 		return nil, s.internal(err)
 	}
 	return &getOutput{Body: toJobOut(job, s.now())}, nil
-}
-
-func (s *Server) getSSH(ctx context.Context, in *jobRef) (*sshOutput, error) {
-	empty := &sshOutput{Body: SSHList{SSHConnections: []jobs.SSHConnection{}}}
-	job, err := s.Jobs.Get(ctx, in.UserID, in.JobID)
-	if errors.Is(err, jobs.ErrNotFound) {
-		return empty, nil
-	}
-	if err != nil {
-		return nil, s.internal(err)
-	}
-	cfg, err := s.Jobs.Config(ctx)
-	if err != nil {
-		return nil, s.internal(err)
-	}
-	conns, err := s.Jobs.SSH(ctx, job, cfg)
-	if errors.Is(err, jobs.ErrSSHUnavailable) {
-		return nil, &msgError{Status: http.StatusNotFound, Msg: jobs.ErrSSHUnavailable.Error()}
-	}
-	if err != nil {
-		return nil, s.internal(err)
-	}
-	return &sshOutput{Body: SSHList{SSHConnections: conns}}, nil
 }

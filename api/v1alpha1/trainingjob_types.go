@@ -54,19 +54,6 @@ type EnvVar struct {
 	Value string `json:"value"`
 }
 
-// AccessSpec controls interactive access to each worker.
-type AccessSpec struct {
-	// ssh creates a sshpiper Pipe per worker (username root@{jobID}-{index}).
-	// +optional
-	// +kubebuilder:default=true
-	SSH *bool `json:"ssh,omitempty"`
-
-	// jupyter creates a Service + Ingress per worker on port 1888.
-	// +optional
-	// +kubebuilder:default=true
-	Jupyter *bool `json:"jupyter,omitempty"`
-}
-
 // TrainingJobSpec defines the desired state of TrainingJob.
 type TrainingJobSpec struct {
 	// userID is the platform user that owns this job.
@@ -121,12 +108,8 @@ type TrainingJobSpec struct {
 	// +optional
 	QueueName string `json:"queueName,omitempty"`
 
-	// access controls SSH / Jupyter endpoints.
-	// +optional
-	Access AccessSpec `json:"access,omitempty"`
-
 	// suspend stops the job: the underlying TrainJob and its pods are deleted,
-	// access endpoints are removed, the spec is kept so it can be started again.
+	// the spec is kept so it can be started again.
 	// +optional
 	Suspend bool `json:"suspend,omitempty"`
 
@@ -159,10 +142,6 @@ type WorkerStatus struct {
 	NodeIP   string `json:"nodeIP,omitempty"`
 	// phase is the pod phase.
 	Phase string `json:"phase,omitempty"`
-	// sshUser is the sshpiper username for this worker.
-	SSHUser string `json:"sshUser,omitempty"`
-	// jupyterURLs are the ingress URLs for this worker.
-	JupyterURLs []string `json:"jupyterURLs,omitempty"`
 }
 
 // TrainingJobStatus defines the observed state of TrainingJob.
@@ -219,8 +198,9 @@ type TrainingJobStatus struct {
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
-// TrainingJob is a distributed training job built on Kubeflow Trainer + Kueue,
-// with per-worker SSH and Jupyter access.
+// TrainingJob is a distributed training job built on Kubeflow Trainer + Kueue.
+// Workers are not reachable interactively: the pod network is not isolated
+// between users, so no SSH / Jupyter / exec endpoints are exposed.
 type TrainingJob struct {
 	metav1.TypeMeta `json:",inline"`
 

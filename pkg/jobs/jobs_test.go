@@ -4,15 +4,12 @@ import (
 	"context"
 	"testing"
 
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	v1 "github.com/scclabs/forgeai/api/v1alpha1"
 	"github.com/scclabs/forgeai/pkg/naming"
-	"github.com/scclabs/forgeai/pkg/platform"
 )
 
 func newClient(t *testing.T, objs ...runtime.Object) *Client {
@@ -83,44 +80,5 @@ func TestStartFinished(t *testing.T) {
 	}
 	if _, err := c.Stop(ctx, job.Name); err != ErrNotFound {
 		t.Fatalf("err=%v", err)
-	}
-}
-
-func TestSSH(t *testing.T) {
-	ctx := context.Background()
-	name := naming.JobName("pod-prod", "u1", "ackjob-1")
-	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "sshpiper", Namespace: "pod-prod"},
-		Spec:       corev1.ServiceSpec{Ports: []corev1.ServicePort{{Port: 2222}}},
-		Status: corev1.ServiceStatus{LoadBalancer: corev1.LoadBalancerStatus{
-			Ingress: []corev1.LoadBalancerIngress{{IP: "10.0.0.1"}},
-		}},
-	}
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: naming.SecretName(name), Namespace: "pod-prod"},
-		Data:       map[string][]byte{"SSH_PASSWORD": []byte("pw")},
-	}
-	c := newClient(t, svc, secret)
-	cfg := &platform.Config{
-		RootDomain: "dev1.example.com", ExtraDomains: []string{"dev1.example.cn"},
-		SSH: platform.SSHConfig{PiperService: "pod-prod/sshpiper", Domains: map[string][]string{
-			"10.0.0.1": {"ssh.dev1.example.com", "ssh.dev1.example.cn"},
-		}},
-	}
-	job := &v1.TrainingJob{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "pod-prod"}}
-	job.Status.Workers = []v1.WorkerStatus{
-		{Index: 0, Phase: "Running", SSHUser: "root@ackjob-1-0"},
-		{Index: 1, Phase: "Pending", SSHUser: "root@ackjob-1-1"},
-	}
-	conns, err := c.SSH(ctx, job, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := SSHConnection{
-		ID: "worker-0", URL: "ssh://root@ackjob-1-0@ssh.dev1.example.com:2222",
-		RefactorURL: "ssh://root@ackjob-1-0@ssh.dev1.example.cn:2222", Password: "pw",
-	}
-	if len(conns) != 1 || conns[0] != want {
-		t.Fatalf("conns=%+v", conns)
 	}
 }

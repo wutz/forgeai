@@ -258,6 +258,18 @@ a { color: inherit; text-decoration: none; }
 
 /* Detail pane */
 .split { grid-template-columns: minmax(0, 1fr) 420px; }
+/* Without a selection the detail pane is not rendered, so the list keeps the
+   whole width instead of leaving an empty 420px column. */
+.split:not(:has(> :nth-child(2))) { grid-template-columns: minmax(0, 1fr); }
+/* Long cells (an image name, a service FQDN) would otherwise widen the table
+   past its column and paint it under the detail pane: truncate instead. */
+.split > * { min-width: 0; }
+.split > .card { overflow-x: auto; }
+.split .table { table-layout: fixed; }
+.split .table th:first-child { width: 26%; }
+.split .table th:last-child { width: 9%; }
+.split .table th, .split .table td { overflow: hidden; text-overflow: ellipsis; }
+.split .table .cell-main, .split .table .cell-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .detail-title { min-width: 0; }
 .detail-title h3 { overflow-wrap: anywhere; }
 .detail-actions {

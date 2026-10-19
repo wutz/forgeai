@@ -16,6 +16,7 @@ import {Logo} from './Logo'
 import {Icon, IconName} from './ui'
 
 const PREFS = 'forgeai.connection'
+const SIDEBAR = 'forgeai.sidebar'
 
 type Area = 'overview' | 'jobs' | 'sandboxes' | 'templates' | 'volumes' | 'files' | 'images' | 'resources' | 'admin'
 
@@ -27,6 +28,13 @@ export default function App() {
   const [area, setArea] = useState<Area>('overview')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  // The rail remembers its state across launches, like the connection does.
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR) === 'collapsed')
+
+  const toggleSidebar = () => setCollapsed(v => {
+    localStorage.setItem(SIDEBAR, v ? 'open' : 'collapsed')
+    return !v
+  })
 
   useEffect(() => {
     Contexts().then(setContexts).catch(e => setError(errText(e)))
@@ -91,19 +99,26 @@ export default function App() {
   return (
     <div className="app">
       <Header>
+        <button className="icon-btn header-toggle" onClick={toggleSidebar}
+                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                aria-expanded={!collapsed} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+          <Icon name="panel"/>
+        </button>
         <div className="conn">
           <span className="conn-meta">{conn.project ? `${conn.project} · ${conn.namespace}` : conn.context}</span>
           <button className="btn btn-sm" onClick={logout}>Switch</button>
         </div>
       </Header>
-      <div className="shell">
+      <div className={`shell ${collapsed ? 'collapsed' : ''}`}>
         <nav className="sidebar">
           {groups.map(g => (
             <div className="nav-group" key={g.label}>
               <div className="nav-label">{g.label}</div>
               {g.items.map(item => (
                 <button key={item.area} className={`nav-item ${area === item.area ? 'active' : ''}`}
-                        onClick={() => setArea(item.area)}>
+                        onClick={() => setArea(item.area)}
+                        title={collapsed ? item.label : undefined}
+                        aria-label={item.label} aria-current={area === item.area ? 'page' : undefined}>
                   <Icon name={item.icon}/><span>{item.label}</span>
                 </button>
               ))}

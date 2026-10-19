@@ -30,6 +30,7 @@ const ICONS = {
   image: 'M4 5h16v14H4zM4 15l5-5 4 4 3-3 4 4M15 9h.01',
   check: 'm5 12 4.5 4.5L19 7',
   warning: 'M12 4 2.5 20h19L12 4zM12 10v4M12 17h.01',
+  panel: 'M3 4h18v16H3zM9 4v16',
 } as const
 
 export type IconName = keyof typeof ICONS

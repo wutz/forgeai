@@ -97,7 +97,7 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div className={`app ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <Header>
         <button className="icon-btn header-toggle" onClick={toggleSidebar}
                 aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}

@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "gui",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd gui && wails dev -browser=false"],
+      "port": 34115
+    }
+  ]
+}

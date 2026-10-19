@@ -35,3 +35,22 @@ export function fmtDate(iso?: string): string {
   const d = new Date(iso)
   return isNaN(+d) ? iso : d.toLocaleString()
 }
+
+// toGiB reads a storage quantity ("500Gi", "1Ti", "2G") as GiB.
+export function toGiB(q?: string): number {
+  if (!q) return 0
+  const m = /^([0-9.]+)\s*([KMGTPE]i?)?$/.exec(q.trim())
+  if (!m) return 0
+  const n = parseFloat(m[1])
+  const mult: Record<string, number> = {
+    Ki: 1 / 1024 ** 2, Mi: 1 / 1024, Gi: 1, Ti: 1024, Pi: 1024 ** 2,
+    k: 1e-6, M: 1e-3, G: 1, T: 1e3, P: 1e6,
+  }
+  return n * (mult[m[2] || 'Gi'] ?? 1)
+}
+
+// pct returns value/max as a whole percentage, clamped to 0..100.
+export function pct(value: number, max: number): number {
+  if (!(max > 0)) return 0
+  return Math.min(100, Math.max(0, Math.round((value / max) * 100)))
+}

@@ -11,6 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -20,6 +21,7 @@ import (
 
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
+	"github.com/wutz/forgeai/pkg/sandbox"
 )
 
 // loadingRules reads $KUBECONFIG or ~/.kube/config.
@@ -165,7 +167,7 @@ func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
 	}
 	info := ConnInfo{
 		Context: contextName, Server: rest.Host, Namespace: namespace, Project: project,
-		Admin: admin,
+		Admin: admin, Sandboxes: namespace != "" && sandboxesAvailable(ctx, k8s, namespace),
 	}
 	conn := &Connection{Info: info, k8s: k8s, rest: rest, core: core}
 	if cfg, err := platform.Load(ctx, k8s, conn.configNamespace()); err == nil {
@@ -185,6 +187,18 @@ func (a *App) isolate(ctx context.Context, k8s client.Client) error {
 		return fmt.Errorf("list InstanceTypes: %w", err)
 	}
 	return nil
+}
+
+// sandboxesAvailable reports whether agent-sandbox is installed and the user
+// may use it in the project namespace; the GUI hides the Sandboxes view when
+// it is not.
+func sandboxesAvailable(ctx context.Context, k8s client.Client, namespace string) bool {
+	list := &unstructured.UnstructuredList{}
+	list.SetGroupVersionKind(sandbox.SandboxGVK.GroupVersion().WithKind("SandboxList"))
+	if err := k8s.List(ctx, list, client.InNamespace(namespace), client.Limit(1)); err != nil {
+		return false
+	}
+	return true
 }
 
 // mustBeAdmin reports whether the user may create Projects; the admin area

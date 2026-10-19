@@ -2,6 +2,7 @@ import {FormEvent, useEffect, useState} from 'react'
 import {CreateJob, ListInstanceTypes, TemplateNames, ListVolumes} from '../wailsjs/go/app/App'
 import {app, training, volumes} from '../wailsjs/go/models'
 import {envToLines, linesToEnv, errText} from './util'
+import {Dialog} from './ui'
 
 // JobCreateDialog is the "New job" form: template prefill, instance type,
 // workers, volumes, env and retry defaults.
@@ -70,10 +71,14 @@ export function JobCreateDialog({onClose, onCreated}: {
   }
 
   return (
-    <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="dialog">
-        <form onSubmit={submit}>
-          <h2>New job</h2>
+    <Dialog title="New job" subtitle="Rendered into a TrainJob of the project namespace"
+            onClose={onClose} footer={<>
+              <button className="btn" onClick={onClose}>Cancel</button>
+              <button className="btn btn-primary" onClick={submit} disabled={busy || !f.name || !f.image}>
+                {busy ? 'Creating…' : 'Create job'}
+              </button>
+            </>}>
+        <form onSubmit={submit} className="dialog-form">
           {error && <div className="banner banner-error">{error}</div>}
           <div className="field">
             <label htmlFor="j-name">Name</label>
@@ -146,13 +151,6 @@ export function JobCreateDialog({onClose, onCreated}: {
             </div>
           </div>
         </form>
-        <div className="dialog-foot">
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={submit} disabled={busy || !f.name || !f.image}>
-            {busy ? 'Creating…' : 'Create job'}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Dialog>
   )
 }

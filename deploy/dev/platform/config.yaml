@@ -28,6 +28,15 @@ network:
   systemNamespaces: [ingress-nginx, ingress-nginx-cs, forgeai-system, kube-system, gpu-operator]
 fileServer:
   idleTimeout: 30m
+sandbox:
+  # agent-sandbox is installed in agent-sandbox-system; gvisor and kata are
+  # the RuntimeClasses it offers (see kubectl get runtimeclass).
+  namespace: agent-sandbox-system
+  defaultImage: ghcr.io/kubernetes-sigs/agent-sandbox/python-runtime-sandbox:latest
+  runtimeClasses: [gvisor, kata]
+  defaultRuntimeClass: gvisor
+  # Suspend a sandbox that no client used for 30m (0 disables it).
+  idleTimeout: 30m
 training:
   defaultRuntime: torch-distributed
   shmSize: 16Gi

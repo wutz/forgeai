@@ -3,8 +3,8 @@ module github.com/wutz/forgeai/gui
 go 1.26.0
 
 require (
-	github.com/wutz/forgeai v0.0.0-00010101000000-000000000000
 	github.com/wailsapp/wails/v2 v2.16.0
+	github.com/wutz/forgeai v0.0.0-00010101000000-000000000000
 	k8s.io/api v0.37.1
 	k8s.io/apimachinery v0.37.1
 	k8s.io/client-go v0.37.1

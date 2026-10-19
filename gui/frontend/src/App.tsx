@@ -1,9 +1,10 @@
-import {useCallback, useEffect, useState} from 'react'
+import {useEffect, useState} from 'react'
 import {Connect, Contexts, Logout, Projects} from '../wailsjs/go/app/App'
 import {Environment} from '../wailsjs/runtime/runtime'
 import {app} from '../wailsjs/go/models'
+import {Overview} from './Overview'
 import {Jobs} from './Jobs'
-import {JobCreateDialog} from './JobCreateDialog'
+import {Sandboxes} from './Sandboxes'
 import {Templates} from './Templates'
 import {Volumes} from './Volumes'
 import {FilesView} from './FilesView'
@@ -12,17 +13,30 @@ import {Resources} from './Resources'
 import {Admin} from './Admin'
 import {errText} from './util'
 import {Logo} from './Logo'
+import {HeaderSlot, Icon, IconName} from './ui'
 
 const PREFS = 'forgeai.connection'
+const SIDEBAR = 'forgeai.sidebar'
 
-type Area = 'jobs' | 'templates' | 'volumes' | 'files' | 'images' | 'resources' | 'admin'
+type Area = 'overview' | 'jobs' | 'sandboxes' | 'templates' | 'volumes' | 'files' | 'images' | 'resources' | 'admin'
+
+type NavItem = {area: Area, label: string, icon: IconName}
 
 export default function App() {
   const [contexts, setContexts] = useState<app.KubeContext[]>([])
   const [conn, setConn] = useState<app.ConnInfo | null>(null)
-  const [area, setArea] = useState<Area>('jobs')
+  const [area, setArea] = useState<Area>('overview')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  // The rail remembers its state across launches, like the connection does.
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR) === 'collapsed')
+  // Views portal their PageHeader into this node in the top bar.
+  const [headerSlot, setHeaderSlot] = useState<HTMLDivElement | null>(null)
+
+  const toggleSidebar = () => setCollapsed(v => {
+    localStorage.setItem(SIDEBAR, v ? 'open' : 'collapsed')
+    return !v
+  })
 
   useEffect(() => {
     Contexts().then(setContexts).catch(e => setError(errText(e)))
@@ -36,7 +50,7 @@ export default function App() {
       const info = await Connect(contextName, namespace)
       localStorage.setItem(PREFS, JSON.stringify({ctx: contextName, ns: namespace}))
       setConn(info)
-      setArea(info.project ? 'jobs' : 'admin')
+      setArea(info.project ? 'overview' : 'admin')
       setError('')
     } catch (e) {
       setError(errText(e))
@@ -54,38 +68,89 @@ export default function App() {
 
   // Without a project (admin of a cluster with no projects yet) only the
   // admin area is usable.
-  const nav: [Area, string][] = conn.project ? [
-    ['jobs', 'Jobs'], ['templates', 'Templates'], ['volumes', 'Volumes'],
-    ['files', 'Files'], ['images', 'Images'], ['resources', 'Resources'],
+  // The sidebar groups areas like the reference consoles: workspace, storage,
+  // cluster catalogue, then admin. Sandboxes appear only when the connected
+  // cluster runs agents.x-k8s.io.
+  const groups: {label: string, items: NavItem[]}[] = conn.project ? [
+    {
+      label: 'Workspace',
+      items: [
+        {area: 'overview', label: 'Overview', icon: 'grid'},
+        {area: 'jobs', label: 'Jobs', icon: 'play'},
+        ...(conn.sandboxes ? [{area: 'sandboxes', label: 'Sandboxes', icon: 'box'} as NavItem] : []),
+        {area: 'templates', label: 'Templates', icon: 'scroll'},
+      ],
+    },
+    {
+      label: 'Storage',
+      items: [
+        {area: 'volumes', label: 'Volumes', icon: 'database'},
+        {area: 'files', label: 'Files', icon: 'folder'},
+        {area: 'images', label: 'Images', icon: 'image'},
+      ],
+    },
+    {
+      label: 'Cluster',
+      items: [{area: 'resources', label: 'Resources', icon: 'cpu'}],
+    },
   ] : []
-  if (conn.admin) nav.push(['admin', 'Projects'])
+  if (conn.admin) {
+    groups.push({label: 'Admin', items: [{area: 'admin', label: 'Projects', icon: 'shield'}]})
+  }
 
   return (
-    <div className="app">
-      <Header>
-        <div className="conn">
-          <span className="conn-meta">{conn.project ? `${conn.project} · ${conn.namespace}` : conn.context}</span>
-          <button className="btn btn-sm" onClick={logout}>Switch</button>
+    <HeaderSlot.Provider value={headerSlot}>
+      <div className={`app ${collapsed ? 'sidebar-collapsed' : ''}`}>
+        <header className="header header-shell">
+          <div className="header-side">
+            <button className="icon-btn header-toggle" onClick={toggleSidebar}
+                    aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                    aria-expanded={!collapsed} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+              <Icon name="panel"/>
+            </button>
+          </div>
+          <div className="header-main">
+            <div className="header-slot" ref={setHeaderSlot}/>
+            <div className="conn">
+              <span className="conn-meta">{conn.project ? `${conn.project} · ${conn.namespace}` : conn.context}</span>
+              <button className="btn btn-sm" onClick={logout}>Switch</button>
+            </div>
+          </div>
+        </header>
+        <div className={`shell ${collapsed ? 'collapsed' : ''}`}>
+          <nav className="sidebar">
+            {groups.map(g => (
+              <div className="nav-group" key={g.label}>
+                <div className="nav-label">{g.label}</div>
+                {g.items.map(item => (
+                  <button key={item.area} className={`nav-item ${area === item.area ? 'active' : ''}`}
+                          onClick={() => setArea(item.area)}
+                          title={collapsed ? item.label : undefined}
+                          aria-label={item.label} aria-current={area === item.area ? 'page' : undefined}>
+                    <Icon name={item.icon}/><span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+            <div className="nav-foot">
+              <span className="conn-meta" title={conn.server}>{conn.context}</span>
+              <span className="conn-meta" title={conn.namespace}>{conn.namespace || 'no namespace'}</span>
+            </div>
+          </nav>
+          <main className="main">
+            {area === 'overview' && <Overview onOpen={setArea}/>}
+            {area === 'jobs' && <Jobs/>}
+            {area === 'sandboxes' && <Sandboxes/>}
+            {area === 'templates' && <Templates/>}
+            {area === 'volumes' && <Volumes/>}
+            {area === 'files' && <FilesView/>}
+            {area === 'images' && <Images/>}
+            {area === 'resources' && <Resources/>}
+            {area === 'admin' && <Admin/>}
+          </main>
         </div>
-      </Header>
-      <div className="shell">
-        <nav className="sidebar">
-          {nav.map(([key, label]) => (
-            <button key={key} className={`nav-item ${area === key ? 'active' : ''}`}
-                    onClick={() => setArea(key)}>{label}</button>
-          ))}
-        </nav>
-        <main className="main">
-          {area === 'jobs' && <Jobs/>}
-          {area === 'templates' && <Templates/>}
-          {area === 'volumes' && <Volumes/>}
-          {area === 'files' && <FilesView/>}
-          {area === 'images' && <Images/>}
-          {area === 'resources' && <Resources/>}
-          {area === 'admin' && <Admin/>}
-        </main>
       </div>
-    </div>
+    </HeaderSlot.Provider>
   )
 }
 
@@ -102,8 +167,14 @@ function ConnectScreen({contexts, onConnect, loading, error}: {
   // type their namespace (or rely on the context default).
   const [projects, setProjects] = useState<app.ProjectNamespace[]>([])
 
+  // Fall back to the current context when the saved one is gone from the
+  // kubeconfig (a removed or renamed context would otherwise be submitted
+  // while the select shows the first option).
   useEffect(() => {
-    if (!ctx && contexts.length) setCtx((contexts.find(c => c.current) || contexts[0]).name)
+    if (!contexts.length) return
+    if (!ctx || !contexts.some(c => c.name === ctx)) {
+      setCtx((contexts.find(c => c.current) || contexts[0]).name)
+    }
   }, [contexts])
 
   useEffect(() => {
@@ -165,12 +236,8 @@ function ConnectScreen({contexts, onConnect, loading, error}: {
 }
 
 // Header doubles as the window title bar: it is the drag region of the
-// frameless macOS window.
-function Header({children}: {children?: React.ReactNode}) {
-  return (
-    <header className="header">
-      <div className="logo"><Logo/>forgeai</div>
-      {children}
-    </header>
-  )
+// frameless macOS window. The connect screen has no sidebar, so the band
+// stays empty and the card carries the wordmark.
+function Header() {
+  return <header className="header"/>
 }

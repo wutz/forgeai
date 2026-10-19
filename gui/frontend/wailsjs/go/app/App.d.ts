@@ -53,6 +53,8 @@ export function Logs(arg1:string,arg2:number,arg3:number):Promise<string>;
 
 export function MemberKubeconfig(arg1:string,arg2:string):Promise<string>;
 
+export function Projects(arg1:string):Promise<Array<app.ProjectNamespace>>;
+
 export function PurgeVolume(arg1:string):Promise<void>;
 
 export function Quota():Promise<app.QuotaUsage>;

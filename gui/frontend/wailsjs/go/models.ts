@@ -503,6 +503,20 @@ export namespace app {
 		}
 	}
 	
+	export class ProjectNamespace {
+	    namespace: string;
+	    project: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProjectNamespace(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.namespace = source["namespace"];
+	        this.project = source["project"];
+	    }
+	}
 	
 	
 	export class QuotaUsage {

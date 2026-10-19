@@ -266,6 +266,7 @@ forgeai is a desktop console for AI training, RL and inference jobs on Kubernete
 - **Status colors**: Running `{colors.success}` (#16a34a); Queued / Pending / Restarting / Stopping `{colors.warning}`; Failed `{colors.error}` (text and dot); Succeeded / Stopped / Idle `{colors.mute}`. Status is always text + dot, never color alone.
 - **CSS**: `gui/frontend/src/style.css` mirrors these tokens as custom properties (`--ember`, `--ember-deep`, `--ember-soft`, `--success`, ...); change both together.
 - Ink (`{colors.ink}`) remains the default for headings and secondary buttons; ember is used sparingly (one primary action per view).
+- **Window chrome**: the macOS title bar is hidden (inset traffic lights); the app header is the drag region. The header has no bottom border — it flows into the sidebar as one white L-shaped frame around the canvas, and only the sidebar keeps a hairline on its right. Without a sidebar (connect screen) the header takes the canvas color.
 
 ## Overview
 

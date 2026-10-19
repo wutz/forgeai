@@ -179,7 +179,7 @@ func (a *App) MemberKubeconfig(projectName, member string) (string, error) {
 	}
 	ctx, cancel := a.call()
 	defer cancel()
-	cfg, err := platform.Load(ctx, c.k8s, c.namespace())
+	cfg, err := platform.Load(ctx, c.k8s, c.configNamespace())
 	if err != nil {
 		return "", err
 	}

@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wutz/forgeai/pkg/platform"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -59,7 +61,15 @@ type KubeContext struct {
 	Current   bool   `json:"current"`
 }
 
-// ConnInfo describes the active connection.
+// ProjectNamespace is a forgeai project namespace offered on the connect
+// screen.
+type ProjectNamespace struct {
+	Namespace string `json:"namespace"`
+	Project   string `json:"project"`
+}
+
+// ConnInfo describes the active connection. Namespace and Project are empty
+// for an admin-only connection to a cluster without projects.
 type ConnInfo struct {
 	Context   string `json:"context"`
 	Server    string `json:"server"`
@@ -90,3 +100,13 @@ func (a *App) call() (context.Context, context.CancelFunc) {
 }
 
 func (c *Connection) namespace() string { return c.Info.Namespace }
+
+// configNamespace is where the connection reads the platform config: the
+// operator's copy in the project namespace (members cannot read the platform
+// namespace), or the platform namespace for an admin-only connection.
+func (c *Connection) configNamespace() string {
+	if c.Info.Namespace == "" {
+		return platform.Namespace()
+	}
+	return c.Info.Namespace
+}

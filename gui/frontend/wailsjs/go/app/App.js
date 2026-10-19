@@ -98,6 +98,10 @@ export function MemberKubeconfig(arg1, arg2) {
   return window['go']['app']['App']['MemberKubeconfig'](arg1, arg2);
 }
 
+export function Projects(arg1) {
+  return window['go']['app']['App']['Projects'](arg1);
+}
+
 export function PurgeVolume(arg1) {
   return window['go']['app']['App']['PurgeVolume'](arg1);
 }

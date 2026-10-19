@@ -9,8 +9,10 @@ import (
 
 	authv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -41,24 +43,89 @@ func (a *App) Contexts() ([]KubeContext, error) {
 	return out, nil
 }
 
-// Connect switches to a kubeconfig context and a forgeai project namespace.
-// The namespace is only accepted when it carries the forgeai project label,
-// so the GUI cannot be pointed at unrelated parts of the cluster. It returns
-// the resolved connection info, including whether the user may administer
-// Projects (used to show the admin area).
-func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
+// clientConfig resolves a kubeconfig context to its REST config and default
+// namespace.
+func clientConfig(contextName string) (*rest.Config, string, error) {
 	cc := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules(),
 		&clientcmd.ConfigOverrides{CurrentContext: contextName})
-	rest, err := cc.ClientConfig()
+	cfg, err := cc.ClientConfig()
+	if err != nil {
+		return nil, "", err
+	}
+	namespace, _, err := cc.Namespace()
+	if err != nil {
+		return nil, "", err
+	}
+	cfg.Timeout = 30 * time.Second
+	return cfg, namespace, nil
+}
+
+// Projects lists the forgeai project namespaces visible to a kubeconfig
+// context, for the namespace picker of the connect screen. Users that may not
+// list namespaces (plain project members) get an empty list.
+func (a *App) Projects(contextName string) ([]ProjectNamespace, error) {
+	cfg, _, err := clientConfig(contextName)
+	if err != nil {
+		return nil, err
+	}
+	k8s, err := client.New(cfg, client.Options{Scheme: scheme()})
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
+	defer cancel()
+	out, err := listProjects(ctx, k8s)
+	if apierrors.IsForbidden(err) {
+		return []ProjectNamespace{}, nil
+	}
+	return out, err
+}
+
+// listProjects returns the forgeai project namespaces sorted by name.
+func listProjects(ctx context.Context, k8s client.Client) ([]ProjectNamespace, error) {
+	list := &corev1.NamespaceList{}
+	if err := k8s.List(ctx, list, client.MatchingLabels{naming.LabelManagedBy: naming.ManagedBy},
+		client.HasLabels{naming.LabelProject}); err != nil {
+		return nil, err
+	}
+	out := make([]ProjectNamespace, 0, len(list.Items))
+	for _, ns := range list.Items {
+		out = append(out, ProjectNamespace{Namespace: ns.Name, Project: ns.Labels[naming.LabelProject]})
+	}
+	slices.SortFunc(out, func(a, b ProjectNamespace) int { return strings.Compare(a.Namespace, b.Namespace) })
+	return out, nil
+}
+
+// projectOf returns the forgeai project of a namespace, or "" when the
+// namespace is not a project namespace.
+func projectOf(ctx context.Context, k8s client.Client, namespace string) (string, error) {
+	ns := &corev1.Namespace{}
+	if err := k8s.Get(ctx, client.ObjectKey{Name: namespace}, ns); err != nil {
+		return "", fmt.Errorf("namespace %q: %w", namespace, err)
+	}
+	if ns.Labels[naming.LabelManagedBy] != naming.ManagedBy {
+		return "", nil
+	}
+	return ns.Labels[naming.LabelProject], nil
+}
+
+// Connect switches to a kubeconfig context and a forgeai project namespace.
+// The namespace is only accepted when it carries the forgeai project label,
+// so the GUI cannot be pointed at unrelated parts of the cluster. When no
+// namespace is given and the context default (often "default") is not a
+// project, the first project namespace the user can see is used instead; an
+// admin of a cluster without projects connects to the admin area only. It
+// returns the resolved connection info, including whether the user may
+// administer Projects (used to show the admin area).
+func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
+	rest, defaultNamespace, err := clientConfig(contextName)
 	if err != nil {
 		return ConnInfo{}, err
 	}
-	if namespace == "" {
-		if namespace, _, err = cc.Namespace(); err != nil {
-			return ConnInfo{}, err
-		}
+	explicit := namespace != ""
+	if !explicit {
+		namespace = defaultNamespace
 	}
-	rest.Timeout = 30 * time.Second
 
 	k8s, err := client.New(rest, client.Options{Scheme: scheme()})
 	if err != nil {
@@ -71,14 +138,25 @@ func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
 
 	ctx, cancel := context.WithTimeout(a.ctx, 15*time.Second)
 	defer cancel()
-	ns := &corev1.Namespace{}
 
-	if err := k8s.Get(ctx, client.ObjectKey{Name: namespace}, ns); err != nil {
-		return ConnInfo{}, fmt.Errorf("namespace %q: %w", namespace, err)
+	admin := mustBeAdmin(ctx, k8s)
+	project, err := projectOf(ctx, k8s, namespace)
+	if err == nil && project == "" {
+		err = fmt.Errorf("namespace %q is not a forgeai project", namespace)
 	}
-	project := ns.Labels[naming.LabelProject]
-	if project == "" || ns.Labels[naming.LabelManagedBy] != naming.ManagedBy {
-		return ConnInfo{}, fmt.Errorf("namespace %q is not a forgeai project", namespace)
+	if err != nil && !explicit {
+		if projects, lerr := listProjects(ctx, k8s); lerr == nil {
+			switch {
+			case len(projects) > 0:
+				namespace, project, err = projects[0].Namespace, projects[0].Project, nil
+			case admin:
+				// No projects yet: only the admin area is usable.
+				namespace, err = "", nil
+			}
+		}
+	}
+	if err != nil {
+		return ConnInfo{}, err
 	}
 
 	// Cluster-wide reads need the forgeai catalogues; probe they work.
@@ -87,12 +165,10 @@ func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
 	}
 	info := ConnInfo{
 		Context: contextName, Server: rest.Host, Namespace: namespace, Project: project,
-		Admin: mustBeAdmin(ctx, k8s),
+		Admin: admin,
 	}
 	conn := &Connection{Info: info, k8s: k8s, rest: rest, core: core}
-	// The operator mirrors the platform config into each project namespace;
-	// members cannot read the platform namespace.
-	if cfg, err := platform.Load(ctx, k8s, namespace); err == nil {
+	if cfg, err := platform.Load(ctx, k8s, conn.configNamespace()); err == nil {
 		conn.insecure = cfg.Registry.Insecure
 	}
 	a.mu.Lock()
@@ -177,7 +253,7 @@ func (a *App) Config() (PlatformConfig, error) {
 	}
 	ctx, cancel := a.call()
 	defer cancel()
-	cfg, err := platform.Load(ctx, c.k8s, c.namespace())
+	cfg, err := platform.Load(ctx, c.k8s, c.configNamespace())
 	if err != nil {
 		return PlatformConfig{}, err
 	}

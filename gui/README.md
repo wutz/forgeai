@@ -12,10 +12,12 @@
 ## Live development
 
 ```sh
-wails dev
+make gui-dev    # from the repository root
 ```
 
 This runs a Vite dev server with hot reload. A browser dev server on http://localhost:34115 also exposes the Go methods.
+
+Do not run `wails dev` in this directory directly. It builds its debug binary into `build/bin/forgeai.app` and, on exit, deletes only `Contents/MacOS/forgeai`, leaving a bundle without an executable behind; launching it then reports that forgeai is damaged or incomplete until it is rebuilt. `make gui-dev` (via `hack/gui-dev.sh`) moves the packaged bundle aside for the dev session and restores it afterwards. If you did run `wails dev` directly, `make gui` recreates the app.
 
 ## Building
 

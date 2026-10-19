@@ -269,6 +269,22 @@ forgeai is a desktop console for AI training, RL and inference jobs on Kubernete
 - **Logo**: a white anvil with a four-point spark on a Forge Ember rounded tile (radius ≈ 22% of the side). `gui/frontend/src/Logo.tsx` holds the SVG paths, reused by `frontend/public/favicon.svg`, `build/appicon.png` and `build/windows/icon.ico`; change all of them together. Header 22px next to the "forgeai" wordmark, connect card 40px.
 - **Window chrome**: the macOS title bar is hidden (inset traffic lights); the app header is the drag region. The header has no bottom border — it flows into the sidebar as one white L-shaped frame around the canvas, and only the sidebar keeps a hairline on its right. Without a sidebar (connect screen) the header takes the canvas color.
 
+## Console layout
+
+The app surface follows the Geist ladder but reads as a dense console: a grouped sidebar, a page frame, and card grids of live cluster data. All of it lives in `gui/frontend/src/redesign.css`, layered after `style.css` (same tokens, new layout); `ui.tsx` holds the shared primitives so every view is assembled from the same parts.
+
+- **App canvas** — `--canvas` #f4f5f7 (a step darker than the marketing #fafafa) so white cards read as sheets on the desktop window. Cards stay `{colors.canvas-elevated}` at `--radius-lg` (14px) with a 1px `{colors.hairline}` and a whisper shadow.
+- **Sidebar** — 224px, white, no top border with the header. Items are grouped under uppercase Geist Mono labels (`Workspace`, `Storage`, `Cluster`, `Admin`) at 10.5px / `{colors.faint}`. An item is a 34px row: 16px stroke icon in `{colors.mute}` + 13.5px label; the active row takes the `{colors.hairline-soft}` fill with an `{colors.ember}` icon. Connection context and namespace sit in a footer block pinned to the bottom. At ≤820px the sidebar collapses to a 64px icon rail.
+- **Page frame** — `.main` pads 24/28px and centers a 1180px column. Every view opens with a `PageHeader`: a mono uppercase eyebrow (`Workspace`, `Storage`, …), a 23px/600 title at -0.7px, optional inline meta (live counts), and right-aligned actions. The primary action is `btn-accent` (ember) — one per view.
+- **Metric tiles** — a responsive grid (`repeat(auto-fit, minmax(190px, 1fr))`). Each tile carries a 22px toned icon chip, a 12px mute label, a 26px/600 tabular value with a mute unit, a 12px detail line and an optional `Meter`. Tones: ember (in use), success (running), warning (queued), error (failed), violet (reserved for a second accent), neutral.
+- **Meters** — 6px full-radius tracks on `{colors.hairline-soft}` with a label row above (11.5px mute, tabular figures). Fill tones mirror the tiles; `muted` marks informational usage. Meters are always derived from real list data — there is no fabricated trend chart.
+- **Segmented filter** — an inset `{colors.hairline-soft}` pill container holding 26px segments; the active segment is a white chip with a 1px shadow and an ember-tinted count. Used for job state filters.
+- **Tabs** — underline tabs inside detail cards (34px, 2px ember underline on the active tab), for `Overview` / `Workers` / `Log` / `Env`.
+- **Badges** — 20px full-radius pills at 11px/500: neutral by default, toned for status, instance type, isolation class and quota facts.
+- **Tables** — hairline header row in mono uppercase 11px; 11px/16px cell padding; the first cell is a `.cell-main` / `.cell-sub` pair (name + image or template) so the list reads without extra columns. Selected rows take the ember wash.
+- **Detail split** — list + 420px detail card (`minmax(0, 1fr) 420px`), collapsing to one column at ≤1100px. The detail card has a title head, an action bar (`detail-actions`) and the tab body.
+- **Dialogs** — 620px (440px for small forms), `{rounded.lg}`, Level-2 floating shadow, a dimmed blurred backdrop, a title/subtitle head, a scrolling body and a footer with the cancel and primary actions.
+
 ## Overview
 
 Vercel's Geist system is an exercise in subtraction. The page is a near-white sheet (`{colors.canvas}` — #fafafa) carrying near-black ink (`{colors.ink}` — #171717), and almost nothing else competes. Headings, body copy, primary buttons, and the thin 1px borders that define every card all draw from the same ink-and-grey ladder. The one place color is allowed to exist is the hero, where a soft multi-stop **mesh gradient** — cyan, blue, violet, magenta, amber — blooms behind or beside the headline as the brand's entire decorative system. Everywhere else, restraint.

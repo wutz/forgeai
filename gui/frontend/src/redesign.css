@@ -41,20 +41,26 @@ a { color: inherit; text-decoration: none; }
   transition: background 160ms ease;
 }
 /* The shell header is split into two flex boxes rather than relying on the
-   gradient alone, so the title starts exactly where the sidebar ends. */
+   gradient alone, so the title starts exactly where the sidebar ends.
+   The toggle sits at the right end of the sidebar column, clear of the macOS
+   traffic lights in the top-left corner. */
 .header.header-shell { padding: 0; gap: 0; }
 .header-side {
   flex: 0 0 var(--sidebar-w); width: var(--sidebar-w);
-  display: flex; align-items: center; padding: 0 18px;
+  display: flex; align-items: center; justify-content: flex-end; padding: 0 14px;
 }
+/* Keep the traffic lights (hidden-inset title bar) clear of the column. */
+.platform-darwin .header.header-shell { padding-left: 0; }
+.platform-darwin .header-side { padding-left: 84px; }
 .header-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 16px; padding: 0 20px 0 24px; }
-/* Collapsed: the sidebar is gone, so the toggle sits on the canvas and the
-   header is one flat surface. */
+/* Collapsed: the sidebar is gone, so the toggle moves to the left edge after
+   the traffic lights and the header is one flat surface. */
 .app.sidebar-collapsed { --sidebar-w: 0px; }
 .app.sidebar-collapsed .header { background: var(--canvas); }
 .app.sidebar-collapsed .header-side {
-  flex: 0 0 auto; width: auto; padding: 0 12px 0 20px;
+  flex: 0 0 auto; width: auto; justify-content: flex-start; padding: 0 12px 0 20px;
 }
+.platform-darwin .app.sidebar-collapsed .header-side { padding-left: 84px; }
 .logo { font-size: 15px; }
 .header-toggle { color: var(--body); }
 
@@ -377,7 +383,8 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
   .app .sidebar { display: none; }
   .app:not(.sidebar-collapsed) { --sidebar-w: 224px; }
   .app:not(.sidebar-collapsed) .header { background: linear-gradient(to right, var(--chrome) 0 calc(var(--sidebar-w) - 1px), var(--chrome-line) calc(var(--sidebar-w) - 1px) var(--sidebar-w), var(--canvas) var(--sidebar-w) 100%); }
-  .app:not(.sidebar-collapsed) .header-side { flex: 0 0 var(--sidebar-w); width: var(--sidebar-w); padding: 0 18px; }
+  .app:not(.sidebar-collapsed) .header-side { flex: 0 0 var(--sidebar-w); width: var(--sidebar-w); padding: 0 14px; }
+  .platform-darwin .app:not(.sidebar-collapsed) .header-side { padding-left: 84px; }
   .app:not(.sidebar-collapsed) .shell { grid-template-columns: var(--sidebar-w) minmax(0, 1fr); }
   .app:not(.sidebar-collapsed) .sidebar { display: flex; }
 }

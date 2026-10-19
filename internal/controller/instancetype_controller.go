@@ -58,8 +58,8 @@ type InstanceTypeReconciler struct {
 	Now func() time.Time
 }
 
-// +kubebuilder:rbac:groups=forgeai.scclabs.dev,resources=instancetypes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=forgeai.scclabs.dev,resources=instancetypes/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=instancetypes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=instancetypes/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=nodes;pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=resourceflavors,verbs=get;list;watch;create;update;patch;delete
 

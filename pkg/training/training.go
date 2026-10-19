@@ -23,7 +23,7 @@ import (
 )
 
 // AnnotationTemplateSpec stores the job form of a template (JSON).
-const AnnotationTemplateSpec = "forgeai.scclabs.dev/template-spec"
+const AnnotationTemplateSpec = "forgeai.wutz.dev/template-spec"
 
 // MaxNameLength leaves room for retry suffixes (-r99) within 63 characters.
 const MaxNameLength = 50

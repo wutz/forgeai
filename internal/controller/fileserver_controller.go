@@ -57,7 +57,7 @@ const (
 	labelInstance = "app.kubernetes.io/instance"
 	kindSecret    = "Secret"
 	// annotationServedVolumes on the pod template restarts dufs when volumes change.
-	annotationServedVolumes = "forgeai.scclabs.dev/volumes"
+	annotationServedVolumes = "forgeai.wutz.dev/volumes"
 	// activityProbeInterval is how often a running server's access log is read.
 	activityProbeInterval = time.Minute
 )
@@ -76,9 +76,9 @@ type FileServerReconciler struct {
 	Now      func() time.Time
 }
 
-// +kubebuilder:rbac:groups=forgeai.scclabs.dev,resources=fileservers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=forgeai.scclabs.dev,resources=fileservers/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=forgeai.scclabs.dev,resources=fileservers/finalizers,verbs=update
+// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=fileservers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=fileservers/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=fileservers/finalizers,verbs=update
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services;secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=pods/log,verbs=get

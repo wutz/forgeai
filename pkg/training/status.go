@@ -17,7 +17,7 @@ import (
 
 // AnnotationStopped is set by users to stop a job; the operator deactivates
 // its Kueue workload, which releases the pods and keeps the job.
-const AnnotationStopped = "forgeai.scclabs.dev/stopped"
+const AnnotationStopped = "forgeai.wutz.dev/stopped"
 
 // Phase is a summary of a TrainJob's lifecycle.
 type Phase string
@@ -33,7 +33,7 @@ const (
 	PhaseRetried Phase = "Retried"
 )
 
-// Failure reasons written to forgeai.scclabs.dev/failure-reason.
+// Failure reasons written to forgeai.wutz.dev/failure-reason.
 const (
 	ReasonNodeFailure     = "NodeFailure"
 	ReasonEvicted         = "Evicted"

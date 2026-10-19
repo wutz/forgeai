@@ -114,7 +114,7 @@ func (a *App) isolate(ctx context.Context, k8s client.Client) error {
 func mustBeAdmin(ctx context.Context, k8s client.Client) bool {
 	sar := &authv1.SelfSubjectAccessReview{Spec: authv1.SelfSubjectAccessReviewSpec{
 		ResourceAttributes: &authv1.ResourceAttributes{
-			Group: "forgeai.scclabs.dev", Resource: "projects", Verb: "create",
+			Group: "forgeai.wutz.dev", Resource: "projects", Verb: "create",
 		},
 	}}
 	if err := k8s.Create(ctx, sar); err != nil {

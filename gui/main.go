@@ -6,6 +6,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
 
 	"github.com/wutz/forgeai/gui/app"
 )
@@ -25,7 +26,12 @@ func main() {
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 250, G: 250, B: 250, A: 1},
-		OnStartup:        a.Startup,
+		// Hide the macOS title bar: the app header is the drag region and
+		// leaves room for the window controls.
+		Mac: &mac.Options{
+			TitleBar: mac.TitleBarHiddenInset(),
+		},
+		OnStartup: a.Startup,
 		Bind: []any{
 			a,
 		},

@@ -44,12 +44,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .app { display: flex; flex-direction: column; height: 100%; }
 
-/* Header */
+/* Header: borderless, flows into the sidebar and doubles as the title bar */
 .header {
   display: flex; align-items: center; gap: 16px;
-  height: 56px; padding: 0 20px;
-  background: var(--surface); border-bottom: 1px solid var(--hairline);
+  height: 52px; padding: 0 20px; flex-shrink: 0;
+  background: var(--surface); --wails-draggable: drag; user-select: none;
 }
+.header button, .header select, .header input { --wails-draggable: no-drag; }
+/* Without a sidebar the header melts into the canvas. */
+.app-connect .header { background: var(--canvas); }
+/* Room for the macOS traffic lights of the hidden-inset title bar. */
+.platform-darwin .header { padding-left: 84px; }
 .logo { display: flex; align-items: center; gap: 8px; font-weight: 600; letter-spacing: -0.32px; font-size: 16px; }
 .logo-mark { width: 20px; height: 20px; border-radius: 5px; background: var(--ember); display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 700; }
 .conn { display: flex; align-items: center; gap: 8px; margin-left: auto; }
@@ -150,7 +155,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .shell { flex: 1; display: grid; grid-template-columns: 168px minmax(0, 1fr); min-height: 0; }
 .sidebar {
   display: flex; flex-direction: column; gap: 2px;
-  padding: 12px 8px; background: var(--surface); border-right: 1px solid var(--hairline);
+  padding: 4px 8px 12px; background: var(--surface); border-right: 1px solid var(--hairline);
 }
 .nav-item {
   display: flex; align-items: center; height: 34px; padding: 0 10px;

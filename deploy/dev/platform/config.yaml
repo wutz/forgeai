@@ -29,12 +29,15 @@ network:
 fileServer:
   idleTimeout: 30m
 sandbox:
-  # agent-sandbox is installed in agent-sandbox-system; gvisor and kata are
-  # the RuntimeClasses it offers (see kubectl get runtimeclass).
+  # agent-sandbox is installed in agent-sandbox-system.
   namespace: agent-sandbox-system
-  defaultImage: ghcr.io/kubernetes-sigs/agent-sandbox/python-runtime-sandbox:latest
-  runtimeClasses: [gvisor, kata]
-  defaultRuntimeClass: gvisor
+  defaultImage: registry.k8s.io/agent-sandbox/python-runtime-sandbox:v0.1.0
+  # The gvisor/kata RuntimeClass objects exist on bz1-dev1 but no node has the
+  # runsc/kata handlers configured ("no runtime for ... is configured"), so
+  # sandboxes run on the node runtime (runc) here. List a runtime class under
+  # runtimeClasses once the handlers are installed on the nodes, then it
+  # becomes selectable in the GUI.
+  runtimeClasses: []
   # Suspend a sandbox that no client used for 30m (0 disables it).
   idleTimeout: 30m
 training:

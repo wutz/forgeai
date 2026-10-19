@@ -11,6 +11,7 @@ import {Images} from './Images'
 import {Resources} from './Resources'
 import {Admin} from './Admin'
 import {errText} from './util'
+import {Logo} from './Logo'
 
 const PREFS = 'forgeai.connection'
 
@@ -126,6 +127,7 @@ function ConnectScreen({contexts, onConnect, loading, error}: {
             onConnect(ctx, ns.trim())
           }}>
             <div>
+              <Logo size={40}/>
               <h2>Connect to a cluster</h2>
               <p>Pick the kubeconfig context of your project. The namespace is the project
                 namespace (e.g. forge-myteam); ask your admin for a kubeconfig if you don't
@@ -167,7 +169,7 @@ function ConnectScreen({contexts, onConnect, loading, error}: {
 function Header({children}: {children?: React.ReactNode}) {
   return (
     <header className="header">
-      <div className="logo"><span className="logo-mark" aria-hidden>F</span>forgeai</div>
+      <div className="logo"><Logo/>forgeai</div>
       {children}
     </header>
   )

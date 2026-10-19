@@ -56,7 +56,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* Room for the macOS traffic lights of the hidden-inset title bar. */
 .platform-darwin .header { padding-left: 84px; }
 .logo { display: flex; align-items: center; gap: 8px; font-weight: 600; letter-spacing: -0.32px; font-size: 16px; }
-.logo-mark { width: 20px; height: 20px; border-radius: 5px; background: var(--ember); display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 700; }
+.logo-mark { display: block; flex-shrink: 0; }
 .conn { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .conn-meta { color: var(--mute); font-size: 12px; font-family: var(--mono); }
 
@@ -148,6 +148,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* Connect screen */
 .connect { max-width: 480px; margin: 72px auto; }
 .connect form { display: flex; flex-direction: column; gap: 14px; }
+.connect .logo-mark { margin-bottom: 16px; }
 .connect h2 { margin: 0 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -0.96px; }
 .connect p { margin: 0 0 20px; color: var(--body); }
 

@@ -13,8 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wutz/forgeai/pkg/platform"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -92,6 +90,3 @@ func (a *App) call() (context.Context, context.CancelFunc) {
 }
 
 func (c *Connection) namespace() string { return c.Info.Namespace }
-
-// systemNamespace is where the platform config lives.
-func systemNamespace() string { return platform.Namespace() }

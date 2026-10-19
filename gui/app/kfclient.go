@@ -61,6 +61,19 @@ func trainJobObject(tj *kf.TrainJob) (*unstructured.Unstructured, error) {
 	return u, nil
 }
 
+// createTrainJob creates a rendered TrainJob and returns it as stored, with
+// the server-set creation timestamp and UID.
+func createTrainJob(ctx context.Context, c *Connection, tj *kf.TrainJob) (*kf.TrainJob, error) {
+	u, err := trainJobObject(tj)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.k8s.Create(ctx, u); err != nil {
+		return nil, err
+	}
+	return decodeTrainJob(u)
+}
+
 // encodeTrainJob converts a typed TrainJob back for update calls.
 func encodeTrainJob(tj *kf.TrainJob) (*unstructured.Unstructured, error) {
 	m, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tj)

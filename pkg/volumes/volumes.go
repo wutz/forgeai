@@ -29,6 +29,9 @@ var (
 	ErrInUse = errors.New("volume is in use")
 	// ErrInTrash is returned for operations on a trashed volume.
 	ErrInTrash = errors.New("volume is in the trash")
+	// ErrNotReady is returned when growing a volume that is not bound yet;
+	// Kubernetes only expands bound claims.
+	ErrNotReady = errors.New("volume is not ready")
 )
 
 var nameRE = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
@@ -213,6 +216,9 @@ func (c *Client) Resize(ctx context.Context, name string, sizeGiB int64) (*Volum
 	}
 	if InTrash(pvc) {
 		return nil, ErrInTrash
+	}
+	if pvc.Status.Phase != corev1.ClaimBound {
+		return nil, fmt.Errorf("%w: %s is still being provisioned, grow it once it is Bound", ErrNotReady, name)
 	}
 	cur := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
 	if sizeGiB<<30 < cur.Value() {

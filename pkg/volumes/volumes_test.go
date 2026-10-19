@@ -8,6 +8,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -33,6 +34,18 @@ func TestLifecycle(t *testing.T) {
 	}
 	if _, err := c.Create(ctx, cfg, "data", "", 10); err == nil {
 		t.Error("expected already exists")
+	}
+	if _, err := c.Resize(ctx, "data", 20); !errors.Is(err, ErrNotReady) {
+		t.Fatalf("resize before bound: %v", err)
+	}
+	pvc := &corev1.PersistentVolumeClaim{}
+	if err := k8s.Get(ctx, types.NamespacedName{Namespace: "forge-a", Name: "data"}, pvc); err != nil {
+		t.Fatal(err)
+	}
+	pvc.Status.Phase = corev1.ClaimBound
+	pvc.Status.Capacity = corev1.ResourceList{corev1.ResourceStorage: pvc.Spec.Resources.Requests[corev1.ResourceStorage]}
+	if err := k8s.Status().Update(ctx, pvc); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := c.Resize(ctx, "data", 5); err == nil {
 		t.Error("expected shrink error")

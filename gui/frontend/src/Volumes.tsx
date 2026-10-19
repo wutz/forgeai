@@ -61,7 +61,8 @@ export function Volumes() {
                 <td className="muted mono">{v.users?.join(', ') || '—'}</td>
                 <td className="muted">{fmtDate(v.created)}</td>
                 <td className="actions">
-                  <button className="btn btn-sm" onClick={() => {
+                  <button className="btn btn-sm" disabled={v.phase !== 'Bound' && v.phase !== 'Resizing'}
+                    title={v.phase === 'Pending' ? 'Available once the volume is provisioned' : undefined} onClick={() => {
                     const size = prompt(`New size in GiB (current ${v.capacityGiB || v.requestedGiB}):`,
                       String(Math.max(v.capacityGiB, v.requestedGiB) * 2))
                     if (size) ResizeVolume(v.name, +size).then(refresh).catch(e => setError(errText(e)))

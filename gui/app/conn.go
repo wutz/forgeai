@@ -14,10 +14,10 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/scclabs/forgeai/api/v1alpha1"
+	v1 "github.com/wutz/forgeai/api/v1alpha1"
 
-	"github.com/scclabs/forgeai/pkg/naming"
-	"github.com/scclabs/forgeai/pkg/platform"
+	"github.com/wutz/forgeai/pkg/naming"
+	"github.com/wutz/forgeai/pkg/platform"
 )
 
 // loadingRules reads $KUBECONFIG or ~/.kube/config.

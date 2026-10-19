@@ -3,8 +3,8 @@ package app
 import (
 	"time"
 
-	"github.com/scclabs/forgeai/pkg/platform"
-	"github.com/scclabs/forgeai/pkg/volumes"
+	"github.com/wutz/forgeai/pkg/platform"
+	"github.com/wutz/forgeai/pkg/volumes"
 )
 
 // Volume is the view model of a project volume (PVC).

@@ -11,8 +11,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/scclabs/forgeai/pkg/kf"
-	"github.com/scclabs/forgeai/pkg/naming"
+	"github.com/wutz/forgeai/pkg/kf"
+	"github.com/wutz/forgeai/pkg/naming"
 )
 
 // AnnotationStopped is set by users to stop a job; the operator deactivates

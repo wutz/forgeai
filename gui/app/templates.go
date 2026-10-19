@@ -3,9 +3,9 @@ package app
 import (
 	"time"
 
-	"github.com/scclabs/forgeai/pkg/kf"
-	"github.com/scclabs/forgeai/pkg/naming"
-	"github.com/scclabs/forgeai/pkg/training"
+	"github.com/wutz/forgeai/pkg/kf"
+	"github.com/wutz/forgeai/pkg/naming"
+	"github.com/wutz/forgeai/pkg/training"
 )
 
 // Template is the view model of a job template (a TrainingRuntime).

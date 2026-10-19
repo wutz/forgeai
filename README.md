@@ -94,7 +94,7 @@ make gui                       # gui/build/bin/forgeai.app (needs a wails CLI bu
 ```sh
 kubectl create ns forgeai-system
 kubectl -n forgeai-system create secret generic forgeai-compat-api-keys --from-literal=APIKEY=<key>
-make deploy-dev                # ko build -> ghcr.io/scclabs/forgeai (public), kubectl apply
+make deploy-dev                # ko build -> ghcr.io/wutz/forgeai (public), kubectl apply
 ```
 
 Prerequisites:

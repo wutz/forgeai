@@ -15,11 +15,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/scclabs/forgeai/api/v1alpha1"
-	"github.com/scclabs/forgeai/pkg/kf"
-	"github.com/scclabs/forgeai/pkg/naming"
-	"github.com/scclabs/forgeai/pkg/platform"
-	"github.com/scclabs/forgeai/pkg/training"
+	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	"github.com/wutz/forgeai/pkg/kf"
+	"github.com/wutz/forgeai/pkg/naming"
+	"github.com/wutz/forgeai/pkg/platform"
+	"github.com/wutz/forgeai/pkg/training"
 )
 
 // Job is the view model of a TrainJob. Retries stay under their original job

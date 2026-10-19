@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/scclabs/forgeai/pkg/platform"
+	"github.com/wutz/forgeai/pkg/platform"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -21,7 +21,7 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/scclabs/forgeai/api/v1alpha1"
+	v1 "github.com/wutz/forgeai/api/v1alpha1"
 )
 
 // ErrNotConnected is returned when no kubeconfig context is selected.

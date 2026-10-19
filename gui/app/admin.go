@@ -10,9 +10,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/scclabs/forgeai/api/v1alpha1"
-	"github.com/scclabs/forgeai/pkg/kubeconfig"
-	"github.com/scclabs/forgeai/pkg/platform"
+	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	"github.com/wutz/forgeai/pkg/kubeconfig"
+	"github.com/wutz/forgeai/pkg/platform"
 )
 
 // Project is the admin view of a Project.

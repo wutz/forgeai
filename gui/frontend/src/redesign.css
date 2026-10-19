@@ -24,12 +24,12 @@ a { color: inherit; text-decoration: none; }
 .icon { display: block; flex-shrink: 0; }
 
 /* Header */
-.header { height: 56px; gap: 12px; }
+.header { height: 56px; gap: 12px; background: var(--canvas); }
 .logo { font-size: 15px; }
 
 /* Shell + grouped sidebar */
 .shell { grid-template-columns: 224px minmax(0, 1fr); }
-.sidebar { padding: 8px 12px 12px; gap: 2px; }
+.sidebar { padding: 8px 12px 12px; gap: 2px; background: var(--canvas); }
 .nav-group { display: flex; flex-direction: column; gap: 1px; margin-top: 14px; }
 .nav-group:first-child { margin-top: 2px; }
 .nav-label {

@@ -267,7 +267,7 @@ forgeai is a desktop console for AI training, RL and inference jobs on Kubernete
 - **CSS**: `gui/frontend/src/style.css` mirrors these tokens as custom properties (`--ember`, `--ember-deep`, `--ember-soft`, `--success`, ...); change both together.
 - Ink (`{colors.ink}`) remains the default for headings and secondary buttons; ember is used sparingly (one primary action per view).
 - **Logo**: a white anvil with a four-point spark on a Forge Ember rounded tile (radius ≈ 22% of the side). `gui/frontend/src/Logo.tsx` holds the SVG paths, reused by `frontend/public/favicon.svg`, `build/appicon.png` and `build/windows/icon.ico`; change all of them together. Header 22px next to the "forgeai" wordmark, connect card 40px.
-- **Window chrome**: the macOS title bar is hidden (inset traffic lights); the app header is the drag region. The header has no bottom border — it flows into the sidebar as one white L-shaped frame around the canvas, and only the sidebar keeps a hairline on its right. Without a sidebar (connect screen) the header takes the canvas color.
+- **Window chrome**: the macOS title bar is hidden (inset traffic lights); the app header is the drag region. The header and sidebar share the canvas color, so the window reads as one continuous grey frame; cards are the only white sheets. The sidebar keeps a hairline on its right.
 
 ## Console layout
 

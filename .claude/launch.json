@@ -4,7 +4,7 @@
     {
       "name": "gui",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "cd gui && wails dev -browser=false"],
+      "runtimeArgs": ["-c", "hack/gui-dev.sh -browser=false"],
       "port": 34115
     }
   ]

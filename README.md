@@ -194,6 +194,7 @@ make test                      # operator unit tests with envtest (Trainer and K
 make lint
 make test-e2e                  # against a dedicated Kind cluster
 make gui                       # gui/build/bin/forgeai.app (needs a wails CLI built with golang.org/x/tools >= v0.52 first on PATH)
+make gui-dev                   # wails dev; keeps the packaged app intact (plain `wails dev` deletes its executable)
 ```
 
 After editing `api/v1alpha1/*_types.go` or kubebuilder markers, run `make manifests generate`.

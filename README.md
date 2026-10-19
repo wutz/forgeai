@@ -12,7 +12,7 @@ forgeai is a Kubernetes-native AI platform covering development, training, RL an
 ## TrainingJob
 
 ```yaml
-apiVersion: forgeai.scclabs.dev/v1alpha1
+apiVersion: forgeai.wutz.dev/v1alpha1
 kind: TrainingJob
 metadata:
   name: p-97a5af344957-demo   # p-{fnv1a(ns-userID)[:12]}-{jobID}, same as scc-k8s-v2
@@ -94,7 +94,7 @@ make gui                       # gui/build/bin/forgeai.app (needs a wails CLI bu
 ```sh
 kubectl create ns forgeai-system
 kubectl -n forgeai-system create secret generic forgeai-compat-api-keys --from-literal=APIKEY=<key>
-make deploy-dev                # ko build -> ghcr.io/scclabs/forgeai (public), kubectl apply
+make deploy-dev                # ko build -> ghcr.io/wutz/forgeai (public), kubectl apply
 ```
 
 Prerequisites:

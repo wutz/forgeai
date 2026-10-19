@@ -14,10 +14,10 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/scclabs/forgeai/api/v1alpha1"
+	v1 "github.com/wutz/forgeai/api/v1alpha1"
 
-	"github.com/scclabs/forgeai/pkg/naming"
-	"github.com/scclabs/forgeai/pkg/platform"
+	"github.com/wutz/forgeai/pkg/naming"
+	"github.com/wutz/forgeai/pkg/platform"
 )
 
 // loadingRules reads $KUBECONFIG or ~/.kube/config.
@@ -114,7 +114,7 @@ func (a *App) isolate(ctx context.Context, k8s client.Client) error {
 func mustBeAdmin(ctx context.Context, k8s client.Client) bool {
 	sar := &authv1.SelfSubjectAccessReview{Spec: authv1.SelfSubjectAccessReviewSpec{
 		ResourceAttributes: &authv1.ResourceAttributes{
-			Group: "forgeai.scclabs.dev", Resource: "projects", Verb: "create",
+			Group: "forgeai.wutz.dev", Resource: "projects", Verb: "create",
 		},
 	}}
 	if err := k8s.Create(ctx, sar); err != nil {

@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/scclabs/forgeai/pkg/platform"
+	"github.com/wutz/forgeai/pkg/platform"
 )
 
 func TestLifecycle(t *testing.T) {

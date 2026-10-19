@@ -9,7 +9,7 @@ patches:
   patch: |-
     - op: replace
       path: /spec/template/spec/containers/0/image
-      value: ko://github.com/scclabs/forgeai/cmd
+      value: ko://github.com/wutz/forgeai/cmd
     - op: replace
       path: /spec/template/spec/containers/0/command
       value: ["/ko-app/cmd"]

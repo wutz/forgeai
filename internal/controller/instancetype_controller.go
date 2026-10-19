@@ -38,11 +38,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	v1 "github.com/scclabs/forgeai/api/v1alpha1"
-	"github.com/scclabs/forgeai/pkg/instancetype"
-	"github.com/scclabs/forgeai/pkg/kf"
-	"github.com/scclabs/forgeai/pkg/naming"
-	"github.com/scclabs/forgeai/pkg/platform"
+	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	"github.com/wutz/forgeai/pkg/instancetype"
+	"github.com/wutz/forgeai/pkg/kf"
+	"github.com/wutz/forgeai/pkg/naming"
+	"github.com/wutz/forgeai/pkg/platform"
 )
 
 // instanceTypeKey is the single reconcile request of the InstanceType
@@ -58,8 +58,8 @@ type InstanceTypeReconciler struct {
 	Now func() time.Time
 }
 
-// +kubebuilder:rbac:groups=forgeai.scclabs.dev,resources=instancetypes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=forgeai.scclabs.dev,resources=instancetypes/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=instancetypes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=instancetypes/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=nodes;pods,verbs=get;list;watch
 // +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=resourceflavors,verbs=get;list;watch;create;update;patch;delete
 

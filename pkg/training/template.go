@@ -5,7 +5,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/scclabs/forgeai/pkg/kf"
+	"github.com/wutz/forgeai/pkg/kf"
 )
 
 func batchJobTemplate(image string, cmd []string, env []corev1.EnvVar) batchv1.JobTemplateSpec {

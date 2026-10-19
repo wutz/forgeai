@@ -7,8 +7,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/scclabs/forgeai/pkg/harbor"
-	"github.com/scclabs/forgeai/pkg/naming"
+	"github.com/wutz/forgeai/pkg/harbor"
+	"github.com/wutz/forgeai/pkg/naming"
 )
 
 // Image is one pushed image tag.

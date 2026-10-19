@@ -7,7 +7,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 
-	"github.com/scclabs/forgeai/gui/app"
+	"github.com/wutz/forgeai/gui/app"
 )
 
 //go:embed all:frontend/dist

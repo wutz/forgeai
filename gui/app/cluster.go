@@ -7,9 +7,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/scclabs/forgeai/api/v1alpha1"
-	"github.com/scclabs/forgeai/pkg/instancetype"
-	"github.com/scclabs/forgeai/pkg/naming"
+	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	"github.com/wutz/forgeai/pkg/instancetype"
+	"github.com/wutz/forgeai/pkg/naming"
 )
 
 // InstanceType is the view model of a GPU instance type.

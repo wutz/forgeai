@@ -90,7 +90,9 @@ func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
 		Admin: mustBeAdmin(ctx, k8s),
 	}
 	conn := &Connection{Info: info, k8s: k8s, rest: rest, core: core}
-	if cfg, err := platform.Load(ctx, k8s, systemNamespace()); err == nil {
+	// The operator mirrors the platform config into each project namespace;
+	// members cannot read the platform namespace.
+	if cfg, err := platform.Load(ctx, k8s, namespace); err == nil {
 		conn.insecure = cfg.Registry.Insecure
 	}
 	a.mu.Lock()

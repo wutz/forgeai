@@ -1,7 +1,7 @@
 ---
 version: alpha
-name: Vercel Analysis
-description: An analysis of Vercel's design language — the Geist system, a stark black-on-near-white developer-platform aesthetic where a single ink tone carries every heading, CTA, and border, and the only color the page allows itself is a multi-stop mesh gradient (cyan / blue / violet / magenta / amber) confined to the hero. Geist Sans drives tightly-tracked display type, Geist Mono labels the technical eyebrows, and pill-shaped black buttons mark the marketing CTAs while 6px square buttons handle app and nav chrome.
+name: forgeai (Geist + Forge Ember)
+description: The forgeai desktop console uses Vercel's Geist system as an app surface with Forge Ember (#ea580c) as the single theme color; see the "forgeai Theme" section. The rest of this file is an analysis of Vercel's design language — the Geist system, a stark black-on-near-white developer-platform aesthetic where a single ink tone carries every heading, CTA, and border, and the only color the page allows itself is a multi-stop mesh gradient (cyan / blue / violet / magenta / amber) confined to the hero. Geist Sans drives tightly-tracked display type, Geist Mono labels the technical eyebrows, and pill-shaped black buttons mark the marketing CTAs while 6px square buttons handle app and nav chrome.
 
 colors:
   primary: "#171717"
@@ -167,6 +167,24 @@ components:
     typography: "{typography.button-md}"
     rounded: "{rounded.sm}"
     padding: "0px 6px"
+  # forgeai app components (Forge Ember accent)
+  button-accent-sm:
+    backgroundColor: "{colors.ember}"
+    textColor: "{colors.on-primary}"
+    typography: "{typography.button-md}"
+    rounded: "{rounded.sm}"
+    padding: "0px 6px"
+  button-accent-sm-hover:
+    backgroundColor: "{colors.ember-deep}"
+    textColor: "{colors.on-primary}"
+  nav-item-active:
+    backgroundColor: "{colors.ember-soft}"
+    textColor: "{colors.ember-deep}"
+    rounded: "{rounded.sm}"
+  table-row-selected:
+    backgroundColor: "{colors.ember-soft}"
+  input-focus:
+    borderColor: "{colors.ember}"
   button-category-pill:
     backgroundColor: "{colors.canvas-elevated}"
     textColor: "{colors.ink}"
@@ -242,10 +260,11 @@ components:
 
 ## forgeai Theme
 
-forgeai is a desktop console for AI training, RL and inference jobs on Kubernetes. It follows the Geist system below as an **app surface** (not marketing): 6px square buttons (`{components.button-primary-sm}` / `{components.button-ghost-sm}`), hairline cards and tables, no hero mesh gradient.
+forgeai is a desktop console for AI training, RL and inference jobs on Kubernetes. It follows the Geist system below as an **app surface** (not marketing): 6px square buttons (`{components.button-accent-sm}` / `{components.button-ghost-sm}`), hairline cards and tables, no hero mesh gradient.
 
-- **Theme color — Forge Ember** (`{colors.ember}` #ea580c): the heat of a forge, matching the name. Used for the primary action ("New job"), the active nav item, focus rings and the logo mark. Press tone `{colors.ember-deep}` (#c2410c), wash `{colors.ember-soft}` (#ffedd5) for selected rows. Ember replaces Vercel Blue as the accent; `{colors.link}` stays for plain links.
-- **Status colors**: Running `{colors.success}`, Queued / Pending `{colors.warning}`, Failed `{colors.error}`, Succeeded / Stopped `{colors.mute}`. Status is always text + dot, never color alone.
+- **Theme color — Forge Ember** (`{colors.ember}` #ea580c): the heat of a forge, matching the name and the platform's job of "forging" models. Used for the primary action (`{components.button-accent-sm}`, e.g. "New job"), the active nav item (`{components.nav-item-active}`), focus rings and input focus (`{components.input-focus}`, with an `{colors.ember-soft}` 3px ring) and the logo mark. Press tone `{colors.ember-deep}` (#c2410c), wash `{colors.ember-soft}` (#ffedd5) for selected rows (`{components.table-row-selected}`). Ember replaces Vercel Blue and ink as the accent; `{colors.link}` stays for plain links.
+- **Status colors**: Running `{colors.success}` (#16a34a); Queued / Pending / Restarting / Stopping `{colors.warning}`; Failed `{colors.error}` (text and dot); Succeeded / Stopped / Idle `{colors.mute}`. Status is always text + dot, never color alone.
+- **CSS**: `gui/frontend/src/style.css` mirrors these tokens as custom properties (`--ember`, `--ember-deep`, `--ember-soft`, `--success`, ...); change both together.
 - Ink (`{colors.ink}`) remains the default for headings and secondary buttons; ember is used sparingly (one primary action per view).
 
 ## Overview
@@ -291,7 +310,7 @@ Surfaces barely lift. Cards are white (`{colors.canvas-elevated}`) on the #fafaf
 ### Semantic
 - **Error** (`{colors.error}` — #ee0000): validation / destructive, with a deep press tier `{colors.error-deep}` (#c50000).
 - **Warning** (`{colors.warning}` — #f5a623): caution states, with soft `{colors.warning-soft}` and deep `{colors.warning-deep}` tiers.
-- **Success** maps to `{colors.link}` (#0070f3) — the blue doubles as the positive/active signal.
+- **Success** maps to `{colors.link}` (#0070f3) on Vercel — the blue doubles as the positive/active signal. forgeai uses a distinct green `{colors.success}` (#16a34a, soft `{colors.success-soft}`) instead, so running jobs are not confused with links.
 
 ### Brand Gradient
 Three named two-stop gradients form the legacy Vercel gradient identity, surviving as illustration and accent washes:

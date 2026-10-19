@@ -2,6 +2,7 @@ import {FormEvent, useEffect, useState} from 'react'
 import {CreateSandbox, ListInstanceTypes, ListVolumes, SandboxOptions} from '../wailsjs/go/app/App'
 import {app, sandbox, volumes, v1} from '../wailsjs/go/models'
 import {envToLines, linesToEnv, errText} from './util'
+import {Dialog} from './ui'
 
 // SandboxCreateDialog is the "New sandbox" form: image, isolation runtime
 // class, optional instance type and volumes, and the auto-stop timer.
@@ -56,10 +57,14 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   }
 
   return (
-    <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="dialog">
-        <form onSubmit={submit}>
-          <h2>New sandbox</h2>
+    <Dialog title="New sandbox" subtitle="An isolated, resumable agent environment"
+            onClose={onClose} footer={<>
+              <button className="btn" onClick={onClose}>Cancel</button>
+              <button className="btn btn-primary" onClick={submit} disabled={busy || !f.name || !f.image}>
+                {busy ? 'Creating…' : 'Create sandbox'}
+              </button>
+            </>}>
+        <form onSubmit={submit} className="dialog-form">
           {error && <div className="banner banner-error">{error}</div>}
           <div className="field">
             <label htmlFor="s-name">Name</label>
@@ -132,13 +137,6 @@ export function SandboxCreateDialog({onClose, onCreated}: {
             </div>
           </div>
         </form>
-        <div className="dialog-foot">
-          <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={submit} disabled={busy || !f.name || !f.image}>
-            {busy ? 'Creating…' : 'Create sandbox'}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Dialog>
   )
 }

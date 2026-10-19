@@ -2,6 +2,7 @@ import {useEffect, useRef, useState} from 'react'
 import {Files, Heartbeat} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {errText} from './util'
+import {Card, Empty, Icon, PageHeader, Spinner} from './ui'
 
 // Files opens the on-demand file browser (dufs): it wakes the project's
 // FileServer, embeds the served URL and keeps a heartbeat going while the
@@ -16,6 +17,7 @@ export function FilesView() {
 
   useEffect(() => {
     alive.current = true
+    setReady(false)
     Files().then(f => {
       setState(f)
       if (f.phase === 'Ready') setReady(true)
@@ -41,23 +43,26 @@ export function FilesView() {
     : state?.url
 
   return (
-    <>
-      {error && <div className="banner banner-error">{error}</div>}
-      <div className="toolbar">
-        <h1 className="title">Files</h1>
-        {state && <span className={`status status-${state.phase.toLowerCase()}`}>
-          <span className="dot" aria-hidden/>{state.phase}
-        </span>}
-        <span className="muted">{state?.volumes?.join(', ') || ''}</span>
-        <span className="spacer"/>
-        {state?.url && !embed && (
-          <button className="btn" onClick={() => setTick(t => t + 1)}>Retry</button>
-        )}
-        {state?.url && (
-          <a className="btn" href={state.url} target="_blank" rel="noreferrer">Open in browser</a>
-        )}
-      </div>
+    <div className="page">
+      <PageHeader eyebrow="Storage" title="Files"
+                  meta={state && (
+                    <span className={`status status-${state.phase.toLowerCase()}`}>
+                      <span className="dot" aria-hidden/>{state.phase}
+                    </span>
+                  )}
+                  actions={<>
+                    {state?.url && !embed && (
+                      <button className="btn btn-sm" onClick={() => setTick(t => t + 1)}>Retry</button>
+                    )}
+                    {state?.url && (
+                      <a className="btn btn-sm" href={state.url} target="_blank" rel="noreferrer">
+                        <Icon name="external" size={13}/>Open in browser
+                      </a>
+                    )}
+                  </>}/>
+      {error && <div className="banner banner-error" role="alert">{error}</div>}
       <p className="muted note">
+        {state?.volumes?.length ? `Serving ${state.volumes.join(', ')}. ` : ''}
         Shared volumes are served over HTTPS and scaled to zero when idle. Uploading here counts
         as activity and keeps the server up.
       </p>
@@ -66,11 +71,15 @@ export function FilesView() {
           <iframe src={embed} title="Files" allow="clipboard-write"/>
         </div>
       ) : (
-        <div className="card"><div className="empty">
-          {state?.phase === 'Starting' ? 'Starting the file server…' :
-            state?.phase === 'Idle' ? 'Waking the file server…' : 'Waiting for the file server…'}
-        </div></div>
+        <Card>
+          {state ? (
+            <Spinner label={state.phase === 'Starting' ? 'Starting the file server…' :
+              state.phase === 'Idle' ? 'Waking the file server…' : 'Waiting for the file server…'}/>
+          ) : (
+            <Empty icon="folder" title="Opening the file browser…"/>
+          )}
+        </Card>
       )}
-    </>
+    </div>
   )
 }

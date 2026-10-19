@@ -6,7 +6,7 @@ forgeai is a Kubernetes-native AI platform covering development, training, RL an
 |---|---|---|
 | Operator | `api/`, `internal/`, `cmd/` | `Project`, `InstanceType` and `FileServer` CRDs; adds stop/resume, failure classification and retries to `TrainJob`s; purges trashed volumes |
 | GUI | `gui/` | [Wails](https://wails.io) desktop client that talks to Kubernetes directly through a kubeconfig context |
-| Shared library | `pkg/` | Naming, platform config, instance types, job rendering and status, volumes, Harbor client, kubeconfig export |
+| Shared library | `pkg/` | Naming, platform config, instance types, job rendering and status, sandboxes, volumes, Harbor client, kubeconfig export |
 
 There is no API server of its own: the operator reconciles Kubernetes objects and the GUI (or `kubectl`) creates them with the member's own credentials.
 
@@ -89,6 +89,40 @@ The operator adds what Trainer and Kueue lack, for `TrainJob`s in project namesp
 
 Retries share the `forgeai.wutz.dev/job-group` label; the GUI nests them under the first job.
 
+## Sandboxes
+
+Members run agents and other interactive workloads in [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) `Sandbox`es (SIG Apps, `agents.x-k8s.io/v1beta1`). forgeai does not reimplement the sandbox controller: it adds project RBAC, platform defaults, the stop/start contract and an idle policy.
+
+```yaml
+apiVersion: agents.x-k8s.io/v1beta1
+kind: Sandbox
+metadata:
+  name: agent
+  namespace: forge-demo
+  labels:
+    forgeai.wutz.dev/project: demo
+spec:
+  operatingMode: Running          # Suspended keeps the object, deletes the pod
+  podTemplate:
+    spec:
+      runtimeClassName: gvisor    # isolation; kata also offered
+      containers:
+      - name: sandbox             # the container name forgeai renders
+        image: cr.dev1.../forge-demo/agent:latest
+```
+
+The GUI renders the same object from a form (`pkg/sandbox`): image, bash command, env, isolation runtime class, an optional instance type (GPU, CPU/memory and node placement), project volumes and an auto-stop timer. `service: true` gives the sandbox a stable Service and DNS name.
+
+| Feature | How |
+|---|---|
+| Stop | annotation `forgeai.wutz.dev/stopped: "true"`; the operator sets `operatingMode: Suspended`, the pod is deleted, the object and its volumes are kept |
+| Start | remove the annotation; the sandbox comes back with its volumes |
+| Idle suspend | a sandbox nothing used for `sandbox.idleTimeout` is suspended and marked stopped; clients keep it awake with the `forgeai.wutz.dev/last-active` heartbeat (the GUI sends one while the sandbox is open) |
+| Auto-stop | the form's TTL sets `shutdownTime` with `shutdownPolicy: Retain`, so the sandbox stops instead of being deleted |
+| Templates | `SandboxTemplate`s are listed by the GUI; members create templates, claims and warm pools with `kubectl` (the edit role allows it) |
+
+Members create, stop, start and delete sandboxes in their namespace with the `forgeai-project-edit` role; `view` members see them read-only. Project network policies admit the agent-sandbox controller in `sandbox.namespace`, so sandbox API servers reachable from the pod stay reachable in isolated projects.
+
 ## Volumes
 
 Volumes are PVCs in the project namespace, created from the platform `storageTypes` (ReadWriteMany by default) and limited by the project quota. Volumes can be resized (grow only) and moved to the trash:
@@ -131,6 +165,7 @@ Platform settings live in the ConfigMap `forgeai-system/forgeai-platform` (`conf
 | `network` | `systemNamespaces` allowed into isolated projects, `dnsNamespace` |
 | `fileServer` | dufs `image`, `idleTimeout`, `hostPrefix` |
 | `training` | `defaultRuntime`, `shmSize`, `stuckTimeout`, `maxRetries` |
+| `sandbox` | agent-sandbox `namespace`, `defaultImage`, offered `images`, `runtimeClasses` and `defaultRuntimeClass`, `shmSize`, `idleTimeout` (0 disables) and `maxTTL` |
 | `trashRetention` | Default retention of trashed volumes |
 
 The operator rereads the config every 15 seconds.
@@ -142,6 +177,7 @@ The desktop client connects with a kubeconfig context and a project namespace (t
 | View | Description |
 |---|---|
 | Jobs | Create, stop, start, rerun and delete jobs; worker status and logs; retries nested under their job |
+| Sandboxes | Create, stop, start and delete agent sandboxes; logs, endpoint, resources and idle state (shown when the cluster runs agent-sandbox) |
 | Templates | Job templates (`TrainingRuntime`s) to prefill the job form |
 | Volumes | Create, resize, trash, restore and purge volumes |
 | Files | Opens the on-demand file server |
@@ -176,6 +212,7 @@ make deploy-dev                # ko build -> ghcr.io/wutz/forgeai (public), kube
 Prerequisites:
 
 - Kubeflow Trainer v2 (with JobSet) and a `ClusterTrainingRuntime` named after `training.defaultRuntime`
+- agent-sandbox v1.0 or later (CRDs `agents.x-k8s.io/v1beta1`), for the Sandboxes view; the isolation RuntimeClasses (`gvisor`, `kata`) come from the node runtimes
 - Kueue, with the `trainer.kubeflow.org/trainjob` integration enabled
 - NVIDIA GPU operator (GPU feature discovery labels and the `nvidia.com/gpu` resource)
 - A CNI that enforces NetworkPolicies, an ingress controller and Harbor

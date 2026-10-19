@@ -76,6 +76,9 @@ type ConnInfo struct {
 	Namespace string `json:"namespace"`
 	Project   string `json:"project"`
 	Admin     bool   `json:"admin"`
+	// Sandboxes is set when the cluster runs agent-sandbox and the user may
+	// use it; the Sandboxes view is hidden otherwise.
+	Sandboxes bool `json:"sandboxes"`
 }
 
 func scheme() *runtime.Scheme {

@@ -116,6 +116,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--mute); }
 .status-running .dot { background: var(--success); }
 .status-queued .dot, .status-pending .dot, .status-restarting .dot, .status-stopping .dot { background: var(--warning); }
+.status-stopped .dot, .status-suspended .dot { background: var(--mute); }
+.status-succeeded .dot { background: var(--success); }
 .status-failed { color: var(--error); }
 .status-failed .dot { background: var(--error); }
 

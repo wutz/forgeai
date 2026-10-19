@@ -17,7 +17,7 @@ import (
 
 // AnnotationStopped is set by users to stop a job; the operator deactivates
 // its Kueue workload, which releases the pods and keeps the job.
-const AnnotationStopped = "forgeai.wutz.dev/stopped"
+const AnnotationStopped = naming.AnnotationStopped
 
 // Phase is a summary of a TrainJob's lifecycle.
 type Phase string

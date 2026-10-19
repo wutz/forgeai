@@ -3,6 +3,7 @@ import {Connect, Contexts, Logout, Projects} from '../wailsjs/go/app/App'
 import {Environment} from '../wailsjs/runtime/runtime'
 import {app} from '../wailsjs/go/models'
 import {Jobs} from './Jobs'
+import {Sandboxes} from './Sandboxes'
 import {JobCreateDialog} from './JobCreateDialog'
 import {Templates} from './Templates'
 import {Volumes} from './Volumes'
@@ -15,7 +16,7 @@ import {Logo} from './Logo'
 
 const PREFS = 'forgeai.connection'
 
-type Area = 'jobs' | 'templates' | 'volumes' | 'files' | 'images' | 'resources' | 'admin'
+type Area = 'jobs' | 'sandboxes' | 'templates' | 'volumes' | 'files' | 'images' | 'resources' | 'admin'
 
 export default function App() {
   const [contexts, setContexts] = useState<app.KubeContext[]>([])
@@ -55,7 +56,9 @@ export default function App() {
   // Without a project (admin of a cluster with no projects yet) only the
   // admin area is usable.
   const nav: [Area, string][] = conn.project ? [
-    ['jobs', 'Jobs'], ['templates', 'Templates'], ['volumes', 'Volumes'],
+    ['jobs', 'Jobs'],
+    ...(conn.sandboxes ? [['sandboxes', 'Sandboxes'] as [Area, string]] : []),
+    ['templates', 'Templates'], ['volumes', 'Volumes'],
     ['files', 'Files'], ['images', 'Images'], ['resources', 'Resources'],
   ] : []
   if (conn.admin) nav.push(['admin', 'Projects'])
@@ -77,6 +80,7 @@ export default function App() {
         </nav>
         <main className="main">
           {area === 'jobs' && <Jobs/>}
+          {area === 'sandboxes' && <Sandboxes/>}
           {area === 'templates' && <Templates/>}
           {area === 'volumes' && <Volumes/>}
           {area === 'files' && <FilesView/>}

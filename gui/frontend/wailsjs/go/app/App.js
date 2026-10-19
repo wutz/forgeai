@@ -18,6 +18,10 @@ export function CreateJob(arg1) {
   return window['go']['app']['App']['CreateJob'](arg1);
 }
 
+export function CreateSandbox(arg1) {
+  return window['go']['app']['App']['CreateSandbox'](arg1);
+}
+
 export function CreateTemplate(arg1) {
   return window['go']['app']['App']['CreateTemplate'](arg1);
 }
@@ -42,6 +46,10 @@ export function DeleteProject(arg1) {
   return window['go']['app']['App']['DeleteProject'](arg1);
 }
 
+export function DeleteSandbox(arg1) {
+  return window['go']['app']['App']['DeleteSandbox'](arg1);
+}
+
 export function DeleteTemplate(arg1) {
   return window['go']['app']['App']['DeleteTemplate'](arg1);
 }
@@ -58,8 +66,16 @@ export function GetProject(arg1) {
   return window['go']['app']['App']['GetProject'](arg1);
 }
 
+export function GetSandbox(arg1) {
+  return window['go']['app']['App']['GetSandbox'](arg1);
+}
+
 export function Heartbeat() {
   return window['go']['app']['App']['Heartbeat']();
+}
+
+export function KeepSandboxAwake(arg1) {
+  return window['go']['app']['App']['KeepSandboxAwake'](arg1);
 }
 
 export function ListImages() {
@@ -76,6 +92,10 @@ export function ListJobs() {
 
 export function ListProjects() {
   return window['go']['app']['App']['ListProjects']();
+}
+
+export function ListSandboxes() {
+  return window['go']['app']['App']['ListSandboxes']();
 }
 
 export function ListTemplates() {
@@ -126,6 +146,18 @@ export function RestoreVolume(arg1) {
   return window['go']['app']['App']['RestoreVolume'](arg1);
 }
 
+export function SandboxLogs(arg1, arg2) {
+  return window['go']['app']['App']['SandboxLogs'](arg1, arg2);
+}
+
+export function SandboxOptions() {
+  return window['go']['app']['App']['SandboxOptions']();
+}
+
+export function SandboxTemplates() {
+  return window['go']['app']['App']['SandboxTemplates']();
+}
+
 export function SaveProject(arg1) {
   return window['go']['app']['App']['SaveProject'](arg1);
 }
@@ -138,8 +170,16 @@ export function StartJob(arg1) {
   return window['go']['app']['App']['StartJob'](arg1);
 }
 
+export function StartSandbox(arg1) {
+  return window['go']['app']['App']['StartSandbox'](arg1);
+}
+
 export function StopJob(arg1) {
   return window['go']['app']['App']['StopJob'](arg1);
+}
+
+export function StopSandbox(arg1) {
+  return window['go']['app']['App']['StopSandbox'](arg1);
 }
 
 export function TemplateNames() {

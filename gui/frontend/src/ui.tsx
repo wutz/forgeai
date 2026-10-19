@@ -2,7 +2,13 @@
 // segmented filters, tabs, badges, empty state and dialogs. Everything here
 // renders from tokens in style.css (gui/DESIGN.md).
 
-import {ReactNode} from 'react'
+import {ReactNode, createContext, useContext} from 'react'
+import {createPortal} from 'react-dom'
+
+// HeaderSlot is the node in the app header that PageHeader renders into, so
+// every view shows its title and actions in the top bar instead of repeating
+// a title band at the top of the content.
+export const HeaderSlot = createContext<HTMLElement | null>(null)
 
 // Icon is a 16px stroke icon (Lucide-style paths, 1.75 stroke).
 const ICONS = {
@@ -45,13 +51,15 @@ export function Icon({name, size = 16}: {name: IconName; size?: number}) {
   )
 }
 
-// PageHeader is the top band of every view: eyebrow (mono, uppercase),
-// title, optional inline meta and the actions on the right.
+// PageHeader is the title band of every view. It renders into the app header
+// (HeaderSlot) so the top bar carries the title, optional inline meta and the
+// actions; views outside a header fall back to a band above the content.
 export function PageHeader({eyebrow, title, meta, actions}: {
   eyebrow?: string, title: string, meta?: ReactNode, actions?: ReactNode
 }) {
-  return (
-    <div className="page-head">
+  const slot = useContext(HeaderSlot)
+  const content = (
+    <>
       <div className="page-head-text">
         {eyebrow && <div className="eyebrow">{eyebrow}</div>}
         <div className="page-head-row">
@@ -60,8 +68,11 @@ export function PageHeader({eyebrow, title, meta, actions}: {
         </div>
       </div>
       {actions && <div className="page-head-actions">{actions}</div>}
-    </div>
+    </>
   )
+  return slot
+    ? createPortal(<div className="page-head in-header">{content}</div>, slot)
+    : <div className="page-head">{content}</div>
 }
 
 export function Card({title, subtitle, actions, children, className = ''}: {

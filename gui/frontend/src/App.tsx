@@ -13,7 +13,7 @@ import {Resources} from './Resources'
 import {Admin} from './Admin'
 import {errText} from './util'
 import {Logo} from './Logo'
-import {Icon, IconName} from './ui'
+import {HeaderSlot, Icon, IconName} from './ui'
 
 const PREFS = 'forgeai.connection'
 const SIDEBAR = 'forgeai.sidebar'
@@ -30,6 +30,8 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   // The rail remembers its state across launches, like the connection does.
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR) === 'collapsed')
+  // Views portal their PageHeader into this node in the top bar.
+  const [headerSlot, setHeaderSlot] = useState<HTMLDivElement | null>(null)
 
   const toggleSidebar = () => setCollapsed(v => {
     localStorage.setItem(SIDEBAR, v ? 'open' : 'collapsed')
@@ -97,51 +99,58 @@ export default function App() {
   }
 
   return (
-    <div className={`app ${collapsed ? 'sidebar-collapsed' : ''}`}>
-      <Header>
-        <button className="icon-btn header-toggle" onClick={toggleSidebar}
-                aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                aria-expanded={!collapsed} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
-          <Icon name="panel"/>
-        </button>
-        <div className="conn">
-          <span className="conn-meta">{conn.project ? `${conn.project} · ${conn.namespace}` : conn.context}</span>
-          <button className="btn btn-sm" onClick={logout}>Switch</button>
-        </div>
-      </Header>
-      <div className={`shell ${collapsed ? 'collapsed' : ''}`}>
-        <nav className="sidebar">
-          {groups.map(g => (
-            <div className="nav-group" key={g.label}>
-              <div className="nav-label">{g.label}</div>
-              {g.items.map(item => (
-                <button key={item.area} className={`nav-item ${area === item.area ? 'active' : ''}`}
-                        onClick={() => setArea(item.area)}
-                        title={collapsed ? item.label : undefined}
-                        aria-label={item.label} aria-current={area === item.area ? 'page' : undefined}>
-                  <Icon name={item.icon}/><span>{item.label}</span>
-                </button>
-              ))}
-            </div>
-          ))}
-          <div className="nav-foot">
-            <span className="conn-meta" title={conn.server}>{conn.context}</span>
-            <span className="conn-meta" title={conn.namespace}>{conn.namespace || 'no namespace'}</span>
+    <HeaderSlot.Provider value={headerSlot}>
+      <div className={`app ${collapsed ? 'sidebar-collapsed' : ''}`}>
+        <header className="header header-shell">
+          <div className="header-side">
+            <button className="icon-btn header-toggle" onClick={toggleSidebar}
+                    aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                    aria-expanded={!collapsed} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+              <Icon name="panel"/>
+            </button>
           </div>
-        </nav>
-        <main className="main">
-          {area === 'overview' && <Overview onOpen={setArea}/>}
-          {area === 'jobs' && <Jobs/>}
-          {area === 'sandboxes' && <Sandboxes/>}
-          {area === 'templates' && <Templates/>}
-          {area === 'volumes' && <Volumes/>}
-          {area === 'files' && <FilesView/>}
-          {area === 'images' && <Images/>}
-          {area === 'resources' && <Resources/>}
-          {area === 'admin' && <Admin/>}
-        </main>
+          <div className="header-main">
+            <div className="header-slot" ref={setHeaderSlot}/>
+            <div className="conn">
+              <span className="conn-meta">{conn.project ? `${conn.project} · ${conn.namespace}` : conn.context}</span>
+              <button className="btn btn-sm" onClick={logout}>Switch</button>
+            </div>
+          </div>
+        </header>
+        <div className={`shell ${collapsed ? 'collapsed' : ''}`}>
+          <nav className="sidebar">
+            {groups.map(g => (
+              <div className="nav-group" key={g.label}>
+                <div className="nav-label">{g.label}</div>
+                {g.items.map(item => (
+                  <button key={item.area} className={`nav-item ${area === item.area ? 'active' : ''}`}
+                          onClick={() => setArea(item.area)}
+                          title={collapsed ? item.label : undefined}
+                          aria-label={item.label} aria-current={area === item.area ? 'page' : undefined}>
+                    <Icon name={item.icon}/><span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+            <div className="nav-foot">
+              <span className="conn-meta" title={conn.server}>{conn.context}</span>
+              <span className="conn-meta" title={conn.namespace}>{conn.namespace || 'no namespace'}</span>
+            </div>
+          </nav>
+          <main className="main">
+            {area === 'overview' && <Overview onOpen={setArea}/>}
+            {area === 'jobs' && <Jobs/>}
+            {area === 'sandboxes' && <Sandboxes/>}
+            {area === 'templates' && <Templates/>}
+            {area === 'volumes' && <Volumes/>}
+            {area === 'files' && <FilesView/>}
+            {area === 'images' && <Images/>}
+            {area === 'resources' && <Resources/>}
+            {area === 'admin' && <Admin/>}
+          </main>
+        </div>
       </div>
-    </div>
+    </HeaderSlot.Provider>
   )
 }
 
@@ -227,12 +236,8 @@ function ConnectScreen({contexts, onConnect, loading, error}: {
 }
 
 // Header doubles as the window title bar: it is the drag region of the
-// frameless macOS window.
-function Header({children}: {children?: React.ReactNode}) {
-  return (
-    <header className="header">
-      <div className="logo"><Logo/>forgeai</div>
-      {children}
-    </header>
-  )
+// frameless macOS window. The connect screen has no sidebar, so the band
+// stays empty and the card carries the wordmark.
+function Header() {
+  return <header className="header"/>
 }

@@ -168,11 +168,7 @@ func (a *App) CreateJob(f training.Form) (*Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	u, err := trainJobObject(tj)
-	if err != nil {
-		return nil, err
-	}
-	if err := c.k8s.Create(ctx, u); err != nil {
+	if tj, err = createTrainJob(ctx, c, tj); err != nil {
 		return nil, err
 	}
 	return toJob(ctx, c, tj)
@@ -236,11 +232,7 @@ func (a *App) RerunJob(name, newName string) (*Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	u, err := trainJobObject(tj)
-	if err != nil {
-		return nil, err
-	}
-	if err := c.k8s.Create(ctx, u); err != nil {
+	if tj, err = createTrainJob(ctx, c, tj); err != nil {
 		return nil, err
 	}
 	return toJob(ctx, c, tj)

@@ -6,6 +6,8 @@ import {sandbox} from '../models';
 import {volumes} from '../models';
 import {time} from '../models';
 
+export function CloseSandboxTerminal(arg1:string):Promise<void>;
+
 export function Config():Promise<app.PlatformConfig>;
 
 export function Connect(arg1:string,arg2:string):Promise<app.ConnInfo>;
@@ -64,6 +66,8 @@ export function Logs(arg1:string,arg2:number,arg3:number):Promise<string>;
 
 export function MemberKubeconfig(arg1:string,arg2:string):Promise<string>;
 
+export function OpenSandboxTerminal(arg1:string,arg2:string,arg3:number,arg4:number):Promise<void>;
+
 export function Projects(arg1:string):Promise<Array<app.ProjectNamespace>>;
 
 export function PurgeVolume(arg1:string):Promise<void>;
@@ -74,6 +78,8 @@ export function Registry():Promise<app.Registry>;
 
 export function RerunJob(arg1:string,arg2:string):Promise<app.Job>;
 
+export function ResizeSandboxTerminal(arg1:string,arg2:number,arg3:number):Promise<void>;
+
 export function ResizeVolume(arg1:string,arg2:number):Promise<volumes.Volume>;
 
 export function RestoreVolume(arg1:string):Promise<volumes.Volume>;
@@ -83,6 +89,8 @@ export function SandboxLogs(arg1:string,arg2:number):Promise<string>;
 export function SandboxOptions():Promise<app.SandboxOptions>;
 
 export function SandboxTemplates():Promise<Array<app.SandboxTemplate>>;
+
+export function SandboxTerminalInput(arg1:string,arg2:string):Promise<void>;
 
 export function SaveProject(arg1:app.Project):Promise<void>;
 

@@ -301,6 +301,9 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
   height: 300px; padding: 12px 14px; border-radius: 8px; background: #0f1117; color: #e4e4e7;
   font-size: 11.5px; line-height: 18px;
 }
+.term-wrap { display: flex; flex-direction: column; gap: 8px; }
+.term { height: 340px; padding: 8px 10px; border-radius: 8px; background: #0f1117; overflow: hidden; }
+.term .xterm { height: 100%; }
 .log-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; }
 .mini-table {
   display: flex; flex-direction: column; border: 1px solid var(--hairline-soft);

@@ -37,6 +37,7 @@ const ICONS = {
   check: 'm5 12 4.5 4.5L19 7',
   warning: 'M12 4 2.5 20h19L12 4zM12 10v4M12 17h.01',
   panel: 'M3 4h18v16H3zM9 4v16',
+  terminal: 'M4 5h16v14H4zM7.5 10l2.5 2-2.5 2M12.5 15h4',
 } as const
 
 export type IconName = keyof typeof ICONS

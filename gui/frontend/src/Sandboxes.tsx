@@ -106,12 +106,30 @@ function SandboxDetail({name, onDone}: { name: string, onDone: () => void }) {
   const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('overview')
   const [log, setLog] = useState('')
+  // pending is the transition in flight. It stays set until the phase reaches
+  // its target, because suspending or resuming takes the controller a while.
+  const [pending, setPending] = useState<'start' | 'stop' | null>(null)
   const act = (p: Promise<unknown>) => p.then(onDone).catch(e => setError(errText(e)))
+  const transition = (kind: 'start' | 'stop', p: Promise<unknown>) => {
+    setPending(kind)
+    p.then(onDone).catch(e => {
+      setError(errText(e))
+      setPending(null)
+    })
+  }
+  const phase = box?.phase
+
+  useEffect(() => {
+    if (!phase || !pending) return
+    const up = phase === 'Running' || phase === 'Pending'
+    if (pending === 'start' ? up : !up) setPending(null)
+  }, [phase, pending])
 
   useEffect(() => {
     setBox(null)
     setLog('')
     setTab('overview')
+    setPending(null)
     const load = () => GetSandbox(name).then(setBox).catch(e => setError(errText(e)))
     load()
     const t = setInterval(load, 5000)
@@ -143,11 +161,15 @@ function SandboxDetail({name, onDone}: { name: string, onDone: () => void }) {
           SandboxLogs(box.name, 500).then(v => { setLog(v); setTab('log') }).catch(e => setError(errText(e)))}>
           <Icon name="scroll" size={13}/>Logs
         </button>
-        {running && <button className="btn btn-sm" onClick={() => act(StopSandbox(box.name))}>
-          <Icon name="square" size={12}/>Stop
+        {running && <button className="btn btn-sm" disabled={pending !== null}
+                           onClick={() => transition('stop', StopSandbox(box.name))}>
+          {pending === 'stop' ? <span className="spinner" aria-hidden/> : <Icon name="square" size={12}/>}
+          {pending === 'stop' ? 'Stopping…' : 'Stop'}
         </button>}
-        {!running && <button className="btn btn-sm btn-accent" onClick={() => act(StartSandbox(box.name))}>
-          <Icon name="play" size={12}/>Start
+        {!running && <button className="btn btn-sm btn-accent" disabled={pending !== null}
+                             onClick={() => transition('start', StartSandbox(box.name))}>
+          {pending === 'start' ? <span className="spinner" aria-hidden/> : <Icon name="play" size={12}/>}
+          {pending === 'start' ? 'Starting…' : 'Start'}
         </button>}
         <span className="spacer"/>
         <button className="btn btn-sm btn-danger" onClick={() =>

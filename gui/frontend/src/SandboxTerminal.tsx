@@ -7,12 +7,14 @@ import {
 } from '../wailsjs/go/app/App'
 import {EventsOn} from '../wailsjs/runtime/runtime'
 import {errText} from './util'
+import {Icon} from './ui'
 
 // SandboxTerminal is an interactive shell in a running sandbox. The session
 // lives as long as the component: leaving the tab closes the shell.
 export function SandboxTerminal({name}: {name: string}) {
   const host = useRef<HTMLDivElement>(null)
   const [error, setError] = useState('')
+  const [maximized, setMaximized] = useState(false)
 
   useEffect(() => {
     const el = host.current
@@ -57,8 +59,18 @@ export function SandboxTerminal({name}: {name: string}) {
     }
   }, [name])
 
+  // Maximizing only changes the layout; the resize observer refits the
+  // terminal and sends the new size to the shell.
   return (
-    <div className="term-wrap">
+    <div className={`term-wrap${maximized ? ' term-max' : ''}`}>
+      <div className="term-bar">
+        <span className="spacer"/>
+        <button className="btn btn-sm" onClick={() => setMaximized(m => !m)}
+                aria-label={maximized ? 'Restore terminal' : 'Maximize terminal'}>
+          <Icon name={maximized ? 'minimize' : 'maximize'} size={13}/>
+          {maximized ? 'Restore' : 'Maximize'}
+        </button>
+      </div>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       <div className="term" ref={host}/>
     </div>

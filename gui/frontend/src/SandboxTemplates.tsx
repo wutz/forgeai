@@ -1,73 +1,53 @@
 import {useEffect, useState} from 'react'
-import {CreateSandboxTemplate, DeleteSandboxTemplate, SandboxOptions, SandboxTemplates as ListSandboxTemplates} from '../wailsjs/go/app/App'
+import {CreateSandboxTemplate, SandboxOptions} from '../wailsjs/go/app/App'
 import {app, sandbox} from '../wailsjs/go/models'
-import {envToLines, linesToEnv, fmtDate, errText} from './util'
-import {Card, Dialog, Empty, Icon, PageHeader} from './ui'
+import {linesToEnv, fmtDate, errText} from './util'
+import {Dialog, Empty} from './ui'
 
-// SandboxTemplates lists SandboxTemplates (agent blueprints new sandboxes
-// start from) and creates or deletes them.
-export function SandboxTemplates() {
-  const [items, setItems] = useState<app.SandboxTemplate[]>([])
-  const [error, setError] = useState('')
-  const [creating, setCreating] = useState(false)
-
-  const refresh = () => ListSandboxTemplates().then(items => {
-    setItems(items); setError('')
-  }).catch(e => setError(errText(e)))
-  useEffect(() => { refresh() }, [])
-
+// SandboxTemplateTable lists SandboxTemplates (agent blueprints new sandboxes
+// start from) inside the Templates page.
+export function SandboxTemplateTable({items, onDelete}: {
+  items: app.SandboxTemplate[], onDelete: (name: string) => void
+}) {
+  if (items.length === 0) {
+    return (
+      <Empty icon="layers" title="No sandbox templates yet">
+        A template captures an image, command and environment so new sandboxes start from it.
+      </Empty>
+    )
+  }
   return (
-    <div className="page">
-      <PageHeader eyebrow="Workspace" title="Sandbox templates"
-                  meta={<span className="muted" style={{fontSize: 12.5}}>{items.length} templates</span>}
-                  actions={<button className="btn btn-primary" onClick={() => setCreating(true)}>
-                    <Icon name="plus" size={14}/>New sandbox template
-                  </button>}/>
-      {error && <div className="banner banner-error" role="alert">{error}</div>}
-      {creating && <SandboxTemplateDialog onClose={() => setCreating(false)} onSaved={() => {
-        setCreating(false); refresh()
-      }}/>}
-
-      <Card>
-        {items.length === 0 ? (
-          <Empty icon="layers" title="No sandbox templates yet">
-            A template captures an image, command and environment so new sandboxes start from it.
-          </Empty>
-        ) : (
-          <table className="table">
-            <thead>
-            <tr><th>Name</th><th>Image</th><th>Isolation</th><th>Created</th><th/></tr>
-            </thead>
-            <tbody>
-            {items.map(t => (
-              <tr key={t.name}>
-                <td className="mono">
-                  <span className="cell-main">{t.name}</span>
-                  {t.description && <span className="cell-sub">{t.description}</span>}
-                </td>
-                <td className="mono trunc" title={t.form?.image}>{t.form?.image || '—'}</td>
-                <td className="mono">{t.form?.runtimeClass || 'runc'}</td>
-                <td className="muted">{fmtDate(t.created)}</td>
-                <td>
-                  <div className="actions">
-                    <button className="btn btn-sm btn-danger" onClick={() =>
-                      confirm(`Delete sandbox template ${t.name}? Existing sandboxes keep running.`) &&
-                      DeleteSandboxTemplate(t.name).then(refresh).catch(e => setError(errText(e)))}>
-                      Delete
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            </tbody>
-          </table>
-        )}
-      </Card>
-    </div>
+    <table className="table">
+      <thead>
+      <tr><th>Name</th><th>Image</th><th>Isolation</th><th>Created</th><th/></tr>
+      </thead>
+      <tbody>
+      {items.map(t => (
+        <tr key={t.name}>
+          <td className="mono">
+            <span className="cell-main">{t.name}</span>
+            {t.description && <span className="cell-sub">{t.description}</span>}
+          </td>
+          <td className="mono trunc" title={t.form?.image}>{t.form?.image || '—'}</td>
+          <td className="mono">{t.form?.runtimeClass || 'runc'}</td>
+          <td className="muted">{fmtDate(t.created)}</td>
+          <td>
+            <div className="actions">
+              <button className="btn btn-sm btn-danger" onClick={() =>
+                confirm(`Delete sandbox template ${t.name}? Existing sandboxes keep running.`) &&
+                onDelete(t.name)}>
+                Delete
+              </button>
+            </div>
+          </td>
+        </tr>
+      ))}
+      </tbody>
+    </table>
   )
 }
 
-function SandboxTemplateDialog({onClose, onSaved}: {onClose: () => void, onSaved: () => void}) {
+export function SandboxTemplateDialog({onClose, onSaved}: {onClose: () => void, onSaved: () => void}) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [opts, setOpts] = useState<app.SandboxOptions | null>(null)

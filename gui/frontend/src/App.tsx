@@ -6,7 +6,6 @@ import {Overview} from './Overview'
 import {Jobs} from './Jobs'
 import {Sandboxes} from './Sandboxes'
 import {Templates} from './Templates'
-import {SandboxTemplates} from './SandboxTemplates'
 import {Volumes} from './Volumes'
 import {FilesView} from './FilesView'
 import {Images} from './Images'
@@ -19,7 +18,7 @@ import {HeaderSlot, Icon, IconName} from './ui'
 const PREFS = 'forgeai.connection'
 const SIDEBAR = 'forgeai.sidebar'
 
-type Area = 'overview' | 'jobs' | 'sandboxes' | 'sandbox-templates' | 'templates' | 'volumes' | 'files' | 'images' | 'resources' | 'admin'
+type Area = 'overview' | 'jobs' | 'sandboxes' | 'templates' | 'volumes' | 'files' | 'images' | 'resources' | 'admin'
 
 type NavItem = {area: Area, label: string, icon: IconName}
 
@@ -78,11 +77,8 @@ export default function App() {
       items: [
         {area: 'overview', label: 'Overview', icon: 'grid'},
         {area: 'jobs', label: 'Jobs', icon: 'play'},
-        ...(conn.sandboxes ? [
-          {area: 'sandboxes', label: 'Sandboxes', icon: 'box'} as NavItem,
-          {area: 'sandbox-templates', label: 'Sandbox templates', icon: 'layers'} as NavItem,
-        ] : []),
-        {area: 'templates', label: 'Job templates', icon: 'scroll'},
+        ...(conn.sandboxes ? [{area: 'sandboxes', label: 'Sandboxes', icon: 'box'} as NavItem] : []),
+        {area: 'templates', label: 'Templates', icon: 'scroll'},
       ],
     },
     {
@@ -145,8 +141,7 @@ export default function App() {
             {area === 'overview' && <Overview onOpen={setArea}/>}
             {area === 'jobs' && <Jobs/>}
             {area === 'sandboxes' && <Sandboxes/>}
-            {area === 'sandbox-templates' && <SandboxTemplates/>}
-            {area === 'templates' && <Templates/>}
+            {area === 'templates' && <Templates sandboxes={conn.sandboxes}/>}
             {area === 'volumes' && <Volumes/>}
             {area === 'files' && <FilesView/>}
             {area === 'images' && <Images/>}

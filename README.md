@@ -178,7 +178,7 @@ The desktop client connects with a kubeconfig context and a project namespace (t
 |---|---|
 | Jobs | Create, stop, start, rerun and delete jobs; worker status and logs; retries nested under their job |
 | Sandboxes | Create, stop, start and delete agent sandboxes; logs, endpoint, resources and idle state (shown when the cluster runs agent-sandbox) |
-| Templates | Job templates (`TrainingRuntime`s) to prefill the job form |
+| Templates | Sandbox templates (prefill the sandbox form) and job templates (`TrainingRuntime`s, prefill the job form) in one view; create and delete both, each sorted by name |
 | Volumes | Create, resize, trash, restore and purge volumes |
 | Files | Opens the on-demand file server |
 | Images | Push instructions and robot credentials; list and delete images in the project's Harbor project |

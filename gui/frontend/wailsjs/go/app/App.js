@@ -26,6 +26,10 @@ export function CreateSandbox(arg1) {
   return window['go']['app']['App']['CreateSandbox'](arg1);
 }
 
+export function CreateSandboxTemplate(arg1) {
+  return window['go']['app']['App']['CreateSandboxTemplate'](arg1);
+}
+
 export function CreateTemplate(arg1) {
   return window['go']['app']['App']['CreateTemplate'](arg1);
 }
@@ -52,6 +56,10 @@ export function DeleteProject(arg1) {
 
 export function DeleteSandbox(arg1) {
   return window['go']['app']['App']['DeleteSandbox'](arg1);
+}
+
+export function DeleteSandboxTemplate(arg1) {
+  return window['go']['app']['App']['DeleteSandboxTemplate'](arg1);
 }
 
 export function DeleteTemplate(arg1) {

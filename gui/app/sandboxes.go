@@ -287,6 +287,49 @@ func (a *App) CreateSandboxTemplate(f sandbox.TemplateForm) (*SandboxTemplate, e
 	return &out, nil
 }
 
+// UpdateSandboxTemplate replaces the form of an existing SandboxTemplate. The
+// name is the template's identity and does not change. Sandboxes already
+// created from it are not affected.
+func (a *App) UpdateSandboxTemplate(name string, f sandbox.TemplateForm) (*SandboxTemplate, error) {
+	c, err := a.current()
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := a.call()
+	defer cancel()
+	cur := &unstructured.Unstructured{}
+	cur.SetGroupVersionKind(sandbox.SandboxTemplateGVK)
+	cur.SetNamespace(c.namespace())
+	cur.SetName(name)
+	if err := c.k8s.Get(ctx, client.ObjectKeyFromObject(cur), cur); err != nil {
+		return nil, err
+	}
+	if cur.GetLabels()[naming.LabelManagedBy] != naming.ManagedBy {
+		return nil, fmt.Errorf("sandbox template %s was not created by forgeai and cannot be edited here", name)
+	}
+	cfg, err := platform.Load(ctx, c.k8s, c.namespace())
+	if err != nil {
+		return nil, err
+	}
+	f.Name = name
+	u, err := sandbox.RenderTemplate(&f, sandbox.Context{Namespace: c.namespace(), Project: c.Info.Project, Platform: cfg})
+	if err != nil {
+		return nil, err
+	}
+	// The resource version makes the update fail if someone changed the
+	// template since it was loaded into the form.
+	u.SetResourceVersion(cur.GetResourceVersion())
+	if err := c.k8s.Update(ctx, u); err != nil {
+		return nil, err
+	}
+	t := &sandbox.SandboxTemplate{}
+	if err := sandbox.FromUnstructured(u.Object, t); err != nil {
+		return nil, err
+	}
+	out := toSandboxTemplate(t)
+	return &out, nil
+}
+
 // DeleteSandboxTemplate deletes a SandboxTemplate. Sandboxes already created
 // from it are not affected.
 func (a *App) DeleteSandboxTemplate(name string) error {

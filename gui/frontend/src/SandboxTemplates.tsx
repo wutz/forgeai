@@ -1,13 +1,13 @@
 import {useEffect, useState} from 'react'
-import {CreateSandboxTemplate, SandboxOptions} from '../wailsjs/go/app/App'
+import {CreateSandboxTemplate, UpdateSandboxTemplate, SandboxOptions} from '../wailsjs/go/app/App'
 import {app, sandbox} from '../wailsjs/go/models'
 import {envMap, envToLines, linesToEnv, fmtDate, errText} from './util'
 import {Dialog, Empty} from './ui'
 
 // SandboxTemplateTable lists SandboxTemplates (agent blueprints new sandboxes
 // start from) inside the Templates page.
-export function SandboxTemplateTable({items, onDelete}: {
-  items: app.SandboxTemplate[], onDelete: (name: string) => void
+export function SandboxTemplateTable({items, onEdit, onDelete}: {
+  items: app.SandboxTemplate[], onEdit: (t: app.SandboxTemplate) => void, onDelete: (name: string) => void
 }) {
   if (items.length === 0) {
     return (
@@ -33,6 +33,7 @@ export function SandboxTemplateTable({items, onDelete}: {
           <td className="muted">{fmtDate(t.created)}</td>
           <td>
             <div className="actions">
+              <button className="btn btn-sm" onClick={() => onEdit(t)}>Edit</button>
               <button className="btn btn-sm btn-danger" onClick={() =>
                 confirm(`Delete sandbox template ${t.name}? Existing sandboxes keep running.`) &&
                 onDelete(t.name)}>
@@ -47,10 +48,11 @@ export function SandboxTemplateTable({items, onDelete}: {
   )
 }
 
-// SandboxTemplateDialog creates a sandbox template. initial prefills the form
-// (save-as-template from a sandbox); without it the platform defaults apply.
-export function SandboxTemplateDialog({initial, onClose, onSaved}: {
-  initial?: sandbox.TemplateForm, onClose: () => void, onSaved: (name: string) => void
+// SandboxTemplateDialog creates a sandbox template, or edits the existing one
+// of that name when existing is set. initial prefills the form (edit, or
+// save-as-template from a sandbox); without it the platform defaults apply.
+export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
+  initial?: sandbox.TemplateForm, existing?: string, onClose: () => void, onSaved: (name: string) => void
 }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -79,13 +81,17 @@ export function SandboxTemplateDialog({initial, onClose, onSaved}: {
       ...f,
       env: Object.entries(linesToEnv(envText)).map(([name, value]) => ({name, value})),
     })
-    CreateSandboxTemplate(payload).then(() => onSaved(payload.name)).catch(e => {
+    const req = existing ? UpdateSandboxTemplate(existing, payload) : CreateSandboxTemplate(payload)
+    req.then(() => onSaved(payload.name)).catch(e => {
       setError(errText(e)); setBusy(false)
     })
   }
 
   return (
-    <Dialog title="New sandbox template" subtitle="Saved as a SandboxTemplate of the project"
+    <Dialog title={`${existing ? 'Edit' : 'New'} sandbox template`}
+            subtitle={existing
+              ? 'Updates the SandboxTemplate; sandboxes already created from it are not changed'
+              : 'Saved as a SandboxTemplate of the project'}
             onClose={onClose} footer={<>
               <button className="btn" onClick={onClose}>Cancel</button>
               <button className="btn btn-primary" onClick={save} disabled={busy || !f.name || !f.image}>
@@ -97,7 +103,7 @@ export function SandboxTemplateDialog({initial, onClose, onSaved}: {
         <div className="row">
           <div className="field">
             <label htmlFor="st-name">Name</label>
-            <input id="st-name" className="input mono" value={f.name}
+            <input id="st-name" className="input mono" value={f.name} disabled={!!existing}
                    onChange={e => set('name', e.target.value)} placeholder="agent" required/>
           </div>
           <div className="field">

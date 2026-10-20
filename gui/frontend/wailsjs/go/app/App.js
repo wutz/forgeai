@@ -213,3 +213,11 @@ export function TemplateNames() {
 export function TrashVolume(arg1) {
   return window['go']['app']['App']['TrashVolume'](arg1);
 }
+
+export function UpdateSandboxTemplate(arg1, arg2) {
+  return window['go']['app']['App']['UpdateSandboxTemplate'](arg1, arg2);
+}
+
+export function UpdateTemplate(arg1, arg2) {
+  return window['go']['app']['App']['UpdateTemplate'](arg1, arg2);
+}

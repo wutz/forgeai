@@ -420,7 +420,7 @@ func toSandbox(ctx context.Context, c *Connection, u *unstructured.Unstructured)
 			continue
 		}
 		out.Image = ctr.Image
-		out.Command = strings.Join(ctr.Command, " ")
+		out.Command = sandbox.ScriptOf(ctr.Command)
 		for _, e := range ctr.Env {
 			out.Env[e.Name] = e.Value
 		}

@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {CreateSandboxTemplate, SandboxOptions} from '../wailsjs/go/app/App'
 import {app, sandbox} from '../wailsjs/go/models'
-import {linesToEnv, fmtDate, errText} from './util'
+import {envMap, envToLines, linesToEnv, fmtDate, errText} from './util'
 import {Dialog, Empty} from './ui'
 
 // SandboxTemplateTable lists SandboxTemplates (agent blueprints new sandboxes
@@ -47,18 +47,23 @@ export function SandboxTemplateTable({items, onDelete}: {
   )
 }
 
-export function SandboxTemplateDialog({onClose, onSaved}: {onClose: () => void, onSaved: () => void}) {
+// SandboxTemplateDialog creates a sandbox template. initial prefills the form
+// (save-as-template from a sandbox); without it the platform defaults apply.
+export function SandboxTemplateDialog({initial, onClose, onSaved}: {
+  initial?: sandbox.TemplateForm, onClose: () => void, onSaved: (name: string) => void
+}) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [opts, setOpts] = useState<app.SandboxOptions | null>(null)
-  const [f, setF] = useState(sandbox.TemplateForm.createFrom({
+  const [f, setF] = useState(initial ?? sandbox.TemplateForm.createFrom({
     name: '', description: '', image: '', command: '', env: [], runtimeClass: '',
   }))
-  const [envText, setEnvText] = useState('')
+  const [envText, setEnvText] = useState(initial ? envToLines(envMap(initial.env)) : '')
 
   useEffect(() => {
     SandboxOptions().then(o => {
       setOpts(o)
+      if (initial) return
       setF(prev => sandbox.TemplateForm.createFrom({
         ...prev, image: o.defaultImage, runtimeClass: o.defaultRuntimeClass,
       }))
@@ -74,7 +79,7 @@ export function SandboxTemplateDialog({onClose, onSaved}: {onClose: () => void, 
       ...f,
       env: Object.entries(linesToEnv(envText)).map(([name, value]) => ({name, value})),
     })
-    CreateSandboxTemplate(payload).then(onSaved).catch(e => {
+    CreateSandboxTemplate(payload).then(() => onSaved(payload.name)).catch(e => {
       setError(errText(e)); setBusy(false)
     })
   }

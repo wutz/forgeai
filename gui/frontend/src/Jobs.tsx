@@ -1,7 +1,8 @@
 import {useEffect, useMemo, useState} from 'react'
 import {GetJob, ListJobs, Logs, DeleteJob, StopJob, StartJob, RerunJob} from '../wailsjs/go/app/App'
-import {app} from '../wailsjs/go/models'
+import {app, training} from '../wailsjs/go/models'
 import {JobCreateDialog} from './JobCreateDialog'
+import {TemplateDialog} from './Templates'
 import {Status, envToLines, fmtDate, errText} from './util'
 import {Badge, Card, Empty, Icon, PageHeader, Segmented, Spinner, Tabs} from './ui'
 
@@ -135,12 +136,25 @@ function JobTable({jobs, selected, onSelect}: {
 
 type DetailTab = 'overview' | 'workers' | 'log' | 'env'
 
+// jobTemplateForm is the job template a job's settings are saved as. Volumes
+// are left out: job templates do not carry them.
+function jobTemplateForm(job: app.Job) {
+  return training.Form.createFrom({
+    name: '', description: '', image: job.image, command: job.command,
+    env: Object.entries(job.env || {}).map(([name, value]) => ({name, value})),
+    instanceType: job.instanceType, workers: job.workers || 1, volumes: [],
+    maxRetries: job.maxRetries || 0, retryOn: job.retryOn || 'Infra',
+  })
+}
+
 function JobDetail({name, onDone}: { name: string, onDone: () => void }) {
   const [job, setJob] = useState<app.Job | null>(null)
   const [error, setError] = useState('')
   const [tab, setTab] = useState<DetailTab>('overview')
   const [log, setLog] = useState('')
   const [logTitle, setLogTitle] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [savedTemplate, setSavedTemplate] = useState('')
   const act = (p: Promise<unknown>) => p.then(onDone).catch(e => setError(errText(e)))
   const detailOf = (n: string) => GetJob(n).then(setJob).catch(e => setError(errText(e)))
 
@@ -148,6 +162,8 @@ function JobDetail({name, onDone}: { name: string, onDone: () => void }) {
     setJob(null)
     setLog('')
     setTab('overview')
+    setSaving(false)
+    setSavedTemplate('')
     GetJob(name).then(setJob).catch(e => setError(errText(e)))
     const t = setInterval(() => GetJob(name).then(setJob).catch(() => {}), 5000)
     return () => clearInterval(t)
@@ -174,6 +190,10 @@ function JobDetail({name, onDone}: { name: string, onDone: () => void }) {
         <div className="card-head-actions"><Status phase={job.phase}/></div>
       </div>
       {error && <div className="banner banner-error">{error}</div>}
+      {savedTemplate && <div className="banner" role="status">Saved job template {savedTemplate}.</div>}
+      {saving && <TemplateDialog form={jobTemplateForm(job)} onClose={() => setSaving(false)} onSaved={n => {
+        setSaving(false); setSavedTemplate(n)
+      }}/>}
 
       <div className="detail-actions">
         <button className="btn btn-sm" onClick={() => viewLog(0, 'worker 0')}>
@@ -191,6 +211,9 @@ function JobDetail({name, onDone}: { name: string, onDone: () => void }) {
           <button className="btn btn-sm" onClick={() => act(RerunJob(job.name, ''))}>
             <Icon name="refresh" size={13}/>Rerun
           </button>}
+        <button className="btn btn-sm" onClick={() => setSaving(true)}>
+          <Icon name="layers" size={13}/>Save as template
+        </button>
         <span className="spacer"/>
         <button className="btn btn-sm btn-danger" onClick={() =>
           confirm(`Delete job ${job.name}?`) && act(DeleteJob(job.name))}>

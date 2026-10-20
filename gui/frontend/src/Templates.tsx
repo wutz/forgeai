@@ -126,8 +126,10 @@ function JobTemplateTable({items, onEdit, onDelete}: {
   )
 }
 
-function TemplateDialog({form, onClose, onSaved}: {
-  form: training.Form, onClose: () => void, onSaved: () => void
+// TemplateDialog creates a job template from form, or edits one when form is
+// named after an existing template.
+export function TemplateDialog({form, onClose, onSaved}: {
+  form: training.Form, onClose: () => void, onSaved: (name: string) => void
 }) {
   const [f, setF] = useState(form)
   const [error, setError] = useState('')
@@ -143,7 +145,7 @@ function TemplateDialog({form, onClose, onSaved}: {
       env: Object.entries(linesToEnv(envText)).map(([name, value]) => ({name, value})),
       volumes: [],
     })
-    CreateTemplate(payload).then(onSaved).catch(e => {
+    CreateTemplate(payload).then(() => onSaved(payload.name ?? '')).catch(e => {
       setError(errText(e)); setBusy(false)
     })
   }

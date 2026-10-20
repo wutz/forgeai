@@ -1,6 +1,6 @@
 import {useEffect, useState} from 'react'
-import {ListTemplates, CreateTemplate, DeleteTemplate, DeleteSandboxTemplate, SandboxTemplates as ListSandboxTemplates} from '../wailsjs/go/app/App'
-import {app, training} from '../wailsjs/go/models'
+import {ListTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, DeleteSandboxTemplate, SandboxTemplates as ListSandboxTemplates} from '../wailsjs/go/app/App'
+import {app, sandbox, training} from '../wailsjs/go/models'
 import {envToLines, linesToEnv, fmtDate, errText} from './util'
 import {Card, Dialog, Empty, Icon, PageHeader, Segmented} from './ui'
 import {SandboxTemplateDialog, SandboxTemplateTable} from './SandboxTemplates'
@@ -23,8 +23,8 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
   const [sandboxItems, setSandboxItems] = useState<app.SandboxTemplate[]>([])
   const [jobItems, setJobItems] = useState<app.Template[]>([])
   const [error, setError] = useState('')
-  const [creatingSandbox, setCreatingSandbox] = useState(false)
-  const [editingJob, setEditingJob] = useState<training.Form | null>(null)
+  const [sandboxDialog, setSandboxDialog] = useState<SandboxDialogState | null>(null)
+  const [jobDialog, setJobDialog] = useState<JobDialogState | null>(null)
 
   const refresh = () => Promise.all([
     sandboxes ? ListSandboxTemplates() : Promise.resolve<app.SandboxTemplate[]>([]),
@@ -48,16 +48,18 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
                     {isSandbox ? sandboxItems.length : jobItems.length} {isSandbox ? 'sandbox' : 'job'} templates
                   </span>}
                   actions={<button className="btn btn-primary" onClick={() => isSandbox
-                    ? setCreatingSandbox(true)
-                    : setEditingJob(blankJobForm())}>
+                    ? setSandboxDialog({})
+                    : setJobDialog({form: blankJobForm()})}>
                     <Icon name="plus" size={14}/>{isSandbox ? 'New sandbox template' : 'New job template'}
                   </button>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
-      {creatingSandbox && <SandboxTemplateDialog onClose={() => setCreatingSandbox(false)} onSaved={() => {
-        setCreatingSandbox(false); refresh()
+      {sandboxDialog && <SandboxTemplateDialog initial={sandboxDialog.initial} existing={sandboxDialog.existing}
+                                               onClose={() => setSandboxDialog(null)} onSaved={() => {
+        setSandboxDialog(null); refresh()
       }}/>}
-      {editingJob && <TemplateDialog form={editingJob} onClose={() => setEditingJob(null)} onSaved={() => {
-        setEditingJob(null); refresh()
+      {jobDialog && <TemplateDialog form={jobDialog.form} existing={jobDialog.existing}
+                                    onClose={() => setJobDialog(null)} onSaved={() => {
+        setJobDialog(null); refresh()
       }}/>}
 
       {sandboxes && (
@@ -69,12 +71,20 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
 
       <Card>
         {isSandbox
-          ? <SandboxTemplateTable items={sandboxItems} onDelete={onDeleteSandbox}/>
-          : <JobTemplateTable items={jobItems} onEdit={setEditingJob} onDelete={onDeleteJob}/>}
+          ? <SandboxTemplateTable items={sandboxItems} onEdit={t => setSandboxDialog({
+              initial: sandbox.TemplateForm.createFrom({...t.form, name: t.name}), existing: t.name,
+            })} onDelete={onDeleteSandbox}/>
+          : <JobTemplateTable items={jobItems} onEdit={t => setJobDialog({
+              form: training.Form.createFrom({...t.form, name: t.name}), existing: t.name,
+            })} onDelete={onDeleteJob}/>}
       </Card>
     </div>
   )
 }
+
+// existing names the template being edited; without it the dialog creates one.
+type JobDialogState = {form: training.Form, existing?: string}
+type SandboxDialogState = {initial?: sandbox.TemplateForm, existing?: string}
 
 function blankJobForm() {
   return training.Form.createFrom({
@@ -84,7 +94,7 @@ function blankJobForm() {
 }
 
 function JobTemplateTable({items, onEdit, onDelete}: {
-  items: app.Template[], onEdit: (f: training.Form) => void, onDelete: (name: string) => void
+  items: app.Template[], onEdit: (t: app.Template) => void, onDelete: (name: string) => void
 }) {
   if (items.length === 0) {
     return (
@@ -111,8 +121,7 @@ function JobTemplateTable({items, onEdit, onDelete}: {
           <td className="muted">{fmtDate(t.created)}</td>
           <td>
             <div className="actions">
-              <button className="btn btn-sm" onClick={() =>
-                onEdit(training.Form.createFrom({...t.form, name: t.name}))}>Edit</button>
+              <button className="btn btn-sm" onClick={() => onEdit(t)}>Edit</button>
               <button className="btn btn-sm btn-danger" onClick={() =>
                 confirm(`Delete template ${t.name}?`) && onDelete(t.name)}>
                 Delete
@@ -126,10 +135,10 @@ function JobTemplateTable({items, onEdit, onDelete}: {
   )
 }
 
-// TemplateDialog creates a job template from form, or edits one when form is
-// named after an existing template.
-export function TemplateDialog({form, onClose, onSaved}: {
-  form: training.Form, onClose: () => void, onSaved: (name: string) => void
+// TemplateDialog creates a job template from form, or edits the existing
+// template of that name when existing is set.
+export function TemplateDialog({form, existing, onClose, onSaved}: {
+  form: training.Form, existing?: string, onClose: () => void, onSaved: (name: string) => void
 }) {
   const [f, setF] = useState(form)
   const [error, setError] = useState('')
@@ -145,14 +154,17 @@ export function TemplateDialog({form, onClose, onSaved}: {
       env: Object.entries(linesToEnv(envText)).map(([name, value]) => ({name, value})),
       volumes: [],
     })
-    CreateTemplate(payload).then(() => onSaved(payload.name ?? '')).catch(e => {
+    const req = existing ? UpdateTemplate(existing, payload) : CreateTemplate(payload)
+    req.then(() => onSaved(payload.name ?? '')).catch(e => {
       setError(errText(e)); setBusy(false)
     })
   }
 
   return (
-    <Dialog title={`${form.name ? 'Edit' : 'New'} template`}
-            subtitle="Saved as a namespaced TrainingRuntime of the project"
+    <Dialog title={`${existing ? 'Edit' : 'New'} template`}
+            subtitle={existing
+              ? 'Updates the TrainingRuntime; jobs already created from it keep their settings'
+              : 'Saved as a namespaced TrainingRuntime of the project'}
             onClose={onClose} footer={<>
               <button className="btn" onClick={onClose}>Cancel</button>
               <button className="btn btn-primary" onClick={save} disabled={busy || !f.name || !f.image}>
@@ -164,7 +176,7 @@ export function TemplateDialog({form, onClose, onSaved}: {
         <div className="row">
           <div className="field">
             <label htmlFor="t-name">Name</label>
-            <input id="t-name" className="input mono" value={f.name}
+            <input id="t-name" className="input mono" value={f.name} disabled={!!existing}
                    onChange={e => set('name', e.target.value)} required/>
           </div>
           <div className="field">

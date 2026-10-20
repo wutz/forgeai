@@ -1,7 +1,10 @@
 package app
 
 import (
+	"fmt"
 	"time"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/wutz/forgeai/pkg/kf"
 	"github.com/wutz/forgeai/pkg/naming"
@@ -65,6 +68,45 @@ func (a *App) CreateTemplate(f training.Form) (*Template, error) {
 		return nil, err
 	}
 	if err := c.k8s.Create(ctx, u); err != nil {
+		return nil, err
+	}
+	form, err := training.TemplateForm(rt)
+	if err != nil {
+		return nil, err
+	}
+	return &Template{Name: rt.Name, Description: f.Description, Form: form}, nil
+}
+
+// UpdateTemplate replaces the form of an existing job template. The name is
+// the template's identity and does not change. Jobs created from the template
+// keep their settings.
+func (a *App) UpdateTemplate(name string, f training.Form) (*Template, error) {
+	c, err := a.current()
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := a.call()
+	defer cancel()
+	cur := runtimeStub(kf.TrainingRuntimeGVK, c.namespace(), name)
+	if err := c.k8s.Get(ctx, client.ObjectKeyFromObject(cur), cur); err != nil {
+		return nil, err
+	}
+	if cur.GetLabels()[naming.LabelManagedBy] != naming.ManagedBy {
+		return nil, fmt.Errorf("template %s was not created by forgeai and cannot be edited here", name)
+	}
+	f.Name = name
+	rt, err := training.Template(&f, c.namespace())
+	if err != nil {
+		return nil, err
+	}
+	u, err := runtimeObject(rt)
+	if err != nil {
+		return nil, err
+	}
+	// The resource version makes the update fail if someone changed the
+	// template since it was loaded into the form.
+	u.SetResourceVersion(cur.GetResourceVersion())
+	if err := c.k8s.Update(ctx, u); err != nil {
 		return nil, err
 	}
 	form, err := training.TemplateForm(rt)

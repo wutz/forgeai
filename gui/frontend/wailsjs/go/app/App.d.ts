@@ -111,3 +111,7 @@ export function StopSandbox(arg1:string):Promise<app.Sandbox>;
 export function TemplateNames():Promise<Array<string>>;
 
 export function TrashVolume(arg1:string):Promise<volumes.Volume>;
+
+export function UpdateSandboxTemplate(arg1:string,arg2:sandbox.TemplateForm):Promise<app.SandboxTemplate>;
+
+export function UpdateTemplate(arg1:string,arg2:training.Form):Promise<app.Template>;

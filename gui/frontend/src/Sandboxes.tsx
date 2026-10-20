@@ -2,8 +2,9 @@ import {useEffect, useState} from 'react'
 import {
   DeleteSandbox, GetSandbox, KeepSandboxAwake, ListSandboxes, SandboxLogs, StartSandbox, StopSandbox,
 } from '../wailsjs/go/app/App'
-import {app} from '../wailsjs/go/models'
+import {app, sandbox} from '../wailsjs/go/models'
 import {SandboxCreateDialog} from './SandboxCreateDialog'
+import {SandboxTemplateDialog} from './SandboxTemplates'
 import {SandboxTerminal} from './SandboxTerminal'
 import {Status, envToLines, fmtDate, errText} from './util'
 import {Badge, Card, Empty, Icon, PageHeader, Spinner, Tabs} from './ui'
@@ -101,11 +102,23 @@ function SandboxTable({boxes, selected, onSelect}: {
 
 type Tab = 'overview' | 'terminal' | 'log' | 'env'
 
+// sandboxTemplateForm is the sandbox template a sandbox's agent is saved as.
+// Sizing, placement, volumes and lifetime are per sandbox, so they are left out.
+function sandboxTemplateForm(box: app.Sandbox) {
+  return sandbox.TemplateForm.createFrom({
+    name: '', description: '', image: box.image, command: box.command || '',
+    env: Object.entries(box.env || {}).map(([name, value]) => ({name, value})),
+    runtimeClass: box.runtimeClass || '',
+  })
+}
+
 function SandboxDetail({name, onDone}: { name: string, onDone: () => void }) {
   const [box, setBox] = useState<app.Sandbox | null>(null)
   const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('overview')
   const [log, setLog] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [savedTemplate, setSavedTemplate] = useState('')
   // pending is the transition in flight. It stays set until the phase reaches
   // its target, because suspending or resuming takes the controller a while.
   const [pending, setPending] = useState<'start' | 'stop' | null>(null)
@@ -130,6 +143,8 @@ function SandboxDetail({name, onDone}: { name: string, onDone: () => void }) {
     setLog('')
     setTab('overview')
     setPending(null)
+    setSaving(false)
+    setSavedTemplate('')
     const load = () => GetSandbox(name).then(setBox).catch(e => setError(errText(e)))
     load()
     const t = setInterval(load, 5000)
@@ -155,6 +170,9 @@ function SandboxDetail({name, onDone}: { name: string, onDone: () => void }) {
         <div className="card-head-actions"><Status phase={box.phase}/></div>
       </div>
       {error && <div className="banner banner-error">{error}</div>}
+      {savedTemplate && <div className="banner" role="status">Saved sandbox template {savedTemplate}.</div>}
+      {saving && <SandboxTemplateDialog initial={sandboxTemplateForm(box)} onClose={() => setSaving(false)}
+                                        onSaved={n => { setSaving(false); setSavedTemplate(n) }}/>}
 
       <div className="detail-actions">
         <button className="btn btn-sm" onClick={() =>
@@ -171,6 +189,9 @@ function SandboxDetail({name, onDone}: { name: string, onDone: () => void }) {
           {pending === 'start' ? <span className="spinner" aria-hidden/> : <Icon name="play" size={12}/>}
           {pending === 'start' ? 'Starting…' : 'Start'}
         </button>}
+        <button className="btn btn-sm" onClick={() => setSaving(true)}>
+          <Icon name="layers" size={13}/>Save as template
+        </button>
         <span className="spacer"/>
         <button className="btn btn-sm btn-danger" onClick={() =>
           confirm(`Delete sandbox ${box.name}? Its pod and volumes are deleted.`) &&

@@ -30,6 +30,11 @@ export function linesToEnv(s: string): EnvMap {
   return env
 }
 
+// envMap turns the name/value list of a form into an EnvMap.
+export function envMap(env: {name: string, value: string}[] = []): EnvMap {
+  return Object.fromEntries(env.map(e => [e.name, e.value]))
+}
+
 export function fmtDate(iso?: string): string {
   if (!iso) return '—'
   const d = new Date(iso)

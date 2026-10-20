@@ -55,8 +55,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: var(--surface); --wails-draggable: drag; user-select: none;
 }
 .header button, .header select, .header input { --wails-draggable: no-drag; }
-/* Without a sidebar the header melts into the canvas. */
-.app-connect .header { background: var(--canvas); }
 /* Room for the macOS traffic lights of the hidden-inset title bar. */
 .platform-darwin .header { padding-left: 84px; }
 .logo { display: flex; align-items: center; gap: 8px; font-weight: 600; letter-spacing: -0.32px; font-size: 16px; }
@@ -150,13 +148,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .dialog { width: 600px; max-height: 90vh; overflow: auto; background: var(--surface); border-radius: var(--radius-lg); box-shadow: 0 16px 48px rgba(0,0,0,0.16); }
 .dialog form { display: flex; flex-direction: column; gap: 14px; padding: 20px; }
 .dialog-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--hairline); background: var(--canvas); border-radius: 0 0 var(--radius-lg) var(--radius-lg); }
-
-/* Connect screen */
-.connect { max-width: 480px; margin: 72px auto; }
-.connect form { display: flex; flex-direction: column; gap: 14px; }
-.connect .logo-mark { margin-bottom: 16px; }
-.connect h2 { margin: 0 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -0.96px; }
-.connect p { margin: 0 0 20px; color: var(--body); }
 
 /* Sidebar shell */
 .shell { flex: 1; display: grid; grid-template-columns: 168px minmax(0, 1fr); min-height: 0; }

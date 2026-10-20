@@ -92,11 +92,15 @@ a { color: inherit; text-decoration: none; }
    hover steps down instead, so only the active row is lighter. */
 .sidebar .nav-item:not(.active):hover { background: rgba(15, 23, 42, 0.05); }
 .header .icon-btn:hover { background: rgba(15, 23, 42, 0.06); color: var(--ink); }
-.nav-foot {
-  margin-top: auto; padding: 12px 10px 4px; border-top: 1px solid var(--hairline-soft);
-  display: flex; flex-direction: column; gap: 2px;
+/* Scope: the cluster and project pickers at the top of the sidebar */
+.scope {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 4px 0 14px; margin-bottom: 4px; border-bottom: 1px solid var(--chrome-line);
 }
-.nav-foot .conn-meta { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scope-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.scope .nav-label { padding: 0 2px; }
+.scope .select, .scope .input { width: 100%; font-size: 13px; }
+.scope .select:disabled, .scope .input:disabled { opacity: 0.6; }
 
 /* Page frame */
 /* Pin both to their columns so hiding the sidebar (display: none) does not
@@ -363,10 +367,6 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
 .dialog-body { padding: 18px; overflow: auto; display: flex; flex-direction: column; gap: 14px; }
 .dialog-foot { padding: 12px 18px; background: #fafafa; }
 .dialog form, .dialog .dialog-form { display: flex; flex-direction: column; gap: 14px; }
-
-/* Connect screen */
-.connect h2 { font-size: 26px; letter-spacing: -1.1px; }
-.connect p { font-size: 13px; line-height: 20px; }
 
 /* Files iframe */
 .files-frame { height: calc(100vh - 230px); }

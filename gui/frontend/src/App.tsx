@@ -1,5 +1,5 @@
-import {useEffect, useState} from 'react'
-import {Connect, Contexts, Logout, Projects} from '../wailsjs/go/app/App'
+import {Fragment, useEffect, useRef, useState} from 'react'
+import {Connect, Contexts, Projects} from '../wailsjs/go/app/App'
 import {Environment} from '../wailsjs/runtime/runtime'
 import {app} from '../wailsjs/go/models'
 import {Overview} from './Overview'
@@ -11,19 +11,45 @@ import {FilesView} from './FilesView'
 import {Images} from './Images'
 import {Resources} from './Resources'
 import {Admin} from './Admin'
+import {Scope} from './Scope'
 import {errText} from './util'
-import {Logo} from './Logo'
-import {HeaderSlot, Icon, IconName} from './ui'
+import {Empty, HeaderSlot, Icon, IconName, Spinner} from './ui'
 
+// PREFS is the last connection. NAMESPACES maps each kubeconfig context to the
+// project last opened in it, so switching clusters returns to that project.
 const PREFS = 'forgeai.connection'
+const NAMESPACES = 'forgeai.namespaces'
 const SIDEBAR = 'forgeai.sidebar'
 
 type Area = 'overview' | 'jobs' | 'sandboxes' | 'templates' | 'volumes' | 'files' | 'images' | 'resources' | 'admin'
 
 type NavItem = {area: Area, label: string, icon: IconName}
 
+// pickNamespace chooses the project a context opens with: the requested one,
+// else the one last used there, else the first project. Users that may not
+// list projects get no list, so the requested namespace is taken as typed.
+// With nothing to go on it returns '' and the context default is used.
+function pickNamespace(list: app.ProjectNamespace[], requested: string, remembered: string): string {
+  if (!list.length) return requested || remembered
+  const known = [requested, remembered].find(ns => list.some(p => p.namespace === ns))
+  return known ?? list[0].namespace
+}
+
+// areaFor keeps the open view when the new connection offers it. A connection
+// without a project only has the admin area.
+function areaFor(current: Area, info: app.ConnInfo): Area {
+  if (!info.project) return 'admin'
+  if (current === 'admin' && !info.admin) return 'overview'
+  if (current === 'sandboxes' && !info.sandboxes) return 'overview'
+  return current
+}
+
 export default function App() {
   const [contexts, setContexts] = useState<app.KubeContext[]>([])
+  // cluster is the kubeconfig context shown in the sidebar. It leads the
+  // connection while a switch is in flight.
+  const [cluster, setCluster] = useState('')
+  const [projects, setProjects] = useState<app.ProjectNamespace[]>([])
   const [conn, setConn] = useState<app.ConnInfo | null>(null)
   const [area, setArea] = useState<Area>('overview')
   const [error, setError] = useState('')
@@ -32,46 +58,70 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR) === 'collapsed')
   // Views portal their PageHeader into this node in the top bar.
   const [headerSlot, setHeaderSlot] = useState<HTMLDivElement | null>(null)
+  // Each connect takes a number; a slower, superseded switch must not win.
+  const attempt = useRef(0)
+  const started = useRef(false)
 
   const toggleSidebar = () => setCollapsed(v => {
     localStorage.setItem(SIDEBAR, v ? 'open' : 'collapsed')
     return !v
   })
 
-  useEffect(() => {
-    Contexts().then(setContexts).catch(e => setError(errText(e)))
-    // The macOS title bar is hidden; leave room for the window controls.
-    Environment().then(env => document.body.classList.toggle('platform-darwin', env.platform === 'darwin'))
-  }, [])
-
-  const connect = async (contextName: string, namespace: string) => {
+  const connectTo = async (contextName: string, requested = '') => {
+    const seq = ++attempt.current
+    const remembered: Record<string, string> = JSON.parse(localStorage.getItem(NAMESPACES) || '{}')
+    setCluster(contextName)
     setLoading(true)
+    setError('')
     try {
-      const info = await Connect(contextName, namespace)
-      localStorage.setItem(PREFS, JSON.stringify({ctx: contextName, ns: namespace}))
+      const list = await Projects(contextName).catch(() => [] as app.ProjectNamespace[])
+      const info = await Connect(contextName, pickNamespace(list, requested, remembered[contextName] || ''))
+      if (seq !== attempt.current) return
+      localStorage.setItem(PREFS, JSON.stringify({ctx: contextName, ns: info.namespace}))
+      localStorage.setItem(NAMESPACES, JSON.stringify({...remembered, [contextName]: info.namespace}))
+      setProjects(list)
       setConn(info)
-      setArea(info.project ? 'overview' : 'admin')
-      setError('')
+      setArea(current => areaFor(current, info))
     } catch (e) {
+      if (seq !== attempt.current) return
       setError(errText(e))
+      // Keep the sidebar on the cluster that is actually connected.
+      setCluster(current => (conn ? conn.context : current))
     } finally {
-      setLoading(false)
+      if (seq === attempt.current) setLoading(false)
     }
   }
 
-  const logout = async () => {
-    await Logout()
-    setConn(null)
+  useEffect(() => {
+    // StrictMode runs effects twice in development; connect once.
+    if (started.current) return
+    started.current = true
+    // The macOS title bar is hidden; leave room for the window controls.
+    Environment().then(env => document.body.classList.toggle('platform-darwin', env.platform === 'darwin'))
+    Contexts().then(list => {
+      setContexts(list)
+      const last: {ctx?: string, ns?: string} = JSON.parse(localStorage.getItem(PREFS) || '{}')
+      const start = list.find(c => c.name === last.ctx) || list.find(c => c.current) || list[0]
+      if (!start) {
+        setError('No kubeconfig context found. Add one to $KUBECONFIG or ~/.kube/config.')
+        return
+      }
+      connectTo(start.name, start.name === last.ctx ? last.ns : '')
+    }).catch(e => setError(errText(e)))
+  }, [])
+
+  const switchCluster = (name: string) => {
+    if (name !== conn?.context) connectTo(name)
   }
 
-  if (!conn) return <ConnectScreen contexts={contexts} onConnect={connect} loading={loading} error={error}/>
+  const switchProject = (namespace: string) => {
+    if (conn && namespace !== conn.namespace) connectTo(conn.context, namespace)
+  }
 
-  // Without a project (admin of a cluster with no projects yet) only the
-  // admin area is usable.
   // The sidebar groups areas like the reference consoles: workspace, storage,
   // cluster catalogue, then admin. Sandboxes appear only when the connected
   // cluster runs agents.x-k8s.io.
-  const groups: {label: string, items: NavItem[]}[] = conn.project ? [
+  const groups: {label: string, items: NavItem[]}[] = conn?.project ? [
     {
       label: 'Workspace',
       items: [
@@ -94,7 +144,7 @@ export default function App() {
       items: [{area: 'resources', label: 'Resources', icon: 'cpu'}],
     },
   ] : []
-  if (conn.admin) {
+  if (conn?.admin) {
     groups.push({label: 'Admin', items: [{area: 'admin', label: 'Projects', icon: 'shield'}]})
   }
 
@@ -111,14 +161,17 @@ export default function App() {
           </div>
           <div className="header-main">
             <div className="header-slot" ref={setHeaderSlot}/>
-            <div className="conn">
-              <span className="conn-meta">{conn.project ? `${conn.project} · ${conn.namespace}` : conn.context}</span>
-              <button className="btn btn-sm" onClick={logout}>Switch</button>
-            </div>
+            {conn && (
+              <div className="conn">
+                <span className="conn-meta">{conn.project ? `${conn.project} · ${conn.namespace}` : conn.context}</span>
+              </div>
+            )}
           </div>
         </header>
         <div className={`shell ${collapsed ? 'collapsed' : ''}`}>
           <nav className="sidebar">
+            <Scope contexts={contexts} cluster={cluster} projects={projects} namespace={conn?.namespace ?? ''}
+                   connected={!!conn} busy={loading} onCluster={switchCluster} onProject={switchProject}/>
             {groups.map(g => (
               <div className="nav-group" key={g.label}>
                 <div className="nav-label">{g.label}</div>
@@ -132,112 +185,32 @@ export default function App() {
                 ))}
               </div>
             ))}
-            <div className="nav-foot">
-              <span className="conn-meta" title={conn.server}>{conn.context}</span>
-              <span className="conn-meta" title={conn.namespace}>{conn.namespace || 'no namespace'}</span>
-            </div>
           </nav>
           <main className="main">
-            {area === 'overview' && <Overview onOpen={setArea}/>}
-            {area === 'jobs' && <Jobs/>}
-            {area === 'sandboxes' && <Sandboxes/>}
-            {area === 'templates' && <Templates sandboxes={conn.sandboxes}/>}
-            {area === 'volumes' && <Volumes/>}
-            {area === 'files' && <FilesView/>}
-            {area === 'images' && <Images/>}
-            {area === 'resources' && <Resources/>}
-            {area === 'admin' && <Admin/>}
+            {error && <div className="banner banner-error" role="alert">{error}</div>}
+            {conn ? (
+              // Keyed by the connection so every view refetches after a switch.
+              <Fragment key={`${conn.context}/${conn.namespace}`}>
+                {area === 'overview' && <Overview onOpen={setArea}/>}
+                {area === 'jobs' && <Jobs/>}
+                {area === 'sandboxes' && <Sandboxes/>}
+                {area === 'templates' && <Templates sandboxes={conn.sandboxes}/>}
+                {area === 'volumes' && <Volumes/>}
+                {area === 'files' && <FilesView/>}
+                {area === 'images' && <Images/>}
+                {area === 'resources' && <Resources/>}
+                {area === 'admin' && <Admin/>}
+              </Fragment>
+            ) : loading ? (
+              <Spinner label="Connecting…"/>
+            ) : (
+              <Empty icon="server" title="Not connected">
+                Choose a cluster and project in the sidebar.
+              </Empty>
+            )}
           </main>
         </div>
       </div>
     </HeaderSlot.Provider>
   )
-}
-
-function ConnectScreen({contexts, onConnect, loading, error}: {
-  contexts: app.KubeContext[],
-  onConnect: (ctx: string, ns: string) => void,
-  loading: boolean,
-  error: string,
-}) {
-  const saved = JSON.parse(localStorage.getItem(PREFS) || '{}')
-  const [ctx, setCtx] = useState(saved.ctx || '')
-  const [ns, setNs] = useState(saved.ns || '')
-  // Project namespaces the context can list; empty for plain members, who
-  // type their namespace (or rely on the context default).
-  const [projects, setProjects] = useState<app.ProjectNamespace[]>([])
-
-  // Fall back to the current context when the saved one is gone from the
-  // kubeconfig (a removed or renamed context would otherwise be submitted
-  // while the select shows the first option).
-  useEffect(() => {
-    if (!contexts.length) return
-    if (!ctx || !contexts.some(c => c.name === ctx)) {
-      setCtx((contexts.find(c => c.current) || contexts[0]).name)
-    }
-  }, [contexts])
-
-  useEffect(() => {
-    if (!ctx) return
-    let live = true
-    Projects(ctx).then(list => {
-      if (!live) return
-      setProjects(list)
-      if (list.length) setNs((cur: string) => list.some(p => p.namespace === cur) ? cur : list[0].namespace)
-    }).catch(() => live && setProjects([]))
-    return () => { live = false }
-  }, [ctx])
-
-  return (
-    <div className="app app-connect">
-      <Header/>
-      <main className="main">
-        <div className="connect card">
-          <form className="card-body" onSubmit={e => {
-            e.preventDefault()
-            onConnect(ctx, ns.trim())
-          }}>
-            <div>
-              <Logo size={40}/>
-              <h2>Connect to a cluster</h2>
-              <p>Pick the kubeconfig context of your project. The namespace is the project
-                namespace (e.g. forge-myteam); ask your admin for a kubeconfig if you don't
-                have one.</p>
-            </div>
-            {error && <div className="banner banner-error" role="alert">{error}</div>}
-            <div className="field">
-              <label htmlFor="ctx">Kubeconfig context</label>
-              <select id="ctx" className="select" value={ctx} onChange={e => setCtx(e.target.value)} required>
-                {contexts.map(c =>
-                  <option key={c.name} value={c.name}>{c.name}{c.current ? ' (current)' : ''}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="ns">Project namespace</label>
-              {projects.length ? (
-                <select id="ns" className="select mono" value={ns} onChange={e => setNs(e.target.value)}>
-                  {projects.map(p =>
-                    <option key={p.namespace} value={p.namespace}>{p.namespace} ({p.project})</option>)}
-                </select>
-              ) : (
-                <input id="ns" className="input mono" value={ns} onChange={e => setNs(e.target.value)}
-                       placeholder="Context default, e.g. forge-myteam"/>
-              )}
-              <span className="hint">Must be a forgeai project namespace.</span>
-            </div>
-            <button className="btn btn-primary" type="submit" disabled={loading || !ctx}>
-              {loading ? 'Connecting…' : 'Connect'}
-            </button>
-          </form>
-        </div>
-      </main>
-    </div>
-  )
-}
-
-// Header doubles as the window title bar: it is the drag region of the
-// frameless macOS window. The connect screen has no sidebar, so the band
-// stays empty and the card carries the wordmark.
-function Header() {
-  return <header className="header"/>
 }

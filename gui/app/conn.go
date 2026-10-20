@@ -63,8 +63,8 @@ func clientConfig(contextName string) (*rest.Config, string, error) {
 }
 
 // Projects lists the forgeai project namespaces visible to a kubeconfig
-// context, for the namespace picker of the connect screen. Users that may not
-// list namespaces (plain project members) get an empty list.
+// context, for the project picker in the sidebar. Users that may not list
+// namespaces (plain project members) get an empty list.
 func (a *App) Projects(contextName string) ([]ProjectNamespace, error) {
 	cfg, _, err := clientConfig(contextName)
 	if err != nil {

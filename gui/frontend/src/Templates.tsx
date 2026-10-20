@@ -17,7 +17,7 @@ export function Templates() {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Workspace" title="Templates"
+      <PageHeader eyebrow="Workspace" title="Job templates"
                   meta={<span className="muted" style={{fontSize: 12.5}}>{items.length} templates</span>}
                   actions={<button className="btn btn-primary"
                                    onClick={() => setEditing(training.Form.createFrom({

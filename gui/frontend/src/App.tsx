@@ -82,7 +82,7 @@ export default function App() {
           {area: 'sandboxes', label: 'Sandboxes', icon: 'box'} as NavItem,
           {area: 'sandbox-templates', label: 'Sandbox templates', icon: 'layers'} as NavItem,
         ] : []),
-        {area: 'templates', label: 'Templates', icon: 'scroll'},
+        {area: 'templates', label: 'Job templates', icon: 'scroll'},
       ],
     },
     {

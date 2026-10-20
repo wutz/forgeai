@@ -224,12 +224,11 @@ func (a *App) RerunJob(name, newName string) (*Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	f, err := training.TrainJobForm(src)
+	f, err := rerunForm(src, newName)
 	if err != nil {
 		return nil, err
 	}
-	f.Name, f.Template = newName, ""
-	tj, err := a.renderTrainJob(ctx, c, *f)
+	tj, err := a.renderTrainJob(ctx, c, f)
 	if err != nil {
 		return nil, err
 	}
@@ -237,6 +236,17 @@ func (a *App) RerunJob(name, newName string) (*Job, error) {
 		return nil, err
 	}
 	return toJob(ctx, c, tj)
+}
+
+// rerunForm is the form of a new job copied from src. It keeps src's job
+// template, so the rerun stays grouped with the template it came from.
+func rerunForm(src *kf.TrainJob, name string) (training.Form, error) {
+	f, err := training.TrainJobForm(src)
+	if err != nil {
+		return training.Form{}, err
+	}
+	f.Name = name
+	return *f, nil
 }
 
 // Logs returns the last tailLines of a worker pod log.

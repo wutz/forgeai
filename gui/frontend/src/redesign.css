@@ -372,7 +372,6 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
 .dialog form, .dialog .dialog-form { display: flex; flex-direction: column; gap: 14px; }
 
 /* Files iframe */
-.files-frame { height: calc(100vh - 230px); }
 
 /* Images */
 .repo summary::-webkit-details-marker { display: none; }

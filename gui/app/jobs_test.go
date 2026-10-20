@@ -64,3 +64,15 @@ func TestGetJobDrillsIntoRetries(t *testing.T) {
 		t.Error("expected not found")
 	}
 }
+
+func TestRerunFormKeepsTemplate(t *testing.T) {
+	src := testTrainJob("train", "")
+	src.Labels = map[string]string{naming.LabelTemplate: "torch", naming.LabelInstanceType: "cpu.small"}
+	f, err := rerunForm(src, "train-again")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Name != "train-again" || f.Template != "torch" || f.InstanceType != "cpu.small" {
+		t.Errorf("rerun form = %+v, want the new name with template torch on cpu.small", f)
+	}
+}

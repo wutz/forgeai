@@ -4,14 +4,17 @@ import {app} from '../wailsjs/go/models'
 import {errText} from './util'
 import {Card, Empty, Icon, PageHeader, Spinner} from './ui'
 
-// Files opens the on-demand file browser (dufs): it wakes the project's
-// FileServer, embeds the served URL with the basic-auth credentials and keeps
-// it awake while the view is open. Files also heartbeats the server, so the
-// server scales to zero once the view closes and nothing else uses it.
+// Files shows the project's on-demand file server (dufs). It wakes the server
+// and keeps it up while the view is open. The files open in the browser: an
+// embedded frame cannot sign in, because Chrome blocks subresources whose URL
+// carries credentials, so the username and password are shown for the browser's
+// sign-in prompt instead.
 export function FilesView() {
   const [state, setState] = useState<app.Files | null>(null)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
+  const [showPassword, setShowPassword] = useState(false)
+  const [copied, setCopied] = useState('')
 
   useEffect(() => {
     let stopped = false
@@ -37,13 +40,16 @@ export function FilesView() {
     }
   }, [attempt])
 
+  const copy = (text: string, key: string) =>
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key)
+      setTimeout(() => setCopied(''), 1500)
+    }, () => {})
+
   const ready = state?.phase === 'Ready'
-  const creds = state?.username && state.password ? {user: state.username, pass: state.password} : null
-  // Only a ready server with credentials is embedded. Without credentials
-  // (view-only members) the iframe would prompt for a password nobody has.
-  const embed = state?.url && ready && creds
-    ? state.url.replace('://', `://${encodeURIComponent(creds.user)}:${encodeURIComponent(creds.pass)}@`)
-    : undefined
+  // Only a ready server offers its URL: an idle one has no pod behind it.
+  const open = ready && state?.url ? state.url : ''
+  const hasCreds = !!(state?.username && state.password)
 
   return (
     <div className="page">
@@ -57,8 +63,8 @@ export function FilesView() {
                     {error && (
                       <button className="btn btn-sm" onClick={() => setAttempt(n => n + 1)}>Retry</button>
                     )}
-                    {state?.url && (
-                      <a className="btn btn-sm" href={state.url} target="_blank" rel="noreferrer">
+                    {open && (
+                      <a className="btn btn-sm btn-primary" href={open} target="_blank" rel="noreferrer">
                         <Icon name="external" size={13}/>Open in browser
                       </a>
                     )}
@@ -66,25 +72,45 @@ export function FilesView() {
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       <p className="muted note">
         {state?.volumes?.length ? `Serving ${state.volumes.join(', ')}. ` : ''}
-        Shared volumes are served over HTTPS and scaled to zero when idle. Uploading here counts
-        as activity and keeps the server up.
+        Shared volumes are served over HTTPS and scaled to zero when idle. Activity in the
+        browser keeps the server up.
       </p>
-      {embed ? (
-        <div className="files-frame card">
-          <iframe src={embed} title="Files" allow="clipboard-write"/>
-        </div>
+      {!state ? (
+        <Card>
+          <Empty icon="folder" title="Opening the file browser…"/>
+        </Card>
+      ) : ready && hasCreds ? (
+        <Card title="Sign in" subtitle="Enter these when the browser asks for a password">
+          <div className="robot-password">
+            <span className="muted">Username</span>
+            <code className="mono">{state.username}</code>
+            <button className="btn btn-sm" onClick={() => copy(state.username ?? '', 'user')}>
+              <Icon name={copied === 'user' ? 'check' : 'copy'} size={13}/>
+              {copied === 'user' ? 'Copied' : 'Copy username'}
+            </button>
+          </div>
+          <div className="robot-password">
+            <span className="muted">Password</span>
+            <code className="mono">{showPassword ? state.password : '••••••••••••'}</code>
+            <button className="btn btn-sm" onClick={() => setShowPassword(v => !v)}>
+              {showPassword ? 'Hide' : 'Show'}
+            </button>
+            <button className="btn btn-sm" onClick={() => copy(state.password ?? '', 'password')}>
+              <Icon name={copied === 'password' ? 'check' : 'copy'} size={13}/>
+              {copied === 'password' ? 'Copied' : 'Copy password'}
+            </button>
+          </div>
+        </Card>
+      ) : ready ? (
+        <Card>
+          <Empty icon="folder" title="No file server password for your role">
+            The server is up. Ask a project admin for access.
+          </Empty>
+        </Card>
       ) : (
         <Card>
-          {!state ? (
-            <Empty icon="folder" title="Opening the file browser…"/>
-          ) : ready && !creds ? (
-            <Empty icon="folder" title="No file server password for your role">
-              The server is up. Ask a project admin for access, or use Open in browser to sign in.
-            </Empty>
-          ) : (
-            <Spinner label={state.phase === 'Starting' ? 'Starting the file server…' :
-              state.phase === 'Idle' ? 'Waking the file server…' : 'Waiting for the file server…'}/>
-          )}
+          <Spinner label={state.phase === 'Starting' ? 'Starting the file server…' :
+            state.phase === 'Idle' ? 'Waking the file server…' : 'Waiting for the file server…'}/>
         </Card>
       )}
     </div>

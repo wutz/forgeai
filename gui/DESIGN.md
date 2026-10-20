@@ -1,7 +1,7 @@
 ---
 version: alpha
-name: forgeai (Geist + Forge Ember)
-description: The forgeai desktop console uses Vercel's Geist system as an app surface with Forge Ember (#ea580c) as the single theme color; see the "forgeai Theme" section. The rest of this file is an analysis of Vercel's design language — the Geist system, a stark black-on-near-white developer-platform aesthetic where a single ink tone carries every heading, CTA, and border, and the only color the page allows itself is a multi-stop mesh gradient (cyan / blue / violet / magenta / amber) confined to the hero. Geist Sans drives tightly-tracked display type, Geist Mono labels the technical eyebrows, and pill-shaped black buttons mark the marketing CTAs while 6px square buttons handle app and nav chrome.
+name: forgeai (Geist + Forge Indigo)
+description: The forgeai desktop console uses Vercel's Geist system as an app surface with Forge Indigo (#4f46e5, on cool zinc neutrals) as the single theme color; see the "forgeai Theme" section. The rest of this file is an analysis of Vercel's design language — the Geist system, a stark black-on-near-white developer-platform aesthetic where a single ink tone carries every heading, CTA, and border, and the only color the page allows itself is a multi-stop mesh gradient (cyan / blue / violet / magenta / amber) confined to the hero. Geist Sans drives tightly-tracked display type, Geist Mono labels the technical eyebrows, and pill-shaped black buttons mark the marketing CTAs while 6px square buttons handle app and nav chrome.
 
 colors:
   primary: "#171717"
@@ -34,12 +34,21 @@ colors:
   gradient-preview-end: "#ff0080"
   gradient-ship-start: "#ff4d4d"
   gradient-ship-end: "#f9cb28"
-  # forgeai theme: "Forge Ember" (see "forgeai Theme" section)
-  ember: "#ea580c"
-  ember-deep: "#c2410c"
-  ember-soft: "#ffedd5"
-  success: "#16a34a"
-  success-soft: "#dcfce7"
+  # forgeai theme: "Forge Indigo" (see "forgeai Theme" section)
+  accent: "#4f46e5"
+  accent-deep: "#4338ca"
+  accent-soft: "#eef2ff"
+  accent-ring: "rgba(79, 70, 229, 0.18)"
+  accent-gradient-start: "#6366f1"
+  accent-gradient-end: "#7c3aed"
+  success: "#059669"
+  success-soft: "#d1fae5"
+  # app neutrals (zinc), overriding the Geist greys in the console
+  app-ink: "#18181b"
+  app-body: "#52525b"
+  app-mute: "#71717a"
+  app-hairline: "#e4e4e7"
+  app-hairline-soft: "#f4f4f5"
 
 typography:
   display-xl:
@@ -167,24 +176,25 @@ components:
     typography: "{typography.button-md}"
     rounded: "{rounded.sm}"
     padding: "0px 6px"
-  # forgeai app components (Forge Ember accent)
+  # forgeai app components (Forge Indigo accent)
   button-accent-sm:
-    backgroundColor: "{colors.ember}"
+    backgroundColor: "linear-gradient(135deg, {colors.accent-gradient-start}, {colors.accent-gradient-end})"
     textColor: "{colors.on-primary}"
     typography: "{typography.button-md}"
     rounded: "{rounded.sm}"
     padding: "0px 6px"
   button-accent-sm-hover:
-    backgroundColor: "{colors.ember-deep}"
+    backgroundColor: "{colors.accent-deep}"
     textColor: "{colors.on-primary}"
   nav-item-active:
-    backgroundColor: "{colors.ember-soft}"
-    textColor: "{colors.ember-deep}"
+    backgroundColor: "{colors.canvas-elevated}"
+    textColor: "{colors.app-ink}"
     rounded: "{rounded.sm}"
   table-row-selected:
-    backgroundColor: "{colors.ember-soft}"
+    backgroundColor: "{colors.accent-soft}"
+    borderColor: "{colors.accent}"
   input-focus:
-    borderColor: "{colors.ember}"
+    borderColor: "{colors.accent}"
   button-category-pill:
     backgroundColor: "{colors.canvas-elevated}"
     textColor: "{colors.ink}"
@@ -262,28 +272,29 @@ components:
 
 forgeai is a desktop console for AI training, RL and inference jobs on Kubernetes. It follows the Geist system below as an **app surface** (not marketing): 6px square buttons (`{components.button-accent-sm}` / `{components.button-ghost-sm}`), hairline cards and tables, no hero mesh gradient.
 
-- **Theme color — Forge Ember** (`{colors.ember}` #ea580c): the heat of a forge, matching the name and the platform's job of "forging" models. Used for the primary action (`{components.button-accent-sm}`, e.g. "New job"), the active nav item (`{components.nav-item-active}`), focus rings and input focus (`{components.input-focus}`, with an `{colors.ember-soft}` 3px ring) and the logo mark. Press tone `{colors.ember-deep}` (#c2410c), wash `{colors.ember-soft}` (#ffedd5) for selected rows (`{components.table-row-selected}`). Ember replaces Vercel Blue and ink as the accent; `{colors.link}` stays for plain links.
+- **Theme color — Forge Indigo** (`{colors.accent}` #4f46e5): a cool, electric indigo in the register of current AI and developer tools, chosen over the earlier Forge Ember orange so the console reads calm and technical next to dense cluster data. It is 6.3:1 on white, so white labels on it pass WCAG AA. Used for the accent action (`{components.button-accent-sm}`, e.g. "Start", filled with the `{colors.accent-gradient-start}` → `{colors.accent-gradient-end}` indigo→violet gradient plus a 1px inner highlight), the active nav icon, tab underlines, meters, focus rings and input focus (`{components.input-focus}`, with a translucent `{colors.accent-ring}` 3px ring) and the logo tile. Press tone `{colors.accent-deep}` (#4338ca), wash `{colors.accent-soft}` (#eef2ff) for selected rows, which also carry a 2px accent bar on their left edge (`{components.table-row-selected}`). `{colors.link}` is the accent too.
+- **Neutrals**: the console uses the zinc ladder (`{colors.app-ink}` #18181b, `{colors.app-body}` #52525b, `{colors.app-mute}` #71717a, `{colors.app-hairline}` #e4e4e7) in place of Geist's neutral greys. The faint blue cast sits with indigo, and mute at #71717a is 4.8:1 on white (Geist's #8f8f8f is 3.3:1). Shadows and the dialog backdrop are tinted with slate (`rgba(15, 23, 42, …)`), not pure black.
 - **Status colors**: Running `{colors.success}` (#16a34a); Queued / Pending / Restarting / Stopping `{colors.warning}`; Failed `{colors.error}` (text and dot); Succeeded / Stopped / Idle `{colors.mute}`. Status is always text + dot, never color alone.
-- **CSS**: `gui/frontend/src/style.css` mirrors these tokens as custom properties (`--ember`, `--ember-deep`, `--ember-soft`, `--success`, ...); change both together.
-- Ink (`{colors.ink}`) remains the default for headings and secondary buttons; ember is used sparingly (one primary action per view).
-- **Logo**: a white anvil with a four-point spark on a Forge Ember rounded tile (radius ≈ 22% of the side). `gui/frontend/src/Logo.tsx` holds the SVG paths, reused by `frontend/public/favicon.svg`, `build/appicon.png` and `build/windows/icon.ico`; change all of them together. Header 22px next to the "forgeai" wordmark, connect card 40px.
+- **CSS**: `gui/frontend/src/style.css` mirrors these tokens as custom properties (`--accent`, `--accent-deep`, `--accent-soft`, `--accent-ring`, `--accent-gradient`, `--success`, ...); change both together.
+- Ink (`{colors.ink}`) remains the default for headings and secondary buttons; the accent is used sparingly (one accent action per view).
+- **Logo**: a white anvil with a four-point spark on a rounded tile (radius ≈ 22% of the side) filled with the 135° indigo→violet accent gradient. `build/appicon.png` is the 32-unit mark drawn at 824px with 100px of transparent padding on a 1024 canvas; `icon.ico` holds 16–256px PNGs of the same render. `gui/frontend/src/Logo.tsx` holds the SVG paths, reused by `frontend/public/favicon.svg`, `build/appicon.png` and `build/windows/icon.ico`; change all of them together. Header 22px next to the "forgeai" wordmark, connect card 40px.
 - **Window chrome**: the macOS title bar is hidden (inset traffic lights); the app header is the drag region. The header and sidebar share the canvas color, so the window reads as one continuous grey frame; cards are the only white sheets. The sidebar keeps a hairline on its right.
 
 ## Console layout
 
 The app surface follows the Geist ladder but reads as a dense console: a grouped sidebar, a page frame, and card grids of live cluster data. All of it lives in `gui/frontend/src/redesign.css`, layered after `style.css` (same tokens, new layout); `ui.tsx` holds the shared primitives so every view is assembled from the same parts.
 
-- **App canvas** — `--canvas` #f4f5f7 (a step darker than the marketing #fafafa) so white cards read as sheets on the desktop window. Cards stay `{colors.canvas-elevated}` at `--radius-lg` (14px) with a 1px `{colors.hairline}` and a whisper shadow.
-- **Window chrome** — `--chrome` #e9ebee paints the sidebar, one step below the canvas, so navigation reads as its own surface next to the content area. The header spans the full window and is split to match: a gradient fills `0 → sidebar width` with chrome, the next 1px with `--chrome-line` (continuing the sidebar divider) and the rest with the canvas, so the top bar reads as chrome above the sidebar and as content above the page. With the sidebar hidden the header is all canvas and the toggle moves to the left edge. On this darker ground hover states step down (`rgba(23,23,23,0.05)`) rather than lifting in white.
-- **Sidebar** — 224px, chrome-colored, a hairline on its right. Items are grouped under uppercase Geist Mono labels (`Workspace`, `Storage`, `Cluster`, `Admin`) at 10.5px / `{colors.faint}`. An item is a 34px row: 16px stroke icon in `{colors.mute}` + 13.5px label; the active row takes the `{colors.hairline-soft}` fill with an `{colors.ember}` icon. Connection context and namespace sit in a footer block pinned to the bottom.
+- **App canvas** — `--canvas` #f6f7f9 (a step darker than the marketing #fafafa) so white cards read as sheets on the desktop window. Cards stay `{colors.canvas-elevated}` at `--radius-lg` (14px) with a 1px `{colors.hairline}` and a whisper shadow.
+- **Window chrome** — `--chrome` #eef0f4 paints the sidebar, one step below the canvas, so navigation reads as its own surface next to the content area. The header spans the full window and is split to match: a gradient fills `0 → sidebar width` with chrome, the next 1px with `--chrome-line` (continuing the sidebar divider) and the rest with the canvas, so the top bar reads as chrome above the sidebar and as content above the page. With the sidebar hidden the header is all canvas and the toggle moves to the left edge. On this darker ground hover states step down (`rgba(15,23,42,0.05)`) rather than lifting in white.
+- **Sidebar** — 224px, chrome-colored, a hairline on its right. Items are grouped under uppercase Geist Mono labels (`Workspace`, `Storage`, `Cluster`, `Admin`) at 10.5px / `{colors.faint}`. An item is a 34px row: 16px stroke icon in `{colors.mute}` + 13.5px label; the active row is a white chip with a whisper shadow, an ink label and an `{colors.accent}` icon. Connection context and namespace sit in a footer block pinned to the bottom.
 - **Sidebar toggle** — a panel icon at the right end of the sidebar column (clear of the macOS traffic lights, which own the top-left 84px) hides the sidebar completely: the grid's first track collapses to 0, the sidebar is `display: none`, the header becomes one flat canvas surface and the toggle moves to the left edge after the traffic lights to bring it back. The state persists in `localStorage` (`forgeai.sidebar`). At ≤820px the window starts with the sidebar hidden and the toggle is the only way to open it.
 - **Page frame** — `.main` pads 20/28/40px and centers a 1180px column. The view title lives in the top bar, not in the content: `PageHeader` portals into the header slot, so the bar reads `[nav toggle] [eyebrow · title · live meta] … [view actions] [connection] [Switch]`. In the bar the eyebrow is 10.5px mono, the title 15px/600 and actions are 28px `btn-sm`. Without a sidebar (connect screen) the bar is empty and the card carries the wordmark. Below 1100px the eyebrow and connection label drop out to keep the title and actions legible; a view rendered outside the shell falls back to a title band above the content.
-- **Metric tiles** — a responsive grid (`repeat(auto-fit, minmax(190px, 1fr))`). Each tile carries a 22px toned icon chip, a 12px mute label, a 26px/600 tabular value with a mute unit, a 12px detail line and an optional `Meter`. Tones: ember (in use), success (running), warning (queued), error (failed), violet (reserved for a second accent), neutral.
+- **Metric tiles** — a responsive grid (`repeat(auto-fit, minmax(190px, 1fr))`). Each tile carries a 22px toned icon chip, a 12px mute label, a 26px/600 tabular value with a mute unit, a 12px detail line and an optional `Meter`. Tones: accent (in use), success (running), warning (queued), error (failed), violet (#7c3aed, a secondary tone that pairs with the indigo gradient), neutral.
 - **Meters** — 6px full-radius tracks on `{colors.hairline-soft}` with a label row above (11.5px mute, tabular figures). Fill tones mirror the tiles; `muted` marks informational usage. Meters are always derived from real list data — there is no fabricated trend chart.
-- **Segmented filter** — an inset `{colors.hairline-soft}` pill container holding 26px segments; the active segment is a white chip with a 1px shadow and an ember-tinted count. Used for job state filters.
-- **Tabs** — underline tabs inside detail cards (34px, 2px ember underline on the active tab), for `Overview` / `Workers` / `Log` / `Env`.
+- **Segmented filter** — an inset `{colors.hairline-soft}` pill container holding 26px segments; the active segment is a white chip with a 1px shadow and an accent-tinted count. Used for job state filters.
+- **Tabs** — underline tabs inside detail cards (34px, 2px accent underline on the active tab), for `Overview` / `Workers` / `Log` / `Env`.
 - **Badges** — 20px full-radius pills at 11px/500: neutral by default, toned for status, instance type, isolation class and quota facts.
-- **Tables** — hairline header row in mono uppercase 11px; 11px/16px cell padding; the first cell is a `.cell-main` / `.cell-sub` pair (name + image or template) so the list reads without extra columns. Selected rows take the ember wash.
+- **Tables** — hairline header row in mono uppercase 11px; 11px/16px cell padding; the first cell is a `.cell-main` / `.cell-sub` pair (name + image or template) so the list reads without extra columns. Selected rows take the accent wash and a 2px accent bar on the left.
 - **Detail split** — list + 420px detail card (`minmax(0, 1fr) 420px`), collapsing to one column at ≤1100px. The detail card has a title head, an action bar (`detail-actions`) and the tab body.
 - **Dialogs** — 620px (440px for small forms), `{rounded.lg}`, Level-2 floating shadow, a dimmed blurred backdrop, a title/subtitle head, a scrolling body and a footer with the cancel and primary actions.
 

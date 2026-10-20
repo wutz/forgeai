@@ -75,7 +75,7 @@ export function Admin() {
                 <td>
                   {p.network?.isolation === 'None'
                     ? <span className="muted">None</span>
-                    : <Badge tone="ember">Isolated</Badge>}
+                    : <Badge tone="accent">Isolated</Badge>}
                   {p.network?.denyInternet && <span className="muted" style={{fontSize: 12}}> · no internet</span>}
                 </td>
                 <td className="muted">{p.members?.map(m => m.name).join(', ') || '—'}</td>

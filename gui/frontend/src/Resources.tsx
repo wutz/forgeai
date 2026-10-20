@@ -37,7 +37,7 @@ export function Resources() {
       {error && <div className="banner banner-error" role="alert">{error}</div>}
 
       <div className="metrics">
-        <MetricTile icon="cpu" label="GPUs in the cluster" tone="ember"
+        <MetricTile icon="cpu" label="GPUs in the cluster" tone="accent"
                     value={total} detail={`${types.length} instance types`}/>
         <MetricTile icon="check" label="Free now" tone="success"
                     value={free} detail={total ? `${pct(used, total)}% in use` : 'no GPU nodes'}/>
@@ -93,7 +93,7 @@ export function Resources() {
                 <td className="mono">GPUs ({g.class})</td>
                 <td>
                   <Meter value={g.used} max={Math.max(g.quota, 1)}
-                         tone={g.used >= g.quota ? 'warning' : 'ember'}
+                         tone={g.used >= g.quota ? 'warning' : 'accent'}
                          right={<span>{pct(g.used, g.quota)}%</span>}/>
                 </td>
                 <td>{g.used}</td>

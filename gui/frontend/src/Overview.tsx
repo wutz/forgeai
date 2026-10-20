@@ -75,10 +75,10 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
                     detail={failed.length ? 'Open Jobs to inspect' : 'No failures'}>
           <Meter value={failed.length} max={Math.max(jobs.length, 1)} tone={failed.length ? 'error' : 'muted'}/>
         </MetricTile>
-        <MetricTile icon="cpu" label="GPUs in use" tone="ember"
+        <MetricTile icon="cpu" label="GPUs in use" tone="accent"
                     value={gpuUsed} unit={gpuTotal ? `/ ${gpuTotal}` : undefined}
                     detail={gpuTotal ? `${gpuFree} free in the cluster` : 'No GPU nodes detected'}>
-          <Meter value={gpuUsed} max={Math.max(gpuTotal, 1)} tone="ember"/>
+          <Meter value={gpuUsed} max={Math.max(gpuTotal, 1)} tone="accent"/>
         </MetricTile>
       </div>
 
@@ -117,7 +117,7 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
             <div className="quota-list">
               {(quota.gpuClasses || []).map(g => (
                 <Meter key={g.class} value={g.used} max={Math.max(g.quota, 1)}
-                       tone={g.used >= g.quota ? 'warning' : 'ember'}
+                       tone={g.used >= g.quota ? 'warning' : 'accent'}
                        label={<span className="mono">GPUs · {g.class}</span>}
                        right={<span>{g.used} / {g.quota}</span>}/>
               ))}

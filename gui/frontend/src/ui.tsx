@@ -98,7 +98,7 @@ export function Card({title, subtitle, actions, children, className = ''}: {
 // value with a unit, a detail line and an optional meter.
 export function MetricTile({icon, label, value, unit, detail, tone, children}: {
   icon?: IconName, label: string, value: ReactNode, unit?: string, detail?: ReactNode,
-  tone?: 'ember' | 'success' | 'warning' | 'error' | 'violet', children?: ReactNode
+  tone?: 'accent' | 'success' | 'warning' | 'error' | 'violet', children?: ReactNode
 }) {
   return (
     <div className={`metric ${tone ? `metric-${tone}` : ''}`}>
@@ -114,8 +114,8 @@ export function MetricTile({icon, label, value, unit, detail, tone, children}: {
 }
 
 // Meter is a thin progress bar with an optional label row and a tone.
-export function Meter({value, max, tone = 'ember', label, right}: {
-  value: number, max: number, tone?: 'ember' | 'success' | 'warning' | 'error' | 'muted',
+export function Meter({value, max, tone = 'accent', label, right}: {
+  value: number, max: number, tone?: 'accent' | 'success' | 'warning' | 'error' | 'muted',
   label?: ReactNode, right?: ReactNode
 }) {
   const pct = max > 0 ? Math.min(100, Math.max(0, (value / max) * 100)) : 0
@@ -168,7 +168,7 @@ export function Tabs<T extends string>({tabs, value, onChange}: {
 
 // Badge is a small pill: neutral by default, toned for status.
 export function Badge({children, tone}: {
-  children: ReactNode, tone?: 'ember' | 'success' | 'warning' | 'error' | 'neutral'
+  children: ReactNode, tone?: 'accent' | 'success' | 'warning' | 'error' | 'neutral'
 }) {
   return <span className={`badge ${tone ? `badge-${tone}` : ''}`}>{children}</span>
 }

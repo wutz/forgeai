@@ -1,23 +1,27 @@
-/* Tokens from gui/DESIGN.md (Geist app surface + forgeai "Forge Ember" theme). */
+/* Tokens from gui/DESIGN.md (Geist app surface + forgeai "Forge Indigo" theme). */
 :root {
-  --ink: #171717;
-  --body: #4d4d4d;
-  --mute: #8f8f8f;
-  --hairline: #ebebeb;
-  --hairline-soft: #f2f2f2;
+  /* Cool zinc neutrals: a faint blue cast that sits with the indigo accent. */
+  --ink: #18181b;
+  --body: #52525b;
+  --mute: #71717a;
+  --hairline: #e4e4e7;
+  --hairline-soft: #f4f4f5;
   --canvas: #fafafa;
   --surface: #ffffff;
-  --link: #0070f3;
-  --error: #ee0000;
-  --error-soft: #ffe5e5;
-  --warning: #f5a623;
-  --warning-deep: #ab570a;
-  --warning-soft: #ffefcf;
-  --success: #16a34a;
-  --success-soft: #dcfce7;
-  --ember: #ea580c;
-  --ember-deep: #c2410c;
-  --ember-soft: #ffedd5;
+  --link: #4f46e5;
+  --error: #dc2626;
+  --error-soft: #fee2e2;
+  --warning: #f59e0b;
+  --warning-deep: #b45309;
+  --warning-soft: #fef3c7;
+  --success: #059669;
+  --success-soft: #d1fae5;
+  --accent: #4f46e5;
+  --accent-deep: #4338ca;
+  --accent-soft: #eef2ff;
+  --accent-ring: rgba(79, 70, 229, 0.18);
+  /* Indigo → violet, for the logo tile and the accent button. */
+  --accent-gradient: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
@@ -40,7 +44,7 @@ body {
 
 button, input, select, textarea { font: inherit; color: inherit; }
 
-:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .app { display: flex; flex-direction: column; height: 100%; }
 
@@ -76,8 +80,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .btn:hover:not(:disabled) { background: var(--hairline-soft); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-primary { background: var(--ember); border-color: var(--ember); color: #fff; }
-.btn-primary:hover:not(:disabled) { background: var(--ember-deep); border-color: var(--ember-deep); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--accent-deep); border-color: var(--accent-deep); }
 .btn-danger { color: var(--error); }
 .btn-sm { height: 28px; padding: 0 8px; font-size: 13px; }
 
@@ -86,7 +90,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   border: 1px solid var(--hairline); background: var(--surface); min-width: 0;
 }
 .textarea { height: auto; padding: 8px 10px; font-family: var(--mono); font-size: 13px; resize: vertical; }
-.input:focus, .select:focus, .textarea:focus { outline: none; border-color: var(--ember); box-shadow: 0 0 0 3px var(--ember-soft); }
+.input:focus, .select:focus, .textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field label { font-size: 13px; font-weight: 500; color: var(--body); }
@@ -106,7 +110,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .table tr:last-child td { border-bottom: none; }
 .table tbody tr { cursor: pointer; }
 .table tbody tr:hover { background: var(--canvas); }
-.table tbody tr.selected { background: var(--ember-soft); }
+.table tbody tr.selected { background: var(--accent-soft); }
 .mono { font-family: var(--mono); font-size: 13px; }
 .muted { color: var(--mute); }
 .trunc { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -166,7 +170,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-weight: 500; font-size: 14px; color: var(--body); cursor: pointer; text-align: left;
 }
 .nav-item:hover { background: var(--hairline-soft); color: var(--ink); }
-.nav-item.active { background: var(--ember-soft); color: var(--ember-deep); }
+.nav-item.active { background: var(--accent-soft); color: var(--accent-deep); }
+::selection { background: var(--accent-ring); }
 
 /* Files iframe */
 .files-frame { height: calc(100vh - 200px); overflow: hidden; }

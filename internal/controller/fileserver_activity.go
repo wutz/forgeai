@@ -32,7 +32,7 @@ import (
 // the last request. Health checks from the kubelet are ignored.
 func LogActivity(cs kubernetes.Interface) ActivityFunc {
 	return func(ctx context.Context, namespace, pod string, since time.Time) (time.Time, error) {
-		opts := &corev1.PodLogOptions{Container: "dufs"}
+		opts := &corev1.PodLogOptions{Container: fileServerContainer}
 		if !since.IsZero() {
 			opts.SinceTime = &metav1.Time{Time: since}
 		} else {

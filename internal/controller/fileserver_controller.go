@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -58,6 +59,10 @@ const (
 	kindSecret    = "Secret"
 	// annotationServedVolumes on the pod template restarts dufs when volumes change.
 	annotationServedVolumes = "forgeai.wutz.dev/volumes"
+	// rootVolumeName is the scratch emptyDir at /data; the volumes are mounted under it.
+	rootVolumeName = "root"
+	// fileServerContainer is the dufs container, also the name of its binary.
+	fileServerContainer = "dufs"
 	// activityProbeInterval is how often a running server's access log is read.
 	activityProbeInterval = time.Minute
 )
@@ -292,10 +297,22 @@ func fileServerDeployment(fs *v1.FileServer, cfg *platform.Config, name string, 
 			LocalObjectReference: corev1.LocalObjectReference{Name: secret.Name}, Key: corev1.BasicAuthPasswordKey,
 		}}},
 	}
+	// dufs serves /data, but only the volumes are writable: every other path is
+	// read-only, so uploads to the root are refused rather than landing in the
+	// scratch emptyDir. The image has no shell, so dufs gets its arguments
+	// directly; the kubelet expands $(DUFS_PASSWORD) from the Secret env.
+	rules := make([]string, 0, 1+len(vols))
+	rules = append(rules, "/:ro")
+	for _, v := range vols {
+		rules = append(rules, "/"+v+":rw")
+	}
+	auth := fileServerUser + ":$(DUFS_PASSWORD)@" + strings.Join(rules, ",")
+	args := []string{
+		"/data", "--bind", "0.0.0.0", "--port", strconv.Itoa(fileServerPort),
+		"--allow-all", "--enable-cors", "--auth", auth,
+		"--log-format", `$time_iso8601 $remote_user "$request" $status`,
+	}
 	res := corev1.ResourceList{corev1.ResourceCPU: resource.MustParse("1"), corev1.ResourceMemory: resource.MustParse("1Gi")}
-	script := fmt.Sprintf(`exec dufs /data --bind 0.0.0.0 --port %d --allow-all --enable-cors `+
-		`--auth "%s:${DUFS_PASSWORD}@/:rw" --log-format '$time_iso8601 $remote_user "$request" $status'`,
-		fileServerPort, fileServerUser)
 	return &appsv1.Deployment{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: fs.Namespace, Labels: labels},
@@ -318,8 +335,9 @@ func fileServerDeployment(fs *v1.FileServer, cfg *platform.Config, name string, 
 						FSGroupChangePolicy: new(corev1.FSGroupChangeOnRootMismatch),
 					},
 					Containers: []corev1.Container{{
-						Name: "dufs", Image: cfg.FileServer.Image,
-						Command: []string{"/bin/sh", "-c", script},
+						Name: fileServerContainer, Image: cfg.FileServer.Image,
+						Command: []string{fileServerContainer},
+						Args:    args,
 						Env:     env,
 						Ports:   []corev1.ContainerPort{{Name: fileServerPortName, ContainerPort: fileServerPort}},
 						ReadinessProbe: &corev1.Probe{ProbeHandler: corev1.ProbeHandler{HTTPGet: &corev1.HTTPGetAction{
@@ -332,9 +350,12 @@ func fileServerDeployment(fs *v1.FileServer, cfg *platform.Config, name string, 
 							AllowPrivilegeEscalation: new(false), ReadOnlyRootFilesystem: new(true),
 							Capabilities: &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 						},
-						VolumeMounts: append(mounts, corev1.VolumeMount{Name: "root", MountPath: "/data", ReadOnly: true}),
+						// The volumes nest under root, so runc creates their mountpoints
+						// in it; root is writable at the mount level and dufs' rules
+						// keep it read-only.
+						VolumeMounts: append(mounts, corev1.VolumeMount{Name: rootVolumeName, MountPath: "/data"}),
 					}},
-					Volumes: append(podVols, corev1.Volume{Name: "root", VolumeSource: corev1.VolumeSource{
+					Volumes: append(podVols, corev1.Volume{Name: rootVolumeName, VolumeSource: corev1.VolumeSource{
 						EmptyDir: &corev1.EmptyDirVolumeSource{SizeLimit: new(resource.MustParse("1Mi"))},
 					}}),
 				},

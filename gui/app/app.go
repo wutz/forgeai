@@ -63,8 +63,8 @@ type KubeContext struct {
 	Current   bool   `json:"current"`
 }
 
-// ProjectNamespace is a forgeai project namespace offered on the connect
-// screen.
+// ProjectNamespace is a forgeai project namespace offered in the sidebar
+// project picker.
 type ProjectNamespace struct {
 	Namespace string `json:"namespace"`
 	Project   string `json:"project"`

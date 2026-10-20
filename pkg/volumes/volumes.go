@@ -32,6 +32,9 @@ var (
 	// ErrNotReady is returned when growing a volume that is not bound yet;
 	// Kubernetes only expands bound claims.
 	ErrNotReady = errors.New("volume is not ready")
+	// ErrPastExpiry is returned when a purge time is not in the future: the
+	// volume would be purged at the next reconcile.
+	ErrPastExpiry = errors.New("purge time must be in the future")
 )
 
 var nameRE = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
@@ -268,8 +271,12 @@ func (c *Client) Trash(ctx context.Context, name string, retention time.Duration
 	return &v, nil
 }
 
-// SetExpiry changes when a trashed volume is purged.
+// SetExpiry changes when a trashed volume is purged. The time must be in the
+// future, so a mistyped date cannot purge the volume at the next reconcile.
 func (c *Client) SetExpiry(ctx context.Context, name string, at time.Time) (*Volume, error) {
+	if !at.After(c.now()) {
+		return nil, ErrPastExpiry
+	}
 	pvc, err := c.get(ctx, name)
 	if err != nil {
 		return nil, err

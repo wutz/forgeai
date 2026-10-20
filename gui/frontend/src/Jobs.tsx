@@ -4,14 +4,15 @@ import {app, training} from '../wailsjs/go/models'
 import {JobCreateDialog} from './JobCreateDialog'
 import {TemplateDialog} from './Templates'
 import {Status, envToLines, fmtDate, errText} from './util'
-import {Badge, Card, Empty, Icon, PageHeader, Segmented, Spinner, Tabs} from './ui'
+import {Badge, Card, Empty, Icon, PageHeader, Segmented, Spinner, Tabs, useConfirm} from './ui'
 
-type Filter = 'all' | 'running' | 'queued' | 'failed' | 'done'
+type Filter = 'all' | 'running' | 'queued' | 'stopped' | 'failed' | 'done'
 
 const FILTERS: {value: Filter, label: string}[] = [
   {value: 'all', label: 'All'},
   {value: 'running', label: 'Running'},
   {value: 'queued', label: 'Queued'},
+  {value: 'stopped', label: 'Stopped'},
   {value: 'failed', label: 'Failed'},
   {value: 'done', label: 'Done'},
 ]
@@ -25,6 +26,8 @@ function bucket(phase: string): Filter {
     case 'Restarting':
     case 'Stopping':
       return 'queued'
+    case 'Stopped':
+      return 'stopped'
     case 'Failed':
       return 'failed'
     default:
@@ -52,7 +55,7 @@ export function Jobs() {
   }, [])
 
   const counts = useMemo(() => {
-    const c: Record<Filter, number> = {all: jobs.length, running: 0, queued: 0, failed: 0, done: 0}
+    const c: Record<Filter, number> = {all: jobs.length, running: 0, queued: 0, stopped: 0, failed: 0, done: 0}
     for (const j of jobs) c[bucket(j.phase)]++
     return c
   }, [jobs])
@@ -80,7 +83,8 @@ export function Jobs() {
       <div className="split">
         <JobTable jobs={shown} selected={selected} onSelect={n =>
           setSelected(prev => prev === n ? null : n)}/>
-        {selected && <JobDetail name={selected} onDone={refresh}/>}
+        {selected && <JobDetail name={selected} onDone={refresh} onOpen={n => { setSelected(n); refresh() }}
+                                onDeleted={() => { setSelected(null); refresh() }}/>}
       </div>
     </div>
   )
@@ -147,23 +151,36 @@ function jobTemplateForm(job: app.Job) {
   })
 }
 
-function JobDetail({name, onDone}: { name: string, onDone: () => void }) {
+function JobDetail({name, onDone, onOpen, onDeleted}: {
+  name: string, onDone: () => void, onOpen: (name: string) => void, onDeleted: () => void
+}) {
   const [job, setJob] = useState<app.Job | null>(null)
   const [error, setError] = useState('')
   const [tab, setTab] = useState<DetailTab>('overview')
   const [log, setLog] = useState('')
   const [logTitle, setLogTitle] = useState('')
+  const [logWorker, setLogWorker] = useState(0)
   const [saving, setSaving] = useState(false)
   const [savedTemplate, setSavedTemplate] = useState('')
-  const act = (p: Promise<unknown>) => p.then(onDone).catch(e => setError(errText(e)))
+  // pending is the action in flight; its button stays disabled until it answers.
+  const [pending, setPending] = useState('')
+  const confirm = useConfirm()
   const detailOf = (n: string) => GetJob(n).then(setJob).catch(e => setError(errText(e)))
+  const act = (kind: string, p: Promise<unknown>) => {
+    setPending(kind)
+    setError('')
+    return p.then(() => { onDone(); return detailOf(name) }).catch(e => setError(errText(e))).finally(() => setPending(''))
+  }
 
   useEffect(() => {
     setJob(null)
     setLog('')
+    setLogWorker(0)
     setTab('overview')
     setSaving(false)
     setSavedTemplate('')
+    setError('')
+    setPending('')
     GetJob(name).then(setJob).catch(e => setError(errText(e)))
     const t = setInterval(() => GetJob(name).then(setJob).catch(() => {}), 5000)
     return () => clearInterval(t)
@@ -173,10 +190,18 @@ function JobDetail({name, onDone}: { name: string, onDone: () => void }) {
   const live = job.phase !== 'Failed' && job.phase !== 'Succeeded'
   const retriable = job.phase === 'Failed' || job.phase === 'Succeeded'
 
+  // Rerun submits a fresh job from this one's form and opens it.
+  const rerun = () => {
+    setPending('rerun')
+    setError('')
+    RerunJob(job.name, '').then(j => onOpen(j.name)).catch(e => setError(errText(e))).finally(() => setPending(''))
+  }
+
   const viewLog = (worker: number, label: string) =>
     Logs(job.name, worker, 500).then(v => {
       setLog(v)
       setLogTitle(label)
+      setLogWorker(worker)
       setTab('log')
     }).catch(e => setError(errText(e)))
 
@@ -191,6 +216,7 @@ function JobDetail({name, onDone}: { name: string, onDone: () => void }) {
       </div>
       {error && <div className="banner banner-error">{error}</div>}
       {savedTemplate && <div className="banner" role="status">Saved job template {savedTemplate}.</div>}
+      {confirm.dialog}
       {saving && <TemplateDialog form={jobTemplateForm(job)} onClose={() => setSaving(false)} onSaved={n => {
         setSaving(false); setSavedTemplate(n)
       }}/>}
@@ -200,23 +226,27 @@ function JobDetail({name, onDone}: { name: string, onDone: () => void }) {
           <Icon name="scroll" size={13}/>Logs
         </button>
         {live && job.phase !== 'Stopped' &&
-          <button className="btn btn-sm" onClick={() => act(StopJob(job.name))}>
-            <Icon name="square" size={12}/>Stop
+          <button className="btn btn-sm" disabled={!!pending} onClick={() => act('stop', StopJob(job.name))}>
+            <Icon name="square" size={12}/>{pending === 'stop' ? 'Stopping…' : 'Stop'}
           </button>}
         {job.phase === 'Stopped' &&
-          <button className="btn btn-sm btn-accent" onClick={() => act(StartJob(job.name))}>
-            <Icon name="play" size={12}/>Resume
+          <button className="btn btn-sm btn-accent" disabled={!!pending} onClick={() => act('start', StartJob(job.name))}>
+            <Icon name="play" size={12}/>{pending === 'start' ? 'Resuming…' : 'Resume'}
           </button>}
         {retriable &&
-          <button className="btn btn-sm" onClick={() => act(RerunJob(job.name, ''))}>
-            <Icon name="refresh" size={13}/>Rerun
+          <button className="btn btn-sm" disabled={!!pending} onClick={rerun}>
+            <Icon name="refresh" size={13}/>{pending === 'rerun' ? 'Rerunning…' : 'Rerun'}
           </button>}
         <button className="btn btn-sm" onClick={() => setSaving(true)}>
           <Icon name="layers" size={13}/>Save as template
         </button>
         <span className="spacer"/>
-        <button className="btn btn-sm btn-danger" onClick={() =>
-          confirm(`Delete job ${job.name}?`) && act(DeleteJob(job.name))}>
+        <button className="btn btn-sm btn-danger" onClick={() => confirm.ask({
+          title: `Delete job ${job.name}?`,
+          message: 'Its worker pods stop and the logs go with them. Kueue releases the quota. This cannot be undone.',
+          action: 'Delete job', danger: true,
+          run: () => DeleteJob(job.name).then(onDeleted).catch(e => setError(errText(e))),
+        })}>
           <Icon name="trash" size={13}/>Delete
         </button>
       </div>
@@ -287,7 +317,7 @@ function JobDetail({name, onDone}: { name: string, onDone: () => void }) {
             <div className="log-bar">
               <span className="mono muted">{logTitle || 'worker 0'}</span>
               <span className="spacer"/>
-              <button className="btn btn-sm btn-ghost" onClick={() => viewLog(0, 'worker 0')}>
+              <button className="btn btn-sm btn-ghost" onClick={() => viewLog(logWorker, logTitle || 'worker 0')}>
                 <Icon name="refresh" size={13}/>Reload
               </button>
             </div>

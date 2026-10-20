@@ -2,15 +2,18 @@ import {useEffect, useState} from 'react'
 import {DeleteImage, DeleteImageRepo, ListImages, Registry} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {errText, fmtDate} from './util'
-import {Badge, Card, Empty, Icon, PageHeader} from './ui'
+import {Badge, Card, Empty, Icon, PageHeader, useConfirm} from './ui'
 
 // Images shows the project registry: the push command with the robot
 // credentials and the pushed tags with delete buttons.
 export function Images() {
   const [repos, setRepos] = useState<app.ImageRepo[]>([])
+  // reg stays null until Registry answers, so the empty states do not flash.
   const [reg, setReg] = useState<app.Registry | null>(null)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const confirm = useConfirm()
 
   const refresh = () => {
     Registry().then(setReg).catch(e => setError(errText(e)))
@@ -24,12 +27,32 @@ export function Images() {
       setTimeout(() => setCopied(''), 1500)
     }, () => {})
 
-  const login = reg?.username && reg?.password
-    ? `docker login ${reg.url.split('/')[0]} -u ${reg.username} -p ${reg.password}`
-    : ''
-  const push = (tag: string) => reg ? `docker tag IMAGE ${reg.url}/${tag} && docker push ${reg.url}/${tag}` : ''
+  // The password is not part of the command: docker asks for it, so it stays
+  // out of shell history and the process list.
+  const host = reg?.url.split('/')[0] ?? ''
+  const login = reg?.username ? `docker login ${host} -u ${reg.username}` : ''
+  const push = (tag: string) => reg ? `docker tag <local-image> ${reg.url}/${tag} && docker push ${reg.url}/${tag}` : ''
   const totalTags = repos.reduce((n, r) => n + r.count, 0)
   const totalPulls = repos.reduce((n, r) => n + r.pulls, 0)
+
+  const deleteRepo = (r: app.ImageRepo) => confirm.ask({
+    title: `Delete repository ${r.name}?`,
+    message: `All ${r.count} tags and their images are removed. This cannot be undone.`,
+    action: 'Delete repository', danger: true,
+    run: () => DeleteImageRepo(r.name).then(refresh).catch(e => setError(errText(e))),
+  })
+  // Harbor deletes an image by digest, so every tag on it goes with the row.
+  const deleteImage = (r: app.ImageRepo, img: app.Image) => {
+    const tags = img.tags?.filter(Boolean) ?? []
+    confirm.ask({
+      title: `Delete ${img.digest.slice(7, 19)} from ${r.name}?`,
+      message: tags.length > 1
+        ? `This image also carries ${tags.join(', ')}; deleting it removes all of those tags.`
+        : 'Its tags, if any, are removed with it. This cannot be undone.',
+      action: 'Delete image', danger: true,
+      run: () => DeleteImage(r.name, img.digest).then(refresh).catch(e => setError(errText(e))),
+    })
+  }
 
   return (
     <div className="page">
@@ -41,15 +64,27 @@ export function Images() {
                     <Icon name="refresh" size={14}/>Refresh
                   </button>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
+      {confirm.dialog}
 
       {reg?.enabled && login && (
-        <Card title="Push an image" subtitle="Log in with the project robot credentials"
+        <Card title="Push an image" subtitle="Log in with the project robot account"
               className="card-spaced"
               actions={<button className="btn btn-sm" onClick={() => copy(login, 'login')}>
                 <Icon name={copied === 'login' ? 'check' : 'copy'} size={13}/>
                 {copied === 'login' ? 'Copied' : 'Copy login'}
               </button>}>
           <pre className="code" style={{margin: 0, padding: 14, borderRadius: 0, border: 0}}>{login}</pre>
+          <div className="robot-password">
+            <span className="muted">Password</span>
+            <code className="mono">{showPassword ? reg.password : '••••••••••••'}</code>
+            <button className="btn btn-sm" onClick={() => setShowPassword(v => !v)}>
+              {showPassword ? 'Hide' : 'Show'}
+            </button>
+            <button className="btn btn-sm" onClick={() => copy(reg.password ?? '', 'password')}>
+              <Icon name={copied === 'password' ? 'check' : 'copy'} size={13}/>
+              {copied === 'password' ? 'Copied' : 'Copy password'}
+            </button>
+          </div>
         </Card>
       )}
 
@@ -60,7 +95,7 @@ export function Images() {
             Tag a local image and push it with the command above.
           </Empty>
         )}
-        {repos.length === 0 && !reg?.enabled && (
+        {repos.length === 0 && reg && !reg.enabled && (
           <Empty icon="image" title="Registry is not configured">
             This project has no registry; ask your admin to enable one.
           </Empty>
@@ -68,13 +103,12 @@ export function Images() {
         {repos.map(r => (
           <details key={r.name} className="repo">
             <summary>
-              <span className="mono">{reg?.url ? reg.url.split('/')[0] : ''}/{r.name}</span>
+              <span className="mono">{host}/{r.name}</span>
               <Badge>{r.count} tags</Badge>
               <span className="muted" style={{fontSize: 12}}>{r.pulls} pulls</span>
               <button className="btn btn-sm btn-danger" onClick={e => {
                 e.preventDefault()
-                confirm(`Delete repository ${r.name} with all its tags?`) &&
-                  DeleteImageRepo(r.name).then(refresh).catch(e => setError(errText(e)))
+                deleteRepo(r)
               }}>Delete all</button>
             </summary>
             <table className="table">
@@ -88,13 +122,13 @@ export function Images() {
                   <td className="muted">{fmtDate(img.pushedAt)}</td>
                   <td>
                     <div className="actions">
-                      <button className="btn btn-sm" onClick={() => copy(push(`${r.name}:${tag}`), `push-${img.digest}`)}>
-                        <Icon name={copied === `push-${img.digest}` ? 'check' : 'copy'} size={13}/>
-                        {copied === `push-${img.digest}` ? 'Copied' : 'Tag & push'}
+                      <button className="btn btn-sm" disabled={!tag}
+                              title={tag ? undefined : 'Untagged images cannot be pushed by tag'}
+                              onClick={() => copy(push(`${r.name}:${tag}`), `push-${img.digest}-${tag}`)}>
+                        <Icon name={copied === `push-${img.digest}-${tag}` ? 'check' : 'copy'} size={13}/>
+                        {copied === `push-${img.digest}-${tag}` ? 'Copied' : 'Tag & push'}
                       </button>
-                      <button className="btn btn-sm btn-danger" onClick={() =>
-                        confirm(`Delete ${r.name}:${tag}?`) &&
-                        DeleteImage(r.name, img.digest).then(refresh).catch(e => setError(errText(e)))}>
+                      <button className="btn btn-sm btn-danger" onClick={() => deleteImage(r, img)}>
                         Delete
                       </button>
                     </div>

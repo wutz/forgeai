@@ -78,11 +78,11 @@ export function SandboxCreateDialog({onClose, onCreated}: {
     <Dialog title="New sandbox" subtitle="An isolated, resumable agent environment"
             onClose={onClose} footer={<>
               <button className="btn" onClick={onClose}>Cancel</button>
-              <button className="btn btn-primary" onClick={submit} disabled={busy || !f.name || !f.image}>
+              <button type="submit" form="sandbox-form" className="btn btn-primary" disabled={busy || !f.name || !f.image}>
                 {busy ? 'Creating…' : 'Create sandbox'}
               </button>
             </>}>
-        <form onSubmit={submit} className="dialog-form">
+        <form id="sandbox-form" onSubmit={submit} className="dialog-form">
           {error && <div className="banner banner-error">{error}</div>}
           {templates.length > 0 && (
             <div className="field">
@@ -153,7 +153,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
             <div className="field">
               <label htmlFor="s-ttl">Auto-stop after (hours)</label>
               <input id="s-ttl" className="input" type="number" min={0} step={0.5} value={ttlHours}
-                     onChange={e => setTtlHours(+e.target.value || 0)}/>
+                     onChange={e => setTtlHours(+e.target.value)}/>
               <span className="hint">0 keeps the sandbox until it is stopped{opts?.idleTimeout
                 ? ` or idle for ${opts.idleTimeout}` : ''}.</span>
             </div>

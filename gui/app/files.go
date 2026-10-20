@@ -72,8 +72,8 @@ func (a *App) Files() (*Files, error) {
 	return out, nil
 }
 
-// Heartbeat touches the last-active annotation without returning anything;
-// the open-online-files view calls it once a minute while the user browses.
+// Heartbeat touches the last-active annotation without returning anything.
+// Writes are throttled to heartbeatEvery, so calling it often is cheap.
 func (a *App) Heartbeat() error {
 	c, err := a.current()
 	if err != nil {
@@ -84,27 +84,28 @@ func (a *App) Heartbeat() error {
 	return a.heartbeat(ctx, c)
 }
 
+// heartbeatEvery bounds how often a view's heartbeat writes the FileServer.
+// Files is polled every few seconds; each write would reconcile the object.
+const heartbeatEvery = 30 * time.Second
+
 func (a *App) heartbeat(ctx context.Context, c *Connection) error {
 	fs := &v1.FileServer{}
 	key := client.ObjectKey{Namespace: c.namespace(), Name: naming.FileServerName}
 	if err := c.k8s.Get(ctx, key, fs); err != nil {
 		return err
 	}
-	ann := fs.Annotations
-	if ann == nil {
-		ann = map[string]string{}
+	now := time.Now().UTC()
+	if last, err := time.Parse(time.RFC3339, fs.Annotations[naming.AnnotationLastActive]); err == nil && now.Sub(last) < heartbeatEvery {
+		return nil
 	}
-	ann[naming.AnnotationLastActive] = time.Now().UTC().Format(time.RFC3339)
+	// The patch base must be copied before the annotation changes; otherwise
+	// the merge patch is empty and the operator never sees the activity.
 	patch := client.MergeFrom(fs.DeepCopy())
-	metaAnnotation(fs, naming.AnnotationLastActive, ann[naming.AnnotationLastActive])
-	return c.k8s.Patch(ctx, fs, patch)
-}
-
-func metaAnnotation(fs *v1.FileServer, key, value string) {
 	if fs.Annotations == nil {
 		fs.Annotations = map[string]string{}
 	}
-	fs.Annotations[key] = value
+	fs.Annotations[naming.AnnotationLastActive] = now.Format(time.RFC3339)
+	return c.k8s.Patch(ctx, fs, patch)
 }
 
 func isNotFound(err error) bool { return apierrors.IsNotFound(err) }

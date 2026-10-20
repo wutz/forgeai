@@ -2,7 +2,7 @@
 // segmented filters, tabs, badges, empty state and dialogs. Everything here
 // renders from tokens in style.css (gui/DESIGN.md).
 
-import {ReactNode, createContext, useContext} from 'react'
+import {ReactNode, createContext, useContext, useState} from 'react'
 import {createPortal} from 'react-dom'
 
 // HeaderSlot is the node in the app header that PageHeader renders into, so
@@ -192,6 +192,44 @@ export function Spinner({label}: {label?: string}) {
       <span className="spinner" aria-hidden/>
       {label && <span>{label}</span>}
     </div>
+  )
+}
+
+// ConfirmRequest is an action to confirm before it runs. Confirmations are
+// in-app dialogs, not window.confirm(): WKWebView, which Wails uses on macOS,
+// has no confirm panel, so the native call answers "no" and nothing happens.
+export type ConfirmRequest = {
+  title: string
+  message: ReactNode
+  action: string
+  danger?: boolean
+  run: () => void
+}
+
+// useConfirm returns ask(request) to open the confirmation and dialog to
+// render alongside the view.
+export function useConfirm(): {ask: (request: ConfirmRequest) => void, dialog: ReactNode} {
+  const [request, setRequest] = useState<ConfirmRequest | null>(null)
+  return {
+    ask: setRequest,
+    dialog: request && <ConfirmDialog request={request} onClose={() => setRequest(null)}/>,
+  }
+}
+
+function ConfirmDialog({request, onClose}: {request: ConfirmRequest, onClose: () => void}) {
+  const go = () => {
+    request.run()
+    onClose()
+  }
+  return (
+    <Dialog title={request.title} onClose={onClose} width={420} footer={<>
+      <button className="btn" onClick={onClose}>Cancel</button>
+      <button className={`btn ${request.danger ? 'btn-danger' : 'btn-primary'}`} onClick={go} autoFocus>
+        {request.action}
+      </button>
+    </>}>
+      <p className="muted" style={{margin: 0, lineHeight: 1.5}}>{request.message}</p>
+    </Dialog>
   )
 }
 

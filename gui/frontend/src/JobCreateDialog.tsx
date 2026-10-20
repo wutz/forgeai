@@ -74,11 +74,11 @@ export function JobCreateDialog({onClose, onCreated}: {
     <Dialog title="New job" subtitle="Rendered into a TrainJob of the project namespace"
             onClose={onClose} footer={<>
               <button className="btn" onClick={onClose}>Cancel</button>
-              <button className="btn btn-primary" onClick={submit} disabled={busy || !f.name || !f.image}>
+              <button type="submit" form="job-form" className="btn btn-primary" disabled={busy || !f.name || !f.image}>
                 {busy ? 'Creating…' : 'Create job'}
               </button>
             </>}>
-        <form onSubmit={submit} className="dialog-form">
+        <form id="job-form" onSubmit={submit} className="dialog-form">
           {error && <div className="banner banner-error">{error}</div>}
           <div className="field">
             <label htmlFor="j-name">Name</label>
@@ -108,7 +108,7 @@ export function JobCreateDialog({onClose, onCreated}: {
             <div className="field">
               <label htmlFor="j-workers">Workers</label>
               <input id="j-workers" className="input" type="number" min={1} value={f.workers}
-                     onChange={e => set('workers', +e.target.value || 1)}/>
+                     onChange={e => set('workers', +e.target.value)}/>
             </div>
           </div>
           <div className="field">
@@ -139,7 +139,7 @@ export function JobCreateDialog({onClose, onCreated}: {
             <div className="field">
               <label htmlFor="j-retries">Max retries</label>
               <input id="j-retries" className="input" type="number" min={0} max={20}
-                     value={f.maxRetries || 0} onChange={e => set('maxRetries', +e.target.value || 0)}/>
+                     value={f.maxRetries || 0} onChange={e => set('maxRetries', +e.target.value)}/>
             </div>
             <div className="field">
               <label htmlFor="j-retryon">Retry on</label>

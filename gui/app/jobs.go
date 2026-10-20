@@ -89,8 +89,9 @@ func (a *App) ListJobs() ([]*Job, error) {
 	return out, nil
 }
 
-// GetJob returns the group leader of the named job, with every retry of the
-// group nested under Retries.
+// GetJob returns the named job. A group leader comes with every retry of its
+// group nested under Retries; a retry is returned on its own, so the detail
+// view can drill into it from the list.
 func (a *App) GetJob(name string) (*Job, error) {
 	c, err := a.current()
 	if err != nil {
@@ -102,35 +103,35 @@ func (a *App) GetJob(name string) (*Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	var first *Job
+	var self *kf.TrainJob
 	for i := range items {
-		if !inGroup(&items[i], name) {
+		if items[i].Name == name {
+			self = &items[i]
+			break
+		}
+	}
+	if self == nil {
+		return nil, fmt.Errorf("job %q not found", name)
+	}
+	j, err := toJob(ctx, c, self)
+	if err != nil {
+		return nil, err
+	}
+	if j.Group != j.Name {
+		return j, nil
+	}
+	for i := range items {
+		if items[i].Name == name || groupOf(&items[i]) != name {
 			continue
 		}
-		j, err := toJob(ctx, c, &items[i])
+		r, err := toJob(ctx, c, &items[i])
 		if err != nil {
 			return nil, err
 		}
-		if j.Group == j.Name {
-			first = j
-		} else if first != nil {
-			first.Retries = append(first.Retries, j)
-		}
+		j.Retries = append(j.Retries, r)
 	}
-	if first == nil {
-		return nil, fmt.Errorf("job %q not found", name)
-	}
-	slices.SortFunc(first.Retries, func(a, b *Job) int { return strings.Compare(a.Name, b.Name) })
-	return first, nil
-}
-
-// inGroup reports whether tj belongs to the group of the named job.
-func inGroup(tj *kf.TrainJob, name string) bool {
-	group := tj.Labels[naming.LabelJobGroup]
-	if group == "" {
-		group = tj.Name
-	}
-	return group == name || tj.Name == name
+	slices.SortFunc(j.Retries, func(a, b *Job) int { return strings.Compare(a.Name, b.Name) })
+	return j, nil
 }
 
 // group nests retries (job-group != own name) under their group leader.
@@ -439,13 +440,21 @@ func groupOf(tj *kf.TrainJob) string {
 	return tj.Name
 }
 
-// patchOf returns the forgeai runtime patch holding placement and volumes.
+// patchOf returns the forgeai runtime patch holding placement and volumes, or
+// nil when the job carries none. A hand-edited TrainJob may leave any level
+// empty; that must not fail the whole job list.
 func patchOf(tj *kf.TrainJob) *kf.PodSpecPatch {
 	for i := range tj.Spec.RuntimePatches {
 		p := &tj.Spec.RuntimePatches[i]
-		if p.Manager == kf.PatchManager {
-			return p.TrainingRuntimeSpec.Template.Spec.ReplicatedJobs[0].Template.Spec.Template.Spec
+		if p.Manager != kf.PatchManager || p.TrainingRuntimeSpec == nil ||
+			p.TrainingRuntimeSpec.Template == nil || p.TrainingRuntimeSpec.Template.Spec == nil {
+			continue
 		}
+		rjs := p.TrainingRuntimeSpec.Template.Spec.ReplicatedJobs
+		if len(rjs) == 0 || rjs[0].Template == nil || rjs[0].Template.Spec == nil || rjs[0].Template.Spec.Template == nil {
+			return nil
+		}
+		return rjs[0].Template.Spec.Template.Spec
 	}
 	return nil
 }

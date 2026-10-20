@@ -424,3 +424,7 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
   .app:not(.sidebar-collapsed) .shell { grid-template-columns: var(--sidebar-w) minmax(0, 1fr); }
   .app:not(.sidebar-collapsed) .sidebar { display: flex; }
 }
+
+/* Robot password on the Images push card: hidden until the user asks. */
+.robot-password { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--line, #eaeaea); font-size: 13px; }
+.robot-password code { font-size: 12.5px; letter-spacing: 0.04em; }

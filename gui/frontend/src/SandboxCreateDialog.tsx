@@ -1,5 +1,5 @@
 import {FormEvent, useEffect, useState} from 'react'
-import {CreateSandbox, ListInstanceTypes, ListVolumes, SandboxOptions} from '../wailsjs/go/app/App'
+import {CreateSandbox, ListInstanceTypes, ListVolumes, SandboxOptions, SandboxTemplates} from '../wailsjs/go/app/App'
 import {app, sandbox, volumes, v1} from '../wailsjs/go/models'
 import {envToLines, linesToEnv, errText} from './util'
 import {Dialog} from './ui'
@@ -21,6 +21,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   const [envText, setEnvText] = useState('')
   const [mounts, setMounts] = useState('')
   const [ttlHours, setTtlHours] = useState(0)
+  const [templates, setTemplates] = useState<app.SandboxTemplate[]>([])
 
   useEffect(() => {
     SandboxOptions().then(o => {
@@ -31,10 +32,27 @@ export function SandboxCreateDialog({onClose, onCreated}: {
     }).catch(e => setError(errText(e)))
     ListInstanceTypes().then(setTypes).catch(() => {})
     ListVolumes(false).then(setVols).catch(() => {})
+    SandboxTemplates().then(setTemplates).catch(() => {})
   }, [])
 
   const set = <K extends keyof sandbox.Form>(k: K, v: sandbox.Form[K]) =>
     setF(prev => sandbox.Form.createFrom({...prev, [k]: v}))
+
+  // useTemplate prefills the agent fields from a SandboxTemplate; the fields
+  // stay editable afterwards.
+  const useTemplate = (name: string) => {
+    const form = templates.find(t => t.name === name)?.form
+    set('template', name)
+    if (!form) return
+    setF(prev => sandbox.Form.createFrom({
+      ...prev,
+      template: name,
+      image: form.image,
+      command: form.command || '',
+      runtimeClass: form.runtimeClass || '',
+    }))
+    setEnvText(envToLines(Object.fromEntries((form.env || []).map(e => [e.name, e.value]))))
+  }
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -66,6 +84,18 @@ export function SandboxCreateDialog({onClose, onCreated}: {
             </>}>
         <form onSubmit={submit} className="dialog-form">
           {error && <div className="banner banner-error">{error}</div>}
+          {templates.length > 0 && (
+            <div className="field">
+              <label htmlFor="s-template">Start from template</label>
+              <select id="s-template" className="select mono" value={f.template || ''}
+                      onChange={e => useTemplate(e.target.value)}>
+                <option value="">None</option>
+                {templates.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+              </select>
+              <span className="hint">Prefills the image, command, environment and isolation below.</span>
+            </div>
+          )}
+
           <div className="field">
             <label htmlFor="s-name">Name</label>
             <input id="s-name" className="input mono" value={f.name}

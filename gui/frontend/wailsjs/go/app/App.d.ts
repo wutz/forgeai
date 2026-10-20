@@ -18,6 +18,8 @@ export function CreateJob(arg1:training.Form):Promise<app.Job>;
 
 export function CreateSandbox(arg1:sandbox.Form):Promise<app.Sandbox>;
 
+export function CreateSandboxTemplate(arg1:sandbox.TemplateForm):Promise<app.SandboxTemplate>;
+
 export function CreateTemplate(arg1:training.Form):Promise<app.Template>;
 
 export function CreateVolume(arg1:string,arg2:string,arg3:number):Promise<volumes.Volume>;
@@ -31,6 +33,8 @@ export function DeleteJob(arg1:string):Promise<void>;
 export function DeleteProject(arg1:string):Promise<void>;
 
 export function DeleteSandbox(arg1:string):Promise<void>;
+
+export function DeleteSandboxTemplate(arg1:string):Promise<void>;
 
 export function DeleteTemplate(arg1:string):Promise<void>;
 

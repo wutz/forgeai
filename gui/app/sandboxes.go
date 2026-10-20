@@ -255,20 +255,78 @@ func (a *App) SandboxTemplates() ([]SandboxTemplate, error) {
 		if err := sandbox.FromUnstructured(list.Items[i].Object, t); err != nil {
 			continue
 		}
-		st := SandboxTemplate{Name: t.Name, Created: t.CreationTimestamp.UTC().Format(time.RFC3339)}
-		for _, ctr := range t.Spec.PodTemplate.Spec.Containers {
-			st.Images = append(st.Images, ctr.Image)
-		}
-		out = append(out, st)
+		out = append(out, toSandboxTemplate(t))
 	}
 	return out, nil
 }
 
+// CreateSandboxTemplate saves a SandboxTemplate from a form.
+func (a *App) CreateSandboxTemplate(f sandbox.TemplateForm) (*SandboxTemplate, error) {
+	c, err := a.current()
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := a.call()
+	defer cancel()
+	cfg, err := platform.Load(ctx, c.k8s, c.namespace())
+	if err != nil {
+		return nil, err
+	}
+	u, err := sandbox.RenderTemplate(&f, sandbox.Context{Namespace: c.namespace(), Project: c.Info.Project, Platform: cfg})
+	if err != nil {
+		return nil, err
+	}
+	if err := c.k8s.Create(ctx, u); err != nil {
+		return nil, err
+	}
+	t := &sandbox.SandboxTemplate{}
+	if err := sandbox.FromUnstructured(u.Object, t); err != nil {
+		return nil, err
+	}
+	out := toSandboxTemplate(t)
+	return &out, nil
+}
+
+// DeleteSandboxTemplate deletes a SandboxTemplate. Sandboxes already created
+// from it are not affected.
+func (a *App) DeleteSandboxTemplate(name string) error {
+	c, err := a.current()
+	if err != nil {
+		return err
+	}
+	ctx, cancel := a.call()
+	defer cancel()
+	u := &unstructured.Unstructured{}
+	u.SetGroupVersionKind(sandbox.SandboxTemplateGVK)
+	u.SetNamespace(c.namespace())
+	u.SetName(name)
+	err = c.k8s.Delete(ctx, u)
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
+}
+
+func toSandboxTemplate(t *sandbox.SandboxTemplate) SandboxTemplate {
+	st := SandboxTemplate{
+		Name:        t.Name,
+		Description: t.Annotations[naming.AnnotationDescription],
+		Created:     t.CreationTimestamp.UTC().Format(time.RFC3339),
+		Form:        sandbox.TemplateFormOf(t),
+	}
+	for _, ctr := range t.Spec.PodTemplate.Spec.Containers {
+		st.Images = append(st.Images, ctr.Image)
+	}
+	return st
+}
+
 // SandboxTemplate is a SandboxTemplate as listed in the GUI.
 type SandboxTemplate struct {
-	Name    string   `json:"name"`
-	Images  []string `json:"images,omitempty"`
-	Created string   `json:"created"`
+	Name        string                `json:"name"`
+	Description string                `json:"description,omitempty"`
+	Images      []string              `json:"images,omitempty"`
+	Created     string                `json:"created"`
+	Form        *sandbox.TemplateForm `json:"form"`
 }
 
 // mutateSandbox reads, changes and updates a sandbox.

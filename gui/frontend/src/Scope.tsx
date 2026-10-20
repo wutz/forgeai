@@ -26,8 +26,8 @@ export function Scope({contexts, cluster, projects, namespace, connected, busy, 
         <label className="nav-label" htmlFor="scope-project">Project</label>
         {projects.length ? (
           <select id="scope-project" className="select mono" value={namespace} disabled={busy || !connected}
-                  onChange={e => onProject(e.target.value)}>
-            {projects.map(p => <option key={p.namespace} value={p.namespace}>{p.namespace} ({p.project})</option>)}
+                  title={projectTitle(projects, namespace)} onChange={e => onProject(e.target.value)}>
+            {projects.map(p => <option key={p.namespace} value={p.namespace}>{p.namespace}</option>)}
           </select>
         ) : (
           <NamespaceInput value={namespace} disabled={busy || !connected} onCommit={onProject}/>
@@ -35,6 +35,13 @@ export function Scope({contexts, cluster, projects, namespace, connected, busy, 
       </div>
     </div>
   )
+}
+
+// projectTitle is the tooltip of the project select: the namespace with the
+// project it belongs to, which the compact select does not show.
+function projectTitle(projects: app.ProjectNamespace[], namespace: string): string | undefined {
+  const p = projects.find(p => p.namespace === namespace)
+  return p ? `${p.namespace} (${p.project})` : undefined
 }
 
 // NamespaceInput is the project field for users that may not list projects:

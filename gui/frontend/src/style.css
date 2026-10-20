@@ -59,8 +59,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .platform-darwin .header { padding-left: 84px; }
 .logo { display: flex; align-items: center; gap: 8px; font-weight: 600; letter-spacing: -0.32px; font-size: 16px; }
 .logo-mark { display: block; flex-shrink: 0; }
-.conn { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-.conn-meta { color: var(--mute); font-size: 12px; font-family: var(--mono); }
 
 /* Layout */
 .main { flex: 1; overflow: auto; padding: 24px; }

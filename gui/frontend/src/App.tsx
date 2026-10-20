@@ -161,11 +161,6 @@ export default function App() {
           </div>
           <div className="header-main">
             <div className="header-slot" ref={setHeaderSlot}/>
-            {conn && (
-              <div className="conn">
-                <span className="conn-meta">{conn.project ? `${conn.project} · ${conn.namespace}` : conn.context}</span>
-              </div>
-            )}
           </div>
         </header>
         <div className={`shell ${collapsed ? 'collapsed' : ''}`}>

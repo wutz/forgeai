@@ -305,8 +305,11 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
 .term { height: 340px; padding: 8px 10px; border-radius: 8px; background: #0f1117; overflow: hidden; }
 .term .xterm { height: 100%; }
 .term-bar { display: flex; align-items: center; }
+/* Covers the main content area only: below the 56px app header and right of
+   the sidebar (--sidebar-w is 0 when the sidebar is hidden). Padding matches .main. */
 .term-wrap.term-max {
-  position: fixed; inset: 0; z-index: 50; padding: 16px; background: var(--canvas);
+  position: fixed; top: 56px; left: var(--sidebar-w); right: 0; bottom: 0; z-index: 50;
+  padding: 20px 28px 24px; background: var(--canvas);
 }
 .term-wrap.term-max .term { flex: 1; height: auto; min-height: 0; }
 .log-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; }

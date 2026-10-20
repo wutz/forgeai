@@ -34,6 +34,8 @@ type App struct {
 
 	mu   sync.RWMutex
 	conn *Connection
+	// terminals are the open sandbox shells, by session id.
+	terminals sync.Map
 }
 
 // New creates the bound application.

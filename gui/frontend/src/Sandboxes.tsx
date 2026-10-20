@@ -4,6 +4,7 @@ import {
 } from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {SandboxCreateDialog} from './SandboxCreateDialog'
+import {SandboxTerminal} from './SandboxTerminal'
 import {Status, envToLines, fmtDate, errText} from './util'
 import {Badge, Card, Empty, Icon, PageHeader, Spinner, Tabs} from './ui'
 
@@ -98,7 +99,7 @@ function SandboxTable({boxes, selected, onSelect}: {
   )
 }
 
-type Tab = 'overview' | 'log' | 'env'
+type Tab = 'overview' | 'terminal' | 'log' | 'env'
 
 function SandboxDetail({name, onDone}: { name: string, onDone: () => void }) {
   const [box, setBox] = useState<app.Sandbox | null>(null)
@@ -157,6 +158,7 @@ function SandboxDetail({name, onDone}: { name: string, onDone: () => void }) {
       <div className="section">
         <Tabs tabs={[
           {value: 'overview', label: 'Overview', icon: 'grid'},
+          {value: 'terminal', label: 'Terminal', icon: 'terminal'},
           {value: 'log', label: 'Log', icon: 'scroll'},
           {value: 'env', label: 'Env', icon: 'layers'},
         ]} value={tab} onChange={setTab}/>
@@ -180,6 +182,9 @@ function SandboxDetail({name, onDone}: { name: string, onDone: () => void }) {
             <dt>Created</dt><dd>{fmtDate(box.created)}</dd>
           </dl>
         )}
+        {tab === 'terminal' && (box.podPhase === 'Running'
+          ? <SandboxTerminal name={box.name}/>
+          : <p className="muted">Start the sandbox to open a terminal.</p>)}
         {tab === 'log' && <pre className="logs">{log || 'No output'}</pre>}
         {tab === 'env' && <pre className="code">{box.command ? `$ ${box.command}\n\n` : ''}
           {envToLines(box.env) || '—'}</pre>}

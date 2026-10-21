@@ -66,6 +66,10 @@ export function DeleteTemplate(arg1) {
   return window['go']['app']['App']['DeleteTemplate'](arg1);
 }
 
+export function FileServerPhase() {
+  return window['go']['app']['App']['FileServerPhase']();
+}
+
 export function Files() {
   return window['go']['app']['App']['Files']();
 }

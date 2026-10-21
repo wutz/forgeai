@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"net/http"
 	"net/url"
 	"time"
 
@@ -70,10 +71,17 @@ func (a *App) Files() (*Files, error) {
 		if err != nil {
 			return nil, err
 		}
-		target = &fileTarget{
-			base: base,
-			user: string(sec.Data[corev1.BasicAuthUsernameKey]),
-			pass: string(sec.Data[corev1.BasicAuthPasswordKey]),
+		// The pod can be Ready before the ingress routes to it; until then the
+		// browser gets 503 and the frame would never recover. Report Starting
+		// until the server answers through the ingress.
+		if !fileServerServing(ctx, base) {
+			out.Phase = string(v1.FileServerStarting)
+		} else {
+			target = &fileTarget{
+				base: base,
+				user: string(sec.Data[corev1.BasicAuthUsernameKey]),
+				pass: string(sec.Data[corev1.BasicAuthPasswordKey]),
+			}
 		}
 	}
 	a.files.SetTarget(target)
@@ -85,6 +93,44 @@ func (a *App) Files() (*Files, error) {
 		out.Address = origin + "/"
 	}
 	return out, nil
+}
+
+// fileServerServing reports whether the file server answers at base. dufs
+// serves its health check before authentication, so no credentials are needed.
+// Any failure, including a 503 from the ingress, counts as not serving.
+func fileServerServing(ctx context.Context, base *url.URL) bool {
+	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base.JoinPath("__dufs__", "health").String(), nil)
+	if err != nil {
+		return false
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
+}
+
+// FileServerPhase reports the phase of the file server (Idle, Starting or
+// Ready) without waking it or refreshing its heartbeat. It is empty when the
+// project has no file server yet.
+func (a *App) FileServerPhase() (string, error) {
+	c, err := a.current()
+	if err != nil {
+		return "", err
+	}
+	ctx, cancel := a.call()
+	defer cancel()
+	fs := &v1.FileServer{}
+	if err := c.k8s.Get(ctx, client.ObjectKey{Namespace: c.namespace(), Name: naming.FileServerName}, fs); err != nil {
+		if isNotFound(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	return string(fs.Status.Phase), nil
 }
 
 // Heartbeat touches the last-active annotation without returning anything.

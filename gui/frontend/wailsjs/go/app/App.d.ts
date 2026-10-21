@@ -38,6 +38,8 @@ export function DeleteSandboxTemplate(arg1:string):Promise<void>;
 
 export function DeleteTemplate(arg1:string):Promise<void>;
 
+export function FileServerPhase():Promise<string>;
+
 export function Files():Promise<app.Files>;
 
 export function GetJob(arg1:string):Promise<app.Job>;

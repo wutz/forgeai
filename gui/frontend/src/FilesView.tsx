@@ -2,19 +2,16 @@ import {useEffect, useState} from 'react'
 import {Files} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {errText} from './util'
-import {Card, Empty, Icon, PageHeader, Spinner} from './ui'
+import {Card, Empty, PageHeader, Spinner} from './ui'
 
 // Files shows the project's on-demand file server (dufs). It wakes the server
-// and keeps it up while the view is open. The files open in the browser: an
-// embedded frame cannot sign in, because Chrome blocks subresources whose URL
-// carries credentials, so the username and password are shown for the browser's
-// sign-in prompt instead.
+// and keeps it up while the view is open. The browser is embedded through a
+// loopback proxy in the backend, which adds the basic-auth credentials, so the
+// user signs in automatically and the password never reaches the webview.
 export function FilesView() {
   const [state, setState] = useState<app.Files | null>(null)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
-  const [showPassword, setShowPassword] = useState(false)
-  const [copied, setCopied] = useState('')
 
   useEffect(() => {
     let stopped = false
@@ -40,16 +37,9 @@ export function FilesView() {
     }
   }, [attempt])
 
-  const copy = (text: string, key: string) =>
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(key)
-      setTimeout(() => setCopied(''), 1500)
-    }, () => {})
-
   const ready = state?.phase === 'Ready'
-  // Only a ready server offers its URL: an idle one has no pod behind it.
-  const open = ready && state?.url ? state.url : ''
-  const hasCreds = !!(state?.username && state.password)
+  // Only a ready server has an address: an idle one has no pod behind it.
+  const frame = ready && state?.address ? state.address : ''
 
   return (
     <div className="page">
@@ -59,16 +49,9 @@ export function FilesView() {
                       <span className="dot" aria-hidden/>{state.phase}
                     </span>
                   )}
-                  actions={<>
-                    {error && (
-                      <button className="btn btn-sm" onClick={() => setAttempt(n => n + 1)}>Retry</button>
-                    )}
-                    {open && (
-                      <a className="btn btn-sm btn-primary" href={open} target="_blank" rel="noreferrer">
-                        <Icon name="external" size={13}/>Open in browser
-                      </a>
-                    )}
-                  </>}/>
+                  actions={error && (
+                    <button className="btn btn-sm" onClick={() => setAttempt(n => n + 1)}>Retry</button>
+                  )}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       <p className="muted note">
         {state?.volumes?.length ? `Serving ${state.volumes.join(', ')}. ` : ''}
@@ -79,31 +62,13 @@ export function FilesView() {
         <Card>
           <Empty icon="folder" title="Opening the file browser…"/>
         </Card>
-      ) : ready && hasCreds ? (
-        <Card title="Sign in" subtitle="Enter these when the browser asks for a password">
-          <div className="robot-password">
-            <span className="muted">Username</span>
-            <code className="mono">{state.username}</code>
-            <button className="btn btn-sm" onClick={() => copy(state.username ?? '', 'user')}>
-              <Icon name={copied === 'user' ? 'check' : 'copy'} size={13}/>
-              {copied === 'user' ? 'Copied' : 'Copy username'}
-            </button>
-          </div>
-          <div className="robot-password">
-            <span className="muted">Password</span>
-            <code className="mono">{showPassword ? state.password : '••••••••••••'}</code>
-            <button className="btn btn-sm" onClick={() => setShowPassword(v => !v)}>
-              {showPassword ? 'Hide' : 'Show'}
-            </button>
-            <button className="btn btn-sm" onClick={() => copy(state.password ?? '', 'password')}>
-              <Icon name={copied === 'password' ? 'check' : 'copy'} size={13}/>
-              {copied === 'password' ? 'Copied' : 'Copy password'}
-            </button>
-          </div>
-        </Card>
+      ) : frame ? (
+        <div className="files-frame card">
+          <iframe src={frame} title="Files" allow="clipboard-write"/>
+        </div>
       ) : ready ? (
         <Card>
-          <Empty icon="folder" title="No file server password for your role">
+          <Empty icon="folder" title="No file server access for your role">
             The server is up. Ask a project admin for access.
           </Empty>
         </Card>

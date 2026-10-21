@@ -54,11 +54,8 @@ export namespace app {
 	}
 	export class Files {
 	    phase: string;
-	    url?: string;
-	    username?: string;
-	    password?: string;
+	    address?: string;
 	    volumes: string[];
-	    secret: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Files(source);
@@ -67,11 +64,8 @@ export namespace app {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.phase = source["phase"];
-	        this.url = source["url"];
-	        this.username = source["username"];
-	        this.password = source["password"];
+	        this.address = source["address"];
 	        this.volumes = source["volumes"];
-	        this.secret = source["secret"];
 	    }
 	}
 	export class GPUUsage {

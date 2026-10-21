@@ -26,15 +26,16 @@ import (
 	"github.com/wutz/forgeai/pkg/naming"
 )
 
-// proxyFor starts a proxy in front of target and returns its origin.
-func proxyFor(t *testing.T, target, user, pass string) string {
+// proxyFor starts a proxy in front of target, with the test credentials, and
+// returns its origin.
+func proxyFor(t *testing.T, target string) string {
 	t.Helper()
 	base, err := url.Parse(target)
 	if err != nil {
 		t.Fatal(err)
 	}
 	p := &fileProxy{}
-	p.SetTarget(&fileTarget{base: base, user: user, pass: pass})
+	p.SetTarget(&fileTarget{base: base, user: "forgeai", pass: "s3cret"})
 	origin, err := p.Origin()
 	if err != nil {
 		t.Fatal(err)
@@ -50,7 +51,7 @@ func TestFileProxyAddsCredentialsAndDropsCORS(t *testing.T) {
 		_, _ = io.WriteString(w, "listing")
 	}))
 	defer up.Close()
-	origin := proxyFor(t, up.URL, "forgeai", "s3cret")
+	origin := proxyFor(t, up.URL)
 
 	resp, err := http.Get(origin + "/data/a.txt?json")
 	if err != nil {
@@ -80,7 +81,7 @@ func TestFileProxyRefusesForeignOriginAndHost(t *testing.T) {
 		_, _ = io.WriteString(w, "ok")
 	}))
 	defer up.Close()
-	origin := proxyFor(t, up.URL, "forgeai", "s3cret")
+	origin := proxyFor(t, up.URL)
 
 	cases := []struct {
 		name   string
@@ -221,23 +222,7 @@ func appProxyOrigin(t *testing.T, a *App) string {
 // same auth rules: the browser UI and its absolute asset paths, the JSON
 // listing, uploads into a volume, and the read-only root all go through.
 func TestFileProxyWithDufs(t *testing.T) {
-	bin, err := exec.LookPath("dufs")
-	if err != nil {
-		t.Skip("dufs is not on PATH")
-	}
-	root := t.TempDir()
-	if err := os.Mkdir(root+"/data", 0o755); err != nil {
-		t.Fatal(err)
-	}
-	port := freePort(t)
-	cmd := exec.Command(bin, root, "--bind", "127.0.0.1", "--port", strconv.Itoa(port),
-		"--allow-all", "--enable-cors", "--auth", "forgeai:s3cret@/:ro,/data:rw")
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
-	upstream := fmt.Sprintf("http://127.0.0.1:%d", port)
-	waitForHTTP(t, upstream+"/__dufs__/health")
+	origin, upstream := startDufs(t)
 
 	// Direct access needs the password; the proxy supplies it.
 	if resp, err := http.Get(upstream + "/data/"); err != nil {
@@ -248,7 +233,6 @@ func TestFileProxyWithDufs(t *testing.T) {
 			t.Fatalf("direct status = %d, want 401", resp.StatusCode)
 		}
 	}
-	origin := proxyFor(t, upstream, "forgeai", "s3cret")
 
 	// The browser UI loads from the root with absolute asset paths.
 	req, _ := http.NewRequest(http.MethodGet, origin+"/data/", nil)
@@ -273,6 +257,31 @@ func TestFileProxyWithDufs(t *testing.T) {
 
 	// Only the volume is writable; the root stays read-only.
 	mustGet(t, mustRequest(t, http.MethodPut, origin+"/root.txt", strings.NewReader("x")), http.StatusForbidden)
+}
+
+// startDufs runs the dufs binary the operator uses, with the same auth rules: the
+// root is read-only and only /data is writable. It returns the proxy origin in
+// front of it and the direct upstream URL.
+func startDufs(t *testing.T) (origin, upstream string) {
+	t.Helper()
+	bin, err := exec.LookPath("dufs")
+	if err != nil {
+		t.Skip("dufs is not on PATH")
+	}
+	root := t.TempDir()
+	if err := os.Mkdir(root+"/data", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	port := freePort(t)
+	cmd := exec.Command(bin, root, "--bind", "127.0.0.1", "--port", strconv.Itoa(port),
+		"--allow-all", "--enable-cors", "--auth", "forgeai:s3cret@/:ro,/data:rw")
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
+	upstream = fmt.Sprintf("http://127.0.0.1:%d", port)
+	waitForHTTP(t, upstream+"/__dufs__/health")
+	return proxyFor(t, upstream), upstream
 }
 
 func freePort(t *testing.T) int {

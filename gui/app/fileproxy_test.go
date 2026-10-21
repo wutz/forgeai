@@ -138,6 +138,11 @@ func TestFileProxyWithoutTargetIsUnavailable(t *testing.T) {
 // the backend, and the address goes away when the server is not ready.
 func TestFilesAddressIsLoopbackAndHidesPassword(t *testing.T) {
 	up := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// dufs answers its health check before authentication.
+		if r.URL.Path == "/__dufs__/health" {
+			_, _ = io.WriteString(w, `{"status":"OK"}`)
+			return
+		}
 		if u, p, ok := r.BasicAuth(); !ok || u != "forgeai" || p != "s3cret" {
 			w.WriteHeader(http.StatusUnauthorized)
 			return

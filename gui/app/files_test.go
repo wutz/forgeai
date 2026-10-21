@@ -2,9 +2,13 @@ package app
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -81,5 +85,50 @@ func TestFileServerPhaseWithoutServer(t *testing.T) {
 	phase, err := a.FileServerPhase()
 	if err != nil || phase != "" {
 		t.Fatalf("phase = %q, %v; want empty", phase, err)
+	}
+}
+
+// The pod can be Ready before the ingress routes to it. The browser must keep
+// seeing Starting, and get no address, until the server answers through the
+// ingress; otherwise the frame loads a 503 and never recovers.
+func TestFilesStaysStartingUntilIngressServes(t *testing.T) {
+	var healthy atomic.Bool
+	ingress := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/__dufs__/health" && healthy.Load() {
+			_, _ = w.Write([]byte(`{"status":"OK"}`))
+			return
+		}
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer ingress.Close()
+
+	fs := &v1.FileServer{
+		ObjectMeta: metav1.ObjectMeta{Name: naming.FileServerName, Namespace: testNamespace},
+		Status:     v1.FileServerStatus{Phase: v1.FileServerReady, URL: ingress.URL},
+	}
+	sec := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: naming.FileServerSecretName, Namespace: testNamespace},
+		Data: map[string][]byte{
+			corev1.BasicAuthUsernameKey: []byte("forgeai"),
+			corev1.BasicAuthPasswordKey: []byte("secret"),
+		},
+	}
+	a := testApp(t, fs, sec)
+
+	got, err := a.Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Phase != string(v1.FileServerStarting) || got.Address != "" {
+		t.Fatalf("before ingress serves: phase %q address %q; want Starting and no address", got.Phase, got.Address)
+	}
+
+	healthy.Store(true)
+	got, err = a.Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Phase != string(v1.FileServerReady) || got.Address == "" {
+		t.Fatalf("after ingress serves: phase %q address %q; want Ready with address", got.Phase, got.Address)
 	}
 }

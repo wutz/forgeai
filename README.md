@@ -181,7 +181,7 @@ The desktop client connects with a kubeconfig context and a project namespace (t
 | Templates | Sandbox templates (prefill the sandbox form) and job templates (`TrainingRuntime`s, prefill the job form) in one view; create and delete both, each sorted by name |
 | Volumes | Create, resize, trash, restore and purge volumes |
 | Files | Opens the on-demand file server |
-| Images | Push instructions and robot credentials; list and delete images in the project's Harbor project. Their tags are suggested as the image of jobs, sandboxes and their templates, which also accept any other address |
+| Images | Push instructions and robot credentials; list and delete images in the project's Harbor project. Their tags are offered in a dropdown as the image of jobs, sandboxes and their templates, which also accept any other address |
 | Resources | Instance types with availability and the project quota usage |
 | Projects | Admins only (may create Projects): manage projects and members, export member kubeconfigs |
 

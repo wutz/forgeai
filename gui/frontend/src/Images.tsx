@@ -32,7 +32,7 @@ export function Images() {
   // which the shell would expand, so the username is single-quoted.
   const host = reg?.url.split('/')[0] ?? ''
   const login = reg?.username ? `docker login ${host} -u '${reg.username}'` : ''
-  const push = (tag: string) => reg ? `docker tag <local-image> ${reg.url}/${tag} && docker push ${reg.url}/${tag}` : ''
+  const address = (repo: string, tag: string) => reg ? `${reg.url}/${repo}:${tag}` : ''
   const totalTags = repos.reduce((n, r) => n + r.count, 0)
   const totalPulls = repos.reduce((n, r) => n + r.pulls, 0)
 
@@ -58,8 +58,8 @@ export function Images() {
   return (
     <div className="page">
       <PageHeader eyebrow="Storage" title="Images"
-                  meta={<span className="muted mono" style={{fontSize: 12}}>
-                    {reg?.url || 'registry not configured'}
+                  meta={repos.length > 0 && <span className="muted" style={{fontSize: 12}}>
+                    {repos.length} repositories · {totalTags} tags · {totalPulls} pulls
                   </span>}
                   actions={<button className="btn btn-sm btn-ghost" onClick={refresh}>
                     <Icon name="refresh" size={14}/>Refresh
@@ -68,7 +68,7 @@ export function Images() {
       {confirm.dialog}
 
       {reg?.enabled && login && (
-        <Card title="Push an image" subtitle="Log in with the project robot account, then push to the repository address"
+        <Card title="Push an image" subtitle="Log in with the project robot account, then push to the project address"
               actions={<button className="btn btn-sm" onClick={() => copy(login, 'login')}>
                 <Icon name={copied === 'login' ? 'check' : 'copy'} size={13}/>
                 {copied === 'login' ? 'Copied' : 'Copy login'}
@@ -86,21 +86,20 @@ export function Images() {
             </button>
           </div>
           <div className="robot-password">
-            <span className="muted">Repository</span>
+            <span className="muted">Project</span>
             <code className="mono">{reg.url}</code>
-            <button className="btn btn-sm" onClick={() => copy(reg.url, 'repo')}>
-              <Icon name={copied === 'repo' ? 'check' : 'copy'} size={13}/>
-              {copied === 'repo' ? 'Copied' : 'Copy repository'}
+            <button className="btn btn-sm" onClick={() => copy(reg.url, 'project')}>
+              <Icon name={copied === 'project' ? 'check' : 'copy'} size={13}/>
+              {copied === 'project' ? 'Copied' : 'Copy project'}
             </button>
           </div>
         </Card>
       )}
 
-      <Card title="Repositories" className="card-spaced"
-            subtitle={repos.length ? `${repos.length} repositories · ${totalTags} tags · ${totalPulls} pulls` : undefined}>
+      <Card title="Repositories" className="card-spaced">
         {repos.length === 0 && reg?.enabled && (
           <Empty icon="image" title="No images pushed yet">
-            Tag a local image and push it to <code className="mono">{reg?.url}</code>, the repository
+            Tag a local image and push it to <code className="mono">{reg?.url}</code>, the project
             address above.
           </Empty>
         )}
@@ -132,10 +131,10 @@ export function Images() {
                   <td>
                     <div className="actions">
                       <button className="btn btn-sm" disabled={!tag}
-                              title={tag ? undefined : 'Untagged images cannot be pushed by tag'}
-                              onClick={() => copy(push(`${r.name}:${tag}`), `push-${img.digest}-${tag}`)}>
-                        <Icon name={copied === `push-${img.digest}-${tag}` ? 'check' : 'copy'} size={13}/>
-                        {copied === `push-${img.digest}-${tag}` ? 'Copied' : 'Tag & push'}
+                              title={tag ? undefined : 'Untagged images have no address to copy'}
+                              onClick={() => copy(address(r.name, tag), `address-${img.digest}-${tag}`)}>
+                        <Icon name={copied === `address-${img.digest}-${tag}` ? 'check' : 'copy'} size={13}/>
+                        {copied === `address-${img.digest}-${tag}` ? 'Copied' : 'Copy address'}
                       </button>
                       <button className="btn btn-sm btn-danger" onClick={() => deleteImage(r, img)}>
                         Delete

@@ -42,7 +42,6 @@ colors:
   accent-line: "rgba(79, 70, 229, 0.28)"
   accent-wash-hover: "#e0e7ff"
   accent-wash-press: "#c7d2fe"
-  accent-press: "#3730a3"
   accent-gradient-start: "#6366f1"
   accent-gradient-end: "#7c3aed"
   success: "#059669"
@@ -195,19 +194,18 @@ components:
   button-accent-sm-press:
     backgroundColor: "{colors.accent-wash-press}"
     textColor: "{colors.accent-deep}"
-  # Create and submit: the page's primary action, a flat theme-colour fill
+  # Create and submit: the page's primary action, a light theme-colour tint one step above the accent button
   button-create-sm:
-    backgroundColor: "{colors.accent}"
-    textColor: "{colors.on-primary}"
+    backgroundColor: "{colors.accent-wash-hover}"
+    textColor: "{colors.accent-deep}"
+    borderColor: "{colors.accent-line}"
     typography: "{typography.button-md}"
     rounded: "{rounded.sm}"
     padding: "0px 6px"
   button-create-sm-hover:
-    backgroundColor: "{colors.accent-deep}"
-    textColor: "{colors.on-primary}"
-  button-create-sm-press:
-    backgroundColor: "{colors.accent-press}"
-    textColor: "{colors.on-primary}"
+    backgroundColor: "{colors.accent-wash-press}"
+    textColor: "{colors.accent-deep}"
+    borderColor: "{colors.accent-line}"
   nav-item-active:
     backgroundColor: "{colors.canvas-elevated}"
     textColor: "{colors.app-ink}"
@@ -294,10 +292,10 @@ components:
 
 forgeai is a desktop console for AI training, RL and inference jobs on Kubernetes. It follows the Geist system below as an **app surface** (not marketing): 6px square buttons (`{components.button-accent-sm}` / `{components.button-ghost-sm}`), hairline cards and tables, no hero mesh gradient.
 
-- **Theme color — Forge Indigo** (`{colors.accent}` #4f46e5): a cool, electric indigo in the register of current AI and developer tools, chosen over the earlier Forge Ember orange so the console reads calm and technical next to dense cluster data. Used for the accent action (`{components.button-accent-sm}`, e.g. "Start" or "Resume" on a resource's detail actions): a tinted wash (`{colors.accent-soft}`) with `{colors.accent-deep}` text and a 1px `{colors.accent-line}` edge, deepening to `{colors.accent-wash-hover}` and `{colors.accent-wash-press}`. It is not a saturated fill: a solid indigo or gradient button on every resource page made the accent the loudest thing on screen. The indigo→violet gradient (`{colors.accent-gradient-start}` → `{colors.accent-gradient-end}`) is kept for the logo tile only. Text on the wash is 7:1 (`{colors.accent-deep}` on `{colors.accent-soft}`), 5.3:1 at the press tone. Create and submit actions (`{components.button-create-sm}`: "Create sandbox", "Create job", "Save") are a flat `{colors.accent}` fill with white text (6.3:1), deepening to `{colors.accent-deep}` on hover and `{colors.accent-press}` when pressed. No gradient, no glow. The solid create button is the view's strong accent; the tinted Start or Resume beside it stays quiet. The accent also marks the active nav icon, tab underlines, meters, focus rings and input focus (`{components.input-focus}`, with a translucent `{colors.accent-ring}` 3px ring) and the logo tile. Accent text uses `{colors.accent-deep}` (#4338ca); the `{colors.accent-soft}` (#eef2ff) wash also marks selected rows, which carry a 2px accent bar on their left edge (`{components.table-row-selected}`). `{colors.link}` is the accent too.
+- **Theme color — Forge Indigo** (`{colors.accent}` #4f46e5): a cool, electric indigo in the register of current AI and developer tools, chosen over the earlier Forge Ember orange so the console reads calm and technical next to dense cluster data. Used for the accent action (`{components.button-accent-sm}`, e.g. "Start" or "Resume" on a resource's detail actions): a tinted wash (`{colors.accent-soft}`) with `{colors.accent-deep}` text and a 1px `{colors.accent-line}` edge, deepening to `{colors.accent-wash-hover}` and `{colors.accent-wash-press}`. It is not a saturated fill: a solid indigo or gradient button on every resource page made the accent the loudest thing on screen. The indigo→violet gradient (`{colors.accent-gradient-start}` → `{colors.accent-gradient-end}`) is kept for the logo tile only. Text on the wash is 7:1 (`{colors.accent-deep}` on `{colors.accent-soft}`), 5.3:1 at the press tone. Create and submit actions (`{components.button-create-sm}`: "Create sandbox", "Create job", "Save") are a light tint, `{colors.accent-wash-hover}` with `{colors.accent-deep}` text (6.4:1) and the same `{colors.accent-line}` edge, deepening to `{colors.accent-wash-press}` on hover and press. A solid indigo fill was tried first and read as too heavy on every page, so the create button stays one step stronger than the Start or Resume beside it, not louder. The accent also marks the active nav icon, tab underlines, meters, focus rings and input focus (`{components.input-focus}`, with a translucent `{colors.accent-ring}` 3px ring) and the logo tile. Accent text uses `{colors.accent-deep}` (#4338ca); the `{colors.accent-soft}` (#eef2ff) wash also marks selected rows, which carry a 2px accent bar on their left edge (`{components.table-row-selected}`). `{colors.link}` is the accent too.
 - **Neutrals**: the console uses the zinc ladder (`{colors.app-ink}` #18181b, `{colors.app-body}` #52525b, `{colors.app-mute}` #71717a, `{colors.app-hairline}` #e4e4e7) in place of Geist's neutral greys. The faint blue cast sits with indigo, and mute at #71717a is 4.8:1 on white (Geist's #8f8f8f is 3.3:1). Shadows and the dialog backdrop are tinted with slate (`rgba(15, 23, 42, …)`), not pure black.
 - **Status colors**: Running `{colors.success}` (#16a34a); Queued / Pending / Restarting / Stopping `{colors.warning}`; Failed `{colors.error}` (text and dot); Succeeded / Stopped / Idle `{colors.mute}`. Status is always text + dot, never color alone.
-- **CSS**: `gui/frontend/src/style.css` mirrors these tokens as custom properties (`--accent`, `--accent-deep`, `--accent-soft`, `--accent-ring`, `--accent-line`, `--accent-wash-hover`, `--accent-wash-press`, `--accent-press`, `--accent-gradient`, `--success`, ...); change both together.
+- **CSS**: `gui/frontend/src/style.css` mirrors these tokens as custom properties (`--accent`, `--accent-deep`, `--accent-soft`, `--accent-ring`, `--accent-line`, `--accent-wash-hover`, `--accent-wash-press`, `--accent-gradient`, `--success`, ...); change both together.
 - Ink (`{colors.ink}`) remains the default for headings and body text, and secondary buttons stay white with a hairline. The theme color carries the primary create and submit buttons, and one tinted Start or Resume per detail view; no other accent fills.
 - **Logo**: a white anvil with a four-point spark on a rounded tile (radius ≈ 22% of the side) filled with the 135° indigo→violet accent gradient. `build/appicon.png` is the 32-unit mark drawn at 824px with 100px of transparent padding on a 1024 canvas; `icon.ico` holds 16–256px PNGs of the same render. `gui/frontend/src/Logo.tsx` holds the SVG paths, reused by `frontend/public/favicon.svg`, `build/appicon.png` and `build/windows/icon.ico`; change all of them together. The mark is not rendered inside the app any more (the connect card that showed it at 40px is gone), so `Logo.tsx` is kept as the brand source only.
 - **Window chrome**: the macOS title bar is hidden (inset traffic lights); the app header is the drag region. The header and sidebar share the canvas color, so the window reads as one continuous grey frame; cards are the only white sheets. The sidebar keeps a hairline on its right.

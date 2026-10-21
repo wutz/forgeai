@@ -24,8 +24,6 @@
   --accent-line: rgba(79, 70, 229, 0.28);
   --accent-wash-hover: #e0e7ff;
   --accent-wash-press: #c7d2fe;
-  /* Solid accent button, pressed. */
-  --accent-press: #3730a3;
   /* Indigo → violet, for the logo tile. */
   --accent-gradient: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
   --radius-sm: 6px;

@@ -134,11 +134,15 @@ a { color: inherit; text-decoration: none; }
 /* Controls */
 .btn { height: 32px; padding: 0 12px; border-radius: 8px; font-size: 13px; letter-spacing: -0.1px; box-shadow: var(--shadow-1); }
 .btn:active:not(:disabled) { background: var(--hairline); }
-/* Create and submit: the page's primary action in the theme colour. A flat
-   fill, no gradient, so it stays calm next to the tinted Start and Resume. */
-.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn-primary:hover:not(:disabled) { background: var(--accent-deep); border-color: var(--accent-deep); }
-.btn-primary:active:not(:disabled) { background: var(--accent-press); border-color: var(--accent-press); }
+/* Create and submit: the page's primary action in the theme colour, as a light
+   tint one step stronger than Start and Resume. A solid indigo fill read as too
+   heavy on every page. */
+.btn-primary {
+  background: var(--accent-wash-hover); border-color: var(--accent-line); color: var(--accent-deep);
+  box-shadow: var(--shadow-1);
+}
+.btn-primary:hover:not(:disabled) { background: var(--accent-wash-press); border-color: var(--accent-line); }
+.btn-primary:active:not(:disabled) { background: var(--accent-wash-press); }
 /* Start / Resume: the one accent action per view. A tinted wash with indigo
    text carries the theme colour without a saturated gradient fill or glow. */
 .btn-accent {

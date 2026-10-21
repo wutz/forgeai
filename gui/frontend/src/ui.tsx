@@ -137,19 +137,16 @@ export function Meter({value, max, tone = 'accent', label, right}: {
   )
 }
 
-// Segmented is the pill filter row (Jobs: All / Running / Queued / Failed). A
-// label can be an icon; its title names the option for tooltips and screen
-// readers.
-export function Segmented<T extends string>({options, value, onChange, counts, label}: {
-  options: {value: T, label: ReactNode, title?: string}[], value: T, onChange: (v: T) => void,
-  counts?: Partial<Record<T, number>>, label?: string
+// Segmented is the pill filter row (Jobs: All / Running / Queued / Failed).
+export function Segmented<T extends string>({options, value, onChange, counts}: {
+  options: {value: T, label: string}[], value: T, onChange: (v: T) => void,
+  counts?: Partial<Record<T, number>>
 }) {
   return (
-    <div className="segmented" role="tablist" aria-label={label}>
+    <div className="segmented" role="tablist">
       {options.map(o => (
         <button key={o.value} role="tab" aria-selected={value === o.value}
                 className={`segment ${value === o.value ? 'active' : ''}`}
-                title={o.title} aria-label={o.title}
                 onClick={() => onChange(o.value)}>
           {o.label}
           {counts?.[o.value] !== undefined && <span className="segment-count">{counts[o.value]}</span>}

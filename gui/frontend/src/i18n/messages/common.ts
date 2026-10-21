@@ -60,7 +60,6 @@ export const en = {
   'prefs.themeDark': 'Dark',
   'prefs.langGroup': 'Language',
   'prefs.langSystem': 'Auto',
-  'prefs.langSystemTitle': 'Follow system language',
 }
 
 export const zh: Record<keyof typeof en, string> = {
@@ -113,5 +112,4 @@ export const zh: Record<keyof typeof en, string> = {
   'prefs.themeDark': '深色',
   'prefs.langGroup': '语言',
   'prefs.langSystem': '自动',
-  'prefs.langSystemTitle': '跟随系统语言',
 }

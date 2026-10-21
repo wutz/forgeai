@@ -4,11 +4,19 @@ The official website of forgeai, at https://forgeai.wutz.dev. It is a static [As
 
 | Path | Description |
 |---|---|
-| `src/pages/` | `index.astro` (landing page) and `404.astro` |
-| `src/layouts/Base.astro` | HTML shell, metadata, header and footer |
-| `src/styles/global.css` | Design tokens and styles (mirrors `DESIGN.md`) |
+| `src/pages/` | `index.astro` (English landing page), `zh/index.astro` (Chinese landing page), `404.astro` (both languages) |
+| `src/components/` | `Home.astro` (landing page sections, shared by both languages) and `SiteHeader.astro` (brand, theme and language controls) |
+| `src/i18n/messages.ts` | All copy, in English and Chinese. `zh` is typed against `en`, so an editor flags a missing key |
+| `src/layouts/Base.astro` | HTML shell, metadata, hreflang links, footer, and the inline script that applies the saved theme and language before paint |
+| `src/scripts/preferences.ts` | Theme and language controls in the browser |
+| `src/styles/global.css` | Design tokens and styles (mirrors `DESIGN.md`), light and dark |
 | `public/` | Static files served as-is (favicon, robots.txt) |
 | `wrangler.jsonc` | Worker config: static assets from `dist/`, custom domain `forgeai.wutz.dev` |
+
+## Languages and themes
+
+- **Languages.** English is served at `/` and Chinese at `/zh/`. A visitor whose browser prefers Chinese is sent from `/` to `/zh/`, unless they have chosen a language. The header's language link stores the choice in `localStorage` (`forgeai-lang`).
+- **Themes.** The page follows the system light or dark setting by default. The header's System / Light / Dark control overrides it and stores the choice (`forgeai-theme`).
 
 ## Develop
 

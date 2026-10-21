@@ -32,9 +32,7 @@ colors:
   accent: "#4f46e5"
   accent-deep: "#4338ca"
   accent-soft: "#eef2ff"
-  accent-tint: "#e0e7ff"
   accent-line: "rgba(79, 70, 229, 0.28)"
-  accent-ring: "rgba(79, 70, 229, 0.18)"
   accent-gradient-start: "#6366f1"
   accent-gradient-end: "#7c3aed"
   gradient-develop-start: "#007cf0"
@@ -66,7 +64,7 @@ typography:
   label-sm:
     fontFamily: Geist, Arial, sans-serif
     fontSize: 14px
-    fontWeight: 500 burada komikledin mi yani son DESIGN.md'leri? 
+    fontWeight: 500
     lineHeight: 20px
     letterSpacing: -0.28px
   mono-eyebrow:
@@ -247,12 +245,40 @@ components:
 
 The forgeai website is the public face of the project: a single landing page that explains the platform and links to the repository. It takes the Geist system as its base (white canvas, hairline cards, Geist-style type, one flourish) and uses **Forge Indigo** as its theme colour.
 
-- **Theme colour — Forge Indigo** (`{colors.accent}` #4f46e5). It is the colour of the desktop console (`gui/DESIGN.md`) and of the logo tile, so the website and the product read as one brand. The site is a developer tool for Kubernetes operators, and cool indigo suits that register better than a warm accent. Accent text uses `{colors.accent-deep}` (#4338ca); the 135° `{colors.accent-gradient-start}` → `{colors.accent-gradient-end}` gradient fills the logo tile and the hero glow only.
+- **Theme colour — Forge Indigo** (`{colors.accent}` #4f46e5). It is the colour of the desktop console (`gui/DESIGN.md`) and of the logo tile, so the website and the product read as one brand. The site is a developer tool for Kubernetes operators, and cool indigo suits that register better than a warm accent. Accent text uses `{colors.accent-deep}` (#4338ca) on light and `{colors.accent-text}` (#a5b4fc) on dark; the 135° `{colors.accent-gradient-start}` → `{colors.accent-gradient-end}` gradient belongs to the logo tile only.
 - **Where the accent appears**: the primary button (`{colors.accent}` fill, white label), the eyebrow labels, card icons (`{colors.accent-soft}` with an `{colors.accent-line}` edge), bullet markers and focus rings. No other colour is used for interface chrome.
-- **Hero**: a soft indigo and violet radial glow behind the headline, the only decorative gradient on the page. Sections below it stay flat.
+- **Hero**: a soft indigo and violet radial glow behind the headline, the only decorative gradient on the page. Sections below it stay flat. The glow is a pair of `--hero-glow-a` / `--hero-glow-b` tokens, one per theme.
 - **Neutrals**: Vercel's ink ladder, with `{colors.mute}` darkened from #8f8f8f to #71717a so muted text passes 4.5:1 on the canvas.
 - **Code samples**: set in `{typography.mono-eyebrow}`-style Geist Mono on white panels with a hairline border, in ink. The site does not syntax-highlight them, so there are no keyword or string colours.
-- **CSS**: `website/src/styles/global.css` mirrors these tokens as custom properties (`--accent`, `--accent-deep`, `--accent-soft`, `--accent-line`, `--accent-gradient`, ...); change both together.
+- **CSS**: `website/src/styles/global.css` mirrors these tokens as custom properties (`--accent`, `--accent-deep`, `--accent-soft`, `--accent-line`, `--focus`, ...); change both together.
+
+### Light and dark themes
+The site has a black-and-white light theme and a dark theme. Every neutral and accent token in `global.css` is a `light-dark()` pair, so one set of rules serves both.
+
+- **Default: follow the system.** With no stored choice, the page uses `prefers-color-scheme` through `color-scheme: light dark`.
+- **Manual override.** The header's System / Light / Dark control sets `data-theme` on `<html>` and stores the choice in `localStorage` under `forgeai-theme`. "System" removes both. The inline script in `Base.astro` applies the stored value before first paint, so there is no flash.
+- **Dark values** (ink, canvas and surface are inverted; Forge Indigo is lifted for contrast on dark):
+
+| Token | Light | Dark |
+|---|---|---|
+| `ink` | #171717 | #ededed |
+| `body` | #4d4d4d | #a1a1aa |
+| `mute` | #71717a | #9a9aa3 |
+| `hairline` | #ebebeb | #26262b |
+| `canvas` | #fafafa | #09090b |
+| `surface` (cards, panels) | #ffffff | #121215 |
+| `accent-text` (eyebrows, links) | #4338ca | #a5b4fc |
+| `focus` | #4f46e5 | #818cf8 |
+
+The primary button keeps `{colors.accent}` with a white label in both themes.
+
+### Languages
+The site is in English at `/` and Simplified Chinese at `/zh/`. Copy lives in `src/i18n/messages.ts`, and `zh` is typed against `en`, so an editor flags a missing key.
+
+- **Detection.** On the root page only, a visitor whose browser languages list Chinese first (`zh`, `zh-CN`, `zh-TW`, …) is sent to `/zh/`. Everyone else stays on `/`. Deeper pages never redirect.
+- **Manual choice.** The header's language link stores `forgeai-lang` (`en` or `zh`). A stored choice overrides detection on the root page.
+- **Chinese typography.** The font stack falls back to PingFang SC, Noto Sans SC and Microsoft YaHei. Chinese text uses no negative tracking, a 1.8 line height and 1.3 headings. The mono eyebrows switch to the sans stack.
+- **Terms.** Product and Kubernetes names (Project, TrainJob, Kueue, ClusterQueue, Sandbox, `kubectl`) stay in English in both languages, matching the repository docs.
 
 ## Overview
 

@@ -66,7 +66,10 @@ func (a *App) TrashVolume(name string) (*Volume, error) {
 	if err != nil {
 		return nil, err
 	}
-	retention := cfg.TrashRetention.Duration
+	retention, err := volumes.Retention(ctx, c.k8s, c.namespace(), cfg.TrashRetention.Duration)
+	if err != nil {
+		return nil, err
+	}
 	if retention <= 0 {
 		retention = 7 * 24 * time.Hour
 	}

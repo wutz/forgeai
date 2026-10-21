@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	v1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
 )
@@ -50,7 +51,7 @@ type Volume struct {
 	CapacityGiB  int64  `json:"capacityGiB"`
 	AccessMode   string `json:"accessMode"`
 	Created      string `json:"created"`
-	// Users are the running pods mounting the volume.
+	// Users are the running pods mounting the volume, file server excluded.
 	Users []string `json:"users"`
 	// Trash fields.
 	InTrash   bool   `json:"inTrash"`
@@ -81,6 +82,24 @@ func InTrash(pvc *corev1.PersistentVolumeClaim) bool { return pvc.Labels[naming.
 func ExpireAt(pvc *corev1.PersistentVolumeClaim) (time.Time, bool) {
 	t, err := time.Parse(time.RFC3339, pvc.Annotations[naming.AnnotationExpireAt])
 	return t, err == nil
+}
+
+// Retention returns how long a volume trashed in namespace ns is kept: the
+// owning project's trashRetention when it sets one, else platformDefault. A
+// namespace or project that does not exist falls back to platformDefault.
+func Retention(ctx context.Context, c client.Reader, ns string, platformDefault time.Duration) (time.Duration, error) {
+	nsObj := &corev1.Namespace{}
+	if err := c.Get(ctx, types.NamespacedName{Name: ns}, nsObj); err != nil {
+		return platformDefault, client.IgnoreNotFound(err)
+	}
+	p := &v1.Project{}
+	if err := c.Get(ctx, types.NamespacedName{Name: nsObj.Labels[naming.LabelProject]}, p); err != nil {
+		return platformDefault, client.IgnoreNotFound(err)
+	}
+	if p.Spec.TrashRetention != nil {
+		return p.Spec.TrashRetention.Duration, nil
+	}
+	return platformDefault, nil
 }
 
 func toVolume(pvc *corev1.PersistentVolumeClaim, users []string) Volume {
@@ -179,12 +198,21 @@ func Users(pods []corev1.Pod) map[string][]string {
 	return out
 }
 
+// users maps PVC names to the active pods that block them. File server pods
+// do not count: the file server drops trashed volumes when it reconciles, and
+// its Recreate rollout stops the pod that mounted them.
 func (c *Client) users(ctx context.Context) (map[string][]string, error) {
 	pods := &corev1.PodList{}
 	if err := c.K8s.List(ctx, pods, client.InNamespace(c.Namespace)); err != nil {
 		return nil, err
 	}
-	return Users(pods.Items), nil
+	var others []corev1.Pod
+	for _, p := range pods.Items {
+		if p.Labels[naming.LabelComponent] != naming.ComponentFileServer {
+			others = append(others, p)
+		}
+	}
+	return Users(others), nil
 }
 
 // List returns the volumes of the namespace; trash selects trashed or live volumes.
@@ -237,7 +265,8 @@ func (c *Client) Resize(ctx context.Context, name string, sizeGiB int64) (*Volum
 }
 
 // Trash moves a volume to the trash; it is purged after retention. Volumes
-// mounted by running pods cannot be trashed.
+// mounted by running pods cannot be trashed, but file server pods do not
+// count: they are rebuilt without the trashed volume.
 func (c *Client) Trash(ctx context.Context, name string, retention time.Duration) (*Volume, error) {
 	pvc, err := c.get(ctx, name)
 	if err != nil {

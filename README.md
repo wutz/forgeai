@@ -127,7 +127,7 @@ Members create, stop, start and delete sandboxes in their namespace with the `fo
 
 Volumes are PVCs in the project namespace, created from the platform `storageTypes` (ReadWriteMany by default) and limited by the project quota. Volumes can be resized (grow only) and moved to the trash:
 
-- Trashing sets the label `forgeai.wutz.dev/trash` and `forgeai.wutz.dev/expire-at`; volumes mounted by running pods cannot be trashed.
+- Trashing sets the label `forgeai.wutz.dev/trash` and `forgeai.wutz.dev/expire-at`; volumes mounted by running pods cannot be trashed, except by the file server: it is rebuilt without trashed volumes.
 - Trashed volumes can be restored, purged, or have their expiry changed until they expire.
 - The operator purges expired volumes, postponing while a pod still mounts them. A volume trashed without an expiry (e.g. labelled with `kubectl`) expires after the project `trashRetention` (default: platform `trashRetention`).
 

@@ -32,7 +32,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	v1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
 	"github.com/wutz/forgeai/pkg/volumes"
@@ -64,19 +63,7 @@ func (r *PersistentVolumeClaimReconciler) retention(ctx context.Context, ns stri
 	if err != nil {
 		return 0, err
 	}
-	d := cfg.TrashRetention.Duration
-	nsObj := &corev1.Namespace{}
-	if err := r.Get(ctx, types.NamespacedName{Name: ns}, nsObj); err != nil {
-		return d, client.IgnoreNotFound(err)
-	}
-	p := &v1.Project{}
-	if err := r.Get(ctx, types.NamespacedName{Name: nsObj.Labels[naming.LabelProject]}, p); err != nil {
-		return d, client.IgnoreNotFound(err)
-	}
-	if p.Spec.TrashRetention != nil {
-		d = p.Spec.TrashRetention.Duration
-	}
-	return d, nil
+	return volumes.Retention(ctx, r.Client, ns, cfg.TrashRetention.Duration)
 }
 
 func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {

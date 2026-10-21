@@ -1,7 +1,7 @@
 import {FormEvent, useEffect, useState} from 'react'
 import {CreateSandbox, ListInstanceTypes, ListVolumes, SandboxOptions, SandboxTemplates} from '../wailsjs/go/app/App'
 import {app, sandbox, volumes, v1} from '../wailsjs/go/models'
-import {envToLines, linesToEnv, errText} from './util'
+import {envToLines, linesToEnv, errText, generateName} from './util'
 import {Dialog} from './ui'
 
 // SandboxCreateDialog is the "New sandbox" form: image, isolation runtime
@@ -15,7 +15,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   const [types, setTypes] = useState<app.InstanceType[]>([])
   const [vols, setVols] = useState<volumes.Volume[]>([])
   const [f, setF] = useState<sandbox.Form>(sandbox.Form.createFrom({
-    name: '', image: '', command: '', env: [], instanceType: '', runtimeClass: '', service: true,
+    name: generateName('sandbox'), image: '', command: '', env: [], instanceType: '', runtimeClass: '', service: true,
     volumes: [], ttl: v1.Duration.createFrom({Duration: 0}),
   }))
   const [envText, setEnvText] = useState('')
@@ -105,6 +105,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
           <div className="field">
             <label htmlFor="s-name">Name</label>
             <input id="s-name" className="input mono" value={f.name}
+                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('name', e.target.value)}
                    placeholder="agent" required/>
             <span className="hint">Lowercase DNS label, at most 63 characters (it names the service too).</span>
@@ -112,6 +113,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
           <div className="field">
             <label htmlFor="s-image">Image</label>
             <input id="s-image" className="input mono" value={f.image}
+                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('image', e.target.value)}
                    placeholder="cr.example.com:7443/forge-myproj/agent:latest" required/>
             {opts?.images?.length ? <span className="hint">Offered: {opts.images.join(', ')}</span> : null}
@@ -139,6 +141,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
           <div className="field">
             <label htmlFor="s-command">Command (bash)</label>
             <textarea id="s-command" className="textarea" rows={3} value={f.command || ''}
+                      autoCapitalize="none" autoCorrect="off" spellCheck={false}
                       onChange={e => set('command', e.target.value)}
                       placeholder="python agent.py"/>
             <span className="hint">Empty runs the image entrypoint. The pod is restarted when it exits.</span>
@@ -146,11 +149,13 @@ export function SandboxCreateDialog({onClose, onCreated}: {
           <div className="field">
             <label htmlFor="s-env">Environment</label>
             <textarea id="s-env" className="textarea" rows={3} value={envText}
+                      autoCapitalize="none" autoCorrect="off" spellCheck={false}
                       onChange={e => setEnvText(e.target.value)} placeholder="KEY=value"/>
           </div>
           <div className="field">
             <label htmlFor="s-vols">Volume mounts</label>
             <textarea id="s-vols" className="textarea" rows={2} value={mounts}
+                      autoCapitalize="none" autoCorrect="off" spellCheck={false}
                       onChange={e => setMounts(e.target.value)}
                       placeholder={'volume /data [subpath] — one per line'}/>
             <span className="hint">Volumes: {vols.map(v => v.name).join(', ') || 'none in this project'}</span>

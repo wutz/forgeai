@@ -1,0 +1,89 @@
+---
+import Preferences from '../components/Preferences.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import { htmlLang, localeBase, locales, messages, type Locale } from '../i18n/messages';
+import '../styles/global.css';
+
+interface Props {
+  lang: Locale;
+  title: string;
+  description: string;
+}
+
+const { lang, title, description } = Astro.props;
+const site = 'https://forgeai.wutz.dev';
+const canonical = new URL(Astro.url.pathname, site);
+const t = messages[lang];
+---
+
+<!doctype html>
+<html lang={htmlLang[lang]}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#4f46e5" />
+    <link rel="canonical" href={canonical} />
+    {
+      locales.map((code) => (
+        <link rel="alternate" hreflang={htmlLang[code]} href={new URL(localeBase[code], site)} />
+      ))
+    }
+    <link rel="alternate" hreflang="x-default" href={new URL(localeBase.en, site)} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content={lang === 'zh' ? 'zh_CN' : 'en_US'} />
+    <meta name="twitter:card" content="summary" />
+    <title>{title}</title>
+    <!--
+      Runs before first paint. Applies the saved theme, and on the root page sends visitors
+      whose language is Chinese to /zh/ unless they picked a language. Keys match scripts/preferences.ts.
+    -->
+    <script is:inline>
+      (function () {
+        var root = document.documentElement;
+        var lang = null;
+        var theme = null;
+        try {
+          lang = localStorage.getItem('forgeai-lang');
+          theme = localStorage.getItem('forgeai-theme');
+        } catch (e) {}
+        if (theme === 'light' || theme === 'dark') root.setAttribute('data-theme', theme);
+        if (location.pathname !== '/') return;
+        var target = lang === 'zh' || lang === 'en' ? lang : detect(navigator.languages || [navigator.language]);
+        if (target === 'zh') location.replace('/zh/' + location.search + location.hash);
+        function detect(list) {
+          for (var i = 0; i < list.length; i++) {
+            var tag = String(list[i] || '').toLowerCase();
+            if (tag === 'zh' || tag.indexOf('zh-') === 0) return 'zh';
+            if (tag === 'en' || tag.indexOf('en-') === 0) return 'en';
+          }
+          return 'en';
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <SiteHeader lang={lang} />
+
+    <slot />
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <span>{t.footer.copyright}</span>
+        <Preferences lang={lang} />
+        <div class="footer-links">
+          <a href="https://github.com/wutz/forgeai" rel="noopener">{t.footer.source}</a>
+          <a href="https://github.com/wutz/forgeai#readme" rel="noopener">{t.footer.docs}</a>
+        </div>
+      </div>
+    </footer>
+
+    <script>
+      import '../scripts/preferences';
+    </script>
+  </body>
+</html>

@@ -3,6 +3,7 @@ import {CreateSandbox, ListInstanceTypes, ListVolumes, SandboxOptions, SandboxTe
 import {app, sandbox, volumes, v1} from '../wailsjs/go/models'
 import {envToLines, linesToEnv, errText, generateName} from './util'
 import {Dialog} from './ui'
+import {t} from './i18n'
 import {Mount, VolumeMountsField, mountProblems} from './VolumeMounts'
 
 // SandboxCreateDialog is the "New sandbox" form: image, isolation runtime
@@ -46,7 +47,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   // useTemplate prefills the agent fields from a SandboxTemplate; the fields
   // stay editable afterwards.
   const useTemplate = (name: string) => {
-    const form = templates.find(t => t.name === name)?.form
+    const form = templates.find(tpl => tpl.name === name)?.form
     set('template', name)
     if (!form) return
     setF(prev => sandbox.Form.createFrom({
@@ -88,105 +89,106 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   }
 
   return (
-    <Dialog title="New sandbox" subtitle="An isolated, resumable agent environment"
+    <Dialog title={t('sandboxCreate.title')} subtitle={t('sandboxCreate.subtitle')}
             onClose={onClose} footer={<>
-              <button className="btn" onClick={onClose}>Cancel</button>
+              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
               <button type="submit" form="sandbox-form" className="btn btn-primary" disabled={busy || !f.name || !f.image || !mountsOK}>
-                {busy ? 'Creating…' : 'Create sandbox'}
+                {busy ? t('sandboxCreate.creating') : t('sandboxCreate.create')}
               </button>
             </>}>
         <form id="sandbox-form" onSubmit={submit} className="dialog-form">
           {error && <div className="banner banner-error">{error}</div>}
           {templates.length > 0 && (
             <div className="field">
-              <label htmlFor="s-template">Start from template</label>
+              <label htmlFor="s-template">{t('sandboxCreate.fromTemplate')}</label>
               <select id="s-template" className="select mono" value={f.template || ''}
                       onChange={e => useTemplate(e.target.value)}>
-                <option value="">None</option>
-                {templates.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+                <option value="">{t('common.none')}</option>
+                {templates.map(tpl => <option key={tpl.name} value={tpl.name}>{tpl.name}</option>)}
               </select>
-              <span className="hint">Prefills the image, command, environment and isolation below.</span>
+              <span className="hint">{t('sandboxCreate.templateHint')}</span>
             </div>
           )}
 
           <div className="field">
-            <label htmlFor="s-name">Name</label>
+            <label htmlFor="s-name">{t('common.name')}</label>
             <input id="s-name" className="input mono" value={f.name}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('name', e.target.value)}
                    placeholder="agent" required/>
-            <span className="hint">Lowercase DNS label, at most 63 characters (it names the service too).</span>
+            <span className="hint">{t('sandboxCreate.nameHint')}</span>
           </div>
           <div className="field">
-            <label htmlFor="s-image">Image</label>
+            <label htmlFor="s-image">{t('common.image')}</label>
             <input id="s-image" className="input mono" value={f.image}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('image', e.target.value)}
                    placeholder="cr.example.com:7443/forge-myproj/agent:latest" required/>
-            {opts?.images?.length ? <span className="hint">Offered: {opts.images.join(', ')}</span> : null}
+            {opts?.images?.length ? <span className="hint">{t('sandboxCreate.offered', {images: opts.images.join(', ')})}</span> : null}
           </div>
           <div className="row">
             <div className="field">
-              <label htmlFor="s-runtime">Isolation</label>
+              <label htmlFor="s-runtime">{t('sandboxCreate.isolation')}</label>
               <select id="s-runtime" className="select mono" value={f.runtimeClass || ''}
                       onChange={e => set('runtimeClass', e.target.value)}>
-                <option value="">runc (node runtime)</option>
+                <option value="">{t('sandboxCreate.runcOption')}</option>
                 {(opts?.runtimeClasses || []).map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div className="field">
-              <label htmlFor="s-instance">Instance type</label>
+              <label htmlFor="s-instance">{t('sandboxCreate.instanceType')}</label>
               <select id="s-instance" className="select mono" value={f.instanceType || ''}
                       onChange={e => set('instanceType', e.target.value)}>
-                <option value="">CPU only</option>
-                {types.map(t => <option key={t.name} value={t.name}>
-                  {t.name} · {t.gpuCount}×{t.class} · {t.cpu}/{t.memory} ({t.free} free)
+                <option value="">{t('sandboxCreate.cpuOnly')}</option>
+                {types.map(ty => <option key={ty.name} value={ty.name}>
+                  {ty.name} · {ty.gpuCount}×{ty.class} · {ty.cpu}/{ty.memory} {t('sandboxCreate.instanceFree', {free: ty.free})}
                 </option>)}
               </select>
             </div>
           </div>
           <div className="field">
-            <label htmlFor="s-command">Command (bash)</label>
+            <label htmlFor="s-command">{t('sandboxCreate.command')}</label>
             <textarea id="s-command" className="textarea" rows={3} value={f.command || ''}
                       autoCapitalize="none" autoCorrect="off" spellCheck={false}
                       onChange={e => set('command', e.target.value)}
                       placeholder="python agent.py"/>
-            <span className="hint">Empty runs the image entrypoint. The pod is restarted when it exits.</span>
+            <span className="hint">{t('sandboxCreate.commandHint')}</span>
           </div>
           <div className="field">
-            <label htmlFor="s-env">Environment</label>
+            <label htmlFor="s-env">{t('sandboxCreate.environment')}</label>
             <textarea id="s-env" className="textarea" rows={3} value={envText}
                       autoCapitalize="none" autoCorrect="off" spellCheck={false}
                       onChange={e => setEnvText(e.target.value)} placeholder="KEY=value"/>
           </div>
           <div className="field">
-            <label>Volume mounts</label>
+            <label>{t('sandboxCreate.volumeMounts')}</label>
             <VolumeMountsField mounts={mounts} onChange={setMounts} vols={vols}/>
-            <span className="hint">Shared volumes stay when the sandbox is deleted.</span>
+            <span className="hint">{t('mounts.sandboxHint')}</span>
           </div>
           <div className="row">
             <div className="field">
-              <label htmlFor="s-ttl">Auto-stop after (hours)</label>
+              <label htmlFor="s-ttl">{t('sandboxCreate.ttl')}</label>
               <input id="s-ttl" className="input" type="number" min={0} step={0.5} value={ttlHours}
                      onChange={e => setTtlHours(+e.target.value)}/>
-              <span className="hint">0 keeps the sandbox until it is stopped.</span>
+              <span className="hint">{t('sandboxCreate.ttlHint')}</span>
             </div>
             <div className="field">
-              <label htmlFor="s-idle">Idle timeout (minutes)</label>
+              <label htmlFor="s-idle">{t('sandboxCreate.idle')}</label>
               <input id="s-idle" className="input" type="number" min={0} step={1} value={idleMinutes ?? ''}
                      onChange={e => setIdleMinutes(e.target.value === '' ? null : +e.target.value)}
-                     placeholder={opts?.idleTimeout ? `${opts.idleTimeout} (default)` : 'off'}/>
-              <span className="hint">Empty uses the platform default ({opts?.idleTimeout || 'off'}); 0 turns
-                the idle stop off for this sandbox.</span>
+                     placeholder={opts?.idleTimeout
+                       ? t('sandboxCreate.idleDefault', {value: opts.idleTimeout})
+                       : t('sandboxCreate.off')}/>
+              <span className="hint">{t('sandboxCreate.idleHint', {timeout: opts?.idleTimeout || t('sandboxCreate.off')})}</span>
             </div>
           </div>
           <div className="row">
             <div className="field">
-              <label htmlFor="s-service">Service</label>
+              <label htmlFor="s-service">{t('sandboxCreate.serviceLabel')}</label>
               <select id="s-service" className="select" value={f.service ? 'yes' : 'no'}
                       onChange={e => set('service', e.target.value === 'yes')}>
-                <option value="yes">Yes (stable DNS name)</option>
-                <option value="no">No (pod IP only)</option>
+                <option value="yes">{t('sandboxCreate.serviceYes')}</option>
+                <option value="no">{t('sandboxCreate.serviceNo')}</option>
               </select>
             </div>
           </div>

@@ -1,4 +1,5 @@
 import {volumes} from '../wailsjs/go/models'
+import {MessageKey, t} from './i18n'
 import {Icon} from './ui'
 
 // Mount is one volume mounted into a job's workers or a sandbox. Both forms
@@ -9,11 +10,11 @@ export type Mount = {volume: string, mountPath: string, subPath?: string, readOn
 // every pod.
 const reservedPaths = ['/dev/shm']
 
-// phaseProblems says why a volume in another phase cannot be mounted.
-const phaseProblems: Record<string, string> = {
-  Pending: 'is still being provisioned',
-  Lost: 'is lost',
-  Deleting: 'is being deleted',
+// phaseProblems names why a volume in another phase cannot be mounted.
+const phaseProblems: Record<string, MessageKey> = {
+  Pending: 'mounts.pending',
+  Lost: 'mounts.lost',
+  Deleting: 'mounts.deleting',
 }
 
 // mountable is a volume a pod can mount: bound, or bound and growing.
@@ -34,17 +35,17 @@ export function mountProblems(mounts: Mount[], vols: volumes.Volume[], workers: 
     const path = m.mountPath.trim()
     const sub = (m.subPath || '').trim()
     const v = vols.find(x => x.name === volume)
-    if (!volume) return 'Choose a volume'
-    if (!v) return `${volume} is not a volume of this project`
-    if (!mountable(v)) return `${volume} ${phaseProblems[v.phase] ?? `is ${v.phase.toLowerCase()}`} and cannot be mounted`
-    if (!path) return 'Enter a mount path'
-    if (!path.startsWith('/')) return 'The mount path must be absolute, starting with /'
-    if (reservedPaths.includes(path)) return `${path} is reserved for shared memory`
-    if (mounts.slice(0, i).some(o => o.mountPath.trim() === path)) return 'Another mount already uses this path'
-    if (sub && (sub.startsWith('/') || sub.split('/').includes('..'))) return 'The sub path must be relative and stay inside the volume'
-    if (workers > 1 && v.accessMode !== 'ReadWriteMany') {
-      return `${v.accessMode} volumes attach to one node; a job with several workers needs a ReadWriteMany volume`
+    if (!volume) return t('mounts.chooseVolume')
+    if (!v) return t('mounts.notProject', {volume})
+    if (!mountable(v)) {
+      return t(phaseProblems[v.phase] ?? 'mounts.otherPhase', {volume, phase: v.phase.toLowerCase()})
     }
+    if (!path) return t('mounts.noPath')
+    if (!path.startsWith('/')) return t('mounts.absolute')
+    if (reservedPaths.includes(path)) return t('mounts.reserved', {path})
+    if (mounts.slice(0, i).some(o => o.mountPath.trim() === path)) return t('mounts.duplicate')
+    if (sub && (sub.startsWith('/') || sub.split('/').includes('..'))) return t('mounts.subPathInvalid')
+    if (workers > 1 && v.accessMode !== 'ReadWriteMany') return t('mounts.needRWX', {mode: v.accessMode})
     return ''
   })
 }
@@ -80,35 +81,35 @@ export function VolumeMountsField({mounts, onChange, vols, workers = 1}: {
         return (
           <div className="mount-row" key={i}>
             <div className="mount-line">
-              <select className="select mono" aria-label={`Volume of mount ${i + 1}`} value={m.volume}
+              <select className="select mono" aria-label={t('mounts.volumeOf', {index: i + 1})} value={m.volume}
                       onChange={e => pick(i, e.target.value)}>
-                {!m.volume && <option value="">Choose a volume</option>}
-                {vols && m.volume && !v && <option value={m.volume}>{m.volume} (not found)</option>}
+                {!m.volume && <option value="">{t('mounts.chooseVolume')}</option>}
+                {vols && m.volume && !v && <option value={m.volume}>{t('mounts.notFound', {volume: m.volume})}</option>}
                 {(vols ?? []).map(x => (
                   <option key={x.name} value={x.name} disabled={!mountable(x)}>
-                    {x.name}{mountable(x) ? '' : ` (${x.phase.toLowerCase()})`}
+                    {mountable(x) ? x.name : t('mounts.optionState', {name: x.name, phase: x.phase.toLowerCase()})}
                   </option>
                 ))}
               </select>
-              <input className="input mono" aria-label={`Mount path of mount ${i + 1}`} value={m.mountPath}
+              <input className="input mono" aria-label={t('mounts.pathOf', {index: i + 1})} value={m.mountPath}
                      autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                     placeholder="/data/<volume>" onChange={e => update(i, {mountPath: e.target.value})}/>
-              <button type="button" className="icon-btn" aria-label={`Remove mount ${i + 1}`}
+                     placeholder={t('mounts.pathPlaceholder')} onChange={e => update(i, {mountPath: e.target.value})}/>
+              <button type="button" className="icon-btn" aria-label={t('mounts.remove', {index: i + 1})}
                       onClick={() => onChange(mounts.filter((_, j) => j !== i))}>
                 <Icon name="close" size={14}/>
               </button>
             </div>
             <div className="mount-line">
-              <input className="input mono" aria-label={`Sub path of mount ${i + 1}`} value={m.subPath || ''}
+              <input className="input mono" aria-label={t('mounts.subPathOf', {index: i + 1})} value={m.subPath || ''}
                      autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                     placeholder="sub path (optional)" onChange={e => update(i, {subPath: e.target.value})}/>
+                     placeholder={t('mounts.subPathPlaceholder')} onChange={e => update(i, {subPath: e.target.value})}/>
               <label className="checkbox">
                 <input type="checkbox" checked={!!m.readOnly} onChange={e => update(i, {readOnly: e.target.checked})}/>
-                Read only
+                {t('mounts.readOnly')}
               </label>
             </div>
             {v && <span className="mount-hint">
-              {v.capacityGiB || v.requestedGiB} GiB · {v.accessMode} · {v.phase}
+              {t('mounts.details', {size: v.capacityGiB || v.requestedGiB, mode: v.accessMode, phase: v.phase})}
             </span>}
             {problem && <span className="mount-hint mount-hint-error" role="alert">{problem}</span>}
           </div>
@@ -116,15 +117,11 @@ export function VolumeMountsField({mounts, onChange, vols, workers = 1}: {
       })}
       <div className="mounts-foot">
         <button type="button" className="btn btn-sm" onClick={add} disabled={!vols || choices.length === 0}>
-          <Icon name="plus" size={13}/>Add volume mount
+          <Icon name="plus" size={13}/>{t('mounts.add')}
         </button>
-        {vols?.length === 0 && <span className="mount-hint">
-          No volumes in this project yet. Create one under Storage › Volumes.
-        </span>}
-        {vols && vols.length > 0 && choices.length === 0 && <span className="mount-hint">
-          None of the project's volumes is ready to mount.
-        </span>}
-        {!vols && <span className="mount-hint">Loading volumes…</span>}
+        {vols?.length === 0 && <span className="mount-hint">{t('mounts.noVolumes')}</span>}
+        {vols && vols.length > 0 && choices.length === 0 && <span className="mount-hint">{t('mounts.noneReady')}</span>}
+        {!vols && <span className="mount-hint">{t('mounts.loading')}</span>}
       </div>
     </div>
   )

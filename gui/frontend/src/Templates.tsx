@@ -4,13 +4,15 @@ import {app, sandbox, training} from '../wailsjs/go/models'
 import {envToLines, linesToEnv, fmtDate, errText, generateName} from './util'
 import {Card, Dialog, Empty, Icon, PageHeader, Segmented, useConfirm} from './ui'
 import {SandboxTemplateDialog, SandboxTemplateTable} from './SandboxTemplates'
+import {t} from './i18n'
 import {ImageField} from './ImageField'
 
 type Kind = 'sandbox' | 'job'
 
-const KIND_OPTIONS: {value: Kind, label: string}[] = [
-  {value: 'sandbox', label: 'Sandbox'},
-  {value: 'job', label: 'Job'},
+// kindOptions is built per render so the labels follow the language.
+const kindOptions = (): {value: Kind, label: string}[] => [
+  {value: 'sandbox', label: t('templates.kindSandbox')},
+  {value: 'job', label: t('templates.kindJob')},
 ]
 
 const byName = <T extends {name: string}>(items: T[]) =>
@@ -44,14 +46,16 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Workspace" title="Templates"
+      <PageHeader eyebrow={t('templates.eyebrow')} title={t('templates.title')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>
-                    {isSandbox ? sandboxItems.length : jobItems.length} {isSandbox ? 'sandbox' : 'job'} templates
+                    {isSandbox
+                      ? t('templates.countSandbox', {count: sandboxItems.length})
+                      : t('templates.countJob', {count: jobItems.length})}
                   </span>}
                   actions={<button className="btn btn-primary" onClick={() => isSandbox
                     ? setSandboxDialog({})
                     : setJobDialog({form: blankJobForm()})}>
-                    <Icon name="plus" size={14}/>{isSandbox ? 'New sandbox template' : 'New job template'}
+                    <Icon name="plus" size={14}/>{isSandbox ? t('templates.newSandbox') : t('templates.newJob')}
                   </button>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {sandboxDialog && <SandboxTemplateDialog initial={sandboxDialog.initial} existing={sandboxDialog.existing}
@@ -65,18 +69,18 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
 
       {sandboxes && (
         <div className="list-toolbar">
-          <Segmented options={KIND_OPTIONS} value={kind} onChange={setKind}
+          <Segmented options={kindOptions()} value={kind} onChange={setKind}
                      counts={{sandbox: sandboxItems.length, job: jobItems.length}}/>
         </div>
       )}
 
       <Card>
         {isSandbox
-          ? <SandboxTemplateTable items={sandboxItems} onEdit={t => setSandboxDialog({
-              initial: sandbox.TemplateForm.createFrom({...t.form, name: t.name}), existing: t.name,
+          ? <SandboxTemplateTable items={sandboxItems} onEdit={tpl => setSandboxDialog({
+              initial: sandbox.TemplateForm.createFrom({...tpl.form, name: tpl.name}), existing: tpl.name,
             })} onDelete={onDeleteSandbox}/>
-          : <JobTemplateTable items={jobItems} onEdit={t => setJobDialog({
-              form: training.Form.createFrom({...t.form, name: t.name}), existing: t.name,
+          : <JobTemplateTable items={jobItems} onEdit={tpl => setJobDialog({
+              form: training.Form.createFrom({...tpl.form, name: tpl.name}), existing: tpl.name,
             })} onDelete={onDeleteJob}/>}
       </Card>
     </div>
@@ -100,8 +104,8 @@ function JobTemplateTable({items, onEdit, onDelete}: {
   const confirm = useConfirm()
   if (items.length === 0) {
     return (
-      <Empty icon="scroll" title="No job templates yet">
-        A template captures an image, command and defaults so new jobs start from it.
+      <Empty icon="scroll" title={t('templates.emptyJobTitle')}>
+        {t('templates.emptyJobBody')}
       </Empty>
     )
   }
@@ -110,30 +114,30 @@ function JobTemplateTable({items, onEdit, onDelete}: {
     {confirm.dialog}
     <table className="table">
       <thead>
-      <tr><th>Name</th><th>Image</th><th>Workers</th><th>Instance</th><th>Created</th><th/></tr>
+      <tr><th>{t('common.name')}</th><th>{t('common.image')}</th><th>{t('templates.workers')}</th><th>{t('templates.colInstance')}</th><th>{t('common.created')}</th><th/></tr>
       </thead>
       <tbody>
-      {items.map(t => (
-        <tr key={t.name}>
+      {items.map(tpl => (
+        <tr key={tpl.name}>
           <td className="mono">
-            <span className="cell-main">{t.name}</span>
-            {t.description && <span className="cell-sub">{t.description}</span>}
+            <span className="cell-main">{tpl.name}</span>
+            {tpl.description && <span className="cell-sub">{tpl.description}</span>}
           </td>
-          <td className="mono trunc" title={t.form?.image}>{t.form?.image || '—'}</td>
-          <td>{t.form?.workers || 1}</td>
-          <td className="mono">{t.form?.instanceType || '—'}</td>
-          <td className="muted">{fmtDate(t.created)}</td>
+          <td className="mono trunc" title={tpl.form?.image}>{tpl.form?.image || '—'}</td>
+          <td>{tpl.form?.workers || 1}</td>
+          <td className="mono">{tpl.form?.instanceType || '—'}</td>
+          <td className="muted">{fmtDate(tpl.created)}</td>
           <td>
             <div className="actions">
-              <button className="btn btn-sm" onClick={() => onEdit(t)}>Edit</button>
+              <button className="btn btn-sm" onClick={() => onEdit(tpl)}>{t('common.edit')}</button>
               <button className="btn btn-sm btn-danger" onClick={() =>
                 confirm.ask({
-                  title: `Delete template ${t.name}?`,
-                  message: 'Jobs already created from it are not changed.',
-                  action: 'Delete template', danger: true,
-                  run: () => onDelete(t.name),
+                  title: t('templates.deleteTitle', {name: tpl.name}),
+                  message: t('templates.deleteMessage'),
+                  action: t('templates.deleteAction'), danger: true,
+                  run: () => onDelete(tpl.name),
                 })}>
-                Delete
+                {t('common.delete')}
               </button>
             </div>
           </td>
@@ -182,61 +186,61 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
   }
 
   return (
-    <Dialog title={`${existing ? 'Edit' : 'New'} template`}
+    <Dialog title={existing ? t('templates.dialogEdit') : t('templates.dialogNew')}
             subtitle={existing
-              ? 'Updates the TrainingRuntime; jobs already created from it keep their settings'
-              : 'Saved as a namespaced TrainingRuntime of the project'}
+              ? t('templates.jobEditSubtitle')
+              : t('templates.jobNewSubtitle')}
             onClose={onClose} footer={<>
-              <button className="btn" onClick={onClose}>Cancel</button>
+              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
               <button type="submit" form="template-form" className="btn btn-primary" disabled={busy || !f.name || !f.image}>
-                {busy ? 'Saving…' : 'Save template'}
+                {busy ? t('templates.saving') : t('templates.saveTemplate')}
               </button>
             </>}>
       <form id="template-form" className="dialog-form" onSubmit={e => { e.preventDefault(); save() }}>
         {error && <div className="banner banner-error">{error}</div>}
         <div className="row">
           <div className="field">
-            <label htmlFor="t-name">Name</label>
+            <label htmlFor="t-name">{t('common.name')}</label>
             <input id="t-name" className="input mono" value={f.name} disabled={!!existing}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('name', e.target.value)} required/>
           </div>
           <div className="field">
-            <label htmlFor="t-desc">Description</label>
+            <label htmlFor="t-desc">{t('templates.description')}</label>
             <input id="t-desc" className="input" value={f.description || ''}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('description', e.target.value)}/>
           </div>
         </div>
         <div className="field">
-          <label htmlFor="t-image">Image</label>
+          <label htmlFor="t-image">{t('common.image')}</label>
           <ImageField id="t-image" value={f.image} onChange={image => set('image', image)} required/>
         </div>
         <div className="field">
-          <label htmlFor="t-command">Command (bash)</label>
+          <label htmlFor="t-command">{t('templates.commandBash')}</label>
           <textarea id="t-command" className="textarea" rows={4} value={f.command || ''}
                     autoCapitalize="none" autoCorrect="off" spellCheck={false}
                     onChange={e => set('command', e.target.value)}/>
         </div>
         <div className="row">
           <div className="field">
-            <label htmlFor="t-instance">Default instance type</label>
+            <label htmlFor="t-instance">{t('templates.defaultInstanceType')}</label>
             <select id="t-instance" className="select mono" value={f.instanceType}
                     onChange={e => set('instanceType', e.target.value)} required>
-              {!f.instanceType && <option value="">Choose a type</option>}
-              {f.instanceType && !types.some(t => t.name === f.instanceType) &&
-                <option value={f.instanceType}>{f.instanceType} (not available)</option>}
-              {types.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+              {!f.instanceType && <option value="">{t('templates.chooseType')}</option>}
+              {f.instanceType && !types.some(ty => ty.name === f.instanceType) &&
+                <option value={f.instanceType}>{t('templates.typeUnavailable', {name: f.instanceType})}</option>}
+              {types.map(ty => <option key={ty.name} value={ty.name}>{ty.name}</option>)}
             </select>
           </div>
           <div className="field">
-            <label htmlFor="t-workers">Workers</label>
+            <label htmlFor="t-workers">{t('templates.workers')}</label>
             <input id="t-workers" className="input" type="number" min={1}
                    value={f.workers} onChange={e => set('workers', +e.target.value)}/>
           </div>
         </div>
         <div className="field">
-          <label htmlFor="t-env">Environment</label>
+          <label htmlFor="t-env">{t('templates.environment')}</label>
           <textarea id="t-env" className="textarea" rows={3} value={envText}
                     autoCapitalize="none" autoCorrect="off" spellCheck={false}
                     onChange={e => setEnvText(e.target.value)}/>

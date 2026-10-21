@@ -1,3 +1,5 @@
+import {MessageKey, t} from './i18n'
+
 export function errText(e: unknown): string {
   if (typeof e === 'string') return e
   if (e instanceof Error) return e.message
@@ -5,10 +7,26 @@ export function errText(e: unknown): string {
   return any?.message || JSON.stringify(e)
 }
 
+const phaseKeys = new Map<string, MessageKey>([
+  ['running', 'phase.running'], ['queued', 'phase.queued'], ['pending', 'phase.pending'],
+  ['starting', 'phase.starting'], ['restarting', 'phase.restarting'], ['stopping', 'phase.stopping'],
+  ['stopped', 'phase.stopped'], ['suspended', 'phase.suspended'], ['succeeded', 'phase.succeeded'],
+  ['failed', 'phase.failed'], ['idle', 'phase.idle'], ['ready', 'phase.ready'],
+  ['resizing', 'phase.resizing'],
+])
+
+// phaseLabel is the text shown for a backend phase. Code compares phases by
+// their English names, so only the displayed text is translated; an unknown
+// phase is shown as it arrives.
+export function phaseLabel(phase: string): string {
+  const key = phaseKeys.get(phase.toLowerCase())
+  return key ? t(key) : phase
+}
+
 export function Status({phase}: {phase: string}) {
   return (
     <span className={`status status-${phase.toLowerCase()}`}>
-      <span className="dot" aria-hidden/>{phase}
+      <span className="dot" aria-hidden/>{phaseLabel(phase)}
     </span>
   )
 }

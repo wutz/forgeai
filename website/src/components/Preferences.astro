@@ -1,0 +1,26 @@
+---
+import { localeBase, messages, type Locale } from '../i18n/messages';
+
+interface Props {
+  lang: Locale;
+}
+
+const { lang } = Astro.props;
+const t = messages[lang].header;
+const other: Locale = lang === 'en' ? 'zh' : 'en';
+---
+
+<div class="controls">
+  <div class="segmented" role="group" aria-label={t.theme}>
+    <button type="button" data-theme-option="system" aria-pressed="true">{t.themeSystem}</button>
+    <button type="button" data-theme-option="light" aria-pressed="false">{t.themeLight}</button>
+    <button type="button" data-theme-option="dark" aria-pressed="false">{t.themeDark}</button>
+  </div>
+  <a
+    class="lang-switch"
+    href={localeBase[other]}
+    hreflang={other === 'zh' ? 'zh-CN' : 'en'}
+    lang={other === 'zh' ? 'zh-CN' : 'en'}
+    data-lang-option={other}
+  >{t.switchTo}</a>
+</div>

@@ -1,0 +1,204 @@
+name: GUI release
+
+# Builds the Wails desktop client for macOS, Windows and Linux. Pushing a
+# v<major>.<minor>.<patch> tag also publishes a GitHub release with the
+# installers attached. Pull requests that touch the GUI and manual runs only
+# upload the installers as workflow artifacts.
+
+on:
+  push:
+    tags:
+      - "v*"
+  pull_request:
+    paths:
+      - ".github/workflows/gui-release.yml"
+      - "hack/gui-package.sh"
+      - "gui/**"
+      - "api/**"
+      - "internal/**"
+      - "pkg/**"
+      - "go.mod"
+      - "go.sum"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: gui-release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build ${{ matrix.package }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: darwin/universal
+            package: darwin
+          - os: windows-latest
+            platform: windows/amd64
+            package: windows
+          - os: ubuntu-24.04
+            platform: linux/amd64
+            package: linux
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Resolve version
+        id: version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [[ "$REF_TYPE" == "tag" ]]; then
+            version="${REF_NAME#v}"
+            # Windows and Debian versions must be plain numbers.
+            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Tag $REF_NAME is not of the form vMAJOR.MINOR.PATCH" >&2
+              exit 1
+            fi
+          else
+            version="0.0.0"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: gui/go.mod
+          cache-dependency-path: |
+            go.sum
+            gui/go.sum
+
+      - name: Setup Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gui/frontend/package-lock.json
+
+      - name: Install Linux build dependencies
+        if: matrix.package == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Install NSIS
+        if: matrix.package == 'windows'
+        shell: pwsh
+        run: |
+          if (-not (Get-Command makensis -ErrorAction SilentlyContinue)) {
+            choco install nsis -y --no-progress
+            "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Append
+          }
+
+      - name: Install Wails CLI
+        run: |
+          # The CLI at v2.16.0 pins golang.org/x/tools v0.47.0, which cannot
+          # build it; v0.52.0 is the first version that works (see gui/README.md).
+          cli="$RUNNER_TEMP/wails-cli"
+          mkdir -p "$cli" "$RUNNER_TEMP/bin"
+          cd "$cli"
+          go mod init wails-cli
+          go get github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
+          go get golang.org/x/tools@v0.52.0
+          go build -o "$RUNNER_TEMP/bin/wails$(go env GOEXE)" github.com/wailsapp/wails/v2/cmd/wails
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Set product version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const file = "gui/wails.json";
+            const config = JSON.parse(fs.readFileSync(file, "utf8"));
+            config.info = { ...config.info, productVersion: process.env.VERSION };
+            fs.writeFileSync(file, JSON.stringify(config, null, 2) + "\n");
+          '
+
+      - name: Build
+        working-directory: gui
+        env:
+          PLATFORM: ${{ matrix.platform }}
+          PACKAGE: ${{ matrix.package }}
+        run: |
+          args=(-clean -platform "$PLATFORM")
+          case "$PACKAGE" in
+            windows) args+=(-nsis) ;;
+            linux) args+=(-tags webkit2_41) ;;
+          esac
+          wails build "${args[@]}"
+
+      # Runs after the build: main.go embeds frontend/dist, which only exists
+      # once wails has built the frontend.
+      - name: Test
+        if: matrix.package == 'linux'
+        working-directory: gui
+        run: go test -tags webkit2_41 ./...
+
+      - name: Package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          PACKAGE: ${{ matrix.package }}
+        run: bash hack/gui-package.sh "$VERSION" "$PACKAGE"
+
+      - name: Upload installers
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: forgeai-${{ matrix.package }}
+          path: gui/build/dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download installers
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: forgeai-*
+          path: release
+          merge-multiple: true
+
+      - name: Write checksums
+        working-directory: release
+        run: sha256sum * > SHA256SUMS.txt
+
+      - name: Write release notes
+        run: |
+          version="${TAG#v}"
+          {
+            sed "s/@VERSION@/$version/g" hack/gui-release-notes.md
+            echo
+            gh api "repos/$GH_REPO/releases/generate-notes" -f tag_name="$TAG" --jq .body
+          } > notes.md
+          gh release create "$TAG" release/* --verify-tag --title "forgeai $version" --notes-file notes.md

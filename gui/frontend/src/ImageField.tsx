@@ -3,6 +3,7 @@ import {createPortal} from 'react-dom'
 import {ListImages, Registry} from '../wailsjs/go/app/App'
 import {fmtDate} from './util'
 import {Icon} from './ui'
+import {t} from './i18n'
 
 // Choice is one row of the menu. "typed" is the address being typed when it is
 // not a suggestion, so Enter can use it as it is.
@@ -174,7 +175,7 @@ export function ImageField({id, value, onChange, offered, placeholder, required}
            onMouseEnter={() => setActive(i)} onClick={() => pick(c.address)}>
         {c.kind === 'typed' ? <>
           <Icon name="plus" size={13}/>
-          <span className="combo-label">Use</span>
+          <span className="combo-label">{t('imagePicker.use')}</span>
           <span className="combo-address mono"><span className="combo-prefix">{c.address}</span></span>
         </> : <>
           <span className="combo-address mono" title={c.address}>
@@ -188,22 +189,22 @@ export function ImageField({id, value, onChange, offered, placeholder, required}
     )
   }
 
-  const projectNote = pushed === null ? 'Loading…'
-    : pushedFailed ? 'Project images are unavailable'
-    : 'None pushed yet. Push one in the Images view.'
+  const projectNote = pushed === null ? t('imagePicker.loading')
+    : pushedFailed ? t('imagePicker.unavailable')
+    : t('imagePicker.none')
 
   const menuNode = open && createPortal(
     <div ref={menu} id={`${id}-menu`} className="combo-menu" role="listbox" style={pos}>
       {typedChoice && option(typedChoice)}
       {(projects.length > 0 || !q) && <>
-        <div className="combo-group">Project images</div>
+        <div className="combo-group">{t('imagePicker.projects')}</div>
         {projects.length > 0 ? projects.map(option) : <div className="combo-note">{projectNote}</div>}
       </>}
       {platforms.length > 0 && <>
-        <div className="combo-group">Platform images</div>
+        <div className="combo-group">{t('imagePicker.platform')}</div>
         {platforms.map(option)}
       </>}
-      <div className="combo-foot">↑ ↓ move · Enter pick · Esc close</div>
+      <div className="combo-foot">{t('imagePicker.keys')}</div>
     </div>,
     document.body,
   )
@@ -217,7 +218,7 @@ export function ImageField({id, value, onChange, offered, placeholder, required}
              onChange={e => type(e.target.value)} onKeyDown={onKeyDown}
              onClick={() => { if (!open) openMenu() }}
              placeholder={placeholder} required={required}/>
-      <button type="button" className="icon-btn combo-toggle" tabIndex={-1} aria-label="Show images"
+      <button type="button" className="icon-btn combo-toggle" tabIndex={-1} aria-label={t('imagePicker.show')}
               onClick={() => {
                 if (open) setOpen(false)
                 else {

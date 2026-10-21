@@ -3,8 +3,9 @@ import {
   DeleteProject, GetProject, ListProjects, MemberKubeconfig, SaveProject,
 } from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
-import {errText, fmtDate, generateName} from './util'
+import {errText, fmtDate, generateName, phaseLabel} from './util'
 import {Badge, Card, Dialog, Empty, Icon, PageHeader, useConfirm} from './ui'
+import {t} from './i18n'
 
 // Admin manages Projects: quota (GPU classes, storage), network isolation,
 // members and their kubeconfigs. Shown only to platform admins.
@@ -32,22 +33,22 @@ export function Admin() {
 
   const ready = projects.filter(p => p.ready).length
   const deleteProject = (p: app.Project) => confirm.ask({
-    title: `Delete project ${p.name}?`,
+    title: t('admin.deleteTitle', {name: p.name}),
     message: p.deletionPolicy === 'Delete'
-      ? 'Its namespace, volumes and Harbor project are deleted. This cannot be undone.'
-      : 'Its namespace and data are kept (deletion policy Retain); only the Project object is removed.',
-    action: 'Delete project', danger: true,
+      ? t('admin.deleteDataMessage')
+      : t('admin.deleteRetainMessage'),
+    action: t('admin.deleteAction'), danger: true,
     run: () => DeleteProject(p.name).then(refresh).catch(e => setError(errText(e))),
   })
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Admin" title="Projects"
+      <PageHeader eyebrow={t('admin.eyebrow')} title={t('admin.title')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>
-                    {projects.length} projects · {ready} ready
+                    {t('admin.meta', {total: projects.length, ready})}
                   </span>}
                   actions={<button className="btn btn-primary" onClick={() => edit('')}>
-                    <Icon name="plus" size={14}/>New project
+                    <Icon name="plus" size={14}/>{t('admin.newProject')}
                   </button>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {confirm.dialog}
@@ -56,24 +57,24 @@ export function Admin() {
 
       <Card>
         {projects.length === 0 ? (
-          <Empty icon="shield" title="No projects yet">
-            A project is a namespace with a GPU quota, members and an isolated network.
+          <Empty icon="shield" title={t('admin.noProjects')}>
+            {t('admin.noProjectsHint')}
           </Empty>
         ) : (
           <table className="table">
             <thead>
-            <tr><th>Project</th><th>Status</th><th>GPUs</th><th>Storage</th>
-              <th>Network</th><th>Members</th><th>Created</th><th/></tr>
+            <tr><th>{t('admin.project')}</th><th>{t('common.status')}</th><th>{t('admin.gpus')}</th><th>{t('admin.storage')}</th>
+              <th>{t('admin.network')}</th><th>{t('admin.members')}</th><th>{t('common.created')}</th><th/></tr>
             </thead>
             <tbody>
             {projects.map(p => (
               <tr key={p.name}>
                 <td className="mono">
                   <span className="cell-main">{p.name}</span>
-                  <span className="cell-sub">{p.namespace || 'no namespace'}</span>
+                  <span className="cell-sub">{p.namespace || t('admin.noNamespace')}</span>
                 </td>
                 <td><span className={`status status-${p.ready ? 'running' : 'pending'}`}>
-                  <span className="dot" aria-hidden/>{p.ready ? 'Ready' : 'Pending'}</span></td>
+                  <span className="dot" aria-hidden/>{p.ready ? phaseLabel('Ready') : phaseLabel('Pending')}</span></td>
                 <td>
                   <div className="actions">
                     {Object.entries(p.quota?.gpus || {}).map(([c, n]) =>
@@ -84,16 +85,16 @@ export function Admin() {
                 <td className="mono">{p.quota?.storage || '—'}</td>
                 <td>
                   {p.network?.isolation === 'None'
-                    ? <span className="muted">None</span>
-                    : <Badge tone="accent">Isolated</Badge>}
-                  {p.network?.denyInternet && <span className="muted" style={{fontSize: 12}}> · no internet</span>}
+                    ? <span className="muted">{t('admin.isolationNone')}</span>
+                    : <Badge tone="accent">{t('admin.isolated')}</Badge>}
+                  {p.network?.denyInternet && <span className="muted" style={{fontSize: 12}}> · {t('admin.noInternet')}</span>}
                 </td>
                 <td className="muted">{p.members?.map(m => m.name).join(', ') || '—'}</td>
                 <td className="muted">{fmtDate(p.created)}</td>
                 <td>
                   <div className="actions">
-                    <button className="btn btn-sm" onClick={() => edit(p.name)}>Edit</button>
-                    <button className="btn btn-sm btn-danger" onClick={() => deleteProject(p)}>Delete</button>
+                    <button className="btn btn-sm" onClick={() => edit(p.name)}>{t('common.edit')}</button>
+                    <button className="btn btn-sm btn-danger" onClick={() => deleteProject(p)}>{t('common.delete')}</button>
                   </div>
                 </td>
               </tr>
@@ -117,7 +118,7 @@ function parseGPUs(text: string): Record<string, number> {
   const gpus: Record<string, number> = {}
   for (const pair of text.split(/\s+/).filter(Boolean)) {
     const m = /^([^:]+):(\d+)$/.exec(pair)
-    if (!m) throw new Error(`GPU quota "${pair}" must be class:count, for example rtx-5090:8`)
+    if (!m) throw new Error(t('admin.gpuFormatError', {pair}))
     if (+m[2] > 0) gpus[m[1]] = +m[2]
   }
   return gpus
@@ -170,122 +171,122 @@ function ProjectDialog({form, onClose, onSaved}: {
   }
 
   return (
-    <Dialog title={`${create ? 'New' : 'Edit'} project`}
-            subtitle="Namespace, GPU quota, network isolation and members"
+    <Dialog title={create ? t('admin.newProject') : t('admin.editProject')}
+            subtitle={t('admin.dialogSubtitle')}
             onClose={onClose} footer={<>
-              <button className="btn" onClick={onClose}>Cancel</button>
+              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
               <button type="submit" form="project-form" className="btn btn-primary" disabled={busy || !p.name}>
-                {busy ? 'Saving…' : create ? 'Create project' : 'Save'}
+                {busy ? t('admin.saving') : create ? t('admin.createProject') : t('common.save')}
               </button>
             </>}>
       <form id="project-form" className="dialog-form" onSubmit={save}>
         {error && <div className="banner banner-error">{error}</div>}
         <div className="row">
           <div className="field">
-            <label htmlFor="p-name">Name</label>
+            <label htmlFor="p-name">{t('common.name')}</label>
             <input id="p-name" className="input mono" disabled={!create} value={p.name}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('name', e.target.value)} required/>
           </div>
           <div className="field">
-            <label htmlFor="p-display">Display name</label>
+            <label htmlFor="p-display">{t('admin.displayName')}</label>
             <input id="p-display" className="input" value={p.displayName || ''}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('displayName', e.target.value)}/>
           </div>
         </div>
         <div className="field">
-          <label htmlFor="p-gpus">GPU quota per class (class: count)</label>
+          <label htmlFor="p-gpus">{t('admin.gpuQuotaLabel')}</label>
           <input id="p-gpus" className="input mono" value={gpuText}
                  autoCapitalize="none" autoCorrect="off" spellCheck={false}
                  onChange={e => setGpuText(e.target.value)}
                  placeholder="rtx-5090:8 a100:2"/>
-          <span className="hint">Jobs over quota wait in the Kueue queue.</span>
+          <span className="hint">{t('admin.jobsOverQuota')}</span>
         </div>
         <div className="row">
           <div className="field">
-            <label htmlFor="p-storage">Storage</label>
+            <label htmlFor="p-storage">{t('admin.storage')}</label>
             <input id="p-storage" className="input mono" value={p.quota?.storage || ''}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('quota', app.ProjectQuota.createFrom({...p.quota, storage: e.target.value}))}
                    placeholder="1Ti"/>
-            <span className="hint">Empty means no limit.</span>
+            <span className="hint">{t('admin.emptyNoLimit')}</span>
           </div>
           <div className="field">
-            <label htmlFor="p-registry-storage">Registry storage</label>
+            <label htmlFor="p-registry-storage">{t('admin.registryStorage')}</label>
             <input id="p-registry-storage" className="input mono" value={p.quota?.registryStorage || ''}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('quota', app.ProjectQuota.createFrom({...p.quota, registryStorage: e.target.value}))}
                    placeholder="100Gi"/>
-            <span className="hint">Empty means no limit.</span>
+            <span className="hint">{t('admin.emptyNoLimit')}</span>
           </div>
         </div>
         <div className="row">
           <div className="field">
-            <label htmlFor="p-volumes">Volumes</label>
+            <label htmlFor="p-volumes">{t('admin.volumes')}</label>
             <input id="p-volumes" className="input" type="number" min={0}
                    value={p.quota?.volumes || 0}
                    onChange={e => set('quota', app.ProjectQuota.createFrom({...p.quota, volumes: +e.target.value}))}/>
-            <span className="hint">0 means no limit.</span>
+            <span className="hint">{t('admin.zeroNoLimit')}</span>
           </div>
           <div className="field">
             <label htmlFor="p-pods">Pods</label>
             <input id="p-pods" className="input" type="number" min={0}
                    value={p.quota?.pods || 0}
                    onChange={e => set('quota', app.ProjectQuota.createFrom({...p.quota, pods: +e.target.value}))}/>
-            <span className="hint">0 means no limit.</span>
+            <span className="hint">{t('admin.zeroNoLimit')}</span>
           </div>
         </div>
         <div className="row">
           <div className="field">
-            <label htmlFor="p-trash">Trash retention</label>
+            <label htmlFor="p-trash">{t('admin.trashRetention')}</label>
             <input id="p-trash" className="input mono" value={p.trashRetention || ''}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('trashRetention', e.target.value)} placeholder="168h"/>
-            <span className="hint">Go duration, for example 168h. Empty uses the platform default.</span>
+            <span className="hint">{t('admin.trashHint')}</span>
           </div>
           <div className="field">
-            <label htmlFor="p-deletion">Deletion policy</label>
+            <label htmlFor="p-deletion">{t('admin.deletionPolicy')}</label>
             <select id="p-deletion" className="select" value={p.deletionPolicy || 'Retain'}
                     onChange={e => set('deletionPolicy', e.target.value)}>
-              <option value="Retain">Retain — keep the namespace and data</option>
-              <option value="Delete">Delete — remove namespace, volumes and registry</option>
+              <option value="Retain">{t('admin.policyRetain')}</option>
+              <option value="Delete">{t('admin.policyDelete')}</option>
             </select>
           </div>
         </div>
         <div className="row">
           <div className="field">
-            <label htmlFor="p-isolation">Network isolation</label>
+            <label htmlFor="p-isolation">{t('admin.networkIsolation')}</label>
             <select id="p-isolation" className="select"
                     value={p.network?.isolation || 'Isolated'}
                     onChange={e => set('network', app.ProjectNetwork.createFrom({
                       ...p.network, isolation: e.target.value}))}>
-              <option value="Isolated">Isolated (project only)</option>
-              <option value="None">None</option>
+              <option value="Isolated">{t('admin.isolationIsolated')}</option>
+              <option value="None">{t('admin.isolationNone')}</option>
             </select>
           </div>
           <div className="field">
-            <label>Internet egress</label>
+            <label>{t('admin.internetEgress')}</label>
             <label className="checkbox">
               <input type="checkbox" checked={!!p.network?.denyInternet}
                      onChange={e => set('network', app.ProjectNetwork.createFrom({
                        ...p.network, denyInternet: e.target.checked }))}/>
-              Deny internet (DNS stays allowed)
+              {t('admin.denyInternet')}
             </label>
           </div>
         </div>
 
         <div className="field">
-          <label>Members</label>
+          <label>{t('admin.members')}</label>
           {(p.members || []).map((m, i) => (
             <div className="row" key={i}>
-              <input className="input mono" value={m.name} placeholder="username"
+              <input className="input mono" value={m.name} placeholder={t('admin.usernamePlaceholder')}
                      autoCapitalize="none" autoCorrect="off" spellCheck={false}
                      onChange={e => setMember(i, e.target.value, m.role)}/>
               <select className="select" value={m.role}
                       onChange={e => setMember(i, m.name, e.target.value)}>
-                <option value="edit">edit</option>
-                <option value="view">view</option>
+                <option value="edit">{t('admin.roleEdit')}</option>
+                <option value="view">{t('admin.roleView')}</option>
               </select>
               {!create && <button type="button" className="btn btn-sm"
                                   onClick={() => exportKube(m.name)} disabled={!m.name}>Kubeconfig</button>}
@@ -298,7 +299,7 @@ function ProjectDialog({form, onClose, onSaved}: {
           <button type="button" className="btn btn-sm" style={{alignSelf: 'flex-start'}}
                   onClick={() => set('members', [...(p.members || []),
                     app.ProjectMember.createFrom({name: '', role: 'edit'})])}>
-            <Icon name="plus" size={13}/>Add member
+            <Icon name="plus" size={13}/>{t('admin.addMember')}
           </button>
         </div>
 
@@ -308,7 +309,7 @@ function ProjectDialog({form, onClose, onSaved}: {
               <span className="mono">{kube.split(':')[0]}.yaml</span>
               <span className="spacer"/>
               <button type="button" className="btn btn-sm" onClick={downloadKube}>
-                <Icon name="download" size={13}/>Download
+                <Icon name="download" size={13}/>{t('admin.download')}
               </button>
             </div>
             <pre className="code" style={{maxHeight: 200}}>{kube.split('\n').slice(1).join('\n')}</pre>

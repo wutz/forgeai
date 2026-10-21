@@ -1,5 +1,6 @@
 import {useEffect, useState} from 'react'
 import {app} from '../wailsjs/go/models'
+import {t} from './i18n'
 
 // Scope is the cluster and project picker at the top of the sidebar. Picking
 // either one connects straight away; App remembers the choice.
@@ -16,14 +17,14 @@ export function Scope({contexts, cluster, projects, namespace, connected, busy, 
   return (
     <div className="scope">
       <div className="scope-field">
-        <label className="nav-label" htmlFor="scope-cluster">Cluster</label>
+        <label className="nav-label" htmlFor="scope-cluster">{t('common.cluster')}</label>
         <select id="scope-cluster" className="select" value={cluster} disabled={busy || !contexts.length}
                 onChange={e => onCluster(e.target.value)}>
           {contexts.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
         </select>
       </div>
       <div className="scope-field">
-        <label className="nav-label" htmlFor="scope-project">Project</label>
+        <label className="nav-label" htmlFor="scope-project">{t('common.project')}</label>
         {projects.length ? (
           <select id="scope-project" className="select mono" value={namespace} disabled={busy || !connected}
                   title={projectTitle(projects, namespace)} onChange={e => onProject(e.target.value)}>
@@ -63,7 +64,7 @@ function NamespaceInput({value, disabled, onCommit}: {
   return (
     <input id="scope-project" className="input mono" value={draft} disabled={disabled}
            autoCapitalize="none" autoCorrect="off" spellCheck={false}
-           placeholder="Context default, e.g. forge-myteam"
+           placeholder={t('scope.projectPlaceholder')}
            onChange={e => setDraft(e.target.value)} onBlur={commit}
            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}/>
   )

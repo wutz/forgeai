@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {CreateSandboxTemplate, UpdateSandboxTemplate, SandboxOptions} from '../wailsjs/go/app/App'
 import {app, sandbox} from '../wailsjs/go/models'
-import {envMap, envToLines, linesToEnv, fmtDate, errText} from './util'
+import {envMap, envToLines, linesToEnv, fmtDate, errText, generateName} from './util'
 import {Dialog, Empty, useConfirm} from './ui'
 
 // SandboxTemplateTable lists SandboxTemplates (agent blueprints new sandboxes
@@ -64,9 +64,14 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [opts, setOpts] = useState<app.SandboxOptions | null>(null)
-  const [f, setF] = useState(initial ?? sandbox.TemplateForm.createFrom({
-    name: '', description: '', image: '', command: '', env: [], runtimeClass: '',
-  }))
+  // A new template (also a save-as-template from a sandbox) gets a generated
+  // name; an edit keeps its own.
+  const [f, setF] = useState(() => {
+    const form = initial ?? sandbox.TemplateForm.createFrom({
+      name: '', description: '', image: '', command: '', env: [], runtimeClass: '',
+    })
+    return existing || form.name ? form : sandbox.TemplateForm.createFrom({...form, name: generateName('sandbox-template')})
+  })
   const [envText, setEnvText] = useState(initial ? envToLines(envMap(initial.env)) : '')
 
   useEffect(() => {
@@ -111,11 +116,13 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
           <div className="field">
             <label htmlFor="st-name">Name</label>
             <input id="st-name" className="input mono" value={f.name} disabled={!!existing}
+                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('name', e.target.value)} placeholder="agent" required/>
           </div>
           <div className="field">
             <label htmlFor="st-desc">Description</label>
             <input id="st-desc" className="input" value={f.description || ''}
+                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('description', e.target.value)}/>
           </div>
         </div>
@@ -123,6 +130,7 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
           <div className="field">
             <label htmlFor="st-image">Image</label>
             <input id="st-image" className="input mono" value={f.image}
+                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('image', e.target.value)} required/>
             {opts?.images?.length ? <span className="hint">Offered: {opts.images.join(', ')}</span> : null}
           </div>
@@ -138,6 +146,7 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
         <div className="field">
           <label htmlFor="st-command">Command (bash)</label>
           <textarea id="st-command" className="textarea" rows={3} value={f.command || ''}
+                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
                     onChange={e => set('command', e.target.value)}
                     placeholder="python agent.py"/>
           <span className="hint">Empty runs the image entrypoint.</span>
@@ -145,6 +154,7 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
         <div className="field">
           <label htmlFor="st-env">Environment</label>
           <textarea id="st-env" className="textarea" rows={3} value={envText}
+                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
                     onChange={e => setEnvText(e.target.value)} placeholder="KEY=value"/>
         </div>
       </form>

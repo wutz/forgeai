@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {ListTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, DeleteSandboxTemplate, SandboxTemplates as ListSandboxTemplates, ListInstanceTypes} from '../wailsjs/go/app/App'
 import {app, sandbox, training} from '../wailsjs/go/models'
-import {envToLines, linesToEnv, fmtDate, errText} from './util'
+import {envToLines, linesToEnv, fmtDate, errText, generateName} from './util'
 import {Card, Dialog, Empty, Icon, PageHeader, Segmented, useConfirm} from './ui'
 import {SandboxTemplateDialog, SandboxTemplateTable} from './SandboxTemplates'
 
@@ -149,7 +149,9 @@ function JobTemplateTable({items, onEdit, onDelete}: {
 export function TemplateDialog({form, existing, onClose, onSaved}: {
   form: training.Form, existing?: string, onClose: () => void, onSaved: (name: string) => void
 }) {
-  const [f, setF] = useState(form)
+  // A new template (also a save-as-template from a job) gets a generated name.
+  const [f, setF] = useState(() => existing || form.name
+    ? form : training.Form.createFrom({...form, name: generateName('job-template')}))
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [types, setTypes] = useState<app.InstanceType[]>([])
@@ -195,22 +197,26 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
           <div className="field">
             <label htmlFor="t-name">Name</label>
             <input id="t-name" className="input mono" value={f.name} disabled={!!existing}
+                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('name', e.target.value)} required/>
           </div>
           <div className="field">
             <label htmlFor="t-desc">Description</label>
             <input id="t-desc" className="input" value={f.description || ''}
+                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('description', e.target.value)}/>
           </div>
         </div>
         <div className="field">
           <label htmlFor="t-image">Image</label>
           <input id="t-image" className="input mono" value={f.image}
+                 autoCapitalize="none" autoCorrect="off" spellCheck={false}
                  onChange={e => set('image', e.target.value)} required/>
         </div>
         <div className="field">
           <label htmlFor="t-command">Command (bash)</label>
           <textarea id="t-command" className="textarea" rows={4} value={f.command || ''}
+                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
                     onChange={e => set('command', e.target.value)}/>
         </div>
         <div className="row">
@@ -233,6 +239,7 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
         <div className="field">
           <label htmlFor="t-env">Environment</label>
           <textarea id="t-env" className="textarea" rows={3} value={envText}
+                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
                     onChange={e => setEnvText(e.target.value)}/>
         </div>
       </form>

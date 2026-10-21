@@ -20,7 +20,10 @@ import (
 // sandboxForm renders a small sandbox in the project namespace through the
 // same path the GUI uses.
 func sandboxForm(name string) *unstructured.Unstructured {
-	f := &sandbox.Form{Name: name, Image: "busybox", Command: "sleep 1d", Service: true}
+	return renderSandbox(&sandbox.Form{Name: name, Image: "busybox", Command: "sleep 1d", Service: true})
+}
+
+func renderSandbox(f *sandbox.Form) *unstructured.Unstructured {
 	pcfg, err := platform.Parse([]byte(testPlatformConfig))
 	Expect(err).NotTo(HaveOccurred())
 	u, err := sandbox.Render(f, sandbox.Context{Namespace: sandboxNS, Project: sandboxProject, Platform: pcfg})
@@ -101,24 +104,12 @@ var _ = Describe("Sandbox controller", Ordered, func() {
 
 	It("gives a sandbox with a heartbeat one idle timeout to live", func() {
 		Expect(k8sClient.Create(ctx, sandboxForm("idle"))).To(Succeed())
-		setSandboxStatus("idle", "idle")
-		pod := &sandboxPod{name: "idle"}
-		Expect(pod.create()).To(Succeed())
-
-		// A Ready sandbox without a heartbeat gets one from the controller.
-		Eventually(func() string {
-			return getSandbox("idle").GetAnnotations()[naming.AnnotationLastActive]
-		}, timeout, interval).ShouldNot(BeEmpty())
+		startIdleSandbox("idle")
+		waitForHeartbeat("idle")
 
 		// Backdate the heartbeat past the 1h timeout of the test config: the
 		// next reconcile (triggered by the pod) suspends the sandbox.
-		old := time.Now().Add(-2 * time.Hour).UTC().Format(time.RFC3339)
-		Eventually(func() error {
-			u := getSandbox("idle")
-			Expect(unstructured.SetNestedField(u.Object, old,
-				"metadata", "annotations", naming.AnnotationLastActive)).To(Succeed())
-			return k8sClient.Update(ctx, u)
-		}, timeout, interval).Should(Succeed())
+		backdateHeartbeat("idle", 2*time.Hour)
 
 		Eventually(func() map[string]string {
 			return getSandbox("idle").GetAnnotations()
@@ -127,7 +118,63 @@ var _ = Describe("Sandbox controller", Ordered, func() {
 			HaveKey(naming.AnnotationIdleSince),
 		))
 	})
+
+	It("uses the idle timeout a sandbox was created with", func() {
+		// A 1m timeout suspends it after 2m without a heartbeat, well inside
+		// the 1h platform default.
+		Expect(k8sClient.Create(ctx, renderSandbox(&sandbox.Form{
+			Name: "short", Image: "busybox", Command: "sleep 1d", Service: true,
+			IdleTimeout: &metav1.Duration{Duration: time.Minute},
+		}))).To(Succeed())
+		startIdleSandbox("short")
+		waitForHeartbeat("short")
+		backdateHeartbeat("short", 2*time.Minute)
+
+		Eventually(func() string {
+			return getSandbox("short").GetAnnotations()[naming.AnnotationStopped]
+		}, timeout, interval).Should(Equal("true"))
+	})
+
+	It("keeps a sandbox created with idle timeout 0 running", func() {
+		// 0 turns the idle policy off for this sandbox, even though the
+		// platform default is 1h and the heartbeat is two hours old.
+		Expect(k8sClient.Create(ctx, renderSandbox(&sandbox.Form{
+			Name: "forever", Image: "busybox", Command: "sleep 1d", Service: true,
+			IdleTimeout: &metav1.Duration{},
+		}))).To(Succeed())
+		startIdleSandbox("forever")
+		backdateHeartbeat("forever", 2*time.Hour)
+
+		Consistently(func() string {
+			return getSandbox("forever").GetAnnotations()[naming.AnnotationStopped]
+		}, 2*time.Second, interval).ShouldNot(Equal("true"))
+	})
 })
+
+// startIdleSandbox marks a sandbox Ready with its pod running.
+func startIdleSandbox(name string) {
+	setSandboxStatus(name, name)
+	pod := &sandboxPod{name: name}
+	Expect(pod.create()).To(Succeed())
+}
+
+// waitForHeartbeat waits for the controller to start a Ready sandbox's idle clock.
+func waitForHeartbeat(name string) {
+	Eventually(func() string {
+		return getSandbox(name).GetAnnotations()[naming.AnnotationLastActive]
+	}, timeout, interval).ShouldNot(BeEmpty())
+}
+
+// backdateHeartbeat moves a sandbox's heartbeat back in time.
+func backdateHeartbeat(name string, ago time.Duration) {
+	old := time.Now().Add(-ago).UTC().Format(time.RFC3339)
+	Eventually(func() error {
+		u := getSandbox(name)
+		Expect(unstructured.SetNestedField(u.Object, old,
+			"metadata", "annotations", naming.AnnotationLastActive)).To(Succeed())
+		return k8sClient.Update(ctx, u)
+	}, timeout, interval).Should(Succeed())
+}
 
 // sandboxPod creates the backing pod of a sandbox, owned by it.
 type sandboxPod struct{ name string }

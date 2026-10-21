@@ -35,6 +35,19 @@ export function envMap(env: {name: string, value: string}[] = []): EnvMap {
   return Object.fromEntries(env.map(e => [e.name, e.value]))
 }
 
+// k8sNameAlphabet is the alphabet of Kubernetes' generated name suffixes: no
+// vowels, so a random name never spells a word, and no look-alike characters.
+const k8sNameAlphabet = 'bcdfghjklmnpqrstvwxz2456789'
+
+// generateName returns a Kubernetes-style name, prefix plus five random
+// characters ("sandbox-7xk2m"), a lowercase DNS label as the API server expects.
+export function generateName(prefix: string): string {
+  const random = new Uint32Array(5)
+  crypto.getRandomValues(random)
+  const suffix = Array.from(random, n => k8sNameAlphabet[n % k8sNameAlphabet.length]).join('')
+  return `${prefix}-${suffix}`
+}
+
 export function fmtDate(iso?: string): string {
   if (!iso) return '—'
   const d = new Date(iso)

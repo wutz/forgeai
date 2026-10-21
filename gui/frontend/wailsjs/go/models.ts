@@ -807,6 +807,7 @@ export namespace sandbox {
 	    volumes?: VolumeMount[];
 	    template?: string;
 	    ttl: v1.Duration;
+	    idleTimeout?: v1.Duration;
 	
 	    static createFrom(source: any = {}) {
 	        return new Form(source);
@@ -824,6 +825,7 @@ export namespace sandbox {
 	        this.volumes = this.convertValues(source["volumes"], VolumeMount);
 	        this.template = source["template"];
 	        this.ttl = this.convertValues(source["ttl"], v1.Duration);
+	        this.idleTimeout = this.convertValues(source["idleTimeout"], v1.Duration);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

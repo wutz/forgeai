@@ -1,4 +1,5 @@
 ---
+import Preferences from '../components/Preferences.astro';
 import SiteHeader from '../components/SiteHeader.astro';
 import { htmlLang, localeBase, locales, messages, type Locale } from '../i18n/messages';
 import '../styles/global.css';
@@ -73,6 +74,7 @@ const t = messages[lang];
     <footer class="site-footer">
       <div class="container footer-inner">
         <span>{t.footer.copyright}</span>
+        <Preferences lang={lang} />
         <div class="footer-links">
           <a href="https://github.com/wutz/forgeai" rel="noopener">{t.footer.source}</a>
           <a href="https://github.com/wutz/forgeai#readme" rel="noopener">{t.footer.docs}</a>

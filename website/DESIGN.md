@@ -256,7 +256,7 @@ The forgeai website is the public face of the project: a single landing page tha
 The site has a black-and-white light theme and a dark theme. Every neutral and accent token in `global.css` is a `light-dark()` pair, so one set of rules serves both.
 
 - **Default: follow the system.** With no stored choice, the page uses `prefers-color-scheme` through `color-scheme: light dark`.
-- **Manual override.** The header's System / Light / Dark control sets `data-theme` on `<html>` and stores the choice in `localStorage` under `forgeai-theme`. "System" removes both. The inline script in `Base.astro` applies the stored value before first paint, so there is no flash.
+- **Manual override.** The footer's System / Light / Dark control sets `data-theme` on `<html>` and stores the choice in `localStorage` under `forgeai-theme`. "System" removes both. The inline script in `Base.astro` applies the stored value before first paint, so there is no flash.
 - **Dark values** (ink, canvas and surface are inverted; Forge Indigo is lifted for contrast on dark):
 
 | Token | Light | Dark |
@@ -276,7 +276,7 @@ The primary button keeps `{colors.accent}` with a white label in both themes.
 The site is in English at `/` and Simplified Chinese at `/zh/`. Copy lives in `src/i18n/messages.ts`, and `zh` is typed against `en`, so an editor flags a missing key.
 
 - **Detection.** On the root page only, a visitor whose browser languages list Chinese first (`zh`, `zh-CN`, `zh-TW`, …) is sent to `/zh/`. Everyone else stays on `/`. Deeper pages never redirect.
-- **Manual choice.** The header's language link stores `forgeai-lang` (`en` or `zh`). A stored choice overrides detection on the root page.
+- **Manual choice.** The footer's language link stores `forgeai-lang` (`en` or `zh`). A stored choice overrides detection on the root page.
 - **Chinese typography.** The font stack falls back to PingFang SC, Noto Sans SC and Microsoft YaHei. Chinese text uses no negative tracking, a 1.8 line height and 1.3 headings. The mono eyebrows switch to the sans stack.
 - **Terms.** Product and Kubernetes names (Project, TrainJob, Kueue, ClusterQueue, Sandbox, `kubectl`) stay in English in both languages, matching the repository docs.
 

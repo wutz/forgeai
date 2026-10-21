@@ -99,15 +99,14 @@ func (r *SandboxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
-	// Idle policy: suspend a sandbox nothing has used for sandbox.idleTimeout.
-	// Activity is the client heartbeat (GUI interactions, `kubectl annotate`)
-	// and the pod start; without a heartbeat source the platform keeps
-	// idleTimeout at 0.
+	// Idle policy: suspend a sandbox nothing has used for its idle timeout, the
+	// one it was created with or else sandbox.idleTimeout. Activity is the
+	// client heartbeat (GUI interactions, `kubectl annotate`) and the pod start.
 	cfg, err := r.Config.Get(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	timeout := cfg.Sandbox.IdleTimeout.Duration
+	timeout := sandbox.IdleTimeoutOf(sb, cfg.Sandbox.IdleTimeout.Duration)
 	if timeout <= 0 {
 		return ctrl.Result{}, nil
 	}

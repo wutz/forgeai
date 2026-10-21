@@ -117,7 +117,7 @@ The GUI renders the same object from a form (`pkg/sandbox`): image, bash command
 |---|---|
 | Stop | annotation `forgeai.wutz.dev/stopped: "true"`; the operator sets `operatingMode: Suspended`, the pod is deleted, the object and its volumes are kept |
 | Start | remove the annotation; the sandbox comes back with its volumes |
-| Idle suspend | a sandbox nothing used for `sandbox.idleTimeout` is suspended and marked stopped; clients keep it awake with the `forgeai.wutz.dev/last-active` heartbeat (the GUI sends one while the sandbox is open) |
+| Idle suspend | a sandbox nothing used for its idle timeout is suspended and marked stopped. The timeout is the form's "Idle timeout" in minutes (0 turns the idle stop off for that sandbox, empty uses `sandbox.idleTimeout`), stored in the `forgeai.wutz.dev/idle-timeout` annotation; clients keep it awake with the `forgeai.wutz.dev/last-active` heartbeat (the GUI sends one while the sandbox is open) |
 | Auto-stop | the form's TTL sets `shutdownTime` with `shutdownPolicy: Retain`, so the sandbox stops instead of being deleted |
 | Templates | `SandboxTemplate`s are listed by the GUI; members create templates, claims and warm pools with `kubectl` (the edit role allows it) |
 
@@ -165,7 +165,7 @@ Platform settings live in the ConfigMap `forgeai-system/forgeai-platform` (`conf
 | `network` | `systemNamespaces` allowed into isolated projects, `dnsNamespace` |
 | `fileServer` | dufs `image`, `idleTimeout`, `hostPrefix` |
 | `training` | `defaultRuntime`, `shmSize`, `stuckTimeout`, `maxRetries` |
-| `sandbox` | agent-sandbox `namespace`, `defaultImage`, offered `images`, `runtimeClasses` and `defaultRuntimeClass`, `shmSize`, `idleTimeout` (0 disables) and `maxTTL` |
+| `sandbox` | agent-sandbox `namespace`, `defaultImage`, offered `images`, `runtimeClasses` and `defaultRuntimeClass`, `shmSize`, `idleTimeout` (default for sandboxes without their own; 0 disables) and `maxTTL` |
 | `trashRetention` | Default retention of trashed volumes |
 
 The operator rereads the config every 15 seconds.

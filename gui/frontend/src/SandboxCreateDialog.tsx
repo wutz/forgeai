@@ -21,6 +21,9 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   const [envText, setEnvText] = useState('')
   const [mounts, setMounts] = useState('')
   const [ttlHours, setTtlHours] = useState(0)
+  // idleMinutes stays null until typed: null uses the platform's idle timeout,
+  // 0 turns the idle policy off for this sandbox.
+  const [idleMinutes, setIdleMinutes] = useState<number | null>(null)
   const [templates, setTemplates] = useState<app.SandboxTemplate[]>([])
 
   useEffect(() => {
@@ -67,6 +70,9 @@ export function SandboxCreateDialog({onClose, onCreated}: {
       }).filter(Boolean),
       // The form collects hours; the backend takes a Go duration.
       ttl: v1.Duration.createFrom({Duration: Math.round(ttlHours * 3600 * 1e9)}),
+      idleTimeout: idleMinutes === null
+        ? undefined
+        : v1.Duration.createFrom({Duration: Math.round(idleMinutes * 60 * 1e9)}),
     })
     CreateSandbox(form).then(b => onCreated(b.name)).catch(e => {
       setError(errText(e))
@@ -154,9 +160,18 @@ export function SandboxCreateDialog({onClose, onCreated}: {
               <label htmlFor="s-ttl">Auto-stop after (hours)</label>
               <input id="s-ttl" className="input" type="number" min={0} step={0.5} value={ttlHours}
                      onChange={e => setTtlHours(+e.target.value)}/>
-              <span className="hint">0 keeps the sandbox until it is stopped{opts?.idleTimeout
-                ? ` or idle for ${opts.idleTimeout}` : ''}.</span>
+              <span className="hint">0 keeps the sandbox until it is stopped.</span>
             </div>
+            <div className="field">
+              <label htmlFor="s-idle">Idle timeout (minutes)</label>
+              <input id="s-idle" className="input" type="number" min={0} step={1} value={idleMinutes ?? ''}
+                     onChange={e => setIdleMinutes(e.target.value === '' ? null : +e.target.value)}
+                     placeholder={opts?.idleTimeout ? `${opts.idleTimeout} (default)` : 'off'}/>
+              <span className="hint">Empty uses the platform default ({opts?.idleTimeout || 'off'}); 0 turns
+                the idle stop off for this sandbox.</span>
+            </div>
+          </div>
+          <div className="row">
             <div className="field">
               <label htmlFor="s-service">Service</label>
               <select id="s-service" className="select" value={f.service ? 'yes' : 'no'}

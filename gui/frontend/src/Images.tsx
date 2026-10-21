@@ -3,7 +3,7 @@ import {DeleteImage, DeleteImageRepo, ListImages, Registry} from '../wailsjs/go/
 import {app} from '../wailsjs/go/models'
 import {errText, fmtDate} from './util'
 import {t} from './i18n'
-import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, useConfirm} from './ui'
+import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, useActive, useConfirm} from './ui'
 
 // Images shows the project registry: the push command with the robot
 // credentials and the pushed tags with delete buttons.
@@ -15,6 +15,7 @@ export function Images() {
   const [copied, setCopied] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const confirm = useConfirm()
+  const active = useActive()
 
   const refresh = () => Promise.all([
     Registry().then(setReg),
@@ -23,7 +24,7 @@ export function Images() {
     setError(errText(e))
     throw e
   })
-  useEffect(() => { refresh().catch(() => {}) }, [])
+  useEffect(() => { if (active) refresh().catch(() => {}) }, [active])
 
   const copy = (text: string, key: string) =>
     navigator.clipboard.writeText(text).then(() => {

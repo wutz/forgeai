@@ -1,4 +1,4 @@
-import {Fragment, useEffect, useRef, useState, useSyncExternalStore} from 'react'
+import {Fragment, ReactNode, useContext, useEffect, useRef, useState, useSyncExternalStore} from 'react'
 import {Connect, Contexts, Projects} from '../wailsjs/go/app/App'
 import {Environment} from '../wailsjs/runtime/runtime'
 import {app} from '../wailsjs/go/models'
@@ -13,7 +13,7 @@ import {Resources} from './Resources'
 import {Admin} from './Admin'
 import {Scope} from './Scope'
 import {errText} from './util'
-import {Empty, HeaderSlot, Icon, IconName, Spinner} from './ui'
+import {ActiveView, Empty, HeaderSlot, Icon, IconName, Spinner} from './ui'
 import {Preferences} from './Preferences'
 import {getLocale, subscribeLocale, t} from './i18n'
 
@@ -46,6 +46,19 @@ function areaFor(current: Area, info: app.ConnInfo): Area {
   return current
 }
 
+// Pane keeps a view mounted while another area is on screen, so the view keeps
+// its selections, filters and drafts. Only the view on screen owns the header.
+function Pane({on, children}: {on: boolean, children: ReactNode}) {
+  const slot = useContext(HeaderSlot)
+  return (
+    <ActiveView.Provider value={on}>
+      <HeaderSlot.Provider value={on ? slot : null}>
+        <div hidden={!on}>{children}</div>
+      </HeaderSlot.Provider>
+    </ActiveView.Provider>
+  )
+}
+
 export default function App() {
   // Subscribing re-renders the whole tree when the language is switched, so
   // every t() call below picks up the new catalog.
@@ -57,6 +70,9 @@ export default function App() {
   const [projects, setProjects] = useState<app.ProjectNamespace[]>([])
   const [conn, setConn] = useState<app.ConnInfo | null>(null)
   const [area, setArea] = useState<Area>('overview')
+  // visited lists the areas opened on this connection. A view mounts on its
+  // first visit and stays mounted after that.
+  const [visited, setVisited] = useState<Area[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   // The rail remembers its state across launches, like the connection does.
@@ -114,6 +130,14 @@ export default function App() {
       connectTo(start.name, start.name === last.ctx ? last.ns : '')
     }).catch(e => setError(errText(e)))
   }, [])
+
+  // The current area counts as visited on the render it opens, so its view
+  // mounts at once; the effect records it for the renders after.
+  useEffect(() => {
+    setVisited(v => v.includes(area) ? v : [...v, area])
+  }, [area])
+  const opened = visited.includes(area) ? visited : [...visited, area]
+  const shown = (a: Area, view: ReactNode) => opened.includes(a) && <Pane on={area === a}>{view}</Pane>
 
   const switchCluster = (name: string) => {
     if (name !== conn?.context) connectTo(name)
@@ -192,15 +216,15 @@ export default function App() {
             {conn ? (
               // Keyed by the connection so every view refetches after a switch.
               <Fragment key={`${conn.context}/${conn.namespace}`}>
-                {area === 'overview' && <Overview onOpen={setArea}/>}
-                {area === 'jobs' && <Jobs/>}
-                {area === 'sandboxes' && <Sandboxes/>}
-                {area === 'templates' && <Templates sandboxes={conn.sandboxes}/>}
-                {area === 'volumes' && <Volumes/>}
-                {area === 'files' && <FilesView/>}
-                {area === 'images' && <Images/>}
-                {area === 'resources' && <Resources/>}
-                {area === 'admin' && <Admin/>}
+                {shown('overview', <Overview onOpen={setArea}/>)}
+                {shown('jobs', <Jobs/>)}
+                {shown('sandboxes', <Sandboxes/>)}
+                {shown('templates', <Templates sandboxes={conn.sandboxes}/>)}
+                {shown('volumes', <Volumes/>)}
+                {shown('files', <FilesView/>)}
+                {shown('images', <Images/>)}
+                {shown('resources', <Resources/>)}
+                {shown('admin', <Admin/>)}
               </Fragment>
             ) : loading ? (
               <Spinner label={t('app.connecting')}/>

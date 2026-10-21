@@ -7,7 +7,7 @@ import {SandboxCreateDialog} from './SandboxCreateDialog'
 import {SandboxTemplateDialog} from './SandboxTemplates'
 import {SandboxTerminal} from './SandboxTerminal'
 import {Status, envToLines, fmtDate, errText} from './util'
-import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Spinner, Tabs, useConfirm} from './ui'
+import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Spinner, Tabs, useActive, useConfirm} from './ui'
 import {t} from './i18n'
 
 // HEARTBEAT is how often an open sandbox detail resets the sandbox's idle
@@ -21,6 +21,7 @@ export function Sandboxes() {
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const active = useActive()
 
   const refresh = () => {
     ListSandboxes().then(bs => {
@@ -29,10 +30,11 @@ export function Sandboxes() {
     }).catch(e => setError(errText(e)))
   }
   useEffect(() => {
+    if (!active) return
     refresh()
     const timer = setInterval(refresh, 5000)
     return () => clearInterval(timer)
-  }, [])
+  }, [active])
 
   // Same definition as the detail view: a Pending sandbox is on its way up.
   const running = boxes.filter(b => b.phase === 'Running' || b.phase === 'Pending').length
@@ -128,6 +130,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
   // pending is the transition in flight. It stays set until the phase reaches
   // its target, because suspending or resuming takes the controller a while.
   const [pending, setPending] = useState<'start' | 'stop' | null>(null)
+  const active = useActive()
   const act = (p: Promise<unknown>) => p.then(onDone).catch(e => setError(errText(e)))
   const confirm = useConfirm()
   const transition = (kind: 'start' | 'stop', p: Promise<unknown>) => {
@@ -152,6 +155,12 @@ function SandboxDetail({name, onDone, onDeleted}: {
     setPending(null)
     setSaving(false)
     setSavedTemplate('')
+  }, [name])
+
+  // The poll and heartbeat run only while the view is on screen: a hidden
+  // detail lets the sandbox go idle, as it does when the detail closes.
+  useEffect(() => {
+    if (!active) return
     const load = () => GetSandbox(name).then(setBox).catch(e => setError(errText(e)))
     load()
     const timer = setInterval(load, 5000)
@@ -162,7 +171,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
       clearInterval(timer)
       clearInterval(beat)
     }
-  }, [name])
+  }, [name, active])
 
   if (!box) return <Card><Spinner label={error || t('sandboxes.loading')}/></Card>
   const running = box.phase === 'Running' || box.phase === 'Pending'

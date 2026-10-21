@@ -28,9 +28,10 @@ export function Images() {
     }, () => {})
 
   // The password is not part of the command: docker asks for it, so it stays
-  // out of shell history and the process list.
+  // out of shell history and the process list. The robot name contains "$",
+  // which the shell would expand, so the username is single-quoted.
   const host = reg?.url.split('/')[0] ?? ''
-  const login = reg?.username ? `docker login ${host} -u ${reg.username}` : ''
+  const login = reg?.username ? `docker login ${host} -u '${reg.username}'` : ''
   const push = (tag: string) => reg ? `docker tag <local-image> ${reg.url}/${tag} && docker push ${reg.url}/${tag}` : ''
   const totalTags = repos.reduce((n, r) => n + r.count, 0)
   const totalPulls = repos.reduce((n, r) => n + r.pulls, 0)

@@ -68,7 +68,7 @@ export function Images() {
       {confirm.dialog}
 
       {reg?.enabled && login && (
-        <Card title="Push an image" subtitle="Log in with the project robot account"
+        <Card title="Push an image" subtitle="Log in with the project robot account, then push to the repository address"
               actions={<button className="btn btn-sm" onClick={() => copy(login, 'login')}>
                 <Icon name={copied === 'login' ? 'check' : 'copy'} size={13}/>
                 {copied === 'login' ? 'Copied' : 'Copy login'}
@@ -85,6 +85,14 @@ export function Images() {
               {copied === 'password' ? 'Copied' : 'Copy password'}
             </button>
           </div>
+          <div className="robot-password">
+            <span className="muted">Repository</span>
+            <code className="mono">{reg.url}</code>
+            <button className="btn btn-sm" onClick={() => copy(reg.url, 'repo')}>
+              <Icon name={copied === 'repo' ? 'check' : 'copy'} size={13}/>
+              {copied === 'repo' ? 'Copied' : 'Copy repository'}
+            </button>
+          </div>
         </Card>
       )}
 
@@ -92,7 +100,8 @@ export function Images() {
             subtitle={repos.length ? `${repos.length} repositories · ${totalTags} tags · ${totalPulls} pulls` : undefined}>
         {repos.length === 0 && reg?.enabled && (
           <Empty icon="image" title="No images pushed yet">
-            Tag a local image and push it with the command above.
+            Tag a local image and push it to <code className="mono">{reg?.url}</code>, the repository
+            address above.
           </Empty>
         )}
         {repos.length === 0 && reg && !reg.enabled && (

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -108,10 +109,14 @@ func (a *App) SaveProject(f Project) error {
 	if f.DeletionPolicy != "" {
 		p.Spec.DeletionPolicy = v1.DeletionPolicy(f.DeletionPolicy)
 	}
+	// An empty trash retention falls back to the platform default.
+	p.Spec.TrashRetention = nil
 	if f.TrashRetention != "" {
-		if d, err := time.ParseDuration(f.TrashRetention); err == nil {
-			p.Spec.TrashRetention = &metav1.Duration{Duration: d}
+		d, err := time.ParseDuration(f.TrashRetention)
+		if err != nil {
+			return fmt.Errorf("trash retention: %w", err)
 		}
+		p.Spec.TrashRetention = &metav1.Duration{Duration: d}
 	}
 	if err := applyProjectQuota(&p.Spec.Quota, f.Quota); err != nil {
 		return err
@@ -130,24 +135,28 @@ func (a *App) SaveProject(f Project) error {
 	return c.k8s.Update(ctx, p)
 }
 
+// applyProjectQuota replaces the limits with the form's. An empty or zero
+// field is unset, so the platform default applies (or unlimited for the
+// registry); clearing a limit in the form clears it on the Project.
 func applyProjectQuota(q *v1.ProjectQuota, f ProjectQuota) error {
 	q.GPUs = q.GPUs[:0]
 	for class, count := range f.GPUs {
 		q.GPUs = append(q.GPUs, v1.GPUQuota{Class: class, Count: count})
 	}
-	for _, name := range []struct {
+	q.Storage, q.RegistryStorage, q.Volumes, q.Pods = nil, nil, nil, nil
+	for _, field := range []struct {
 		s   string
 		set func(resource.Quantity)
 	}{
 		{f.Storage, func(v resource.Quantity) { q.Storage = &v }},
 		{f.RegistryStorage, func(v resource.Quantity) { q.RegistryStorage = &v }},
 	} {
-		if name.s != "" {
-			v, err := resource.ParseQuantity(name.s)
+		if field.s != "" {
+			v, err := resource.ParseQuantity(field.s)
 			if err != nil {
 				return err
 			}
-			name.set(v)
+			field.set(v)
 		}
 	}
 	if f.Volumes > 0 {

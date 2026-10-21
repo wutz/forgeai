@@ -2,13 +2,14 @@ import {useEffect, useState} from 'react'
 import {CreateSandboxTemplate, UpdateSandboxTemplate, SandboxOptions} from '../wailsjs/go/app/App'
 import {app, sandbox} from '../wailsjs/go/models'
 import {envMap, envToLines, linesToEnv, fmtDate, errText} from './util'
-import {Dialog, Empty} from './ui'
+import {Dialog, Empty, useConfirm} from './ui'
 
 // SandboxTemplateTable lists SandboxTemplates (agent blueprints new sandboxes
 // start from) inside the Templates page.
 export function SandboxTemplateTable({items, onEdit, onDelete}: {
   items: app.SandboxTemplate[], onEdit: (t: app.SandboxTemplate) => void, onDelete: (name: string) => void
 }) {
+  const confirm = useConfirm()
   if (items.length === 0) {
     return (
       <Empty icon="layers" title="No sandbox templates yet">
@@ -17,6 +18,8 @@ export function SandboxTemplateTable({items, onEdit, onDelete}: {
     )
   }
   return (
+    <>
+    {confirm.dialog}
     <table className="table">
       <thead>
       <tr><th>Name</th><th>Image</th><th>Isolation</th><th>Created</th><th/></tr>
@@ -34,9 +37,12 @@ export function SandboxTemplateTable({items, onEdit, onDelete}: {
           <td>
             <div className="actions">
               <button className="btn btn-sm" onClick={() => onEdit(t)}>Edit</button>
-              <button className="btn btn-sm btn-danger" onClick={() =>
-                confirm(`Delete sandbox template ${t.name}? Existing sandboxes keep running.`) &&
-                onDelete(t.name)}>
+              <button className="btn btn-sm btn-danger" onClick={() => confirm.ask({
+                title: `Delete sandbox template ${t.name}?`,
+                message: 'Existing sandboxes keep running.',
+                action: 'Delete template', danger: true,
+                run: () => onDelete(t.name),
+              })}>
                 Delete
               </button>
             </div>
@@ -45,6 +51,7 @@ export function SandboxTemplateTable({items, onEdit, onDelete}: {
       ))}
       </tbody>
     </table>
+    </>
   )
 }
 
@@ -94,11 +101,11 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
               : 'Saved as a SandboxTemplate of the project'}
             onClose={onClose} footer={<>
               <button className="btn" onClick={onClose}>Cancel</button>
-              <button className="btn btn-primary" onClick={save} disabled={busy || !f.name || !f.image}>
+              <button type="submit" form="sandbox-template-form" className="btn btn-primary" disabled={busy || !f.name || !f.image}>
                 {busy ? 'Saving…' : 'Save template'}
               </button>
             </>}>
-      <form className="dialog-form" onSubmit={e => { e.preventDefault(); save() }}>
+      <form id="sandbox-template-form" className="dialog-form" onSubmit={e => { e.preventDefault(); save() }}>
         {error && <div className="banner banner-error">{error}</div>}
         <div className="row">
           <div className="field">

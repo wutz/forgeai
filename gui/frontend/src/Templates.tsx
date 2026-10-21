@@ -1,8 +1,8 @@
 import {useEffect, useState} from 'react'
-import {ListTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, DeleteSandboxTemplate, SandboxTemplates as ListSandboxTemplates} from '../wailsjs/go/app/App'
+import {ListTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, DeleteSandboxTemplate, SandboxTemplates as ListSandboxTemplates, ListInstanceTypes} from '../wailsjs/go/app/App'
 import {app, sandbox, training} from '../wailsjs/go/models'
 import {envToLines, linesToEnv, fmtDate, errText} from './util'
-import {Card, Dialog, Empty, Icon, PageHeader, Segmented} from './ui'
+import {Card, Dialog, Empty, Icon, PageHeader, Segmented, useConfirm} from './ui'
 import {SandboxTemplateDialog, SandboxTemplateTable} from './SandboxTemplates'
 
 type Kind = 'sandbox' | 'job'
@@ -96,6 +96,7 @@ function blankJobForm() {
 function JobTemplateTable({items, onEdit, onDelete}: {
   items: app.Template[], onEdit: (t: app.Template) => void, onDelete: (name: string) => void
 }) {
+  const confirm = useConfirm()
   if (items.length === 0) {
     return (
       <Empty icon="scroll" title="No job templates yet">
@@ -104,6 +105,8 @@ function JobTemplateTable({items, onEdit, onDelete}: {
     )
   }
   return (
+    <>
+    {confirm.dialog}
     <table className="table">
       <thead>
       <tr><th>Name</th><th>Image</th><th>Workers</th><th>Instance</th><th>Created</th><th/></tr>
@@ -123,7 +126,12 @@ function JobTemplateTable({items, onEdit, onDelete}: {
             <div className="actions">
               <button className="btn btn-sm" onClick={() => onEdit(t)}>Edit</button>
               <button className="btn btn-sm btn-danger" onClick={() =>
-                confirm(`Delete template ${t.name}?`) && onDelete(t.name)}>
+                confirm.ask({
+                  title: `Delete template ${t.name}?`,
+                  message: 'Jobs already created from it are not changed.',
+                  action: 'Delete template', danger: true,
+                  run: () => onDelete(t.name),
+                })}>
                 Delete
               </button>
             </div>
@@ -132,6 +140,7 @@ function JobTemplateTable({items, onEdit, onDelete}: {
       ))}
       </tbody>
     </table>
+    </>
   )
 }
 
@@ -143,9 +152,18 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
   const [f, setF] = useState(form)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [types, setTypes] = useState<app.InstanceType[]>([])
   const [envText, setEnvText] = useState(envToLines(Object.fromEntries((form.env || []).map(e => [e.name, e.value]))))
   const set = <K extends keyof training.Form>(k: K, v: training.Form[K]) =>
     setF(prev => training.Form.createFrom({...prev, [k]: v}))
+
+  // The instance type is a choice of the project's types, defaulting to the first.
+  useEffect(() => {
+    ListInstanceTypes().then(ts => {
+      setTypes(ts)
+      if (!form.instanceType && ts.length) set('instanceType', ts[0].name)
+    }).catch(e => setError(errText(e)))
+  }, [])
 
   const save = () => {
     setBusy(true)
@@ -167,11 +185,11 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
               : 'Saved as a namespaced TrainingRuntime of the project'}
             onClose={onClose} footer={<>
               <button className="btn" onClick={onClose}>Cancel</button>
-              <button className="btn btn-primary" onClick={save} disabled={busy || !f.name || !f.image}>
+              <button type="submit" form="template-form" className="btn btn-primary" disabled={busy || !f.name || !f.image}>
                 {busy ? 'Saving…' : 'Save template'}
               </button>
             </>}>
-      <form className="dialog-form" onSubmit={e => { e.preventDefault(); save() }}>
+      <form id="template-form" className="dialog-form" onSubmit={e => { e.preventDefault(); save() }}>
         {error && <div className="banner banner-error">{error}</div>}
         <div className="row">
           <div className="field">
@@ -198,14 +216,18 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
         <div className="row">
           <div className="field">
             <label htmlFor="t-instance">Default instance type</label>
-            <input id="t-instance" className="input mono" value={f.instanceType}
-                   onChange={e => set('instanceType', e.target.value)}
-                   placeholder="rtx-5090.x1"/>
+            <select id="t-instance" className="select mono" value={f.instanceType}
+                    onChange={e => set('instanceType', e.target.value)} required>
+              {!f.instanceType && <option value="">Choose a type</option>}
+              {f.instanceType && !types.some(t => t.name === f.instanceType) &&
+                <option value={f.instanceType}>{f.instanceType} (not available)</option>}
+              {types.map(t => <option key={t.name} value={t.name}>{t.name}</option>)}
+            </select>
           </div>
           <div className="field">
             <label htmlFor="t-workers">Workers</label>
             <input id="t-workers" className="input" type="number" min={1}
-                   value={f.workers} onChange={e => set('workers', +e.target.value || 1)}/>
+                   value={f.workers} onChange={e => set('workers', +e.target.value)}/>
           </div>
         </div>
         <div className="field">

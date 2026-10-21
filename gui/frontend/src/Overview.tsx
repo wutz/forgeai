@@ -21,7 +21,6 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
       ListJobs().then(setJobs),
       ListInstanceTypes().then(setTypes),
       ListVolumes(false).then(setVols),
-      ListImages().then(setImages),
       Quota().then(setQuota),
     ]).then(results => {
       const failed = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined
@@ -35,11 +34,22 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
     return () => clearInterval(t)
   }, [])
 
+  // Images cost a Harbor call per repository, so they refresh on a slower beat.
+  useEffect(() => {
+    const load = () => ListImages().then(setImages).catch(() => {})
+    load()
+    const t = setInterval(load, 60000)
+    return () => clearInterval(t)
+  }, [])
+
   const running = jobs.filter(j => j.phase === 'Running')
   const queued = jobs.filter(j => j.phase === 'Queued' || j.phase === 'Pending')
   const failed = jobs.filter(j => j.phase === 'Failed')
-  const readyWorkers = jobs.reduce((n, j) => n + (j.ready || 0), 0)
-  const wantedWorkers = jobs.reduce((n, j) => n + (j.workers || 0), 0)
+  // Workers count only jobs that still hold or wait for pods: a finished,
+  // failed or stopped job no longer expects its workers to be ready.
+  const active = jobs.filter(j => j.phase !== 'Succeeded' && j.phase !== 'Failed' && j.phase !== 'Stopped')
+  const readyWorkers = active.reduce((n, j) => n + (j.ready || 0), 0)
+  const wantedWorkers = active.reduce((n, j) => n + (j.workers || 0), 0)
 
   const gpuTotal = types.reduce((n, t) => n + t.total, 0)
   const gpuFree = types.reduce((n, t) => n + t.free, 0)

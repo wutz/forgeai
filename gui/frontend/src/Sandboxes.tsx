@@ -7,10 +7,11 @@ import {SandboxCreateDialog} from './SandboxCreateDialog'
 import {SandboxTemplateDialog} from './SandboxTemplates'
 import {SandboxTerminal} from './SandboxTerminal'
 import {Status, envToLines, fmtDate, errText} from './util'
-import {Badge, Card, Empty, Icon, PageHeader, Spinner, Tabs} from './ui'
+import {Badge, Card, Empty, Icon, PageHeader, Spinner, Tabs, useConfirm} from './ui'
 
-// HEARTBEAT keeps a sandbox the user is looking at out of the idle policy:
-// the operator suspends a sandbox only after sandbox.idleTimeout without one.
+// HEARTBEAT is how often an open sandbox detail resets the sandbox's idle
+// clock. The operator suspends a sandbox once it has been idle for its idle
+// timeout, so the beats stop when the detail closes.
 const HEARTBEAT = 60_000
 
 // Sandboxes is the view of the project's agent sandboxes (agents.x-k8s.io).
@@ -32,7 +33,8 @@ export function Sandboxes() {
     return () => clearInterval(t)
   }, [])
 
-  const running = boxes.filter(b => b.phase === 'Running').length
+  // Same definition as the detail view: a Pending sandbox is on its way up.
+  const running = boxes.filter(b => b.phase === 'Running' || b.phase === 'Pending').length
 
   return (
     <div className="page">
@@ -52,7 +54,8 @@ export function Sandboxes() {
       <div className="split">
         <SandboxTable boxes={boxes} selected={selected} onSelect={n =>
           setSelected(prev => prev === n ? null : n)}/>
-        {selected && <SandboxDetail name={selected} onDone={refresh}/>}
+        {selected && <SandboxDetail name={selected} onDone={refresh}
+                                    onDeleted={() => { setSelected(null); refresh() }}/>}
       </div>
     </div>
   )
@@ -112,7 +115,9 @@ function sandboxTemplateForm(box: app.Sandbox) {
   })
 }
 
-function SandboxDetail({name, onDone}: { name: string, onDone: () => void }) {
+function SandboxDetail({name, onDone, onDeleted}: {
+  name: string, onDone: () => void, onDeleted: () => void
+}) {
   const [box, setBox] = useState<app.Sandbox | null>(null)
   const [error, setError] = useState('')
   const [tab, setTab] = useState<Tab>('overview')
@@ -123,6 +128,7 @@ function SandboxDetail({name, onDone}: { name: string, onDone: () => void }) {
   // its target, because suspending or resuming takes the controller a while.
   const [pending, setPending] = useState<'start' | 'stop' | null>(null)
   const act = (p: Promise<unknown>) => p.then(onDone).catch(e => setError(errText(e)))
+  const confirm = useConfirm()
   const transition = (kind: 'start' | 'stop', p: Promise<unknown>) => {
     setPending(kind)
     p.then(onDone).catch(e => {
@@ -159,6 +165,8 @@ function SandboxDetail({name, onDone}: { name: string, onDone: () => void }) {
 
   if (!box) return <Card><Spinner label={error || 'Loading sandbox…'}/></Card>
   const running = box.phase === 'Running' || box.phase === 'Pending'
+  const showLog = () =>
+    SandboxLogs(box.name, 500).then(v => { setLog(v); setTab('log') }).catch(e => setError(errText(e)))
 
   return (
     <Card className="detail">
@@ -171,12 +179,12 @@ function SandboxDetail({name, onDone}: { name: string, onDone: () => void }) {
       </div>
       {error && <div className="banner banner-error">{error}</div>}
       {savedTemplate && <div className="banner" role="status">Saved sandbox template {savedTemplate}.</div>}
+      {confirm.dialog}
       {saving && <SandboxTemplateDialog initial={sandboxTemplateForm(box)} onClose={() => setSaving(false)}
                                         onSaved={n => { setSaving(false); setSavedTemplate(n) }}/>}
 
       <div className="detail-actions">
-        <button className="btn btn-sm" onClick={() =>
-          SandboxLogs(box.name, 500).then(v => { setLog(v); setTab('log') }).catch(e => setError(errText(e)))}>
+        <button className="btn btn-sm" onClick={showLog}>
           <Icon name="scroll" size={13}/>Logs
         </button>
         {running && <button className="btn btn-sm" disabled={pending !== null}
@@ -193,9 +201,12 @@ function SandboxDetail({name, onDone}: { name: string, onDone: () => void }) {
           <Icon name="layers" size={13}/>Save as template
         </button>
         <span className="spacer"/>
-        <button className="btn btn-sm btn-danger" onClick={() =>
-          confirm(`Delete sandbox ${box.name}? Its pod and volumes are deleted.`) &&
-          act(DeleteSandbox(box.name))}><Icon name="trash" size={13}/>Delete</button>
+        <button className="btn btn-sm btn-danger" onClick={() => confirm.ask({
+          title: `Delete sandbox ${box.name}?`,
+          message: 'Its pod and service stop, and the volumes it created from its claim templates are deleted. Shared volumes stay. This cannot be undone.',
+          action: 'Delete sandbox', danger: true,
+          run: () => DeleteSandbox(box.name).then(onDeleted).catch(e => setError(errText(e))),
+        })}><Icon name="trash" size={13}/>Delete</button>
       </div>
 
       <div className="section">
@@ -228,7 +239,17 @@ function SandboxDetail({name, onDone}: { name: string, onDone: () => void }) {
         {tab === 'terminal' && (box.podPhase === 'Running'
           ? <SandboxTerminal name={box.name}/>
           : <p className="muted">Start the sandbox to open a terminal.</p>)}
-        {tab === 'log' && <pre className="logs">{log || 'No output'}</pre>}
+        {tab === 'log' && (
+          <>
+            <div className="log-bar">
+              <span className="spacer"/>
+              <button className="btn btn-sm btn-ghost" onClick={showLog}>
+                <Icon name="refresh" size={13}/>Reload
+              </button>
+            </div>
+            <pre className="logs">{log || 'No output'}</pre>
+          </>
+        )}
         {tab === 'env' && <pre className="code">{box.command ? `$ ${box.command}\n\n` : ''}
           {envToLines(box.env) || '—'}</pre>}
       </div>

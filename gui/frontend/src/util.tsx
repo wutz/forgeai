@@ -41,17 +41,19 @@ export function fmtDate(iso?: string): string {
   return isNaN(+d) ? iso : d.toLocaleString()
 }
 
-// toGiB reads a storage quantity ("500Gi", "1Ti", "2G") as GiB.
+// toGiB reads a Kubernetes storage quantity ("500Gi", "1Ti", "2G", "1000") as
+// GiB. Binary suffixes (Ki..Ei) are powers of 1024, decimal ones (k..E) powers
+// of 1000, and a bare number counts bytes, as in Kubernetes.
 export function toGiB(q?: string): number {
   if (!q) return 0
-  const m = /^([0-9.]+)\s*([KMGTPE]i?)?$/.exec(q.trim())
+  const m = /^([0-9.]+)\s*(Ki|Mi|Gi|Ti|Pi|Ei|k|M|G|T|P|E)?$/.exec(q.trim())
   if (!m) return 0
-  const n = parseFloat(m[1])
-  const mult: Record<string, number> = {
-    Ki: 1 / 1024 ** 2, Mi: 1 / 1024, Gi: 1, Ti: 1024, Pi: 1024 ** 2,
-    k: 1e-6, M: 1e-3, G: 1, T: 1e3, P: 1e6,
+  const bytes: Record<string, number> = {
+    '': 1,
+    Ki: 1024, Mi: 1024 ** 2, Gi: 1024 ** 3, Ti: 1024 ** 4, Pi: 1024 ** 5, Ei: 1024 ** 6,
+    k: 1e3, M: 1e6, G: 1e9, T: 1e12, P: 1e15, E: 1e18,
   }
-  return n * (mult[m[2] || 'Gi'] ?? 1)
+  return parseFloat(m[1]) * bytes[m[2] ?? ''] / 1024 ** 3
 }
 
 // pct returns value/max as a whole percentage, clamped to 0..100.

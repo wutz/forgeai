@@ -88,6 +88,12 @@ func TestLifecycle(t *testing.T) {
 	if _, err := c.Resize(ctx, "data", 30); !errors.Is(err, ErrInTrash) {
 		t.Fatalf("resize in trash: %v", err)
 	}
+	if _, err := c.SetExpiry(ctx, "data", now.Add(-time.Hour)); !errors.Is(err, ErrPastExpiry) {
+		t.Errorf("SetExpiry in the past: %v", err)
+	}
+	if _, err := c.SetExpiry(ctx, "data", time.Time{}); !errors.Is(err, ErrPastExpiry) {
+		t.Errorf("SetExpiry zero time: %v", err)
+	}
 	if v, err := c.SetExpiry(ctx, "data", now.Add(time.Hour)); err != nil || v.ExpireAt != "2026-10-01T01:00:00Z" {
 		t.Fatalf("expiry %+v %v", v, err)
 	}

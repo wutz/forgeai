@@ -1,11 +1,11 @@
-import {useEffect, useState} from 'react'
+import {FormEvent, useEffect, useState} from 'react'
 import {
   CreateVolume, ListVolumes, ResizeVolume, RestoreVolume, SetVolumeExpiry,
   TrashVolume, PurgeVolume, Config,
 } from '../wailsjs/go/app/App'
 import {app, volumes as vol} from '../wailsjs/go/models'
 import {fmtDate, errText} from './util'
-import {Badge, Card, Dialog, Empty, Icon, Meter, PageHeader} from './ui'
+import {Badge, Card, Dialog, Empty, Icon, Meter, PageHeader, useConfirm} from './ui'
 
 // Volumes manages shared filesystems: create, grow, trash (recycle bin),
 // restore and purge. Deleting is delayed — the operator purges expired
@@ -15,7 +15,11 @@ export function Volumes() {
   const [trash, setTrash] = useState<vol.Volume[]>([])
   const [error, setError] = useState('')
   const [config, setConfig] = useState<app.PlatformConfig | null>(null)
+  const [configError, setConfigError] = useState('')
   const [creating, setCreating] = useState(false)
+  const [growing, setGrowing] = useState<vol.Volume | null>(null)
+  const [expiring, setExpiring] = useState<vol.Volume | null>(null)
+  const confirm = useConfirm()
 
   const refresh = () => {
     ListVolumes(false).then(vs => { setItems(vs); setError('') }).catch(e => setError(errText(e)))
@@ -23,12 +27,25 @@ export function Volumes() {
   }
   useEffect(() => {
     refresh()
-    Config().then(setConfig).catch(() => {})
+    Config().then(setConfig).catch(e => setConfigError(errText(e)))
     const t = setInterval(refresh, 10000)
     return () => clearInterval(t)
   }, [])
 
   const totalGiB = items.reduce((n, v) => n + (v.capacityGiB || v.requestedGiB || 0), 0)
+
+  const trashVolume = (v: vol.Volume) => confirm.ask({
+    title: `Move ${v.name} to the recycle bin?`,
+    message: 'It stays restorable until it expires; the purge time follows the platform trash retention.',
+    action: 'Move to recycle bin', danger: true,
+    run: () => TrashVolume(v.name).then(refresh).catch(e => setError(errText(e))),
+  })
+  const purgeVolume = (v: vol.Volume) => confirm.ask({
+    title: `Permanently delete ${v.name}?`,
+    message: 'Its data is removed now. This cannot be undone.',
+    action: 'Purge now', danger: true,
+    run: () => PurgeVolume(v.name).then(refresh).catch(e => setError(errText(e))),
+  })
 
   return (
     <div className="page">
@@ -40,8 +57,12 @@ export function Volumes() {
                     <Icon name="plus" size={14}/>New volume
                   </button>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
+      {configError && <div className="banner banner-error" role="alert">{configError}</div>}
       {creating && config && <CreateVolumeDialog config={config} onClose={() => setCreating(false)}
                                                  onCreated={refresh}/>}
+      {growing && <ResizeVolumeDialog volume={growing} onClose={() => setGrowing(null)} onDone={refresh}/>}
+      {expiring && <ExpiryDialog volume={expiring} onClose={() => setExpiring(null)} onDone={refresh}/>}
+      {confirm.dialog}
 
       <Card>
         {items.length === 0 ? (
@@ -74,15 +95,10 @@ export function Volumes() {
                   <div className="actions">
                     <button className="btn btn-sm" disabled={v.phase !== 'Bound' && v.phase !== 'Resizing'}
                             title={v.phase === 'Pending' ? 'Available once the volume is provisioned' : undefined}
-                            onClick={() => {
-                              const size = prompt(`New size in GiB (current ${v.capacityGiB || v.requestedGiB}):`,
-                                String(Math.max(v.capacityGiB, v.requestedGiB) * 2))
-                              if (size) ResizeVolume(v.name, +size).then(refresh).catch(e => setError(errText(e)))
-                            }}>Grow</button>
-                    <button className="btn btn-sm btn-danger" onClick={() => {
-                      const days = prompt('Delete to trash. Purge after days:', '7')
-                      if (days) TrashVolume(v.name).then(refresh).catch(e => setError(errText(e)))
-                    }}>Delete</button>
+                            onClick={() => setGrowing(v)}>Grow</button>
+                    <button className="btn btn-sm btn-danger" disabled={!!v.users?.length}
+                            title={v.users?.length ? 'In use by running pods' : undefined}
+                            onClick={() => trashVolume(v)}>Delete</button>
                   </div>
                 </td>
               </tr>
@@ -111,14 +127,8 @@ export function Volumes() {
                   <div className="actions">
                     <button className="btn btn-sm" onClick={() =>
                       RestoreVolume(v.name).then(refresh).catch(e => setError(errText(e)))}>Restore</button>
-                    <button className="btn btn-sm" onClick={() => {
-                      const date = prompt('Purge at (yyyy-mm-dd):', v.expireAt?.slice(0, 10) || '')
-                      if (date) SetVolumeExpiry(v.name, new Date(date)).then(refresh)
-                        .catch(e => setError(errText(e)))
-                    }}>Set expiry</button>
-                    <button className="btn btn-sm btn-danger" onClick={() =>
-                      confirm(`Permanently delete ${v.name}? This cannot be undone.`) &&
-                      PurgeVolume(v.name).then(refresh).catch(e => setError(errText(e)))}>Purge now</button>
+                    <button className="btn btn-sm" onClick={() => setExpiring(v)}>Set expiry</button>
+                    <button className="btn btn-sm btn-danger" onClick={() => purgeVolume(v)}>Purge now</button>
                   </div>
                 </td>
               </tr>
@@ -140,9 +150,13 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const save = () => {
+  const save = (e: FormEvent) => {
+    e.preventDefault()
     setBusy(true)
-    CreateVolume(name, type, size).then(onCreated).catch(e => {
+    CreateVolume(name, type, size).then(() => {
+      onCreated()
+      onClose()
+    }).catch(e => {
       setError(errText(e)); setBusy(false)
     })
   }
@@ -151,15 +165,16 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
     <Dialog title="New volume" subtitle="Backed by a project PersistentVolumeClaim" width={440}
             onClose={onClose} footer={<>
               <button className="btn" onClick={onClose}>Cancel</button>
-              <button className="btn btn-primary" onClick={save} disabled={busy || !name}>
+              <button type="submit" form="create-volume" className="btn btn-primary" disabled={busy}>
                 {busy ? 'Creating…' : 'Create volume'}
               </button>
             </>}>
-      <form className="dialog-form" onSubmit={e => { e.preventDefault(); save() }}>
+      <form id="create-volume" className="dialog-form" onSubmit={save}>
         {error && <div className="banner banner-error">{error}</div>}
         <div className="field">
           <label htmlFor="v-name">Name</label>
-          <input id="v-name" className="input mono" value={name}
+          <input id="v-name" className="input mono" value={name} pattern="[a-z0-9]([a-z0-9\-]*[a-z0-9])?"
+                 maxLength={50} title="Lowercase letters, digits and dashes; up to 50 characters"
                  onChange={e => setName(e.target.value)} required/>
         </div>
         <div className="field">
@@ -173,11 +188,96 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
         <div className="field">
           <label htmlFor="v-size">Size (GiB)</label>
           <input id="v-size" className="input" type="number" min={1} step={10} value={size}
-                 onChange={e => setSize(+e.target.value)}/>
+                 onChange={e => setSize(+e.target.value)} required/>
         </div>
         <Meter value={size} max={Math.max(size, 100)} tone="muted"
                label={<span>Requested storage</span>} right={<span>{size} GiB</span>}/>
       </form>
     </Dialog>
   )
+}
+
+// ResizeVolumeDialog grows a bound volume; Kubernetes cannot shrink it.
+function ResizeVolumeDialog({volume, onClose, onDone}: {
+  volume: vol.Volume, onClose: () => void, onDone: () => void
+}) {
+  const current = volume.capacityGiB || volume.requestedGiB
+  const [size, setSize] = useState(current * 2)
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const save = (e: FormEvent) => {
+    e.preventDefault()
+    setBusy(true)
+    ResizeVolume(volume.name, size).then(() => {
+      onDone()
+      onClose()
+    }).catch(e => {
+      setError(errText(e)); setBusy(false)
+    })
+  }
+  return (
+    <Dialog title={`Grow ${volume.name}`} subtitle={`Currently ${current} GiB; volumes only grow`}
+            width={400} onClose={onClose} footer={<>
+              <button className="btn" onClick={onClose}>Cancel</button>
+              <button type="submit" form="resize-volume" className="btn btn-primary" disabled={busy}>
+                {busy ? 'Growing…' : 'Grow volume'}
+              </button>
+            </>}>
+      <form id="resize-volume" className="dialog-form" onSubmit={save}>
+        {error && <div className="banner banner-error">{error}</div>}
+        <div className="field">
+          <label htmlFor="v-grow">New size (GiB)</label>
+          <input id="v-grow" className="input" type="number" min={current + 1} step={10} value={size}
+                 onChange={e => setSize(+e.target.value)} required/>
+        </div>
+      </form>
+    </Dialog>
+  )
+}
+
+// ExpiryDialog sets the day a trashed volume is purged. The day starts at
+// local midnight, and the earliest choice is tomorrow.
+function ExpiryDialog({volume, onClose, onDone}: {
+  volume: vol.Volume, onClose: () => void, onDone: () => void
+}) {
+  const [day, setDay] = useState(volume.expireAt ? localDay(new Date(volume.expireAt)) : '')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const tomorrow = localDay(new Date(Date.now() + 24 * 3600 * 1000))
+
+  const save = (e: FormEvent) => {
+    e.preventDefault()
+    setBusy(true)
+    SetVolumeExpiry(volume.name, new Date(`${day}T00:00:00`)).then(() => {
+      onDone()
+      onClose()
+    }).catch(e => {
+      setError(errText(e)); setBusy(false)
+    })
+  }
+  return (
+    <Dialog title={`Purge ${volume.name} on`} subtitle="Restore keeps the volume; purge is final"
+            width={400} onClose={onClose} footer={<>
+              <button className="btn" onClick={onClose}>Cancel</button>
+              <button type="submit" form="expiry-volume" className="btn btn-primary" disabled={busy || !day}>
+                {busy ? 'Saving…' : 'Save'}
+              </button>
+            </>}>
+      <form id="expiry-volume" className="dialog-form" onSubmit={save}>
+        {error && <div className="banner banner-error">{error}</div>}
+        <div className="field">
+          <label htmlFor="v-expiry">Purge day</label>
+          <input id="v-expiry" className="input" type="date" min={tomorrow} value={day}
+                 onChange={e => setDay(e.target.value)} required/>
+        </div>
+      </form>
+    </Dialog>
+  )
+}
+
+// localDay formats a date as yyyy-mm-dd in local time, the form of date inputs.
+function localDay(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }

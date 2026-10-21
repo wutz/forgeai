@@ -137,6 +137,9 @@ func (a *App) CreateSandbox(f sandbox.Form) (*Sandbox, error) {
 	if err != nil {
 		return nil, err
 	}
+	if f.InstanceType != "" && it == nil {
+		return nil, fmt.Errorf("instance type %q not found", f.InstanceType)
+	}
 	u, err := sandbox.Render(&f, sandbox.Context{
 		Namespace: c.namespace(), Project: c.Info.Project, InstanceType: it, Platform: cfg,
 		RegistrySecret: registrySecretName(ctx, c),

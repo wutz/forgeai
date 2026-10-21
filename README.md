@@ -165,7 +165,7 @@ Platform settings live in the ConfigMap `forgeai-system/forgeai-platform` (`conf
 | `network` | `systemNamespaces` allowed into isolated projects, `dnsNamespace` |
 | `fileServer` | dufs `image`, `idleTimeout`, `hostPrefix` |
 | `training` | `defaultRuntime`, `shmSize`, `stuckTimeout`, `maxRetries` |
-| `sandbox` | agent-sandbox `namespace`, `defaultImage`, offered `images`, `runtimeClasses` and `defaultRuntimeClass`, `shmSize`, `idleTimeout` (0 disables) and `maxTTL` |
+| `sandbox` | agent-sandbox `namespace`, `defaultImage`, offered `images`, `runtimeClasses` and `defaultRuntimeClass`, `shmSize`, `idleTimeout` (0 disables) |
 | `trashRetention` | Default retention of trashed volumes |
 
 The operator rereads the config every 15 seconds.

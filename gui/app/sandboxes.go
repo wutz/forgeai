@@ -54,7 +54,6 @@ type SandboxOptions struct {
 	RuntimeClasses      []string `json:"runtimeClasses"`
 	DefaultRuntimeClass string   `json:"defaultRuntimeClass"`
 	IdleTimeout         string   `json:"idleTimeout,omitempty"`
-	MaxTTL              string   `json:"maxTTL,omitempty"`
 }
 
 // ListSandboxes lists the sandboxes of the project, newest first.
@@ -112,9 +111,6 @@ func (a *App) SandboxOptions() (*SandboxOptions, error) {
 	if d := cfg.Sandbox.IdleTimeout.Duration; d > 0 {
 		o.IdleTimeout = d.String()
 	}
-	if d := cfg.Sandbox.MaxTTL.Duration; d > 0 {
-		o.MaxTTL = d.String()
-	}
 	return o, nil
 }
 
@@ -129,9 +125,6 @@ func (a *App) CreateSandbox(f sandbox.Form) (*Sandbox, error) {
 	cfg, err := platform.Load(ctx, c.k8s, c.namespace())
 	if err != nil {
 		return nil, err
-	}
-	if maxTTL := cfg.Sandbox.MaxTTL.Duration; maxTTL > 0 && f.TTL.Duration > maxTTL {
-		return nil, fmt.Errorf("auto-stop is limited to %s", maxTTL)
 	}
 	it, err := lookupInstanceType(ctx, c, f.InstanceType)
 	if err != nil {

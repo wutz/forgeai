@@ -646,7 +646,6 @@ export namespace app {
 	    runtimeClasses: string[];
 	    defaultRuntimeClass: string;
 	    idleTimeout?: string;
-	    maxTTL?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SandboxOptions(source);
@@ -659,7 +658,6 @@ export namespace app {
 	        this.runtimeClasses = source["runtimeClasses"];
 	        this.defaultRuntimeClass = source["defaultRuntimeClass"];
 	        this.idleTimeout = source["idleTimeout"];
-	        this.maxTTL = source["maxTTL"];
 	    }
 	}
 	export class SandboxTemplate {

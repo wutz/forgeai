@@ -3,6 +3,7 @@ import {CreateJob, ListInstanceTypes, TemplateNames, ListVolumes} from '../wails
 import {app, training, volumes} from '../wailsjs/go/models'
 import {envToLines, linesToEnv, errText, generateName} from './util'
 import {Dialog} from './ui'
+import {Mount, VolumeMountsField, mountProblems} from './VolumeMounts'
 
 // JobCreateDialog is the "New job" form: template prefill, instance type,
 // workers, volumes, env and retry defaults.
@@ -13,14 +14,15 @@ export function JobCreateDialog({onClose, onCreated}: {
   const [busy, setBusy] = useState(false)
   const [types, setTypes] = useState<app.InstanceType[]>([])
   const [templates, setTemplates] = useState<string[]>([])
-  const [vols, setVols] = useState<volumes.Volume[]>([])
+  // vols is null until the project's volumes load.
+  const [vols, setVols] = useState<volumes.Volume[] | null>(null)
   const [f, setF] = useState(training.Form.createFrom({
     name: generateName('job'), image: '', command: '', workers: 1,
     instanceType: '', env: [], volumes: [],
     maxRetries: 0, retryOn: 'Infra',
   }))
   const [envText, setEnvText] = useState('')
-  const [mounts, setMounts] = useState('')
+  const [mounts, setMounts] = useState<Mount[]>([])
 
   useEffect(() => {
     ListInstanceTypes().then(ts => {
@@ -28,10 +30,7 @@ export function JobCreateDialog({onClose, onCreated}: {
       if (ts.length) setF(prev => training.Form.createFrom({...prev, instanceType: ts[0].name}))
     }).catch(e => setError(errText(e)))
     TemplateNames().then(setTemplates).catch(() => {})
-    ListVolumes(false).then(vs => {
-      setVols(vs)
-      if (vs.length) setMounts(`${vs[0].name} /data`)
-    }).catch(() => {})
+    ListVolumes(false).then(setVols).catch(e => setError(errText(e)))
   }, [])
 
   const set = <K extends keyof training.Form>(k: K, v: training.Form[K]) =>
@@ -47,22 +46,27 @@ export function JobCreateDialog({onClose, onCreated}: {
           const nf = training.Form.createFrom({...t.form, name: f.name, template: name})
           setF(nf)
           setEnvText(envToLines(Object.fromEntries((nf.env || []).map(e => [e.name, e.value]))))
-          setMounts((nf.volumes || []).map(v => `${v.volume} ${v.mountPath}${v.subPath ? ':' + v.subPath : ''}`).join('\n'))
+          setMounts(nf.volumes || [])
         }
       }).catch(e => setError(errText(e))))
   }
 
+  // Mounts need the project's volumes to check against; without any mounts the
+  // form does not wait for them.
+  const mountsOK = mounts.length === 0 ||
+    (vols !== null && mountProblems(mounts, vols, f.workers).every(p => !p))
+
   const submit = (e: FormEvent) => {
     e.preventDefault()
+    if (!mountsOK) return
     setBusy(true)
     const form = training.Form.createFrom({
       ...f,
       env: Object.entries(linesToEnv(envText)).map(([name, value]) => ({name, value})),
-      volumes: mounts.split('\n').map(line => {
-        const [volume, path, sub] = line.trim().split(/\s+/)
-        if (!volume || !path) return null
-        return {volume, mountPath: path, subPath: sub || '', readOnly: false}
-      }).filter(Boolean),
+      volumes: mounts.map(m => ({
+        volume: m.volume.trim(), mountPath: m.mountPath.trim(), subPath: (m.subPath || '').trim(),
+        readOnly: !!m.readOnly,
+      })),
     })
     CreateJob(form).then(j => onCreated(j.name)).catch(e => {
       setError(errText(e))
@@ -74,7 +78,7 @@ export function JobCreateDialog({onClose, onCreated}: {
     <Dialog title="New job" subtitle="Rendered into a TrainJob of the project namespace"
             onClose={onClose} footer={<>
               <button className="btn" onClick={onClose}>Cancel</button>
-              <button type="submit" form="job-form" className="btn btn-primary" disabled={busy || !f.name || !f.image}>
+              <button type="submit" form="job-form" className="btn btn-primary" disabled={busy || !f.name || !f.image || !mountsOK}>
                 {busy ? 'Creating…' : 'Create job'}
               </button>
             </>}>
@@ -133,12 +137,9 @@ export function JobCreateDialog({onClose, onCreated}: {
                       onChange={e => setEnvText(e.target.value)} placeholder="KEY=value"/>
           </div>
           <div className="field">
-            <label htmlFor="j-vols">Volume mounts</label>
-            <textarea id="j-vols" className="textarea" rows={2} value={mounts}
-                      autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                      onChange={e => setMounts(e.target.value)}
-                      placeholder={'volume /data [subpath] — one per line'}/>
-            <span className="hint">Volumes: {vols.map(v => v.name).join(', ') || 'none in this project'}</span>
+            <label>Volume mounts</label>
+            <VolumeMountsField mounts={mounts} onChange={setMounts} vols={vols} workers={f.workers}/>
+            <span className="hint">Every worker mounts the volumes at the paths you set.</span>
           </div>
           <div className="row">
             <div className="field">

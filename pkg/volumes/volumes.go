@@ -36,6 +36,9 @@ var (
 	// ErrPastExpiry is returned when a purge time is not in the future: the
 	// volume would be purged at the next reconcile.
 	ErrPastExpiry = errors.New("purge time must be in the future")
+	// ErrNotShared is returned when a workload on several nodes mounts a
+	// volume that only one node can attach.
+	ErrNotShared = errors.New("volume is not shared between nodes")
 )
 
 var nameRE = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
@@ -180,6 +183,40 @@ func (c *Client) get(ctx context.Context, name string) (*corev1.PersistentVolume
 		return nil, err
 	}
 	return pvc, nil
+}
+
+// Mountable checks that a workload can mount the named volumes: each must be a
+// live volume that is bound (or being resized). A workload on several nodes
+// needs ReadWriteMany volumes, since a ReadWriteOnce volume attaches to one
+// node. Trashed volumes are refused: they are about to be purged.
+func (c *Client) Mountable(ctx context.Context, names []string, nodes int32) error {
+	for _, name := range names {
+		pvc, err := c.get(ctx, name)
+		if err != nil {
+			if errors.Is(err, ErrNotFound) {
+				return fmt.Errorf("%w: %s is not a volume of this project", ErrNotFound, name)
+			}
+			return err
+		}
+		if InTrash(pvc) {
+			return fmt.Errorf("%w: %s", ErrInTrash, name)
+		}
+		if !pvc.DeletionTimestamp.IsZero() {
+			return fmt.Errorf("volume %s is being deleted", name)
+		}
+		switch pvc.Status.Phase {
+		case corev1.ClaimBound:
+		case corev1.ClaimPending:
+			return fmt.Errorf("%w: %s is still being provisioned", ErrNotReady, name)
+		default:
+			return fmt.Errorf("volume %s is %s and cannot be mounted", name, pvc.Status.Phase)
+		}
+		if nodes > 1 && !slices.Contains(pvc.Spec.AccessModes, corev1.ReadWriteMany) {
+			return fmt.Errorf("%w: %s is ReadWriteOnce; a job with several workers needs a shared volume",
+				ErrNotShared, name)
+		}
+	}
+	return nil
 }
 
 // Users maps PVC names to the active pods mounting them.

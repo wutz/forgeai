@@ -344,6 +344,13 @@ func (a *App) renderTrainJob(ctx context.Context, c *Connection, f training.Form
 			registrySecret = naming.RegistrySecretName
 		}
 	}
+	names := make([]string, 0, len(f.Volumes))
+	for _, m := range f.Volumes {
+		names = append(names, m.Volume)
+	}
+	if err := volumesClient(c).Mountable(ctx, names, f.Workers); err != nil {
+		return nil, err
+	}
 	return training.TrainJob(&f, training.Context{
 		Namespace: c.namespace(), InstanceType: it, Config: cfg, RegistrySecret: registrySecret,
 	})

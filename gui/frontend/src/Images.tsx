@@ -68,7 +68,6 @@ export function Images() {
 
       {reg?.enabled && login && (
         <Card title="Push an image" subtitle="Log in with the project robot account"
-              className="card-spaced"
               actions={<button className="btn btn-sm" onClick={() => copy(login, 'login')}>
                 <Icon name={copied === 'login' ? 'check' : 'copy'} size={13}/>
                 {copied === 'login' ? 'Copied' : 'Copy login'}
@@ -88,7 +87,7 @@ export function Images() {
         </Card>
       )}
 
-      <Card title="Repositories"
+      <Card title="Repositories" className="card-spaced"
             subtitle={repos.length ? `${repos.length} repositories · ${totalTags} tags · ${totalPulls} pulls` : undefined}>
         {repos.length === 0 && reg?.enabled && (
           <Empty icon="image" title="No images pushed yet">

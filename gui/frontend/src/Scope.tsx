@@ -62,7 +62,8 @@ function NamespaceInput({value, disabled, onCommit}: {
 
   return (
     <input id="scope-project" className="input mono" value={draft} disabled={disabled}
-           placeholder="Context default, e.g. forge-myteam" spellCheck={false}
+           autoCapitalize="none" autoCorrect="off" spellCheck={false}
+           placeholder="Context default, e.g. forge-myteam"
            onChange={e => setDraft(e.target.value)} onBlur={commit}
            onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}/>
   )

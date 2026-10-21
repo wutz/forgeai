@@ -3,7 +3,7 @@ import {
   DeleteProject, GetProject, ListProjects, MemberKubeconfig, SaveProject,
 } from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
-import {errText, fmtDate} from './util'
+import {errText, fmtDate, generateName} from './util'
 import {Badge, Card, Dialog, Empty, Icon, PageHeader, useConfirm} from './ui'
 
 // Admin manages Projects: quota (GPU classes, storage), network isolation,
@@ -126,7 +126,7 @@ function parseGPUs(text: string): Record<string, number> {
 function ProjectDialog({form, onClose, onSaved}: {
   form: app.Project, onClose: () => void, onSaved: () => void
 }) {
-  const [p, setP] = useState(app.Project.createFrom({...form}))
+  const [p, setP] = useState(() => app.Project.createFrom({...form, name: form.name || generateName('project')}))
   // gpuText is the draft of the GPU field; it is parsed on save.
   const [gpuText, setGpuText] = useState(() => gpuLines(form.quota?.gpus))
   const [error, setError] = useState('')
@@ -184,17 +184,20 @@ function ProjectDialog({form, onClose, onSaved}: {
           <div className="field">
             <label htmlFor="p-name">Name</label>
             <input id="p-name" className="input mono" disabled={!create} value={p.name}
+                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('name', e.target.value)} required/>
           </div>
           <div className="field">
             <label htmlFor="p-display">Display name</label>
             <input id="p-display" className="input" value={p.displayName || ''}
+                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('displayName', e.target.value)}/>
           </div>
         </div>
         <div className="field">
           <label htmlFor="p-gpus">GPU quota per class (class: count)</label>
           <input id="p-gpus" className="input mono" value={gpuText}
+                 autoCapitalize="none" autoCorrect="off" spellCheck={false}
                  onChange={e => setGpuText(e.target.value)}
                  placeholder="rtx-5090:8 a100:2"/>
           <span className="hint">Jobs over quota wait in the Kueue queue.</span>
@@ -203,6 +206,7 @@ function ProjectDialog({form, onClose, onSaved}: {
           <div className="field">
             <label htmlFor="p-storage">Storage</label>
             <input id="p-storage" className="input mono" value={p.quota?.storage || ''}
+                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('quota', app.ProjectQuota.createFrom({...p.quota, storage: e.target.value}))}
                    placeholder="1Ti"/>
             <span className="hint">Empty means no limit.</span>
@@ -210,6 +214,7 @@ function ProjectDialog({form, onClose, onSaved}: {
           <div className="field">
             <label htmlFor="p-registry-storage">Registry storage</label>
             <input id="p-registry-storage" className="input mono" value={p.quota?.registryStorage || ''}
+                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('quota', app.ProjectQuota.createFrom({...p.quota, registryStorage: e.target.value}))}
                    placeholder="100Gi"/>
             <span className="hint">Empty means no limit.</span>
@@ -235,6 +240,7 @@ function ProjectDialog({form, onClose, onSaved}: {
           <div className="field">
             <label htmlFor="p-trash">Trash retention</label>
             <input id="p-trash" className="input mono" value={p.trashRetention || ''}
+                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('trashRetention', e.target.value)} placeholder="168h"/>
             <span className="hint">Go duration, for example 168h. Empty uses the platform default.</span>
           </div>
@@ -274,6 +280,7 @@ function ProjectDialog({form, onClose, onSaved}: {
           {(p.members || []).map((m, i) => (
             <div className="row" key={i}>
               <input className="input mono" value={m.name} placeholder="username"
+                     autoCapitalize="none" autoCorrect="off" spellCheck={false}
                      onChange={e => setMember(i, e.target.value, m.role)}/>
               <select className="select" value={m.role}
                       onChange={e => setMember(i, m.name, e.target.value)}>

@@ -4,7 +4,7 @@ import {
   TrashVolume, PurgeVolume, Config,
 } from '../wailsjs/go/app/App'
 import {app, volumes as vol} from '../wailsjs/go/models'
-import {fmtDate, errText} from './util'
+import {fmtDate, errText, generateName} from './util'
 import {Badge, Card, Dialog, Empty, Icon, Meter, PageHeader, useConfirm} from './ui'
 
 // Volumes manages shared filesystems: create, grow, trash (recycle bin),
@@ -144,7 +144,7 @@ export function Volumes() {
 function CreateVolumeDialog({config, onClose, onCreated}: {
   config: app.PlatformConfig, onClose: () => void, onCreated: () => void
 }) {
-  const [name, setName] = useState('')
+  const [name, setName] = useState(() => generateName('volume'))
   const [type, setType] = useState(Object.keys(config.storageTypes || {})[0] || 'shared')
   const [size, setSize] = useState(100)
   const [error, setError] = useState('')
@@ -174,6 +174,7 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
         <div className="field">
           <label htmlFor="v-name">Name</label>
           <input id="v-name" className="input mono" value={name} pattern="[a-z0-9]([a-z0-9\-]*[a-z0-9])?"
+                 autoCapitalize="none" autoCorrect="off" spellCheck={false}
                  maxLength={50} title="Lowercase letters, digits and dashes; up to 50 characters"
                  onChange={e => setName(e.target.value)} required/>
         </div>

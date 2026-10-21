@@ -1,7 +1,7 @@
 import {FormEvent, useEffect, useState} from 'react'
 import {CreateJob, ListInstanceTypes, TemplateNames, ListVolumes} from '../wailsjs/go/app/App'
 import {app, training, volumes} from '../wailsjs/go/models'
-import {envToLines, linesToEnv, errText} from './util'
+import {envToLines, linesToEnv, errText, generateName} from './util'
 import {Dialog} from './ui'
 
 // JobCreateDialog is the "New job" form: template prefill, instance type,
@@ -15,7 +15,7 @@ export function JobCreateDialog({onClose, onCreated}: {
   const [templates, setTemplates] = useState<string[]>([])
   const [vols, setVols] = useState<volumes.Volume[]>([])
   const [f, setF] = useState(training.Form.createFrom({
-    name: '', image: '', command: '', workers: 1,
+    name: generateName('job'), image: '', command: '', workers: 1,
     instanceType: '', env: [], volumes: [],
     maxRetries: 0, retryOn: 'Infra',
   }))
@@ -83,6 +83,7 @@ export function JobCreateDialog({onClose, onCreated}: {
           <div className="field">
             <label htmlFor="j-name">Name</label>
             <input id="j-name" className="input mono" value={f.name}
+                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('name', e.target.value)}
                    placeholder="lowercase-with-dashes" required/>
             <span className="hint">DNS label; retries are named name-r1, name-r2…</span>
@@ -114,23 +115,27 @@ export function JobCreateDialog({onClose, onCreated}: {
           <div className="field">
             <label htmlFor="j-image">Image</label>
             <input id="j-image" className="input mono" value={f.image}
+                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('image', e.target.value)}
                    placeholder="cr.example.com:7443/forge-myproj/train:latest" required/>
           </div>
           <div className="field">
             <label htmlFor="j-command">Command (bash)</label>
             <textarea id="j-command" className="textarea" rows={4} value={f.command}
+                      autoCapitalize="none" autoCorrect="off" spellCheck={false}
                       onChange={e => set('command', e.target.value)}
                       placeholder="python train.py --epochs 100"/>
           </div>
           <div className="field">
             <label htmlFor="j-env">Environment</label>
             <textarea id="j-env" className="textarea" rows={3} value={envText}
+                      autoCapitalize="none" autoCorrect="off" spellCheck={false}
                       onChange={e => setEnvText(e.target.value)} placeholder="KEY=value"/>
           </div>
           <div className="field">
             <label htmlFor="j-vols">Volume mounts</label>
             <textarea id="j-vols" className="textarea" rows={2} value={mounts}
+                      autoCapitalize="none" autoCorrect="off" spellCheck={false}
                       onChange={e => setMounts(e.target.value)}
                       placeholder={'volume /data [subpath] — one per line'}/>
             <span className="hint">Volumes: {vols.map(v => v.name).join(', ') || 'none in this project'}</span>

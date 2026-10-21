@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {ListInstanceTypes, ListJobs, ListVolumes, ListImages, Quota} from '../wailsjs/go/app/App'
 import {app, volumes} from '../wailsjs/go/models'
-import {Card, Icon, MetricTile, Meter, PageHeader, Spinner} from './ui'
+import {Card, Icon, MetricTile, Meter, PageHeader, RefreshButton, Spinner} from './ui'
 import {Status, errText, fmtDate, pct, toGiB} from './util'
 
 // Overview is the landing view of a project: what is running now, the GPU
@@ -16,21 +16,22 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
   const [error, setError] = useState('')
   const [loaded, setLoaded] = useState(false)
 
-  const refresh = () => {
-    Promise.allSettled([
-      ListJobs().then(setJobs),
-      ListInstanceTypes().then(setTypes),
-      ListVolumes(false).then(setVols),
-      Quota().then(setQuota),
-    ]).then(results => {
-      const failed = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined
-      setError(failed ? errText(failed.reason) : '')
-      setLoaded(true)
-    })
-  }
+  // refresh rejects when any list failed; the banner already shows why.
+  const refresh = () => Promise.allSettled([
+    ListJobs().then(setJobs),
+    ListInstanceTypes().then(setTypes),
+    ListVolumes(false).then(setVols),
+    Quota().then(setQuota),
+  ]).then(results => {
+    const failed = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined
+    setError(failed ? errText(failed.reason) : '')
+    setLoaded(true)
+    if (failed) throw failed.reason
+  })
   useEffect(() => {
-    refresh()
-    const t = setInterval(refresh, 8000)
+    const poll = () => refresh().catch(() => {})
+    poll()
+    const t = setInterval(poll, 8000)
     return () => clearInterval(t)
   }, [])
 
@@ -64,9 +65,7 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
     <div className="page">
       <PageHeader eyebrow="Workspace" title="Overview"
                   meta={<span className="muted" style={{fontSize: 12.5}}>live · every 8s</span>}
-                  actions={<button className="btn btn-sm btn-ghost" onClick={refresh}>
-                    <Icon name="refresh" size={14}/>Refresh
-                  </button>}/>
+                  actions={<RefreshButton onRefresh={refresh}/>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
 
       <div className="metrics">

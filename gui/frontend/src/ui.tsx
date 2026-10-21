@@ -2,7 +2,7 @@
 // segmented filters, tabs, badges, empty state and dialogs. Everything here
 // renders from tokens in style.css (gui/DESIGN.md).
 
-import {ReactNode, createContext, useContext, useState} from 'react'
+import {ReactNode, createContext, useContext, useEffect, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 
 // HeaderSlot is the node in the app header that PageHeader renders into, so
@@ -192,6 +192,51 @@ export function Spinner({label}: {label?: string}) {
       <span className="spinner" aria-hidden/>
       {label && <span>{label}</span>}
     </div>
+  )
+}
+
+// RefreshButton reloads a view on click and shows what it is doing: disabled
+// with a spinner while the reload is in flight, then "Refreshed" or "Failed"
+// for a moment before it goes back to idle. onRefresh must return a promise
+// that rejects when the reload fails; the view shows the error itself.
+export function RefreshButton({label = 'Refresh', onRefresh}: {
+  label?: 'Refresh' | 'Reload', onRefresh: () => Promise<unknown>
+}) {
+  const [state, setState] = useState<'idle' | 'busy' | 'done' | 'failed'>('idle')
+  const timer = useRef(0)
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+
+  const click = () => {
+    window.clearTimeout(timer.current)
+    setState('busy')
+    // new Promise turns a synchronous throw from onRefresh into a rejection.
+    new Promise(resolve => resolve(onRefresh()))
+      .then(() => 'done' as const, () => 'failed' as const)
+      .then(result => {
+        setState(result)
+        timer.current = window.setTimeout(() => setState('idle'), 1800)
+      })
+  }
+
+  const words = label === 'Reload'
+    ? {idle: 'Reload', busy: 'Reloading…', done: 'Reloaded'}
+    : {idle: 'Refresh', busy: 'Refreshing…', done: 'Refreshed'}
+  const shown = {
+    idle: {icon: 'refresh', text: words.idle},
+    busy: {icon: 'refresh', text: words.busy},
+    done: {icon: 'check', text: words.done},
+    failed: {icon: 'warning', text: 'Failed'},
+  } as const
+  const current = shown[state]
+
+  return (
+    <button className={`btn btn-sm btn-ghost ${state === 'failed' ? 'btn-failed' : ''}`}
+            disabled={state === 'busy'} onClick={click} aria-live="polite">
+      {state === 'busy'
+        ? <span className="spinner" aria-hidden/>
+        : <Icon name={current.icon} size={14}/>}
+      {current.text}
+    </button>
   )
 }
 

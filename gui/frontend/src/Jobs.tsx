@@ -4,7 +4,7 @@ import {app, training} from '../wailsjs/go/models'
 import {JobCreateDialog} from './JobCreateDialog'
 import {TemplateDialog} from './Templates'
 import {Status, envToLines, fmtDate, errText} from './util'
-import {Badge, Card, Empty, Icon, PageHeader, Segmented, Spinner, Tabs, useConfirm} from './ui'
+import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Segmented, Spinner, Tabs, useConfirm} from './ui'
 
 type Filter = 'all' | 'running' | 'queued' | 'stopped' | 'failed' | 'done'
 
@@ -197,13 +197,17 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
     RerunJob(job.name, '').then(j => onOpen(j.name)).catch(e => setError(errText(e))).finally(() => setPending(''))
   }
 
+  // viewLog rejects when the log cannot be read; the banner shows why.
   const viewLog = (worker: number, label: string) =>
     Logs(job.name, worker, 500).then(v => {
       setLog(v)
       setLogTitle(label)
       setLogWorker(worker)
       setTab('log')
-    }).catch(e => setError(errText(e)))
+    }, e => {
+      setError(errText(e))
+      throw e
+    })
 
   return (
     <Card className="detail">
@@ -222,7 +226,7 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
       }}/>}
 
       <div className="detail-actions">
-        <button className="btn btn-sm" onClick={() => viewLog(0, 'worker 0')}>
+        <button className="btn btn-sm" onClick={() => viewLog(0, 'worker 0').catch(() => {})}>
           <Icon name="scroll" size={13}/>Logs
         </button>
         {live && job.phase !== 'Stopped' &&
@@ -301,7 +305,7 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
                   <Status phase={w.phase || 'Pending'}/>
                   <span className="mono muted">{w.nodeName || '—'}</span>
                   <span className="muted trunc" title={w.message}>{w.message || ''}</span>
-                  <button className="btn btn-sm" onClick={() => viewLog(w.index, w.podName)}>Log</button>
+                  <button className="btn btn-sm" onClick={() => viewLog(w.index, w.podName).catch(() => {})}>Log</button>
                 </div>
               ))}
             </div>
@@ -317,9 +321,7 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
             <div className="log-bar">
               <span className="mono muted">{logTitle || 'worker 0'}</span>
               <span className="spacer"/>
-              <button className="btn btn-sm btn-ghost" onClick={() => viewLog(logWorker, logTitle || 'worker 0')}>
-                <Icon name="refresh" size={13}/>Reload
-              </button>
+              <RefreshButton label="Reload" onRefresh={() => viewLog(logWorker, logTitle || 'worker 0')}/>
             </div>
             <pre className="logs">{log || 'No output'}</pre>
           </>

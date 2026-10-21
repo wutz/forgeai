@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {ListInstanceTypes, Quota} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {errText, pct, toGiB} from './util'
-import {Badge, Card, Empty, Icon, Meter, MetricTile, PageHeader} from './ui'
+import {Badge, Card, Empty, Icon, Meter, MetricTile, PageHeader, RefreshButton} from './ui'
 
 // Resources shows the cluster GPU catalogue (instance types with free
 // counts) and the project's quota and its use.
@@ -11,13 +11,18 @@ export function Resources() {
   const [quota, setQuota] = useState<app.QuotaUsage | null>(null)
   const [error, setError] = useState('')
 
-  const load = () => {
-    ListInstanceTypes().then(ts => { setTypes(ts); setError('') }).catch(e => setError(errText(e)))
-    Quota().then(setQuota).catch(e => setError(errText(e)))
-  }
+  // load rejects when either list failed; the banner already shows why.
+  const load = () => Promise.all([
+    ListInstanceTypes().then(setTypes),
+    Quota().then(setQuota),
+  ]).then(() => setError(''), e => {
+    setError(errText(e))
+    throw e
+  })
   useEffect(() => {
-    load()
-    const t = setInterval(load, 10000)
+    const poll = () => load().catch(() => {})
+    poll()
+    const t = setInterval(poll, 10000)
     return () => clearInterval(t)
   }, [])
 
@@ -31,9 +36,7 @@ export function Resources() {
     <div className="page">
       <PageHeader eyebrow="Cluster" title="Resources"
                   meta={<span className="muted" style={{fontSize: 12.5}}>live · every 10s</span>}
-                  actions={<button className="btn btn-sm btn-ghost" onClick={load}>
-                    <Icon name="refresh" size={14}/>Refresh
-                  </button>}/>
+                  actions={<RefreshButton onRefresh={load}/>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
 
       <div className="metrics">

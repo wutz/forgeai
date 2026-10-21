@@ -17,14 +17,44 @@
   --shadow-pop: 0 2px 4px rgba(15, 23, 42, 0.04), 0 24px 48px -12px rgba(15, 23, 42, 0.22);
   --violet: #7c3aed;
   --violet-soft: #f3e8ff;
+  /* Surfaces and effects that differ by theme. */
+  --wash: #fafafa;
+  --scrim: rgba(15, 23, 42, 0.32);
+  --hover-wash: rgba(15, 23, 42, 0.05);
+  --scroll-thumb: #d4d4d8;
+  --scroll-thumb-hover: #a1a1aa;
+  --shadow-active: 0 1px 2px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(15, 23, 42, 0.04);
+  --shadow-seg: 0 1px 2px rgba(0, 0, 0, 0.08);
+  color-scheme: light;
+}
+
+/* Dark theme: the sidebar sits below the canvas and the cards above it, as in
+   light. Shadows are black here, since slate would vanish on dark. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --faint: #71717a;
+  --canvas: #111113;
+  --chrome: #0c0c0e;
+  --chrome-line: #1f1f23;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-pop: 0 2px 4px rgba(0, 0, 0, 0.3), 0 24px 48px -12px rgba(0, 0, 0, 0.7);
+  --violet: #a78bfa;
+  --violet-soft: rgba(167, 139, 250, 0.14);
+  --wash: #1f1f23;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --hover-wash: rgba(255, 255, 255, 0.06);
+  --scroll-thumb: #3f3f46;
+  --scroll-thumb-hover: #52525b;
+  --shadow-active: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --shadow-seg: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 /* Scrollbars */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb {
-  background: #d4d4d8; border-radius: 99px; border: 3px solid transparent; background-clip: content-box;
+  background: var(--scroll-thumb); border-radius: 99px; border: 3px solid transparent; background-clip: content-box;
 }
-::-webkit-scrollbar-thumb:hover { background: #a1a1aa; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); background-clip: content-box; }
 ::-webkit-scrollbar-track { background: transparent; }
 a { color: inherit; text-decoration: none; }
 .icon { display: block; flex-shrink: 0; }
@@ -54,6 +84,38 @@ a { color: inherit; text-decoration: none; }
 .platform-darwin .header.header-shell { padding-left: 0; }
 .platform-darwin .header-side { padding-left: 84px; }
 .header-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 16px; padding: 0 20px 0 24px; }
+/* Theme and language menus at the foot of the sidebar: pushed to the bottom
+   by the auto top margin, one row of compact buttons. Each popover opens
+   upward, over the nav. */
+.sidebar-prefs {
+  margin-top: auto; padding-top: 12px; border-top: 1px solid var(--chrome-line);
+  display: flex; align-items: center; gap: 6px;
+}
+.pref-menu { position: relative; }
+.pref-trigger {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px;
+  border: 1px solid var(--hairline); border-radius: 7px; background: var(--surface);
+  color: var(--body); font-size: 12.5px; font-weight: 500; cursor: pointer;
+}
+.pref-trigger:hover { color: var(--ink); }
+.pref-trigger[aria-expanded='true'] { border-color: var(--accent-line); color: var(--ink); }
+.pref-caret { display: inline-flex; color: var(--faint); transform: rotate(90deg); }
+.pref-popover {
+  position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 20; min-width: 148px;
+  padding: 4px; display: flex; flex-direction: column; gap: 2px;
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: 9px;
+  box-shadow: var(--shadow-pop);
+}
+.pref-item {
+  display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px;
+  border: none; border-radius: 6px; background: none; color: var(--body);
+  font-size: 12.5px; text-align: left; cursor: pointer;
+}
+.pref-item:hover { background: var(--hover-wash); color: var(--ink); }
+.pref-item.active { color: var(--ink); }
+.pref-item .icon { color: var(--mute); }
+.pref-item.active .icon { color: var(--accent); }
+.pref-check { display: inline-flex; margin-left: auto; color: var(--accent); }
 /* Collapsed: the sidebar is gone, so the toggle moves to the left edge after
    the traffic lights and the header is one flat surface. */
 .app.sidebar-collapsed { --sidebar-w: 0px; }
@@ -86,12 +148,12 @@ a { color: inherit; text-decoration: none; }
 /* The active row is a white chip lifted off the chrome; ink label, accent icon. */
 .sidebar .nav-item.active {
   background: var(--surface); color: var(--ink);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(15, 23, 42, 0.04);
+  box-shadow: var(--shadow-active);
 }
 /* On the darker chrome the default light hover wash would read as a lift;
    hover steps down instead, so only the active row is lighter. */
-.sidebar .nav-item:not(.active):hover { background: rgba(15, 23, 42, 0.05); }
-.header .icon-btn:hover { background: rgba(15, 23, 42, 0.06); color: var(--ink); }
+.sidebar .nav-item:not(.active):hover { background: var(--hover-wash); }
+.header .icon-btn:hover { background: var(--hover-wash); color: var(--ink); }
 /* Scope: the cluster and project pickers at the top of the sidebar, one compact
    row each: a small mono label beside a 28px select. */
 .scope {
@@ -254,7 +316,7 @@ a { color: inherit; text-decoration: none; }
   font-size: 12.5px; font-weight: 500; color: var(--body);
 }
 .segment:hover { color: var(--ink); }
-.segment.active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+.segment.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-seg); }
 .segment-count { font-size: 11px; color: var(--mute); font-variant-numeric: tabular-nums; }
 .segment.active .segment-count { color: var(--accent-deep); }
 
@@ -285,9 +347,9 @@ a { color: inherit; text-decoration: none; }
   letter-spacing: 0.03em; text-transform: uppercase;
 }
 .table td { padding: 11px 16px; font-size: 13px; }
-.table tbody tr:hover { background: #fafafa; }
+.table tbody tr:hover { background: var(--wash); }
 .table tbody tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
-.table tbody tr.selected:hover { background: #e0e7ff; }
+.table tbody tr.selected:hover { background: var(--accent-tint); }
 .mono { font-size: 12.5px; }
 .cell-main { display: block; color: var(--ink); }
 .cell-sub { display: block; margin-top: 2px; font-size: 11.5px; line-height: 16px; color: var(--mute); }
@@ -359,7 +421,7 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
   font-size: 12.5px; color: var(--ink); cursor: pointer; min-width: 0;
 }
 .mini-row:last-child { border-bottom: none; }
-.mini-row:hover { background: #fafafa; }
+.mini-row:hover { background: var(--wash); }
 .mini-row .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mini-row > span:nth-child(3) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mini-row .icon { color: var(--faint); }
@@ -382,7 +444,7 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* Dialog */
-.overlay { background: rgba(15, 23, 42, 0.32); padding: 24px; backdrop-filter: blur(4px); }
+.overlay { background: var(--scrim); padding: 24px; backdrop-filter: blur(4px); }
 .dialog {
   width: 620px; max-height: 88vh; display: flex; flex-direction: column;
   border-radius: var(--radius-lg); box-shadow: var(--shadow-pop); overflow: hidden;
@@ -395,7 +457,7 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
 .dialog-sub { margin-top: 2px; font-size: 12px; color: var(--mute); }
 .dialog-head .icon-btn { margin-left: auto; margin-top: -2px; }
 .dialog-body { padding: 18px; overflow: auto; display: flex; flex-direction: column; gap: 14px; }
-.dialog-foot { padding: 12px 18px; background: #fafafa; }
+.dialog-foot { padding: 12px 18px; background: var(--wash); }
 .dialog form, .dialog .dialog-form { display: flex; flex-direction: column; gap: 14px; }
 
 /* Files iframe */
@@ -453,5 +515,5 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
 }
 
 /* Robot password on the Images push card: hidden until the user asks. */
-.robot-password { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--line, #eaeaea); font-size: 13px; }
+.robot-password { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--hairline); font-size: 13px; }
 .robot-password code { font-size: 12.5px; letter-spacing: 0.04em; }

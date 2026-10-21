@@ -11,6 +11,12 @@
 #   hack/gui-dev.sh [wails dev flags]
 set -euo pipefail
 
+# A go.work in the main checkout (untracked, `use . ./gui`) is picked up from
+# worktrees nested under .claude/worktrees and breaks wails' binding generation
+# ("main module does not contain package ..."). The GUI is a single module, so
+# the workspace is never needed here.
+export GOWORK=off
+
 root="$(cd "$(dirname "$0")/.." && pwd)"
 bin="$root/gui/build/bin"
 app="$bin/forgeai.app"

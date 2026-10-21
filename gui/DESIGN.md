@@ -39,6 +39,16 @@ colors:
   accent-deep: "#4338ca"
   accent-soft: "#eef2ff"
   accent-ring: "rgba(79, 70, 229, 0.18)"
+  accent-line: "rgba(79, 70, 229, 0.28)"
+  accent-tint: "#e0e7ff"
+  accent-tint-hover: "#d4dcfe"
+  accent-tint-press: "#c7d2fe"
+  app-danger: "#dc2626"
+  app-danger-deep: "#991b1b"
+  app-danger-soft: "#fee2e2"
+  app-danger-wash: "#fef2f2"
+  app-danger-press: "#fecaca"
+  app-danger-line: "rgba(220, 38, 38, 0.28)"
   accent-gradient-start: "#6366f1"
   accent-gradient-end: "#7c3aed"
   success: "#059669"
@@ -176,16 +186,64 @@ components:
     typography: "{typography.button-md}"
     rounded: "{rounded.sm}"
     padding: "0px 6px"
-  # forgeai app components (Forge Indigo accent)
+  # forgeai app buttons: one system with four roles (see "Buttons" under forgeai Theme)
+  button-default-sm:
+    backgroundColor: "{colors.canvas-elevated}"
+    textColor: "{colors.ink}"
+    borderColor: "{colors.hairline}"
+    typography: "{typography.button-md}"
+    rounded: "{rounded.sm}"
+    padding: "0px 6px"
+  button-default-sm-hover:
+    backgroundColor: "{colors.hairline-soft}"
+  button-create-sm:
+    backgroundColor: "{colors.accent-tint}"
+    textColor: "{colors.accent-deep}"
+    borderColor: "{colors.accent-line}"
+    typography: "{typography.button-md}"
+    rounded: "{rounded.sm}"
+    padding: "0px 6px"
+  button-create-sm-hover:
+    backgroundColor: "{colors.accent-tint-hover}"
+  button-create-sm-press:
+    backgroundColor: "{colors.accent-tint-press}"
   button-accent-sm:
-    backgroundColor: "linear-gradient(135deg, {colors.accent-gradient-start}, {colors.accent-gradient-end})"
-    textColor: "{colors.on-primary}"
+    backgroundColor: "{colors.canvas-elevated}"
+    textColor: "{colors.accent-deep}"
+    borderColor: "{colors.accent-line}"
     typography: "{typography.button-md}"
     rounded: "{rounded.sm}"
     padding: "0px 6px"
   button-accent-sm-hover:
-    backgroundColor: "{colors.accent-deep}"
-    textColor: "{colors.on-primary}"
+    backgroundColor: "{colors.accent-soft}"
+  button-accent-sm-press:
+    backgroundColor: "{colors.accent-tint}"
+  button-danger-sm:
+    backgroundColor: "{colors.canvas-elevated}"
+    textColor: "{colors.app-danger}"
+    borderColor: "{colors.hairline}"
+    typography: "{typography.button-md}"
+    rounded: "{rounded.sm}"
+    padding: "0px 6px"
+  button-danger-sm-hover:
+    backgroundColor: "{colors.app-danger-wash}"
+    textColor: "{colors.app-danger-deep}"
+    borderColor: "{colors.app-danger-line}"
+  button-danger-tint-sm:
+    backgroundColor: "{colors.app-danger-wash}"
+    textColor: "{colors.app-danger-deep}"
+    borderColor: "{colors.app-danger-line}"
+    typography: "{typography.button-md}"
+    rounded: "{rounded.sm}"
+    padding: "0px 6px"
+  button-danger-tint-sm-hover:
+    backgroundColor: "{colors.app-danger-soft}"
+  button-danger-tint-sm-press:
+    backgroundColor: "{colors.app-danger-press}"
+  button-disabled:
+    backgroundColor: "{colors.hairline-soft}"
+    textColor: "{colors.faint}"
+    borderColor: "{colors.hairline-soft}"
   nav-item-active:
     backgroundColor: "{colors.canvas-elevated}"
     textColor: "{colors.app-ink}"
@@ -272,11 +330,20 @@ components:
 
 forgeai is a desktop console for AI training, RL and inference jobs on Kubernetes. It follows the Geist system below as an **app surface** (not marketing): 6px square buttons (`{components.button-accent-sm}` / `{components.button-ghost-sm}`), hairline cards and tables, no hero mesh gradient.
 
-- **Theme color — Forge Indigo** (`{colors.accent}` #4f46e5): a cool, electric indigo in the register of current AI and developer tools, chosen over the earlier Forge Ember orange so the console reads calm and technical next to dense cluster data. It is 6.3:1 on white, so white labels on it pass WCAG AA. Used for the accent action (`{components.button-accent-sm}`, e.g. "Start", filled with the `{colors.accent-gradient-start}` → `{colors.accent-gradient-end}` indigo→violet gradient plus a 1px inner highlight), the active nav icon, tab underlines, meters, focus rings and input focus (`{components.input-focus}`, with a translucent `{colors.accent-ring}` 3px ring) and the logo tile. Press tone `{colors.accent-deep}` (#4338ca), wash `{colors.accent-soft}` (#eef2ff) for selected rows, which also carry a 2px accent bar on their left edge (`{components.table-row-selected}`). `{colors.link}` is the accent too.
+- **Theme color — Forge Indigo** (`{colors.accent}` #4f46e5): a cool, electric indigo in the register of current AI and developer tools, chosen over the earlier Forge Ember orange so the console reads calm and technical next to dense cluster data. It is used for the primary create and submit action, the active nav icon, tab underlines, meters, focus rings and input focus (`{components.input-focus}`, with a translucent `{colors.accent-ring}` 3px ring) and the logo tile. `{colors.link}` is the accent too. Accent text uses `{colors.accent-deep}` (#4338ca). The `{colors.accent-soft}` (#eef2ff) wash also marks selected rows, which carry a 2px accent bar on their left edge (`{components.table-row-selected}`). The indigo→violet gradient (`{colors.accent-gradient-start}` → `{colors.accent-gradient-end}`) is kept for the logo tile only.
+- **Buttons** — one system with four roles, all 6px square (`{components.button-default-sm}`, `{components.button-create-sm}`, `{components.button-accent-sm}`, `{components.button-danger-sm}`, `{components.button-danger-tint-sm}`). Fills stay light; ink and hairline carry the page.
+  - *Default*: white, hairline edge, ink label. Every neutral action (Logs, Edit, Cancel, Save as template). Hover `{colors.hairline-soft}`.
+  - *Primary*: the view's create or submit action (Create sandbox, Create job, Save, dialog submit). Indigo tint `{colors.accent-tint}`, `{colors.accent-deep}` label (6.4:1 at rest, 5.8:1 on hover, 5.3:1 pressed), `{colors.accent-line}` edge. Hover `{colors.accent-tint-hover}`, press `{colors.accent-tint-press}`. A solid indigo fill was tried and read as too heavy on every page.
+  - *Accent*: Start and Resume, the state-changing action on a detail view. White with an indigo edge and `{colors.accent-deep}` label (7.9:1). Hover `{colors.accent-soft}`, press `{colors.accent-tint}`. It is one step quieter than Primary, so each view has one strong action.
+  - *Danger*: destructive actions inside a row or view (Delete, Purge now). White with a `{colors.app-danger}` label (4.8:1), hover `{colors.app-danger-wash}` with a `{colors.app-danger-deep}` label (7.6:1) and a `{colors.app-danger-line}` edge.
+  - *Danger tint*: the confirm button of a destructive dialog only. `{colors.app-danger-wash}` at rest, `{colors.app-danger-soft}` on hover, `{colors.app-danger-press}` pressed, `{colors.app-danger-deep}` label (7.6:1 at rest, 6.8:1 on hover, 5.7:1 pressed).
+  - *Ghost*: no edge, body label, for toolbar and card links.
+  - *Disabled*: one grey for every role (`{components.button-disabled}`), not reduced opacity, so a pending "Starting…" reads as a grey button with an accent spinner.
+  - Focus: the 2px `{colors.accent}` outline on keyboard focus, offset 2px.
 - **Neutrals**: the console uses the zinc ladder (`{colors.app-ink}` #18181b, `{colors.app-body}` #52525b, `{colors.app-mute}` #71717a, `{colors.app-hairline}` #e4e4e7) in place of Geist's neutral greys. The faint blue cast sits with indigo, and mute at #71717a is 4.8:1 on white (Geist's #8f8f8f is 3.3:1). Shadows and the dialog backdrop are tinted with slate (`rgba(15, 23, 42, …)`), not pure black.
 - **Status colors**: Running `{colors.success}` (#16a34a); Queued / Pending / Restarting / Stopping `{colors.warning}`; Failed `{colors.error}` (text and dot); Succeeded / Stopped / Idle `{colors.mute}`. Status is always text + dot, never color alone.
-- **CSS**: `gui/frontend/src/style.css` mirrors these tokens as custom properties (`--accent`, `--accent-deep`, `--accent-soft`, `--accent-ring`, `--accent-gradient`, `--success`, ...); change both together.
-- Ink (`{colors.ink}`) remains the default for headings and secondary buttons; the accent is used sparingly (one accent action per view).
+- **CSS**: `gui/frontend/src/style.css` mirrors these tokens as custom properties (`--accent`, `--accent-deep`, `--accent-soft`, `--accent-ring`, `--accent-line`, `--accent-tint`, `--accent-tint-hover`, `--accent-tint-press`, `--error-deep`, `--error-wash`, `--error-soft`, `--error-press`, `--error-line` (the `app-danger*` keys above), `--accent-gradient`, `--success`, ...); change both together.
+- Ink (`{colors.ink}`) carries headings, body text and the default buttons. Colour is limited to the Primary, Accent and Danger roles above; no other accent fills.
 - **Logo**: a white anvil with a four-point spark on a rounded tile (radius ≈ 22% of the side) filled with the 135° indigo→violet accent gradient. `build/appicon.png` is the 32-unit mark drawn at 824px with 100px of transparent padding on a 1024 canvas; `icon.ico` holds 16–256px PNGs of the same render. `gui/frontend/src/Logo.tsx` holds the SVG paths, reused by `frontend/public/favicon.svg`, `build/appicon.png` and `build/windows/icon.ico`; change all of them together. The mark is not rendered inside the app any more (the connect card that showed it at 40px is gone), so `Logo.tsx` is kept as the brand source only.
 - **Window chrome**: the macOS title bar is hidden (inset traffic lights); the app header is the drag region. The header and sidebar share the canvas color, so the window reads as one continuous grey frame; cards are the only white sheets. The sidebar keeps a hairline on its right.
 

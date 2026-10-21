@@ -131,21 +131,45 @@ a { color: inherit; text-decoration: none; }
 .page-head.in-header .page-title { font-size: 15px; line-height: 22px; letter-spacing: -0.3px; }
 .page-head.in-header .page-head-actions { margin-left: auto; }
 
-/* Controls */
+/* Controls
+   One button system with a few roles. Fills stay light and the page reads as
+   ink on hairline; colour appears on the one action that matters.
+   default      white, hairline edge, ink label: every neutral action
+   primary      indigo tint: the view's create or submit action
+   accent       white with an indigo edge: Start, Resume (state changes, not the main action)
+   danger       white with a red label: destructive actions inside a row or view
+   danger-tint  red tint: the confirm button of a destructive dialog
+   ghost        no edge: toolbar and card links
+   Disabled is one grey for every role. Pressed states are per role, so they
+   override the generic press wash below. */
 .btn { height: 32px; padding: 0 12px; border-radius: 8px; font-size: 13px; letter-spacing: -0.1px; box-shadow: var(--shadow-1); }
 .btn:active:not(:disabled) { background: var(--hairline); }
-.btn-primary { background: var(--ink); border-color: var(--ink); color: #fff; }
-.btn-primary:hover:not(:disabled) { background: #09090b; border-color: #09090b; }
-.btn-accent {
-  background: var(--accent-gradient); border-color: var(--accent-deep); color: #fff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 1px 2px rgba(79, 70, 229, 0.3);
-}
-.btn-accent:hover:not(:disabled) { background: var(--accent-deep); border-color: var(--accent-deep); }
-.btn-danger:hover:not(:disabled) { background: var(--error-soft); }
+
+.btn-primary { background: var(--accent-tint); border-color: var(--accent-line); color: var(--accent-deep); }
+.btn-primary:hover:not(:disabled) { background: var(--accent-tint-hover); }
+.btn-primary:active:not(:disabled) { background: var(--accent-tint-press); }
+
+.btn-accent { background: var(--surface); border-color: var(--accent-line); color: var(--accent-deep); }
+.btn-accent:hover:not(:disabled) { background: var(--accent-soft); }
+.btn-accent:active:not(:disabled) { background: var(--accent-tint); }
+
+.btn-danger { color: var(--error); }
+.btn-danger:hover:not(:disabled) { background: var(--error-wash); border-color: var(--error-line); color: var(--error-deep); }
+.btn-danger:active:not(:disabled) { background: var(--error-soft); }
+
+.btn-danger-tint { background: var(--error-wash); border-color: var(--error-line); color: var(--error-deep); }
+.btn-danger-tint:hover:not(:disabled) { background: var(--error-soft); }
+.btn-danger-tint:active:not(:disabled) { background: var(--error-press); }
+
 .btn-sm { height: 28px; padding: 0 9px; font-size: 12.5px; border-radius: 7px; }
 .btn .spinner { width: 12px; height: 12px; border-width: 1.5px; }
 .btn-ghost { border-color: transparent; background: transparent; box-shadow: none; color: var(--body); }
 .btn-ghost:hover:not(:disabled) { background: var(--hairline-soft); color: var(--ink); }
+.btn:disabled {
+  background: var(--hairline-soft); border-color: var(--hairline-soft); color: var(--faint);
+  box-shadow: none; cursor: not-allowed;
+}
+.btn-ghost:disabled { background: none; border-color: transparent; }
 .icon-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; border-radius: 7px; border: none; background: none;

@@ -20,7 +20,19 @@
   --accent-deep: #4338ca;
   --accent-soft: #eef2ff;
   --accent-ring: rgba(79, 70, 229, 0.18);
-  /* Indigo → violet, for the logo tile and the accent button. */
+  /* Button tints: the indigo primary tint and its hover and press steps, and the
+     hairline edge that outlines the accent and tint buttons. */
+  --accent-line: rgba(79, 70, 229, 0.28);
+  --accent-tint: #e0e7ff;
+  --accent-tint-hover: #d4dcfe;
+  --accent-tint-press: #c7d2fe;
+  /* Danger: the red label is --error on white; the tint and its steps use the
+     deeper label so text stays at 5:1 or better. */
+  --error-deep: #991b1b;
+  --error-line: rgba(220, 38, 38, 0.28);
+  --error-wash: #fef2f2;
+  --error-press: #fecaca;
+  /* Indigo → violet, for the logo tile. */
   --accent-gradient: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -75,10 +87,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-weight: 500; font-size: 14px; cursor: pointer; white-space: nowrap;
 }
 .btn:hover:not(:disabled) { background: var(--hairline-soft); }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn-primary:hover:not(:disabled) { background: var(--accent-deep); border-color: var(--accent-deep); }
-.btn-danger { color: var(--error); }
 .btn-sm { height: 28px; padding: 0 8px; font-size: 13px; }
 
 .input, .select, .textarea {

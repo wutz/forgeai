@@ -4,9 +4,26 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
 )
+
+// The admin list shows Ready only once the controller reports the Ready condition.
+func TestToProjectReadyFollowsCondition(t *testing.T) {
+	p := &v1.Project{}
+	if toProject(p).Ready {
+		t.Error("Ready = true without a Ready condition")
+	}
+	p.Status.Conditions = []metav1.Condition{{Type: v1.ConditionReady, Status: metav1.ConditionFalse, Reason: "ReconcileError"}}
+	if toProject(p).Ready {
+		t.Error("Ready = true with Ready=False")
+	}
+	p.Status.Conditions[0].Status = metav1.ConditionTrue
+	if !toProject(p).Ready {
+		t.Error("Ready = false with Ready=True")
+	}
+}
 
 // Clearing a limit in the form must clear it on the Project, so the platform
 // default applies again instead of the old value silently staying in place.

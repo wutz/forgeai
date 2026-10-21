@@ -6,6 +6,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -237,9 +238,10 @@ func toProject(p *v1.Project) Project {
 			Isolation: string(p.Spec.Network.Isolation), DenyInternet: p.Spec.Network.DenyInternet,
 		},
 		DeletionPolicy: string(p.Spec.DeletionPolicy),
-		Ready:          false, Registry: p.Status.Registry.URL,
-		Created: p.CreationTimestamp.UTC().Format(time.RFC3339),
-		Quota:   ProjectQuota{GPUs: map[string]int32{}},
+		Ready:          meta.IsStatusConditionTrue(p.Status.Conditions, v1.ConditionReady),
+		Registry:       p.Status.Registry.URL,
+		Created:        p.CreationTimestamp.UTC().Format(time.RFC3339),
+		Quota:          ProjectQuota{GPUs: map[string]int32{}},
 	}
 	for _, g := range p.Spec.Quota.GPUs {
 		out.Quota.GPUs[g.Class] = g.Count

@@ -4,6 +4,7 @@
 
 import {ReactNode, createContext, useContext, useEffect, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
+import {t} from './i18n'
 
 // HeaderSlot is the node in the app header that PageHeader renders into, so
 // every view shows its title and actions in the top bar instead of repeating
@@ -158,11 +159,11 @@ export function Tabs<T extends string>({tabs, value, onChange}: {
 }) {
   return (
     <div className="tabs" role="tablist">
-      {tabs.map(t => (
-        <button key={t.value} role="tab" aria-selected={value === t.value}
-                className={`tab ${value === t.value ? 'active' : ''}`}
-                onClick={() => onChange(t.value)}>
-          {t.icon && <Icon name={t.icon} size={14}/>}{t.label}
+      {tabs.map(tab => (
+        <button key={tab.value} role="tab" aria-selected={value === tab.value}
+                className={`tab ${value === tab.value ? 'active' : ''}`}
+                onClick={() => onChange(tab.value)}>
+          {tab.icon && <Icon name={tab.icon} size={14}/>}{tab.label}
         </button>
       ))}
     </div>
@@ -219,13 +220,13 @@ export function RefreshButton({label = 'Refresh', onRefresh}: {
   }
 
   const words = label === 'Reload'
-    ? {idle: 'Reload', busy: 'Reloading…', done: 'Reloaded'}
-    : {idle: 'Refresh', busy: 'Refreshing…', done: 'Refreshed'}
+    ? {idle: t('common.reload'), busy: t('ui.reloading'), done: t('ui.reloaded')}
+    : {idle: t('common.refresh'), busy: t('ui.refreshing'), done: t('ui.refreshed')}
   const shown = {
     idle: {icon: 'refresh', text: words.idle},
     busy: {icon: 'refresh', text: words.busy},
     done: {icon: 'check', text: words.done},
-    failed: {icon: 'warning', text: 'Failed'},
+    failed: {icon: 'warning', text: t('ui.failed')},
   } as const
   const current = shown[state]
 
@@ -268,7 +269,7 @@ function ConfirmDialog({request, onClose}: {request: ConfirmRequest, onClose: ()
   }
   return (
     <Dialog title={request.title} onClose={onClose} width={420} footer={<>
-      <button className="btn" onClick={onClose}>Cancel</button>
+      <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
       <button className={`btn ${request.danger ? 'btn-danger-tint' : 'btn-primary'}`} onClick={go} autoFocus>
         {request.action}
       </button>
@@ -291,7 +292,7 @@ export function Dialog({title, subtitle, onClose, children, footer, width}: {
             <h2>{title}</h2>
             {subtitle && <div className="dialog-sub">{subtitle}</div>}
           </div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close"><Icon name="close"/></button>
+          <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}><Icon name="close"/></button>
         </div>
         <div className="dialog-body">{children}</div>
         {footer && <div className="dialog-foot">{footer}</div>}

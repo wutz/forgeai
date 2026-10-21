@@ -342,10 +342,42 @@ forgeai is a desktop console for AI training, RL and inference jobs on Kubernete
   - Focus: the 2px `{colors.accent}` outline on keyboard focus, offset 2px.
 - **Neutrals**: the console uses the zinc ladder (`{colors.app-ink}` #18181b, `{colors.app-body}` #52525b, `{colors.app-mute}` #71717a, `{colors.app-hairline}` #e4e4e7) in place of Geist's neutral greys. The faint blue cast sits with indigo, and mute at #71717a is 4.8:1 on white (Geist's #8f8f8f is 3.3:1). Shadows and the dialog backdrop are tinted with slate (`rgba(15, 23, 42, …)`), not pure black.
 - **Status colors**: Running `{colors.success}` (#16a34a); Queued / Pending / Restarting / Stopping `{colors.warning}`; Failed `{colors.error}` (text and dot); Succeeded / Stopped / Idle `{colors.mute}`. Status is always text + dot, never color alone.
-- **CSS**: `gui/frontend/src/style.css` mirrors these tokens as custom properties (`--accent`, `--accent-deep`, `--accent-soft`, `--accent-ring`, `--accent-line`, `--accent-tint`, `--accent-tint-hover`, `--accent-tint-press`, `--error-deep`, `--error-wash`, `--error-soft`, `--error-press`, `--error-line` (the `app-danger*` keys above), `--accent-gradient`, `--success`, ...); change both together.
+- **CSS**: `gui/frontend/src/style.css` mirrors these tokens as custom properties (`--accent`, `--accent-deep`, `--accent-soft`, `--accent-ring`, `--accent-line`, `--accent-tint`, `--accent-tint-hover`, `--accent-tint-press`, `--error-deep`, `--error-wash`, `--error-soft`, `--error-press`, `--error-line` (the `app-danger*` keys above), `--accent-gradient`, `--success`, ...); change both together. Each theme has its own values; see Dark theme.
 - Ink (`{colors.ink}`) carries headings, body text and the default buttons. Colour is limited to the Primary, Accent and Danger roles above; no other accent fills.
 - **Logo**: a white anvil with a four-point spark on a rounded tile (radius ≈ 22% of the side) filled with the 135° indigo→violet accent gradient. `build/appicon.png` is the 32-unit mark drawn at 824px with 100px of transparent padding on a 1024 canvas; `icon.ico` holds 16–256px PNGs of the same render. `gui/frontend/src/Logo.tsx` holds the SVG paths, reused by `frontend/public/favicon.svg`, `build/appicon.png` and `build/windows/icon.ico`; change all of them together. The mark is not rendered inside the app any more (the connect card that showed it at 40px is gone), so `Logo.tsx` is kept as the brand source only.
 - **Window chrome**: the macOS title bar is hidden (inset traffic lights); the app header is the drag region. The header and sidebar share the canvas color, so the window reads as one continuous grey frame; cards are the only white sheets. The sidebar keeps a hairline on its right.
+
+## Dark theme
+
+The console follows the system appearance. `gui/frontend/src/theme.ts` sets `data-theme="dark"` on `<html>` when the OS is dark (and updates it live when the appearance changes), and `index.html` sets it before the first paint so a dark system never flashes light. Every colour token has a dark value in a `:root[data-theme='dark']` block, in `style.css` and `redesign.css`. Nothing else changes: the same layout, the same roles, and the same Forge Indigo accent, lifted one tone so it reads on dark surfaces.
+
+- **Surfaces**: the page is darker than the cards, and the sidebar sits below the page, as in light. Cards are the lightest sheets, so they still read as sheets. Shadows go black, since the slate tint would vanish on dark.
+- **Accent**: fills and focus rings use `indigo-400` (#818cf8, 6.3:1 on the canvas); accent text uses `indigo-300` (#a5b4fc). The primary tint is `indigo-500` at 22% alpha, so the label stays 7:1 on it. The logo tile keeps its own gradient in both themes.
+- **Status**: success `emerald-400` (#34d399), warning `amber-400` (#fbbf24) with `amber-300` text, error `red-400` (#f87171) with `red-300` text on washes. Status is still text + dot.
+- **Terminal and logs**: the terminal and log panes stay `#0f1117` in both themes, since they are already dark.
+
+| Token | Light | Dark | Role |
+|---|---|---|---|
+| `--canvas` | #f6f7f9 | #111113 | page |
+| `--chrome` | #eef0f4 | #0c0c0e | sidebar |
+| `--chrome-line` | #e2e5eb | #1f1f23 | sidebar divider |
+| `--surface` | #ffffff | #18181b | cards, inputs, dialogs, header row |
+| `--wash` | #fafafa | #1f1f23 | row hover, dialog footer |
+| `--hairline` | #e4e4e7 | #27272a | borders |
+| `--hairline-soft` | #f4f4f5 | #222226 | hover fills, meter track |
+| `--ink` | #18181b | #fafafa | headings, values (16.9:1 on surface) |
+| `--body` | #52525b | #d4d4d8 | body text (12.0:1) |
+| `--mute` | #71717a | #a1a1aa | secondary text (6.9:1) |
+| `--faint` | #a1a1aa | #71717a | nav labels (4.0:1 on chrome; decorative caps) |
+| `--accent` | #4f46e5 | #818cf8 | focus, icons, meters (6.3:1 on canvas) |
+| `--accent-deep` | #4338ca | #a5b4fc | accent text (8.9:1 on surface) |
+| `--accent-tint` | #e0e7ff | indigo-500 @ 22% | primary button, selected row |
+| `--success` | #059669 | #34d399 | running (9.2:1 on surface) |
+| `--warning-deep` | #b45309 | #fcd34d | warning text (9.1:1 on its wash) |
+| `--error` | #dc2626 | #f87171 | failed, danger (6.4:1 on surface) |
+| `--error-deep` | #991b1b | #fca5a5 | danger text on wash |
+| `--scrim` | rgba(15,23,42,.32) | rgba(0,0,0,.6) | dialog backdrop |
+| `--shadow-pop` | slate, low alpha | black, low alpha | dialogs |
 
 ## Console layout
 

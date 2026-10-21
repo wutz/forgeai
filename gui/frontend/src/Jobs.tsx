@@ -4,17 +4,18 @@ import {app, training} from '../wailsjs/go/models'
 import {JobCreateDialog} from './JobCreateDialog'
 import {TemplateDialog} from './Templates'
 import {Status, envToLines, fmtDate, errText} from './util'
+import {t} from './i18n'
 import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Segmented, Spinner, Tabs, useConfirm} from './ui'
 
 type Filter = 'all' | 'running' | 'queued' | 'stopped' | 'failed' | 'done'
 
 const FILTERS: {value: Filter, label: string}[] = [
-  {value: 'all', label: 'All'},
-  {value: 'running', label: 'Running'},
-  {value: 'queued', label: 'Queued'},
-  {value: 'stopped', label: 'Stopped'},
-  {value: 'failed', label: 'Failed'},
-  {value: 'done', label: 'Done'},
+  {value: 'all', label: t('jobs.filterAll')},
+  {value: 'running', label: t('jobs.filterRunning')},
+  {value: 'queued', label: t('jobs.filterQueued')},
+  {value: 'stopped', label: t('jobs.filterStopped')},
+  {value: 'failed', label: t('jobs.filterFailed')},
+  {value: 'done', label: t('jobs.filterDone')},
 ]
 
 function bucket(phase: string): Filter {
@@ -35,6 +36,23 @@ function bucket(phase: string): Filter {
   }
 }
 
+// workerCount is the "N workers" text of a job row.
+function workerCount(n: number): string {
+  return n === 1 ? t('jobs.workersOne') : t('jobs.workersMany', {count: n})
+}
+
+// retryCount is the "N retries" text of a job row.
+function retryCount(n: number): string {
+  return n === 1 ? t('jobs.retriesOne') : t('jobs.retriesMany', {count: n})
+}
+
+// retryOnLabel shows a job's retry condition; unknown values are shown as they arrive.
+function retryOnLabel(retryOn: string): string {
+  if (retryOn === 'Any') return t('jobs.retryAny')
+  if (retryOn === 'Infra') return t('jobs.retryInfra')
+  return retryOn
+}
+
 export function Jobs() {
   const [jobs, setJobs] = useState<app.Job[]>([])
   const [error, setError] = useState('')
@@ -50,8 +68,8 @@ export function Jobs() {
   }
   useEffect(() => {
     refresh()
-    const t = setInterval(refresh, 5000)
-    return () => clearInterval(t)
+    const timer = setInterval(refresh, 5000)
+    return () => clearInterval(timer)
   }, [])
 
   const counts = useMemo(() => {
@@ -64,10 +82,10 @@ export function Jobs() {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Workspace" title="Jobs"
-                  meta={<span className="muted" style={{fontSize: 12.5}}>{jobs.length} total</span>}
+      <PageHeader eyebrow={t('jobs.eyebrow')} title={t('jobs.title')}
+                  meta={<span className="muted" style={{fontSize: 12.5}}>{t('jobs.total', {count: jobs.length})}</span>}
                   actions={<button className="btn btn-primary" onClick={() => setCreating(true)}>
-                    <Icon name="plus" size={14}/>New job
+                    <Icon name="plus" size={14}/>{t('jobs.newJob')}
                   </button>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {creating && <JobCreateDialog onClose={() => setCreating(false)} onCreated={name => {
@@ -94,20 +112,19 @@ function JobTable({jobs, selected, onSelect}: {
   jobs: app.Job[], selected: string | null, onSelect: (name: string) => void
 }) {
   if (!jobs.length) {
-    return <Card><Empty icon="play" title="No jobs here">Create one to start training; jobs
-      wait in the Kueue queue until GPU quota is free.</Empty></Card>
+    return <Card><Empty icon="play" title={t('jobs.emptyTitle')}>{t('jobs.emptyHint')}</Empty></Card>
   }
   return (
     <Card>
       <table className="table">
         <thead>
         <tr>
-          <th>Name</th>
-          <th>Status</th>
-          <th>Instance</th>
-          <th>Ready</th>
-          <th>Retry</th>
-          <th>Age</th>
+          <th>{t('common.name')}</th>
+          <th>{t('common.status')}</th>
+          <th>{t('jobs.instance')}</th>
+          <th>{t('jobs.colReady')}</th>
+          <th>{t('jobs.colRetry')}</th>
+          <th>{t('jobs.colAge')}</th>
         </tr>
         </thead>
         <tbody>
@@ -117,8 +134,8 @@ function JobTable({jobs, selected, onSelect}: {
             <td className="mono">
               <span className="cell-main">{j.name}</span>
               <span className="cell-sub">
-                {j.workers} worker{j.workers === 1 ? '' : 's'}
-                {j.retries?.length ? ` · ${j.retries.length} retries` : ''}
+                {workerCount(j.workers)}
+                {j.retries?.length ? ` · ${retryCount(j.retries.length)}` : ''}
                 {j.template ? ` · ${j.template}` : ''}
               </span>
             </td>
@@ -127,7 +144,7 @@ function JobTable({jobs, selected, onSelect}: {
             <td className="mono">{j.instanceType}</td>
             <td className="mono">{j.ready}/{j.workers}</td>
             <td>{j.maxRetries
-              ? <Badge>{j.retryOn || 'Infra'} × {j.maxRetries}</Badge>
+              ? <Badge>{retryOnLabel(j.retryOn || 'Infra')} × {j.maxRetries}</Badge>
               : <span className="muted">—</span>}</td>
             <td className="muted">{j.age}</td>
           </tr>
@@ -182,11 +199,11 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
     setError('')
     setPending('')
     GetJob(name).then(setJob).catch(e => setError(errText(e)))
-    const t = setInterval(() => GetJob(name).then(setJob).catch(() => {}), 5000)
-    return () => clearInterval(t)
+    const timer = setInterval(() => GetJob(name).then(setJob).catch(() => {}), 5000)
+    return () => clearInterval(timer)
   }, [name])
 
-  if (!job) return <Card><Spinner label={error || 'Loading job…'}/></Card>
+  if (!job) return <Card><Spinner label={error || t('jobs.loadingJob')}/></Card>
   const live = job.phase !== 'Failed' && job.phase !== 'Succeeded'
   const retriable = job.phase === 'Failed' || job.phase === 'Succeeded'
 
@@ -214,72 +231,74 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
       <div className="card-head">
         <div className="detail-title">
           <h3 className="mono">{job.name}</h3>
-          <div className="card-sub">{job.template || 'default runtime'} · created {fmtDate(job.created)}</div>
+          <div className="card-sub">{t('jobs.detailSub', {
+            template: job.template || t('jobs.defaultRuntime'), created: fmtDate(job.created),
+          })}</div>
         </div>
         <div className="card-head-actions"><Status phase={job.phase}/></div>
       </div>
       {error && <div className="banner banner-error">{error}</div>}
-      {savedTemplate && <div className="banner" role="status">Saved job template {savedTemplate}.</div>}
+      {savedTemplate && <div className="banner" role="status">{t('jobs.savedTemplate', {name: savedTemplate})}</div>}
       {confirm.dialog}
       {saving && <TemplateDialog form={jobTemplateForm(job)} onClose={() => setSaving(false)} onSaved={n => {
         setSaving(false); setSavedTemplate(n)
       }}/>}
 
       <div className="detail-actions">
-        <button className="btn btn-sm" onClick={() => viewLog(0, 'worker 0').catch(() => {})}>
-          <Icon name="scroll" size={13}/>Logs
+        <button className="btn btn-sm" onClick={() => viewLog(0, t('jobs.workerLabel', {index: 0})).catch(() => {})}>
+          <Icon name="scroll" size={13}/>{t('common.logs')}
         </button>
         {live && job.phase !== 'Stopped' &&
           <button className="btn btn-sm" disabled={!!pending} onClick={() => act('stop', StopJob(job.name))}>
-            <Icon name="square" size={12}/>{pending === 'stop' ? 'Stopping…' : 'Stop'}
+            <Icon name="square" size={12}/>{pending === 'stop' ? t('jobs.stopping') : t('common.stop')}
           </button>}
         {job.phase === 'Stopped' &&
           <button className="btn btn-sm btn-accent" disabled={!!pending} onClick={() => act('start', StartJob(job.name))}>
-            <Icon name="play" size={12}/>{pending === 'start' ? 'Resuming…' : 'Resume'}
+            <Icon name="play" size={12}/>{pending === 'start' ? t('jobs.resuming') : t('common.resume')}
           </button>}
         {retriable &&
           <button className="btn btn-sm" disabled={!!pending} onClick={rerun}>
-            <Icon name="refresh" size={13}/>{pending === 'rerun' ? 'Rerunning…' : 'Rerun'}
+            <Icon name="refresh" size={13}/>{pending === 'rerun' ? t('jobs.rerunning') : t('jobs.rerun')}
           </button>}
         <button className="btn btn-sm" onClick={() => setSaving(true)}>
-          <Icon name="layers" size={13}/>Save as template
+          <Icon name="layers" size={13}/>{t('jobs.saveAsTemplate')}
         </button>
         <span className="spacer"/>
         <button className="btn btn-sm btn-danger" onClick={() => confirm.ask({
-          title: `Delete job ${job.name}?`,
-          message: 'Its worker pods stop and the logs go with them. Kueue releases the quota. This cannot be undone.',
-          action: 'Delete job', danger: true,
+          title: t('jobs.deleteTitle', {name: job.name}),
+          message: t('jobs.deleteMessage'),
+          action: t('jobs.deleteAction'), danger: true,
           run: () => DeleteJob(job.name).then(onDeleted).catch(e => setError(errText(e))),
         })}>
-          <Icon name="trash" size={13}/>Delete
+          <Icon name="trash" size={13}/>{t('common.delete')}
         </button>
       </div>
 
       <div className="section">
         <Tabs tabs={[
-          {value: 'overview', label: 'Overview', icon: 'grid'},
-          {value: 'workers', label: 'Workers', icon: 'cpu'},
-          {value: 'log', label: 'Log', icon: 'scroll'},
-          {value: 'env', label: 'Env', icon: 'layers'},
+          {value: 'overview', label: t('jobs.tabOverview'), icon: 'grid'},
+          {value: 'workers', label: t('jobs.tabWorkers'), icon: 'cpu'},
+          {value: 'log', label: t('jobs.tabLog'), icon: 'scroll'},
+          {value: 'env', label: t('jobs.tabEnv'), icon: 'layers'},
         ]} value={tab} onChange={setTab}/>
 
         {tab === 'overview' && (
           <>
             <dl className="kv">
-              <dt>Image</dt><dd className="mono">{job.image}</dd>
-              <dt>Instance</dt><dd className="mono">{job.instanceType}
+              <dt>{t('common.image')}</dt><dd className="mono">{job.image}</dd>
+              <dt>{t('jobs.instance')}</dt><dd className="mono">{job.instanceType}
                 {job.gpuCount ? ` (${job.gpuCount}× ${job.gpuClass})` : ''}</dd>
-              <dt>Workers</dt><dd>{job.ready} ready of {job.workers}</dd>
-              <dt>Volumes</dt><dd className="mono">{job.volumes?.join(', ') || '—'}</dd>
-              <dt>Command</dt><dd><pre className="code">{job.command || '—'}</pre></dd>
-              {job.failureReason && <><dt>Failure</dt><dd>{job.failureReason}: {job.message}</dd></>}
-              {job.retriedAs && <><dt>Retried as</dt><dd className="mono">{job.retriedAs}</dd></>}
-              <dt>Created</dt><dd>{fmtDate(job.created)}</dd>
+              <dt>{t('jobs.workers')}</dt><dd>{t('jobs.workersReady', {ready: job.ready, total: job.workers})}</dd>
+              <dt>{t('jobs.volumes')}</dt><dd className="mono">{job.volumes?.join(', ') || '—'}</dd>
+              <dt>{t('jobs.command')}</dt><dd><pre className="code">{job.command || '—'}</pre></dd>
+              {job.failureReason && <><dt>{t('jobs.failure')}</dt><dd>{t('jobs.failureDetail', {reason: job.failureReason, message: job.message || ''})}</dd></>}
+              {job.retriedAs && <><dt>{t('jobs.retriedAs')}</dt><dd className="mono">{job.retriedAs}</dd></>}
+              <dt>{t('common.created')}</dt><dd>{fmtDate(job.created)}</dd>
             </dl>
 
             {job.retries?.length > 0 && (
               <>
-                <h4 className="sub-head">Retries</h4>
+                <h4 className="sub-head">{t('jobs.retries')}</h4>
                 <div className="mini-table">
                   {job.retries.map(r => (
                     <button key={r.name} className="mini-row" onClick={() => detailOf(r.name)}>
@@ -305,13 +324,13 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
                   <Status phase={w.phase || 'Pending'}/>
                   <span className="mono muted">{w.nodeName || '—'}</span>
                   <span className="muted trunc" title={w.message}>{w.message || ''}</span>
-                  <button className="btn btn-sm" onClick={() => viewLog(w.index, w.podName).catch(() => {})}>Log</button>
+                  <button className="btn btn-sm" onClick={() => viewLog(w.index, w.podName).catch(() => {})}>{t('jobs.logButton')}</button>
                 </div>
               ))}
             </div>
           ) : (
             <div className="empty">
-              <div className="empty-title">No pods {job.phase === 'Queued' ? '— waiting for quota' : 'yet'}</div>
+              <div className="empty-title">{job.phase === 'Queued' ? t('jobs.noPodsQueued') : t('jobs.noPodsYet')}</div>
             </div>
           )
         )}
@@ -319,11 +338,11 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
         {tab === 'log' && (
           <>
             <div className="log-bar">
-              <span className="mono muted">{logTitle || 'worker 0'}</span>
+              <span className="mono muted">{logTitle || t('jobs.workerLabel', {index: 0})}</span>
               <span className="spacer"/>
-              <RefreshButton label="Reload" onRefresh={() => viewLog(logWorker, logTitle || 'worker 0')}/>
+              <RefreshButton label="Reload" onRefresh={() => viewLog(logWorker, logTitle || t('jobs.workerLabel', {index: 0}))}/>
             </div>
-            <pre className="logs">{log || 'No output'}</pre>
+            <pre className="logs">{log || t('jobs.noOutput')}</pre>
           </>
         )}
 

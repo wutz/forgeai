@@ -39,6 +39,41 @@
   --radius-lg: 12px;
   --font: Geist, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", Arial, sans-serif;
   --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  color-scheme: light;
+}
+
+/* Dark theme, used when the system appearance is dark (theme.ts sets
+   data-theme on <html>). Same token names; the zinc ladder and the indigo
+   accent are lifted so they read on dark surfaces. See gui/DESIGN.md. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --ink: #fafafa;
+  --body: #d4d4d8;
+  --mute: #a1a1aa;
+  --hairline: #27272a;
+  --hairline-soft: #222226;
+  --canvas: #111113;
+  --surface: #18181b;
+  --link: #818cf8;
+  --error: #f87171;
+  --error-soft: rgba(248, 113, 113, 0.14);
+  --warning: #fbbf24;
+  --warning-deep: #fcd34d;
+  --warning-soft: rgba(251, 191, 36, 0.14);
+  --success: #34d399;
+  --success-soft: rgba(52, 211, 153, 0.14);
+  --accent: #818cf8;
+  --accent-deep: #a5b4fc;
+  --accent-soft: rgba(129, 140, 248, 0.12);
+  --accent-ring: rgba(129, 140, 248, 0.3);
+  --accent-line: rgba(129, 140, 248, 0.34);
+  --accent-tint: rgba(99, 102, 241, 0.22);
+  --accent-tint-hover: rgba(99, 102, 241, 0.3);
+  --accent-tint-press: rgba(99, 102, 241, 0.38);
+  --error-deep: #fca5a5;
+  --error-line: rgba(248, 113, 113, 0.34);
+  --error-wash: rgba(248, 113, 113, 0.08);
+  --error-press: rgba(248, 113, 113, 0.22);
 }
 
 * { box-sizing: border-box; }

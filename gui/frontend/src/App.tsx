@@ -14,6 +14,7 @@ import {Admin} from './Admin'
 import {Scope} from './Scope'
 import {errText} from './util'
 import {Empty, HeaderSlot, Icon, IconName, Spinner} from './ui'
+import {t} from './i18n'
 
 // PREFS is the last connection. NAMESPACES maps each kubeconfig context to the
 // project last opened in it, so switching clusters returns to that project.
@@ -103,7 +104,7 @@ export default function App() {
       const last: {ctx?: string, ns?: string} = JSON.parse(localStorage.getItem(PREFS) || '{}')
       const start = list.find(c => c.name === last.ctx) || list.find(c => c.current) || list[0]
       if (!start) {
-        setError('No kubeconfig context found. Add one to $KUBECONFIG or ~/.kube/config.')
+        setError(t('app.noContext'))
         return
       }
       connectTo(start.name, start.name === last.ctx ? last.ns : '')
@@ -123,29 +124,29 @@ export default function App() {
   // cluster runs agents.x-k8s.io.
   const groups: {label: string, items: NavItem[]}[] = conn?.project ? [
     {
-      label: 'Workspace',
+      label: t('nav.workspace'),
       items: [
-        {area: 'overview', label: 'Overview', icon: 'grid'},
-        {area: 'jobs', label: 'Jobs', icon: 'play'},
-        ...(conn.sandboxes ? [{area: 'sandboxes', label: 'Sandboxes', icon: 'box'} as NavItem] : []),
-        {area: 'templates', label: 'Templates', icon: 'scroll'},
+        {area: 'overview', label: t('nav.overview'), icon: 'grid'},
+        {area: 'jobs', label: t('nav.jobs'), icon: 'play'},
+        ...(conn.sandboxes ? [{area: 'sandboxes', label: t('nav.sandboxes'), icon: 'box'} as NavItem] : []),
+        {area: 'templates', label: t('nav.templates'), icon: 'scroll'},
       ],
     },
     {
-      label: 'Storage',
+      label: t('nav.storage'),
       items: [
-        {area: 'volumes', label: 'Volumes', icon: 'database'},
-        {area: 'files', label: 'Files', icon: 'folder'},
-        {area: 'images', label: 'Images', icon: 'image'},
+        {area: 'volumes', label: t('nav.volumes'), icon: 'database'},
+        {area: 'files', label: t('nav.files'), icon: 'folder'},
+        {area: 'images', label: t('nav.images'), icon: 'image'},
       ],
     },
     {
-      label: 'Cluster',
-      items: [{area: 'resources', label: 'Resources', icon: 'cpu'}],
+      label: t('nav.cluster'),
+      items: [{area: 'resources', label: t('nav.resources'), icon: 'cpu'}],
     },
   ] : []
   if (conn?.admin) {
-    groups.push({label: 'Admin', items: [{area: 'admin', label: 'Projects', icon: 'shield'}]})
+    groups.push({label: t('nav.admin'), items: [{area: 'admin', label: t('nav.projects'), icon: 'shield'}]})
   }
 
   return (
@@ -154,8 +155,8 @@ export default function App() {
         <header className="header header-shell">
           <div className="header-side">
             <button className="icon-btn header-toggle" onClick={toggleSidebar}
-                    aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                    aria-expanded={!collapsed} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+                    aria-label={collapsed ? t('app.expandSidebar') : t('app.collapseSidebar')}
+                    aria-expanded={!collapsed} title={collapsed ? t('app.expandSidebar') : t('app.collapseSidebar')}>
               <Icon name="panel"/>
             </button>
           </div>
@@ -197,10 +198,10 @@ export default function App() {
                 {area === 'admin' && <Admin/>}
               </Fragment>
             ) : loading ? (
-              <Spinner label="Connecting…"/>
+              <Spinner label={t('app.connecting')}/>
             ) : (
-              <Empty icon="server" title="Not connected">
-                Choose a cluster and project in the sidebar.
+              <Empty icon="server" title={t('app.notConnected')}>
+                {t('app.chooseHint')}
               </Empty>
             )}
           </main>

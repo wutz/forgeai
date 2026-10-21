@@ -111,7 +111,7 @@ export function Images() {
         {repos.map(r => (
           <details key={r.name} className="repo">
             <summary>
-              <span className="mono">{host}/{r.name}</span>
+              <span className="mono">{reg?.url}/{r.name}</span>
               <Badge>{r.count} tags</Badge>
               <span className="muted" style={{fontSize: 12}}>{r.pulls} pulls</span>
               <button className="btn btn-sm btn-danger" onClick={e => {

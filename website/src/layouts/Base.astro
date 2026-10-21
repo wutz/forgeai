@@ -1,71 +1,87 @@
 ---
+import SiteHeader from '../components/SiteHeader.astro';
+import { htmlLang, localeBase, locales, messages, type Locale } from '../i18n/messages';
+import '../styles/global.css';
+
 interface Props {
+  lang: Locale;
   title: string;
   description: string;
 }
 
-const { title, description } = Astro.props;
-const canonical = new URL(Astro.url.pathname, Astro.site);
+const { lang, title, description } = Astro.props;
+const site = 'https://forgeai.wutz.dev';
+const canonical = new URL(Astro.url.pathname, site);
+const t = messages[lang];
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang={htmlLang[lang]}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
     <meta name="theme-color" content="#4f46e5" />
     <link rel="canonical" href={canonical} />
+    {
+      locales.map((code) => (
+        <link rel="alternate" hreflang={htmlLang[code]} href={new URL(localeBase[code], site)} />
+      ))
+    }
+    <link rel="alternate" hreflang="x-default" href={new URL(localeBase.en, site)} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
+    <meta property="og:locale" content={lang === 'zh' ? 'zh_CN' : 'en_US'} />
     <meta name="twitter:card" content="summary" />
     <title>{title}</title>
+    <!--
+      Runs before first paint. Applies the saved theme, and on the root page sends visitors
+      whose language is Chinese to /zh/ unless they picked a language. Keys match scripts/preferences.ts.
+    -->
+    <script is:inline>
+      (function () {
+        var root = document.documentElement;
+        var lang = null;
+        var theme = null;
+        try {
+          lang = localStorage.getItem('forgeai-lang');
+          theme = localStorage.getItem('forgeai-theme');
+        } catch (e) {}
+        if (theme === 'light' || theme === 'dark') root.setAttribute('data-theme', theme);
+        if (location.pathname !== '/') return;
+        var target = lang === 'zh' || lang === 'en' ? lang : detect(navigator.languages || [navigator.language]);
+        if (target === 'zh') location.replace('/zh/' + location.search + location.hash);
+        function detect(list) {
+          for (var i = 0; i < list.length; i++) {
+            var tag = String(list[i] || '').toLowerCase();
+            if (tag === 'zh' || tag.indexOf('zh-') === 0) return 'zh';
+            if (tag === 'en' || tag.indexOf('en-') === 0) return 'en';
+          }
+          return 'en';
+        }
+      })();
+    </script>
   </head>
   <body>
-    <header class="site-header">
-      <nav class="container nav" aria-label="Main">
-        <a class="brand" href="/" aria-label="forgeai home">
-          <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
-            <defs>
-              <linearGradient id="brand-tile" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stop-color="#6366f1" />
-                <stop offset="1" stop-color="#7c3aed" />
-              </linearGradient>
-            </defs>
-            <rect width="32" height="32" rx="7" fill="url(#brand-tile)" />
-            <g fill="#fff" transform="translate(5.1 6.1) scale(0.68)">
-              <path d="M3 10 10 9h18v5h-5l-3 4v3l4 3v2H8v-2l4-3v-3l-2-3-3-1.5z" />
-              <path d="m22 1 .9 2.3 2.3.9-2.3.9L22 7.4l-.9-2.3-2.3-.9 2.3-.9z" />
-            </g>
-          </svg>
-          <span>forgeai</span>
-        </a>
-        <div class="nav-links">
-          <a href="/#features">Features</a>
-          <a href="/#how-it-works">How it works</a>
-          <a href="/#get-started">Get started</a>
-          <a href="https://github.com/wutz/forgeai" rel="noopener">GitHub</a>
-        </div>
-      </nav>
-    </header>
+    <SiteHeader lang={lang} />
 
     <slot />
 
     <footer class="site-footer">
       <div class="container footer-inner">
-        <span>© forgeai</span>
+        <span>{t.footer.copyright}</span>
         <div class="footer-links">
-          <a href="https://github.com/wutz/forgeai" rel="noopener">Source on GitHub</a>
-          <a href="https://github.com/wutz/forgeai#readme" rel="noopener">Documentation</a>
+          <a href="https://github.com/wutz/forgeai" rel="noopener">{t.footer.source}</a>
+          <a href="https://github.com/wutz/forgeai#readme" rel="noopener">{t.footer.docs}</a>
         </div>
       </div>
     </footer>
+
+    <script>
+      import '../scripts/preferences';
+    </script>
   </body>
 </html>
-
-<style is:global>
-  @import '../styles/global.css';
-</style>

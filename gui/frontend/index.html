@@ -5,8 +5,15 @@
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
     <title>forgeai</title>
-    <!-- Set the theme before the first paint so a dark system never flashes light. -->
-    <script>document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'</script>
+    <!-- Set the theme before the first paint so a dark system never flashes light.
+         A theme the user picked in the top bar (forgeai.theme) wins over the system. -->
+    <script>
+        (function () {
+            var saved = localStorage.getItem('forgeai.theme')
+            var system = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+            document.documentElement.dataset.theme = saved === 'light' || saved === 'dark' ? saved : system
+        })()
+    </script>
 </head>
 <body>
 <div id="root"></div>

@@ -53,6 +53,14 @@ export const en = {
   'phase.idle': 'Idle',
   'phase.ready': 'Ready',
   'phase.resizing': 'Resizing',
+  // Top-bar preferences: the theme and language switches.
+  'prefs.themeGroup': 'Theme',
+  'prefs.themeSystem': 'Follow system',
+  'prefs.themeLight': 'Light',
+  'prefs.themeDark': 'Dark',
+  'prefs.langGroup': 'Language',
+  'prefs.langSystem': 'Auto',
+  'prefs.langSystemTitle': 'Follow system language',
 }
 
 export const zh: Record<keyof typeof en, string> = {
@@ -98,4 +106,12 @@ export const zh: Record<keyof typeof en, string> = {
   'phase.idle': '空闲',
   'phase.ready': '就绪',
   'phase.resizing': '调整中',
+  // 顶栏的主题与语言切换。
+  'prefs.themeGroup': '主题',
+  'prefs.themeSystem': '跟随系统',
+  'prefs.themeLight': '浅色',
+  'prefs.themeDark': '深色',
+  'prefs.langGroup': '语言',
+  'prefs.langSystem': '自动',
+  'prefs.langSystemTitle': '跟随系统语言',
 }

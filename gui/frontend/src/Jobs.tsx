@@ -9,7 +9,8 @@ import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Segmented, Spinner,
 
 type Filter = 'all' | 'running' | 'queued' | 'stopped' | 'failed' | 'done'
 
-const FILTERS: {value: Filter, label: string}[] = [
+// filterOptions is built per render so the labels follow the language.
+const filterOptions = (): {value: Filter, label: string}[] => [
   {value: 'all', label: t('jobs.filterAll')},
   {value: 'running', label: t('jobs.filterRunning')},
   {value: 'queued', label: t('jobs.filterQueued')},
@@ -17,6 +18,7 @@ const FILTERS: {value: Filter, label: string}[] = [
   {value: 'failed', label: t('jobs.filterFailed')},
   {value: 'done', label: t('jobs.filterDone')},
 ]
+
 
 function bucket(phase: string): Filter {
   switch (phase) {
@@ -95,7 +97,7 @@ export function Jobs() {
       }}/>}
 
       <div className="list-toolbar">
-        <Segmented options={FILTERS} value={filter} onChange={setFilter} counts={counts}/>
+        <Segmented options={filterOptions()} value={filter} onChange={setFilter} counts={counts}/>
       </div>
 
       <div className="split">

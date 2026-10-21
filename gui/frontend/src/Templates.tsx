@@ -8,7 +8,8 @@ import {t} from './i18n'
 
 type Kind = 'sandbox' | 'job'
 
-const KIND_OPTIONS: {value: Kind, label: string}[] = [
+// kindOptions is built per render so the labels follow the language.
+const kindOptions = (): {value: Kind, label: string}[] => [
   {value: 'sandbox', label: t('templates.kindSandbox')},
   {value: 'job', label: t('templates.kindJob')},
 ]
@@ -67,7 +68,7 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
 
       {sandboxes && (
         <div className="list-toolbar">
-          <Segmented options={KIND_OPTIONS} value={kind} onChange={setKind}
+          <Segmented options={kindOptions()} value={kind} onChange={setKind}
                      counts={{sandbox: sandboxItems.length, job: jobItems.length}}/>
         </div>
       )}

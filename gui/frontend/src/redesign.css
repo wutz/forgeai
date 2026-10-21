@@ -84,6 +84,15 @@ a { color: inherit; text-decoration: none; }
 .platform-darwin .header.header-shell { padding-left: 0; }
 .platform-darwin .header-side { padding-left: 84px; }
 .header-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 16px; padding: 0 20px 0 24px; }
+/* Theme and language switches at the foot of the sidebar: pushed to the
+   bottom by the auto top margin, one full-width segmented row each. */
+.sidebar-prefs {
+  margin-top: auto; padding-top: 12px; border-top: 1px solid var(--chrome-line);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.sidebar-prefs .nav-label { padding: 0 2px; }
+.sidebar-prefs .segmented { display: flex; }
+.sidebar-prefs .segment { flex: 1; justify-content: center; padding: 0 6px; }
 /* Collapsed: the sidebar is gone, so the toggle moves to the left edge after
    the traffic lights and the header is one flat surface. */
 .app.sidebar-collapsed { --sidebar-w: 0px; }

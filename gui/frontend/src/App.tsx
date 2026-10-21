@@ -1,4 +1,4 @@
-import {Fragment, useEffect, useRef, useState} from 'react'
+import {Fragment, useEffect, useRef, useState, useSyncExternalStore} from 'react'
 import {Connect, Contexts, Projects} from '../wailsjs/go/app/App'
 import {Environment} from '../wailsjs/runtime/runtime'
 import {app} from '../wailsjs/go/models'
@@ -14,7 +14,8 @@ import {Admin} from './Admin'
 import {Scope} from './Scope'
 import {errText} from './util'
 import {Empty, HeaderSlot, Icon, IconName, Spinner} from './ui'
-import {t} from './i18n'
+import {Preferences} from './Preferences'
+import {getLocale, subscribeLocale, t} from './i18n'
 
 // PREFS is the last connection. NAMESPACES maps each kubeconfig context to the
 // project last opened in it, so switching clusters returns to that project.
@@ -46,6 +47,9 @@ function areaFor(current: Area, info: app.ConnInfo): Area {
 }
 
 export default function App() {
+  // Subscribing re-renders the whole tree when the language is switched, so
+  // every t() call below picks up the new catalog.
+  useSyncExternalStore(subscribeLocale, getLocale)
   const [contexts, setContexts] = useState<app.KubeContext[]>([])
   // cluster is the kubeconfig context shown in the sidebar. It leads the
   // connection while a switch is in flight.
@@ -181,6 +185,7 @@ export default function App() {
                 ))}
               </div>
             ))}
+            <Preferences/>
           </nav>
           <main className="main">
             {error && <div className="banner banner-error" role="alert">{error}</div>}

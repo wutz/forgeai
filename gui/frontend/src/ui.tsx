@@ -41,6 +41,9 @@ const ICONS = {
   terminal: 'M4 5h16v14H4zM7.5 10l2.5 2-2.5 2M12.5 15h4',
   maximize: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
   minimize: 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5',
+  monitor: 'M3 4h18v12H3zM8 20h8M12 16v4',
+  sun: 'M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4',
+  moon: 'M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z',
 } as const
 
 export type IconName = keyof typeof ICONS
@@ -134,16 +137,19 @@ export function Meter({value, max, tone = 'accent', label, right}: {
   )
 }
 
-// Segmented is the pill filter row (Jobs: All / Running / Queued / Failed).
-export function Segmented<T extends string>({options, value, onChange, counts}: {
-  options: {value: T, label: string}[], value: T, onChange: (v: T) => void,
-  counts?: Partial<Record<T, number>>
+// Segmented is the pill filter row (Jobs: All / Running / Queued / Failed). A
+// label can be an icon; its title names the option for tooltips and screen
+// readers.
+export function Segmented<T extends string>({options, value, onChange, counts, label}: {
+  options: {value: T, label: ReactNode, title?: string}[], value: T, onChange: (v: T) => void,
+  counts?: Partial<Record<T, number>>, label?: string
 }) {
   return (
-    <div className="segmented" role="tablist">
+    <div className="segmented" role="tablist" aria-label={label}>
       {options.map(o => (
         <button key={o.value} role="tab" aria-selected={value === o.value}
                 className={`segment ${value === o.value ? 'active' : ''}`}
+                title={o.title} aria-label={o.title}
                 onClick={() => onChange(o.value)}>
           {o.label}
           {counts?.[o.value] !== undefined && <span className="segment-count">{counts[o.value]}</span>}

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"net/url"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -15,17 +16,17 @@ import (
 
 // Files is the state of the on-demand file browser of the project.
 type Files struct {
-	Phase    string   `json:"phase"` // Idle, Starting, Ready
-	URL      string   `json:"url,omitempty"`
-	Username string   `json:"username,omitempty"`
-	Password string   `json:"password,omitempty"`
-	Volumes  []string `json:"volumes"`
-	Secret   string   `json:"secret"`
+	Phase string `json:"phase"` // Idle, Starting, Ready
+	// Address is the loopback URL of the file browser. It is empty until the
+	// server is ready and the user may read its password.
+	Address string   `json:"address,omitempty"`
+	Volumes []string `json:"volumes"`
 }
 
 // Files reports the file server: it wakes or keeps it alive (heartbeat) and
-// returns the URL with the basic-auth credentials from the file server
-// Secret. The server scales to zero when nobody calls this for a while.
+// points the loopback proxy at it. The basic-auth credentials from the file
+// server Secret stay in this process; the webview only gets the proxy
+// address. The server scales to zero when nobody calls this for a while.
 func (a *App) Files() (*Files, error) {
 	c, err := a.current()
 	if err != nil {
@@ -54,20 +55,34 @@ func (a *App) Files() (*Files, error) {
 	if err := a.heartbeat(ctx, c); err != nil {
 		return nil, err
 	}
-	// Read the credentials for the webview; view-only members cannot read
-	// the Secret and get the URL without a password.
-	out := &Files{Phase: "Starting", Secret: naming.FileServerSecretName}
-	sec := &corev1.Secret{}
-	secKey := client.ObjectKey{Namespace: c.namespace(), Name: naming.FileServerSecretName}
-	if err := c.k8s.Get(ctx, secKey, sec); err == nil {
-		out.Username = string(sec.Data[corev1.BasicAuthUsernameKey])
-		out.Password = string(sec.Data[corev1.BasicAuthPasswordKey])
-	}
+	out := &Files{Phase: "Starting"}
 	fs = &v1.FileServer{}
 	if err := c.k8s.Get(ctx, key, fs); err == nil {
 		out.Phase = string(fs.Status.Phase)
-		out.URL = fs.Status.URL
 		out.Volumes = fs.Status.Volumes
+	}
+	// View-only members cannot read the Secret: they get no address.
+	var target *fileTarget
+	sec := &corev1.Secret{}
+	secKey := client.ObjectKey{Namespace: c.namespace(), Name: naming.FileServerSecretName}
+	if out.Phase == string(v1.FileServerReady) && fs.Status.URL != "" && c.k8s.Get(ctx, secKey, sec) == nil {
+		base, err := url.Parse(fs.Status.URL)
+		if err != nil {
+			return nil, err
+		}
+		target = &fileTarget{
+			base: base,
+			user: string(sec.Data[corev1.BasicAuthUsernameKey]),
+			pass: string(sec.Data[corev1.BasicAuthPasswordKey]),
+		}
+	}
+	a.files.SetTarget(target)
+	if target != nil {
+		origin, err := a.files.Origin()
+		if err != nil {
+			return nil, err
+		}
+		out.Address = origin + "/"
 	}
 	return out, nil
 }

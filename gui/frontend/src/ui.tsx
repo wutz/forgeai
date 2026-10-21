@@ -224,7 +224,7 @@ function ConfirmDialog({request, onClose}: {request: ConfirmRequest, onClose: ()
   return (
     <Dialog title={request.title} onClose={onClose} width={420} footer={<>
       <button className="btn" onClick={onClose}>Cancel</button>
-      <button className={`btn ${request.danger ? 'btn-danger' : 'btn-primary'}`} onClick={go} autoFocus>
+      <button className={`btn ${request.danger ? 'btn-danger-tint' : 'btn-primary'}`} onClick={go} autoFocus>
         {request.action}
       </button>
     </>}>

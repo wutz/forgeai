@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {DeleteImage, DeleteImageRepo, ListImages, Registry} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {errText, fmtDate} from './util'
-import {Badge, Card, Empty, Icon, PageHeader, useConfirm} from './ui'
+import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, useConfirm} from './ui'
 
 // Images shows the project registry: the push command with the robot
 // credentials and the pushed tags with delete buttons.
@@ -15,11 +15,14 @@ export function Images() {
   const [showPassword, setShowPassword] = useState(false)
   const confirm = useConfirm()
 
-  const refresh = () => {
-    Registry().then(setReg).catch(e => setError(errText(e)))
-    ListImages().then(rs => { setRepos(rs); setError('') }).catch(e => setError(errText(e)))
-  }
-  useEffect(refresh, [])
+  const refresh = () => Promise.all([
+    Registry().then(setReg),
+    ListImages().then(setRepos),
+  ]).then(() => setError(''), e => {
+    setError(errText(e))
+    throw e
+  })
+  useEffect(() => { refresh().catch(() => {}) }, [])
 
   const copy = (text: string, key: string) =>
     navigator.clipboard.writeText(text).then(() => {
@@ -61,9 +64,7 @@ export function Images() {
                   meta={repos.length > 0 && <span className="muted" style={{fontSize: 12}}>
                     {repos.length} repositories · {totalTags} tags · {totalPulls} pulls
                   </span>}
-                  actions={<button className="btn btn-sm btn-ghost" onClick={refresh}>
-                    <Icon name="refresh" size={14}/>Refresh
-                  </button>}/>
+                  actions={<RefreshButton onRefresh={refresh}/>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {confirm.dialog}
 

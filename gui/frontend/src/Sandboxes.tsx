@@ -7,7 +7,7 @@ import {SandboxCreateDialog} from './SandboxCreateDialog'
 import {SandboxTemplateDialog} from './SandboxTemplates'
 import {SandboxTerminal} from './SandboxTerminal'
 import {Status, envToLines, fmtDate, errText} from './util'
-import {Badge, Card, Empty, Icon, PageHeader, Spinner, Tabs, useConfirm} from './ui'
+import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Spinner, Tabs, useConfirm} from './ui'
 
 // HEARTBEAT is how often an open sandbox detail resets the sandbox's idle
 // clock. The operator suspends a sandbox once it has been idle for its idle
@@ -165,8 +165,12 @@ function SandboxDetail({name, onDone, onDeleted}: {
 
   if (!box) return <Card><Spinner label={error || 'Loading sandbox…'}/></Card>
   const running = box.phase === 'Running' || box.phase === 'Pending'
+  // showLog rejects when the logs cannot be read; the banner shows why.
   const showLog = () =>
-    SandboxLogs(box.name, 500).then(v => { setLog(v); setTab('log') }).catch(e => setError(errText(e)))
+    SandboxLogs(box.name, 500).then(v => { setLog(v); setTab('log') }, e => {
+      setError(errText(e))
+      throw e
+    })
 
   return (
     <Card className="detail">
@@ -184,7 +188,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
                                         onSaved={n => { setSaving(false); setSavedTemplate(n) }}/>}
 
       <div className="detail-actions">
-        <button className="btn btn-sm" onClick={showLog}>
+        <button className="btn btn-sm" onClick={() => showLog().catch(() => {})}>
           <Icon name="scroll" size={13}/>Logs
         </button>
         {running && <button className="btn btn-sm" disabled={pending !== null}
@@ -243,9 +247,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
           <>
             <div className="log-bar">
               <span className="spacer"/>
-              <button className="btn btn-sm btn-ghost" onClick={showLog}>
-                <Icon name="refresh" size={13}/>Reload
-              </button>
+              <RefreshButton label="Reload" onRefresh={showLog}/>
             </div>
             <pre className="logs">{log || 'No output'}</pre>
           </>

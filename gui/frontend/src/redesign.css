@@ -163,6 +163,7 @@ a { color: inherit; text-decoration: none; }
 
 .btn-sm { height: 28px; padding: 0 9px; font-size: 12.5px; border-radius: 7px; }
 .btn .spinner { width: 12px; height: 12px; border-width: 1.5px; }
+.btn-failed, .btn-failed:hover:not(:disabled) { color: var(--error); }
 .btn-ghost { border-color: transparent; background: transparent; box-shadow: none; color: var(--body); }
 .btn-ghost:hover:not(:disabled) { background: var(--hairline-soft); color: var(--ink); }
 .btn:disabled {

@@ -1,0 +1,298 @@
+---
+import Base from '../layouts/Base.astro';
+
+const repo = 'https://github.com/wutz/forgeai';
+
+const features = [
+  {
+    icon: 'PRJ',
+    title: 'Multi-tenant projects',
+    body: 'A Project is a tenant: its own namespace, GPU quota per class, storage and volume limits, network isolation, a registry robot and members with edit or view access.',
+  },
+  {
+    icon: 'TRN',
+    title: 'Distributed training',
+    body: 'Jobs are plain Kubeflow Trainer v2 TrainJobs, admitted by Kueue. Jobs over quota wait in the queue instead of failing.',
+  },
+  {
+    icon: 'RTY',
+    title: 'Failure handling',
+    body: 'Stuck jobs are detected and stopped. Failures are classified (node failure, eviction, OOM, image pull, config, exit code) and retried when the policy allows.',
+  },
+  {
+    icon: 'SBX',
+    title: 'Agent sandboxes',
+    body: 'Interactive workloads run as agent-sandbox Sandboxes under gVisor or Kata. Idle sandboxes suspend, and a TTL stops them on schedule.',
+  },
+  {
+    icon: 'VOL',
+    title: 'Volumes and files',
+    body: 'Shared ReadWriteMany volumes resize, go to a trash with an expiry, and restore. An on-demand file server browses them and scales to zero when idle.',
+  },
+  {
+    icon: 'GPU',
+    title: 'Instance types',
+    body: 'GPU classes and sizes are generated from the nodes of the cluster, with live capacity per node. Members pick an instance type; they never edit the catalogue.',
+  },
+];
+
+const projectYaml = `apiVersion: forgeai.wutz.dev/v1alpha1
+kind: Project
+metadata:
+  name: demo
+spec:
+  displayName: Demo project
+  quota:
+    gpus:
+    - class: rtx-5090
+      count: 8
+    storage: 1Ti
+    volumes: 10
+  network:
+    isolation: Isolated
+  members:
+  - name: alice
+    role: edit
+  deletionPolicy: Retain`;
+
+const objects = [
+  ['Namespace', 'forge-<project>', 'Pod security baseline, network policies and labels that tie it to the project.'],
+  ['ClusterQueue + LocalQueue', 'forge-<project> / default', 'GPU quota per class. Jobs over quota wait in the queue.'],
+  ['ResourceQuota', 'forgeai-quota', 'Backstop for workloads that bypass Kueue: GPUs, CPU, memory, storage, volumes and pods.'],
+  ['NetworkPolicy', 'forgeai-isolation', 'Ingress only from the namespace and platform namespaces; optional internet egress block.'],
+  ['Registry project + robot', 'forge-<project>', 'Harbor project with a pull secret and push credentials, plus a storage quota.'],
+  ['Member ServiceAccount', 'forgeai-members/<project>.<member>', 'A token bound to the project edit or view role. Removing the member revokes it.'],
+];
+---
+
+<Base
+  title="forgeai: Kubernetes-native AI platform"
+  description="forgeai is a Kubernetes-native AI platform. Multi-tenant projects with quotas and isolation, distributed training with Kubeflow Trainer and Kueue, agent sandboxes and shared volumes, all as plain Kubernetes objects."
+>
+  <main>
+    <section class="hero">
+      <div class="container hero-grid">
+        <div>
+          <span class="eyebrow">First milestone · Multi-tenant training</span>
+          <h1>The AI platform for teams on Kubernetes</h1>
+          <p class="lead">
+            forgeai gives every team a project on a shared GPU cluster, with quotas, network isolation and member
+            access. Training jobs, sandboxes and volumes are ordinary Kubernetes objects, so they work with the tools
+            you already run.
+          </p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#get-started">Get started</a>
+            <a class="button button-secondary" href={repo} rel="noopener">View on GitHub</a>
+          </div>
+          <div class="built-on">
+            Built on
+            <ul>
+              <li>Kubeflow Trainer v2</li>
+              <li>Kueue</li>
+              <li>agent-sandbox</li>
+              <li>Harbor</li>
+              <li>dufs</li>
+            </ul>
+          </div>
+        </div>
+
+        <figure class="code-panel" aria-label="Example Project resource">
+          <figcaption class="code-panel-head">
+            <span>project.yaml</span>
+            <span>forgeai.wutz.dev/v1alpha1</span>
+          </figcaption>
+          <pre><code>{projectYaml}</code></pre>
+        </figure>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow-text">Features</span>
+          <h2>Everything a shared AI cluster needs, in one place</h2>
+          <p>
+            forgeai is a Kubernetes operator with a desktop console. It adds the parts that Trainer, Kueue and the
+            sandbox controller leave out: tenancy, lifecycle, retries and access.
+          </p>
+        </div>
+        <ul class="cards">
+          {
+            features.map((f) => (
+              <li class="card">
+                <span class="card-icon" aria-hidden="true">{f.icon}</span>
+                <h3>{f.title}</h3>
+                <p>{f.body}</p>
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+    </section>
+
+    <section class="section" id="how-it-works">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow-text">How it works</span>
+          <h2>No API server of its own</h2>
+          <p>
+            The operator reconciles Kubernetes objects. The desktop console and <code>kubectl</code> create those
+            objects with each member's own credentials, so Kubernetes RBAC decides what everyone can do.
+          </p>
+        </div>
+        <ol class="steps">
+          <li>
+            <h3>An admin creates a Project</h3>
+            <p>Quota, network isolation, trash retention and the list of members go into one cluster-scoped resource.</p>
+          </li>
+          <li>
+            <h3>The operator provisions the tenant</h3>
+            <p>It creates the namespace, queues, quotas, network policy, registry project and member credentials.</p>
+          </li>
+          <li>
+            <h3>Members work inside their project</h3>
+            <p>They submit jobs, start sandboxes and manage volumes with their own kubeconfig. They cannot change quotas, policies or access.</p>
+          </li>
+        </ol>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Object</th>
+                <th scope="col">Name</th>
+                <th scope="col">Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              {
+                objects.map(([object, name, purpose]) => (
+                  <tr>
+                    <td>{object}</td>
+                    <td><code>{name}</code></td>
+                    <td>{purpose}</td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="training">
+      <div class="container two-col">
+        <div>
+          <span class="eyebrow-text">Training</span>
+          <h2>Jobs that recover on their own</h2>
+          <p style="margin-top: 1rem; font-size: 1.0625rem;">
+            Training runs as Kubeflow Trainer v2 TrainJobs in the project namespace, queued by Kueue. The operator adds
+            the lifecycle features Trainer does not provide, so a long run does not need someone watching it.
+          </p>
+          <ul class="bullets">
+            <li><strong>Stop and start</strong> release the pods and keep the job, then reactivate its Kueue workload.</li>
+            <li><strong>Rerun</strong> submits a new job from the form of an existing one.</li>
+            <li><strong>Stuck detection</strong> stops jobs whose pods cannot start, such as image pull errors or crash loops.</li>
+            <li><strong>Retries</strong> resubmit failed jobs as <code>&lt;group&gt;-r&lt;n&gt;</code> up to a limit. Infrastructure failures retry by default.</li>
+          </ul>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Failure reason</th>
+                <th scope="col">Retried by default</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>NodeFailure</td><td>Yes</td></tr>
+              <tr><td>Evicted</td><td>Yes</td></tr>
+              <tr><td>OOMKilled</td><td>Only with <code>retry-on: Any</code></td></tr>
+              <tr><td>ExitCode</td><td>Only with <code>retry-on: Any</code></td></tr>
+              <tr><td>ImagePullFailed</td><td>Never</td></tr>
+              <tr><td>ConfigError</td><td>Never</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="sandboxes">
+      <div class="container two-col">
+        <div>
+          <span class="eyebrow-text">Sandboxes and volumes</span>
+          <h2>Interactive work without idle GPUs</h2>
+          <ul class="bullets">
+            <li><strong>Sandboxes</strong> are agent-sandbox resources with gVisor or Kata isolation, a bash command, env, optional GPU placement and project volumes.</li>
+            <li><strong>Idle suspend</strong> stops a sandbox nothing has used for its timeout. Open clients send a heartbeat to keep it awake.</li>
+            <li><strong>Volumes</strong> are PVCs from the platform storage types. They can grow (never shrink) and go to a trash with an expiry before they are purged.</li>
+            <li><strong>File server</strong> serves each volume over HTTPS with basic auth and scales to zero when it is not in use.</li>
+          </ul>
+        </div>
+        <figure class="code-panel" aria-label="Example Sandbox resource">
+          <figcaption class="code-panel-head">
+            <span>sandbox.yaml</span>
+            <span>agents.x-k8s.io/v1beta1</span>
+          </figcaption>
+          <pre><code>{`apiVersion: agents.x-k8s.io/v1beta1
+kind: Sandbox
+metadata:
+  name: agent
+  namespace: forge-demo
+  labels:
+    forgeai.wutz.dev/project: demo
+spec:
+  operatingMode: Running
+  podTemplate:
+    spec:
+      runtimeClassName: gvisor
+      containers:
+      - name: sandbox
+        image: <registry>/forge-demo/agent:latest`}</code></pre>
+        </figure>
+      </div>
+    </section>
+
+    <section class="section" id="get-started">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow-text">Get started</span>
+          <h2>Install the operator and the console</h2>
+          <p>
+            forgeai needs a Kubernetes cluster with Kubeflow Trainer v2 and Kueue installed. Sandboxes need
+            agent-sandbox, and project registries need Harbor. The steps below run from a checkout of the
+            repository.
+          </p>
+        </div>
+        <div class="install">
+          <div class="install-step">
+            <h3>1. Install the CRDs and the operator</h3>
+            <p>Targets the cluster in your current kubeconfig context. Replace the image with one your cluster can pull.</p>
+            <figure class="code-panel">
+              <pre><code>{`make install
+make deploy IMG=<registry>/forgeai:<tag>`}</code></pre>
+            </figure>
+          </div>
+          <div class="install-step">
+            <h3>2. Create a project</h3>
+            <p>The repository ships a sample Project you can adapt.</p>
+            <figure class="code-panel">
+              <pre><code>{`kubectl apply -f config/samples/forgeai_v1alpha1_project.yaml
+kubectl get fproj`}</code></pre>
+            </figure>
+          </div>
+          <div class="install-step">
+            <h3>3. Build the desktop console</h3>
+            <p>The console is a Wails app that talks to the cluster through a kubeconfig context.</p>
+            <figure class="code-panel">
+              <pre><code>{`make gui`}</code></pre>
+            </figure>
+          </div>
+        </div>
+        <p class="note">
+          Full reference: the <a href={`${repo}#readme`} rel="noopener">README</a> covers the object model, and
+          <a href={`${repo}/tree/main/gui`} rel="noopener">gui/</a> covers the console.
+        </p>
+      </div>
+    </section>
+  </main>
+</Base>

@@ -6,6 +6,7 @@ forgeai is a Kubernetes-native AI platform covering development, training, RL an
 |---|---|---|
 | Operator | `api/`, `internal/`, `cmd/` | `Project`, `InstanceType` and `FileServer` CRDs; adds stop/resume, failure classification and retries to `TrainJob`s; purges trashed volumes |
 | GUI | `gui/` | [Wails](https://wails.io) desktop client that talks to Kubernetes directly through a kubeconfig context |
+| Website | `website/` | Official site ([Astro](https://astro.build)), deployed to Cloudflare Workers at https://forgeai.wutz.dev |
 | Shared library | `pkg/` | Naming, platform config, instance types, job rendering and status, sandboxes, volumes, Harbor client, kubeconfig export |
 
 There is no API server of its own: the operator reconciles Kubernetes objects and the GUI (or `kubectl`) creates them with the member's own credentials.

@@ -184,6 +184,7 @@ The desktop client connects with a kubeconfig context and a project namespace (t
 | Images | Push instructions and robot credentials; list and delete images in the project's Harbor project |
 | Resources | Instance types with availability and the project quota usage |
 | Projects | Admins only (may create Projects): manage projects and members, export member kubeconfigs |
+| Dependencies | Cluster admins only: install or upgrade Kueue, Kubeflow Trainer v2 (with JobSet) and agent-sandbox at the versions pinned in the GUI, and see the forgeai operator's status |
 
 View-only members see the same views read-only and get no registry or file server credentials.
 
@@ -210,10 +211,10 @@ make deploy-dev                # ko build -> ghcr.io/wutz/forgeai (public), kube
 
 `deploy/dev` combines `config/default` with the platform ConfigMap. `make render-dev` only renders `dist/dev.yaml`; `make undeploy-dev` removes everything, including the CRDs.
 
-Prerequisites:
+Prerequisites (the Dependencies view installs the first three into a cluster; `make gui-deps` refreshes the pinned manifests embedded in the GUI):
 
 - Kubeflow Trainer v2 (with JobSet) and a `ClusterTrainingRuntime` named after `training.defaultRuntime`
 - agent-sandbox v1.0 or later (CRDs `agents.x-k8s.io/v1beta1`), for the Sandboxes view; the isolation RuntimeClasses (`gvisor`, `kata`) come from the node runtimes
-- Kueue, with the `trainer.kubeflow.org/trainjob` integration enabled
-- NVIDIA GPU operator (GPU feature discovery labels and the `nvidia.com/gpu` resource)
+- Kueue, with the `trainer.kubeflow.org/trainjob` integration enabled (the bundled Kueue config enables it)
+- NVIDIA GPU operator (GPU feature discovery labels and the `nvidia.com/gpu` resource); not installed from the GUI
 - A CNI that enforces NetworkPolicies, an ingress controller and Harbor

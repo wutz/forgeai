@@ -1,0 +1,25 @@
+{
+  "bundles": [
+    {
+      "name": "trainer",
+      "version": "v2.3.0",
+      "source": "https://github.com/kubeflow/trainer/tree/v2.3.0/manifests",
+      "file": "trainer.yaml",
+      "sha256": "87152d23e5e0bb498e122ae98f23757b7e1e74921f50a18645128da95ead47ca"
+    },
+    {
+      "name": "kueue",
+      "version": "v0.20.2",
+      "source": "https://github.com/kubernetes-sigs/kueue/releases/tag/v0.20.2",
+      "file": "kueue.yaml",
+      "sha256": "1ab14ecd590575ac57f50fa4cbcf529766bc2c32ba974bda1614381281ec52b4"
+    },
+    {
+      "name": "agent-sandbox",
+      "version": "v1.0.7",
+      "source": "https://github.com/kubernetes-sigs/agent-sandbox/releases/tag/v1.0.7",
+      "file": "agent-sandbox.yaml",
+      "sha256": "136c10c9347cb5a6740b351444cae82f404e883c3f520272257ba785f2af0da8"
+    }
+  ]
+}

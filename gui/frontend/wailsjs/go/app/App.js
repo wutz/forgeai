@@ -90,8 +90,16 @@ export function Heartbeat() {
   return window['go']['app']['App']['Heartbeat']();
 }
 
+export function InstallDependency(arg1) {
+  return window['go']['app']['App']['InstallDependency'](arg1);
+}
+
 export function KeepSandboxAwake(arg1) {
   return window['go']['app']['App']['KeepSandboxAwake'](arg1);
+}
+
+export function ListDependencies() {
+  return window['go']['app']['App']['ListDependencies']();
 }
 
 export function ListImages() {

@@ -50,7 +50,11 @@ export function GetSandbox(arg1:string):Promise<app.Sandbox>;
 
 export function Heartbeat():Promise<void>;
 
+export function InstallDependency(arg1:string):Promise<void>;
+
 export function KeepSandboxAwake(arg1:string):Promise<void>;
+
+export function ListDependencies():Promise<app.Dependencies>;
 
 export function ListImages():Promise<Array<app.ImageRepo>>;
 

@@ -3,6 +3,7 @@ import {CreateSandboxTemplate, UpdateSandboxTemplate, SandboxOptions} from '../w
 import {app, sandbox} from '../wailsjs/go/models'
 import {envMap, envToLines, linesToEnv, fmtDate, errText, generateName} from './util'
 import {Dialog, Empty, useConfirm} from './ui'
+import {ImageField} from './ImageField'
 
 // SandboxTemplateTable lists SandboxTemplates (agent blueprints new sandboxes
 // start from) inside the Templates page.
@@ -129,10 +130,8 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
         <div className="row">
           <div className="field">
             <label htmlFor="st-image">Image</label>
-            <input id="st-image" className="input mono" value={f.image}
-                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                   onChange={e => set('image', e.target.value)} required/>
-            {opts?.images?.length ? <span className="hint">Offered: {opts.images.join(', ')}</span> : null}
+            <ImageField id="st-image" value={f.image} onChange={image => set('image', image)}
+                        offered={opts?.images} required/>
           </div>
           <div className="field">
             <label htmlFor="st-runtime">Isolation</label>

@@ -4,6 +4,7 @@ import {app, sandbox, training} from '../wailsjs/go/models'
 import {envToLines, linesToEnv, fmtDate, errText, generateName} from './util'
 import {Card, Dialog, Empty, Icon, PageHeader, Segmented, useConfirm} from './ui'
 import {SandboxTemplateDialog, SandboxTemplateTable} from './SandboxTemplates'
+import {ImageField} from './ImageField'
 
 type Kind = 'sandbox' | 'job'
 
@@ -209,9 +210,7 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
         </div>
         <div className="field">
           <label htmlFor="t-image">Image</label>
-          <input id="t-image" className="input mono" value={f.image}
-                 autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                 onChange={e => set('image', e.target.value)} required/>
+          <ImageField id="t-image" value={f.image} onChange={image => set('image', image)} required/>
         </div>
         <div className="field">
           <label htmlFor="t-command">Command (bash)</label>

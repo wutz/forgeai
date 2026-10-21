@@ -3,6 +3,7 @@ import {CreateJob, ListInstanceTypes, TemplateNames, ListVolumes} from '../wails
 import {app, training, volumes} from '../wailsjs/go/models'
 import {envToLines, linesToEnv, errText, generateName} from './util'
 import {Dialog} from './ui'
+import {ImageField} from './ImageField'
 
 // JobCreateDialog is the "New job" form: template prefill, instance type,
 // workers, volumes, env and retry defaults.
@@ -114,10 +115,8 @@ export function JobCreateDialog({onClose, onCreated}: {
           </div>
           <div className="field">
             <label htmlFor="j-image">Image</label>
-            <input id="j-image" className="input mono" value={f.image}
-                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                   onChange={e => set('image', e.target.value)}
-                   placeholder="cr.example.com:7443/forge-myproj/train:latest" required/>
+            <ImageField id="j-image" value={f.image} onChange={image => set('image', image)}
+                        placeholder="cr.example.com:7443/forge-myproj/train:latest" required/>
           </div>
           <div className="field">
             <label htmlFor="j-command">Command (bash)</label>

@@ -130,11 +130,6 @@ jobs:
             fs.writeFileSync(file, JSON.stringify(config, null, 2) + "\n");
           '
 
-      - name: Test
-        if: matrix.package == 'linux'
-        working-directory: gui
-        run: go test -tags webkit2_41 ./...
-
       - name: Build
         working-directory: gui
         env:
@@ -147,6 +142,13 @@ jobs:
             linux) args+=(-tags webkit2_41) ;;
           esac
           wails build "${args[@]}"
+
+      # Runs after the build: main.go embeds frontend/dist, which only exists
+      # once wails has built the frontend.
+      - name: Test
+        if: matrix.package == 'linux'
+        working-directory: gui
+        run: go test -tags webkit2_41 ./...
 
       - name: Package
         env:

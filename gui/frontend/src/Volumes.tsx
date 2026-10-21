@@ -188,7 +188,7 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
         </div>
         <div className="field">
           <label htmlFor="v-size">Size (GiB)</label>
-          <input id="v-size" className="input" type="number" min={1} step={10} value={size}
+          <input id="v-size" className="input" type="number" min={1} step={1} value={size}
                  onChange={e => setSize(+e.target.value)} required/>
         </div>
         <Meter value={size} max={Math.max(size, 100)} tone="muted"
@@ -229,7 +229,7 @@ function ResizeVolumeDialog({volume, onClose, onDone}: {
         {error && <div className="banner banner-error">{error}</div>}
         <div className="field">
           <label htmlFor="v-grow">New size (GiB)</label>
-          <input id="v-grow" className="input" type="number" min={current + 1} step={10} value={size}
+          <input id="v-grow" className="input" type="number" min={current + 1} step={1} value={size}
                  onChange={e => setSize(+e.target.value)} required/>
         </div>
       </form>

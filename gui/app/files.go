@@ -87,6 +87,26 @@ func (a *App) Files() (*Files, error) {
 	return out, nil
 }
 
+// FileServerPhase reports the phase of the file server (Idle, Starting or
+// Ready) without waking it or refreshing its heartbeat. It is empty when the
+// project has no file server yet.
+func (a *App) FileServerPhase() (string, error) {
+	c, err := a.current()
+	if err != nil {
+		return "", err
+	}
+	ctx, cancel := a.call()
+	defer cancel()
+	fs := &v1.FileServer{}
+	if err := c.k8s.Get(ctx, client.ObjectKey{Namespace: c.namespace(), Name: naming.FileServerName}, fs); err != nil {
+		if isNotFound(err) {
+			return "", nil
+		}
+		return "", err
+	}
+	return string(fs.Status.Phase), nil
+}
+
 // Heartbeat touches the last-active annotation without returning anything.
 // Writes are throttled to heartbeatEvery, so calling it often is cheap.
 func (a *App) Heartbeat() error {

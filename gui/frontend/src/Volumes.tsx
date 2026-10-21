@@ -1,7 +1,7 @@
 import {FormEvent, useEffect, useState} from 'react'
 import {
   CreateVolume, ListVolumes, ResizeVolume, RestoreVolume, SetVolumeExpiry,
-  TrashVolume, PurgeVolume, Config,
+  TrashVolume, PurgeVolume, Config, FileServerPhase,
 } from '../wailsjs/go/app/App'
 import {app, volumes as vol} from '../wailsjs/go/models'
 import {fmtDate, errText, generateName} from './util'
@@ -34,12 +34,26 @@ export function Volumes() {
 
   const totalGiB = items.reduce((n, v) => n + (v.capacityGiB || v.requestedGiB || 0), 0)
 
-  const trashVolume = (v: vol.Volume) => confirm.ask({
-    title: `Move ${v.name} to the recycle bin?`,
-    message: 'It stays restorable until it expires; the purge time follows the platform trash retention.',
-    action: 'Move to recycle bin', danger: true,
-    run: () => TrashVolume(v.name).then(refresh).catch(e => setError(errText(e))),
-  })
+  // The file server serves ReadWriteMany volumes, so trashing one rebuilds it
+  // and ends any transfer in progress. The phase read does not wake or
+  // heartbeat the server.
+  const trashVolume = (v: vol.Volume) => FileServerPhase()
+    .catch(() => '')
+    .then(phase => confirm.ask({
+      title: `Move ${v.name} to the recycle bin?`,
+      message: <>
+        It stays restorable until it expires; the purge time follows the platform trash retention.
+        {(phase === 'Ready' || phase === 'Starting') && v.accessMode === 'ReadWriteMany' && <>
+          <br/><br/>
+          <span className="banner banner-warn" style={{display: 'block'}}>
+            The file server is running. Moving this volume restarts it,
+            which interrupts file transfers in progress.
+          </span>
+        </>}
+      </>,
+      action: 'Move to recycle bin', danger: true,
+      run: () => TrashVolume(v.name).then(refresh).catch(e => setError(errText(e))),
+    }))
   const purgeVolume = (v: vol.Volume) => confirm.ask({
     title: `Permanently delete ${v.name}?`,
     message: 'Its data is removed now. This cannot be undone.',

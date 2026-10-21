@@ -49,3 +49,37 @@ func TestHeartbeatUpdatesExistingAnnotation(t *testing.T) {
 		t.Errorf("throttled heartbeat wrote again: %s", got.Annotations[naming.AnnotationLastActive])
 	}
 }
+
+// Reading the phase must not write the heartbeat: the recycle bin asks before
+// trashing a volume, and a heartbeat would wake the server it is checking.
+func TestFileServerPhaseDoesNotHeartbeat(t *testing.T) {
+	stale := time.Now().UTC().Add(-time.Hour).Format(time.RFC3339)
+	fs := &v1.FileServer{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: naming.FileServerName, Namespace: testNamespace,
+			Annotations: map[string]string{naming.AnnotationLastActive: stale},
+		},
+		Status: v1.FileServerStatus{Phase: v1.FileServerReady},
+	}
+	a := testApp(t, fs)
+	ctx := context.Background()
+	got := &v1.FileServer{}
+	phase, err := a.FileServerPhase()
+	if err != nil || phase != string(v1.FileServerReady) {
+		t.Fatalf("phase = %q, %v; want Ready", phase, err)
+	}
+	if err := a.conn.k8s.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: naming.FileServerName}, got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Annotations[naming.AnnotationLastActive] != stale {
+		t.Errorf("FileServerPhase refreshed last-active: %s", got.Annotations[naming.AnnotationLastActive])
+	}
+}
+
+func TestFileServerPhaseWithoutServer(t *testing.T) {
+	a := testApp(t)
+	phase, err := a.FileServerPhase()
+	if err != nil || phase != "" {
+		t.Fatalf("phase = %q, %v; want empty", phase, err)
+	}
+}

@@ -20,7 +20,11 @@
   --accent-deep: #4338ca;
   --accent-soft: #eef2ff;
   --accent-ring: rgba(79, 70, 229, 0.18);
-  /* Indigo → violet, for the logo tile and the accent button. */
+  /* Tinted accent button: hairline edge and the hover and press washes. */
+  --accent-line: rgba(79, 70, 229, 0.28);
+  --accent-wash-hover: #e0e7ff;
+  --accent-wash-press: #c7d2fe;
+  /* Indigo → violet, for the logo tile. */
   --accent-gradient: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
   --radius-sm: 6px;
   --radius-md: 8px;

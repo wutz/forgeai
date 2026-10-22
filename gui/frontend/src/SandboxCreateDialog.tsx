@@ -37,7 +37,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
         ...prev, image: o.defaultImage, runtimeClass: o.defaultRuntimeClass,
       }))
     }).catch(e => setError(errText(e)))
-    ListInstanceTypes().then(setTypes).catch(() => {})
+    ListInstanceTypes().then(setTypes).catch(e => setError(errText(e)))
     ListVolumes(false).then(setVols).catch(e => setError(errText(e)))
     SandboxTemplates().then(setTemplates).catch(() => {})
   }, [])
@@ -70,10 +70,13 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   // The backend rejects a name that does not start with a letter, or is longer
   // than the sandbox limit; the field says so before Create is pressed.
   const nameOK = NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= SANDBOX_NAME_MAX
+  // Negative durations are refused by the backend; the fields say so before Create.
+  const ttlOK = Number.isFinite(ttlHours) && ttlHours >= 0
+  const idleOK = idleMinutes === null || (Number.isFinite(idleMinutes) && idleMinutes >= 0)
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (!nameOK || !mountsOK || envBad.length) return
+    if (!nameOK || !mountsOK || envBad.length || !ttlOK || !idleOK) return
     setBusy(true)
     const form = sandbox.Form.createFrom({
       ...f,
@@ -98,7 +101,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
     <Dialog title={t('sandboxCreate.title')} subtitle={t('sandboxCreate.subtitle')}
             onClose={onClose} busy={busy} footer={<>
               <CancelButton disabled={busy}/>
-              <button type="submit" form="sandbox-form" className="btn btn-primary" disabled={busy || !nameOK || !f.image || !mountsOK || envBad.length > 0}>
+              <button type="submit" form="sandbox-form" className="btn btn-primary" disabled={busy || !nameOK || !f.image || !mountsOK || envBad.length > 0 || !ttlOK || !idleOK}>
                 {busy ? t('sandboxCreate.creating') : t('sandboxCreate.create')}
               </button>
             </>}>
@@ -179,18 +182,20 @@ export function SandboxCreateDialog({onClose, onCreated}: {
           <div className="row">
             <div className="field">
               <label htmlFor="s-ttl">{t('sandboxCreate.ttl')}</label>
-              <input id="s-ttl" className="input" type="number" min={0} step={0.5} value={ttlHours}
+              <input id="s-ttl" className="input" type="number" step="any" value={ttlHours} aria-invalid={!ttlOK}
                      onChange={e => setTtlHours(+e.target.value)}/>
               <span className="hint">{t('sandboxCreate.ttlHint')}</span>
+              {!ttlOK && <span className="hint hint-error">{t('sandboxCreate.nonNegative')}</span>}
             </div>
             <div className="field">
               <label htmlFor="s-idle">{t('sandboxCreate.idle')}</label>
-              <input id="s-idle" className="input" type="number" min={0} step={1} value={idleMinutes ?? ''}
+              <input id="s-idle" className="input" type="number" step="any" value={idleMinutes ?? ''} aria-invalid={!idleOK}
                      onChange={e => setIdleMinutes(e.target.value === '' ? null : +e.target.value)}
                      placeholder={opts?.idleTimeout
                        ? t('sandboxCreate.idleDefault', {value: opts.idleTimeout})
                        : t('sandboxCreate.off')}/>
               <span className="hint">{t('sandboxCreate.idleHint', {timeout: opts?.idleTimeout || t('sandboxCreate.off')})}</span>
+              {!idleOK && <span className="hint hint-error">{t('sandboxCreate.nonNegative')}</span>}
             </div>
           </div>
           <div className="row">

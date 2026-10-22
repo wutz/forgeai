@@ -60,7 +60,10 @@ func (a *App) Files() (*Files, error) {
 	out := &Files{Phase: "Starting"}
 	fs = &v1.FileServer{}
 	if err := c.k8s.Get(ctx, key, fs); err == nil {
-		out.Phase = string(fs.Status.Phase)
+		// A server the operator has not reconciled yet has no phase; it is still starting.
+		if p := string(fs.Status.Phase); p != "" {
+			out.Phase = p
+		}
 		out.Volumes = fs.Status.Volumes
 	}
 	// View-only members cannot read the Secret: they get no address.

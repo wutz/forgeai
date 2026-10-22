@@ -88,6 +88,19 @@ func TestFileServerPhaseWithoutServer(t *testing.T) {
 	}
 }
 
+// Files creates the server on first use, before the operator has written any
+// status. The view must read that as Starting, not as an empty phase.
+func TestFilesNewServerIsStarting(t *testing.T) {
+	a := testApp(t)
+	got, err := a.Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Phase != string(v1.FileServerStarting) || got.Address != "" {
+		t.Fatalf("new server: phase %q address %q; want Starting and no address", got.Phase, got.Address)
+	}
+}
+
 // The pod can be Ready before the ingress routes to it. The browser must keep
 // seeing Starting, and get no address, until the server answers through the
 // ingress; otherwise the frame loads a 503 and never recovers.

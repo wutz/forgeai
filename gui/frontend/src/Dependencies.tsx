@@ -9,7 +9,7 @@ import {MessageKey, t} from './i18n'
 // Progress is one deps:progress event: a step of an install, or its outcome
 // when done is set (app.DependencyProgress). Wails only generates models for
 // bound methods, so the event payload is typed here.
-type Progress = {cluster: string, name: string, message: string, done: boolean, error?: string}
+type Progress = {cluster: string, name: string, step?: string, done: boolean, error?: string}
 
 // Dependencies installs and checks the cluster components forgeai runs on:
 // Kubeflow Trainer v2 with JobSet, Kueue and agent-sandbox at the versions
@@ -18,7 +18,8 @@ type Progress = {cluster: string, name: string, message: string, done: boolean, 
 export function Dependencies() {
   const [data, setData] = useState<app.Dependencies | null>(null)
   const [error, setError] = useState('')
-  // steps is the latest progress message of each component that is installing.
+  // steps is the latest install step of each component that is installing, as
+  // the step key the backend sent.
   const [steps, setSteps] = useState<Record<string, string>>({})
   // cluster is the context the list was read from. The progress listener reads
   // it from a ref, since it is subscribed once.
@@ -48,23 +49,24 @@ export function Dependencies() {
     // into this list. Its outcome is seen when that cluster is connected.
     if (p.cluster !== cluster.current) return
     if (!p.done) {
-      setSteps(s => ({...s, [p.name]: p.message}))
+      if (p.step) setSteps(s => ({...s, [p.name]: p.step as string}))
       return
     }
     setSteps(({[p.name]: _, ...rest}) => rest)
-    if (p.error) setError(`${p.name}: ${p.error}`)
+    if (p.error) setError(`${title(p.name)}: ${p.error}`)
     refresh().catch(() => undefined)
   }), [])
 
   const install = (d: app.Dependency) => confirm.ask({
-    title: t('deps.confirmTitle', {action: verb(d), name: text(d, 'title')}),
+    title: t('deps.confirmTitle', {action: verb(d), name: title(d.name)}),
     message: <>
       {t(d.name === 'forgeai' ? 'deps.chartConfirmMessage' : 'deps.confirmMessage', {version: d.pinned})}
       {d.name === 'agent-sandbox' && ` ${t('deps.restartNote')}`}
     </>,
     action: verb(d),
     run: () => {
-      setSteps(s => ({...s, [d.name]: t('deps.starting')}))
+      setError('')
+      setSteps(s => ({...s, [d.name]: 'starting'}))
       InstallDependency(d.name).catch(e => {
         setSteps(({[d.name]: _, ...rest}) => rest)
         setError(errText(e))
@@ -108,11 +110,12 @@ export function Dependencies() {
             {items.map(d => {
               const step = steps[d.name]
               const installing = d.status === 'installing'
+              const note = installing ? '' : detail(d)
               return (
                 <tr key={d.name}>
                   <td>
-                    <span className="cell-main">{text(d, 'title')}</span>
-                    <span className="cell-sub">{text(d, 'desc')}</span>
+                    <span className="cell-main">{title(d.name)}</span>
+                    <span className="cell-sub">{desc(d.name)}</span>
                   </td>
                   <td className="mono">
                     {d.installed || <span className="muted">—</span>}
@@ -127,10 +130,10 @@ export function Dependencies() {
                   <td>
                     <Badge tone={tone(d.status)}>{label(d.status)}</Badge>
                     {(installing || step) && <div className="muted" style={{fontSize: 12, marginTop: 4}}>
-                      {step || t('deps.installing')}
+                      {step ? t(`deps.step.${step}` as MessageKey) : t('deps.installing')}
                     </div>}
-                    {!installing && d.message && <div className="muted" style={{fontSize: 12, marginTop: 4}}>
-                      {d.message}
+                    {note && <div className="muted" style={{fontSize: 12, marginTop: 4}}>
+                      {note}
                     </div>}
                   </td>
                   <td>
@@ -153,10 +156,22 @@ export function Dependencies() {
   )
 }
 
-// text is the translated title or description of a component; the names are
-// the ones in the Go catalog.
-function text(d: app.Dependency, part: 'title' | 'desc'): string {
-  return t(`deps.${d.name}.${part}` as MessageKey)
+// title and desc are the translated text of a component, keyed by its name in
+// the Go catalog.
+function title(name: string): string {
+  return t(`deps.${name}.title` as MessageKey)
+}
+
+function desc(name: string): string {
+  return t(`deps.${name}.desc` as MessageKey)
+}
+
+// detail is the line under a component's status. The view words the outdated
+// case itself; the other messages are backend diagnostics, shown as written.
+function detail(d: app.Dependency): string {
+  if (d.status === 'missing') return '' // the status label already says it
+  if (d.status === 'outdated') return t('deps.outdated', {installed: d.installed, pinned: d.pinned})
+  return d.message
 }
 
 // verb is the action a component offers, from its status.

@@ -33,6 +33,16 @@ type NavItem = {area: Area, label: string, icon: IconName}
 // else the one last used there, else the first project. Users that may not
 // list projects get no list, so the requested namespace is taken as typed.
 // With nothing to go on it returns '' and the context default is used.
+// readJSON reads a JSON value from localStorage. A damaged entry counts as
+// absent, so it cannot stop the connection that reads it.
+function readJSON<T>(key: string, fallback: T): T {
+  try {
+    return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback
+  } catch {
+    return fallback
+  }
+}
+
 function pickNamespace(list: app.ProjectNamespace[], requested: string, remembered: string): string {
   if (!list.length) return requested || remembered
   const known = [requested, remembered].find(ns => list.some(p => p.namespace === ns))
@@ -103,7 +113,7 @@ export default function App() {
 
   const connectTo = async (contextName: string, requested = '') => {
     const seq = ++attempt.current
-    const remembered: Record<string, string> = JSON.parse(localStorage.getItem(NAMESPACES) || '{}')
+    const remembered = readJSON<Record<string, string>>(NAMESPACES, {})
     setCluster(contextName)
     setLoading(true)
     setError('')
@@ -134,7 +144,7 @@ export default function App() {
     Environment().then(env => document.body.classList.toggle('platform-darwin', env.platform === 'darwin'))
     Contexts().then(list => {
       setContexts(list)
-      const last: {ctx?: string, ns?: string} = JSON.parse(localStorage.getItem(PREFS) || '{}')
+      const last = readJSON<{ctx?: string, ns?: string}>(PREFS, {})
       const start = list.find(c => c.name === last.ctx) || list.find(c => c.current) || list[0]
       if (!start) {
         setError(t('app.noContext'))

@@ -39,7 +39,7 @@ const (
 // registry at forgeaiChartVersion and waited on until its Deployment is up.
 func installChart(ctx context.Context, c *Connection, progress func(string)) error {
 	ns := platform.Namespace()
-	progress("Ensuring the " + ns + " namespace")
+	progress(stepChartNamespace)
 	if err := ensureNamespace(ctx, c.k8s, ns); err != nil {
 		return err
 	}
@@ -60,7 +60,7 @@ func installChart(ctx context.Context, c *Connection, progress func(string)) err
 	up.Atomic = true
 	up.Timeout = deploymentReadyTimeout
 
-	progress("Pulling the forgeai chart " + forgeaiChartVersion)
+	progress(stepChartPull)
 	path, err := up.ChartPathOptions.LocateChart(forgeaiChart, cli.New())
 	if err != nil {
 		return err
@@ -69,7 +69,7 @@ func installChart(ctx context.Context, c *Connection, progress func(string)) err
 	if err != nil {
 		return err
 	}
-	progress("Installing the forgeai operator")
+	progress(stepChartInstall)
 	_, err = up.RunWithContext(ctx, forgeaiRelease, chrt, nil)
 	return err
 }

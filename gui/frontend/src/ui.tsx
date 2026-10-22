@@ -318,7 +318,7 @@ export function Dialog({title, subtitle, onClose, children, footer, width, busy}
   })
   return (
     <div className="overlay" onMouseDown={e => e.target === e.currentTarget && close()}>
-      <div className="dialog" style={width ? {width} : undefined} role="dialog" aria-modal>
+      <div className="dialog" style={width ? {width} : undefined} role="dialog" aria-modal aria-label={title}>
         <div className="dialog-head">
           <div>
             <h2>{title}</h2>

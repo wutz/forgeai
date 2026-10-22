@@ -60,6 +60,21 @@ const (
 	forgeaiDeployment = "forgeai-controller-manager"
 )
 
+// Install steps, the values of DependencyProgress.Step. The GUI keys its text
+// on them as deps.step.<step>.
+const (
+	stepNamespaces     = "namespaces"
+	stepCRDs           = "crds"
+	stepControllers    = "controllers"
+	stepDeployments    = "deployments"
+	stepWebhooks       = "webhooks"
+	stepChartNamespace = "chart-namespace"
+	stepChartPull      = "chart-pull"
+	stepChartInstall   = "chart-install"
+	stepRecord         = "record"
+	stepRestart        = "restart"
+)
+
 var (
 	crdGVK      = schema.GroupVersionKind{Group: "apiextensions.k8s.io", Version: "v1", Kind: "CustomResourceDefinition"}
 	namespaceGK = schema.GroupKind{Kind: "Namespace"}
@@ -147,9 +162,11 @@ type DependencyProgress struct {
 	// ignores the event.
 	Cluster string `json:"cluster"`
 	Name    string `json:"name"`
-	Message string `json:"message"`
-	Done    bool   `json:"done"`
-	Error   string `json:"error,omitempty"`
+	// Step is the install step under way, one of the step constants. The GUI
+	// shows its translated text, so the backend sends no English prose here.
+	Step  string `json:"step,omitempty"`
+	Done  bool   `json:"done"`
+	Error string `json:"error,omitempty"`
 }
 
 // depBundle is an embedded install manifest of one component at its pinned version.
@@ -557,26 +574,26 @@ func (a *App) InstallDependency(name string) error {
 	go func() {
 		ctx, cancel := context.WithTimeout(a.ctx, depInstallTimeout)
 		defer cancel()
-		progress := func(msg string) {
-			runtime.EventsEmit(a.ctx, depProgressEvent, DependencyProgress{Cluster: cluster, Name: name, Message: msg})
+		progress := func(step string) {
+			runtime.EventsEmit(a.ctx, depProgressEvent, DependencyProgress{Cluster: cluster, Name: name, Step: step})
 		}
 		rec, err := installComponent(ctx, c, b, progress)
 		if err == nil {
-			progress("Recording the install")
+			progress(stepRecord)
 			rec.AppliedBy = currentUser(ctx, c.k8s)
 			rec.AppliedAt = time.Now().UTC().Format(time.RFC3339)
 			err = writeRecord(ctx, c.k8s, name, rec)
 		}
 		if err == nil && name == "agent-sandbox" {
-			progress("Restarting the forgeai operator to start the Sandbox controller")
+			progress(stepRestart)
 			err = restartOperator(ctx, c.k8s)
 		}
 		// Release the component before the outcome is emitted: the view
 		// refreshes on it and must not still see the install in progress.
 		a.installs.finish(key)
-		done := DependencyProgress{Cluster: cluster, Name: name, Message: "Installed " + rec.Version, Done: true}
+		done := DependencyProgress{Cluster: cluster, Name: name, Done: true}
 		if err != nil {
-			done = DependencyProgress{Cluster: cluster, Name: name, Message: "Install failed", Done: true, Error: err.Error()}
+			done.Error = err.Error()
 		}
 		runtime.EventsEmit(a.ctx, depProgressEvent, done)
 	}()
@@ -614,23 +631,23 @@ func installBundle(ctx context.Context, k8s client.Client, b *depBundle, progres
 		stages[s] = append(stages[s], u)
 	}
 
-	progress("Applying namespaces and CRDs")
+	progress(stepNamespaces)
 	if err := applyAll(ctx, k8s, stages[0]); err != nil {
 		return err
 	}
-	progress("Waiting for the CRDs to be established")
+	progress(stepCRDs)
 	if err := waitCRDs(ctx, k8s, stages[0]); err != nil {
 		return err
 	}
-	progress("Applying controllers and RBAC")
+	progress(stepControllers)
 	if err := applyAll(ctx, k8s, stages[1]); err != nil {
 		return err
 	}
-	progress("Waiting for the Deployments to be available")
+	progress(stepDeployments)
 	if err := waitDeployments(ctx, k8s, stages[1]); err != nil {
 		return err
 	}
-	progress("Applying webhooks and custom resources")
+	progress(stepWebhooks)
 	return applyAll(ctx, k8s, stages[2])
 }
 

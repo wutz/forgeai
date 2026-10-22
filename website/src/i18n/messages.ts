@@ -93,7 +93,6 @@ const en = {
     title: 'Every job, sandbox and GPU in one window',
     lead: 'The console is a desktop app for macOS, Windows and Linux. It talks to Kubernetes through your kubeconfig and nothing sits in between, so what you see is what the cluster says.',
     tabsLabel: 'Console views',
-    frameTitle: 'forgeai console',
     items: [
       {
         key: 'jobs',
@@ -376,7 +375,6 @@ const zh: Messages = {
     title: '任务、沙箱和 GPU，一个窗口看全',
     lead: '控制台是适用于 macOS、Windows 和 Linux 的桌面应用。它通过你的 kubeconfig 直接访问 Kubernetes，中间没有任何代理，所见即集群的真实状态。',
     tabsLabel: '控制台视图',
-    frameTitle: 'forgeai 控制台',
     items: [
       {
         key: 'jobs',

@@ -174,9 +174,14 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
   const [size, setSize] = useState(100)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  // Checked as the form reads them, so a bad value is named under its field
+  // instead of a native browser bubble or a failed create.
+  const nameOK = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(name) && name.length <= 50
+  const sizeOK = Number.isInteger(size) && size >= 1
 
   const save = (e: FormEvent) => {
     e.preventDefault()
+    if (!nameOK || !sizeOK) return
     setBusy(true)
     CreateVolume(name, type, size).then(() => {
       onCreated()
@@ -190,7 +195,7 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
     <Dialog title={t('volumes.new')} subtitle={t('volumes.createSubtitle')} width={440}
             onClose={onClose} busy={busy} footer={<>
               <CancelButton/>
-              <button type="submit" form="create-volume" className="btn btn-primary" disabled={busy}>
+              <button type="submit" form="create-volume" className="btn btn-primary" disabled={busy || !nameOK || !sizeOK}>
                 {busy ? t('volumes.creating') : t('volumes.createVolume')}
               </button>
             </>}>
@@ -198,10 +203,11 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
         {error && <div className="banner banner-error">{error}</div>}
         <div className="field">
           <label htmlFor="v-name">{t('common.name')}</label>
-          <input id="v-name" className="input mono" value={name} pattern="[a-z0-9]([a-z0-9\-]*[a-z0-9])?"
+          <input id="v-name" className="input mono" value={name}
                  autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                 maxLength={50} title={t('volumes.nameHint')}
+                 maxLength={50} aria-invalid={!nameOK}
                  onChange={e => setName(e.target.value)} required/>
+          {!nameOK && name !== '' && <span className="hint hint-error">{t('volumes.nameHint')}</span>}
         </div>
         <div className="field">
           <label htmlFor="v-type">{t('volumes.type')}</label>
@@ -214,7 +220,8 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
         <div className="field">
           <label htmlFor="v-size">{t('volumes.sizeGiB')}</label>
           <input id="v-size" className="input" type="number" min={1} step={1} value={size}
-                 onChange={e => setSize(+e.target.value)} required/>
+                 aria-invalid={!sizeOK} onChange={e => setSize(+e.target.value)} required/>
+          {!sizeOK && <span className="hint hint-error">{t('volumes.sizeInvalid')}</span>}
         </div>
         <Meter value={size} max={Math.max(size, 100)} tone="muted"
                label={<span>{t('volumes.requestedStorage')}</span>} right={<span>{size} GiB</span>}/>

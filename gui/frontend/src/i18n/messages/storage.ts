@@ -43,7 +43,7 @@ export const en = {
   'volumes.growVolume': 'Grow volume',
   'volumes.newSize': 'New size (GiB)',
   'volumes.growTooSmall': 'Must be larger than {size} GiB.',
-  'volumes.expiryTitle': 'Purge {name} on',
+  'volumes.expiryTitle': 'Set purge date for {name}',
   'volumes.expirySubtitle': 'Restore keeps the volume; purge is final',
   'volumes.purgeDay': 'Purge day',
   'volumes.purgeDayTooSoon': 'Choose a day from tomorrow on.',

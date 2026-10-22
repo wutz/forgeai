@@ -29,10 +29,6 @@ type Area = 'overview' | 'jobs' | 'sandboxes' | 'templates' | 'volumes' | 'files
 
 type NavItem = {area: Area, label: string, icon: IconName}
 
-// pickNamespace chooses the project a context opens with: the requested one,
-// else the one last used there, else the first project. Users that may not
-// list projects get no list, so the requested namespace is taken as typed.
-// With nothing to go on it returns '' and the context default is used.
 // readJSON reads a JSON value from localStorage. A damaged entry counts as
 // absent, so it cannot stop the connection that reads it.
 function readJSON<T>(key: string, fallback: T): T {
@@ -43,6 +39,10 @@ function readJSON<T>(key: string, fallback: T): T {
   }
 }
 
+// pickNamespace chooses the project a context opens with: the requested one,
+// else the one last used there, else the first project. Users that may not
+// list projects get no list, so the requested namespace is taken as typed.
+// With nothing to go on it returns '' and the context default is used.
 function pickNamespace(list: app.ProjectNamespace[], requested: string, remembered: string): string {
   if (!list.length) return requested || remembered
   const known = [requested, remembered].find(ns => list.some(p => p.namespace === ns))

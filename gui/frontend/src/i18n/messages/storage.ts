@@ -49,6 +49,7 @@ export const en = {
 
   'files.title': 'Files',
   'files.serving': 'Serving {volumes}. ',
+  'files.servingOnWake': 'Will serve {volumes} once started. ',
   'files.note': 'Shared volumes are served over HTTPS and scaled to zero when idle. Activity in the browser keeps the server up.',
   'files.opening': 'Opening the file browser…',
   'files.noAccess': 'No file server access for your role',
@@ -143,6 +144,7 @@ export const zh: Record<keyof typeof en, string> = {
 
   'files.title': '文件',
   'files.serving': '正在提供 {volumes} 的访问。',
+  'files.servingOnWake': '启动后将提供 {volumes} 的访问。',
   'files.note': '共享存储卷通过 HTTPS 提供服务，空闲时自动缩容到零。浏览器中的操作会让服务保持运行。',
   'files.opening': '正在打开文件浏览器…',
   'files.noAccess': '你的角色没有文件服务访问权限',

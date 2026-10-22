@@ -59,7 +59,9 @@ export function FilesView() {
                   )}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       <p className="muted note">
-        {state?.volumes?.length ? t('files.serving', {volumes: state.volumes.join(', ')}) : ''}
+        {state?.volumes?.length
+          ? t(ready ? 'files.serving' : 'files.servingOnWake', {volumes: state.volumes.join(', ')})
+          : ''}
         {t('files.note')}
       </p>
       {!state ? (

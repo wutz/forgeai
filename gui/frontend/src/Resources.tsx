@@ -71,7 +71,9 @@ export function Resources() {
                   <span className="cell-main">{ty.name}</span>
                   <span className="cell-sub">{ty.class}</span>
                 </td>
-                <td><Badge>{ty.gpuCount}× {ty.product}</Badge></td>
+                <td>{ty.gpuCount
+                  ? <Badge>{ty.gpuCount}× {ty.product}</Badge>
+                  : <span className="muted">{t('resources.cpuOnly')}</span>}</td>
                 <td>{ty.cpu}</td>
                 <td>{ty.memory}</td>
                 <td className="mono">{ty.total}</td>

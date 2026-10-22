@@ -115,7 +115,9 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
                 <div className="pool" key={pool.name}>
                   <div className="pool-head">
                     <span className="mono pool-name">{pool.name}</span>
-                    <span className="badge">{pool.gpuCount}× {pool.product}</span>
+                    {pool.gpuCount
+                      ? <span className="badge">{pool.gpuCount}× {pool.product}</span>
+                      : <span className="muted">{t('resources.cpuOnly')}</span>}
                     <span className="spacer"/>
                     <span className="pool-free">
                       <strong className={pool.free >= 1 ? 'free' : 'muted'}>{pool.free}</strong>

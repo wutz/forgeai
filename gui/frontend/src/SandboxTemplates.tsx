@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {CreateSandboxTemplate, UpdateSandboxTemplate, SandboxOptions} from '../wailsjs/go/app/App'
 import {app, sandbox} from '../wailsjs/go/models'
-import {envErrors, envMap, envToLines, linesToEnv, fmtDate, errText, generateName} from './util'
+import {envErrors, envMap, envToLines, linesToEnv, fmtDate, errText, generateName, NAME_MAX, NAME_PATTERN} from './util'
 import {Dialog, Empty, useConfirm} from './ui'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
@@ -90,9 +90,18 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
     setF(prev => sandbox.TemplateForm.createFrom({...prev, [k]: v}))
 
   const envBad = envErrors(envText)
+  // An edit keeps its name (the field is disabled), so only a new name is checked.
+  const nameOK = !!existing || (NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= NAME_MAX)
+  // blocker says why Save is off. A bad name or env line already has a hint
+  // under its field, so the footer only names the blockers that have none.
+  const blocker = !f.name ? t('common.nameRequired')
+    : !nameOK ? t('common.nameInvalid')
+    : !f.image ? t('common.imageRequired')
+    : envBad.length ? t('common.envInvalid', {lines: envBad.join(', ')}) : ''
+  const hasFieldHint = (!nameOK && (f.name ?? '') !== '') || envBad.length > 0
 
   const save = () => {
-    if (envBad.length) return
+    if (blocker) return
     setBusy(true)
     const payload = sandbox.TemplateForm.createFrom({
       ...f,
@@ -110,8 +119,9 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
               ? t('sandboxTemplates.editSubtitle')
               : t('sandboxTemplates.newSubtitle')}
             onClose={onClose} busy={busy} footer={<>
+              {blocker && !busy && !hasFieldHint && <span className="hint hint-error" role="status">{blocker}</span>}
               <button className="btn" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
-              <button type="submit" form="sandbox-template-form" className="btn btn-primary" disabled={busy || !f.name || !f.image || envBad.length > 0}>
+              <button type="submit" form="sandbox-template-form" className="btn btn-primary" disabled={busy || !!blocker}>
                 {busy ? t('templates.saving') : t('templates.saveTemplate')}
               </button>
             </>}>
@@ -122,7 +132,9 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
             <label htmlFor="st-name">{t('common.name')}</label>
             <input id="st-name" className="input mono" value={f.name} disabled={!!existing}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                   onChange={e => set('name', e.target.value)} placeholder="agent" required/>
+                   onChange={e => set('name', e.target.value)} placeholder="agent" required
+                   maxLength={existing ? undefined : NAME_MAX} aria-invalid={!nameOK}/>
+            {!nameOK && (f.name ?? '') !== '' && <span className="hint hint-error">{t('common.nameInvalid')}</span>}
           </div>
           <div className="field">
             <label htmlFor="st-desc">{t('templates.description')}</label>

@@ -1,8 +1,10 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"strings"
+	"sync"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -23,13 +25,19 @@ type Image struct {
 	PulledAt   string   `json:"pulledAt,omitempty"`
 }
 
-// ImageRepo groups the images of one repository.
+// ImageRepo groups the images of one repository. Error is set when its images
+// could not be listed; the repository is still returned, with its counts.
 type ImageRepo struct {
 	Name   string  `json:"name"`
 	Count  int64   `json:"count"`
 	Pulls  int64   `json:"pulls"`
 	Images []Image `json:"images"`
+	Error  string  `json:"error,omitempty"`
 }
+
+// imageListConcurrency bounds the artifact requests sent to the registry at
+// once.
+const imageListConcurrency = 4
 
 // Registry is the project registry: the robot credentials and how to push.
 type Registry struct {
@@ -104,22 +112,39 @@ func (a *App) ListImages() ([]ImageRepo, error) {
 	if err != nil {
 		return nil, err
 	}
-	out := make([]ImageRepo, 0, len(repos))
-	for _, r := range repos {
-		arts, err := hc.ListArtifacts(ctx, harborProject(c), r.Name)
-		if err != nil {
-			return nil, err
-		}
-		ir := ImageRepo{Name: r.Name, Count: r.ArtifactCount, Pulls: r.PullCount}
-		for _, art := range arts {
-			ir.Images = append(ir.Images, Image{
-				Repository: r.Name, Digest: art.Digest, Tags: art.TagNames(),
-				SizeMiB: art.Size >> 20, PushedAt: art.PushTime, PulledAt: art.PullTime,
-			})
-		}
-		out = append(out, ir)
+	out := make([]ImageRepo, len(repos))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, imageListConcurrency)
+	for i, r := range repos {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func() {
+			defer wg.Done()
+			defer func() { <-sem }()
+			out[i] = repoImages(ctx, hc, harborProject(c), r)
+		}()
 	}
+	wg.Wait()
 	return out, nil
+}
+
+// repoImages lists the images of one repository. A repository whose artifacts
+// cannot be listed keeps its counts and says why, so one failure does not hide
+// the other repositories.
+func repoImages(ctx context.Context, hc *harbor.Client, project string, r harbor.Repository) ImageRepo {
+	ir := ImageRepo{Name: r.Name, Count: r.ArtifactCount, Pulls: r.PullCount}
+	arts, err := hc.ListArtifacts(ctx, project, r.Name)
+	if err != nil {
+		ir.Error = err.Error()
+		return ir
+	}
+	for _, art := range arts {
+		ir.Images = append(ir.Images, Image{
+			Repository: r.Name, Digest: art.Digest, Tags: art.TagNames(),
+			SizeMiB: art.Size >> 20, PushedAt: art.PushTime, PulledAt: art.PullTime,
+		})
+	}
+	return ir
 }
 
 // DeleteImage deletes one image by digest or tag.

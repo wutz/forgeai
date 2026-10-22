@@ -77,13 +77,13 @@ func (a *App) ListJobs() ([]*Job, error) {
 	if err != nil {
 		return nil, err
 	}
+	ix, err := loadJobIndex(ctx, c)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]*Job, 0, len(items))
 	for i := range items {
-		j, err := toJob(ctx, c, &items[i])
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, j)
+		out = append(out, ix.job(&items[i]))
 	}
 	group(out)
 	slices.SortFunc(out, func(a, b *Job) int { return strings.Compare(b.Created, a.Created) })
@@ -114,10 +114,11 @@ func (a *App) GetJob(name string) (*Job, error) {
 	if self == nil {
 		return nil, fmt.Errorf("job %q not found", name)
 	}
-	j, err := toJob(ctx, c, self)
+	ix, err := loadJobIndex(ctx, c)
 	if err != nil {
 		return nil, err
 	}
+	j := ix.job(self)
 	if j.Group != j.Name {
 		return j, nil
 	}
@@ -125,11 +126,7 @@ func (a *App) GetJob(name string) (*Job, error) {
 		if items[i].Name == name || groupOf(&items[i]) != name {
 			continue
 		}
-		r, err := toJob(ctx, c, &items[i])
-		if err != nil {
-			return nil, err
-		}
-		j.Retries = append(j.Retries, r)
+		j.Retries = append(j.Retries, ix.job(&items[i]))
 	}
 	slices.SortFunc(j.Retries, func(a, b *Job) int { return strings.Compare(a.Name, b.Name) })
 	return j, nil
@@ -442,13 +439,48 @@ func (a *App) renderTrainJob(ctx context.Context, c *Connection, f training.Form
 	})
 }
 
-// toJob derives the view model: phase from conditions and pods, form fields
-// from the trainer overrides and the forgeai runtime patch.
+// jobIndex holds what toJob reads besides the TrainJob: the pods of every job
+// in the namespace and the instance types. A list loads it once, instead of
+// once per job.
+type jobIndex struct {
+	pods          map[string][]corev1.Pod // by job set name
+	instanceTypes map[string]*v1.InstanceType
+}
+
+func loadJobIndex(ctx context.Context, c *Connection) (*jobIndex, error) {
+	pods := &corev1.PodList{}
+	if err := c.k8s.List(ctx, pods, client.InNamespace(c.namespace()),
+		client.HasLabels{kf.LabelJobSetName}); err != nil {
+		return nil, err
+	}
+	ix := &jobIndex{pods: map[string][]corev1.Pod{}, instanceTypes: map[string]*v1.InstanceType{}}
+	for _, p := range pods.Items {
+		ix.pods[p.Labels[kf.LabelJobSetName]] = append(ix.pods[p.Labels[kf.LabelJobSetName]], p)
+	}
+	// Instance types only add the GPU and CPU of the job view. A user who cannot
+	// list them still sees the jobs, without those details.
+	its := &v1.InstanceTypeList{}
+	if err := c.k8s.List(ctx, its); err == nil {
+		for i := range its.Items {
+			ix.instanceTypes[its.Items[i].Name] = &its.Items[i]
+		}
+	}
+	return ix, nil
+}
+
+// toJob derives the view model of one job. Lists use a jobIndex loaded once.
 func toJob(ctx context.Context, c *Connection, tj *kf.TrainJob) (*Job, error) {
-	pods, err := jobPods(ctx, c, tj.Name)
+	ix, err := loadJobIndex(ctx, c)
 	if err != nil {
 		return nil, err
 	}
+	return ix.job(tj), nil
+}
+
+// job derives the view model: phase from conditions and pods, form fields
+// from the trainer overrides and the forgeai runtime patch.
+func (ix *jobIndex) job(tj *kf.TrainJob) *Job {
+	pods := slices.Clone(ix.pods[tj.Name])
 	phase, msg := training.JobPhase(tj, pods)
 	out := &Job{
 		Name:       tj.Name,
@@ -513,12 +545,12 @@ func toJob(ctx context.Context, c *Connection, tj *kf.TrainJob) (*Job, error) {
 			out.Ready++
 		}
 	}
-	if it, err := lookupInstanceType(ctx, c, out.Instance); err == nil && it != nil {
+	if it := ix.instanceTypes[out.Instance]; it != nil {
 		out.GPUClass = it.Spec.GPU.Class
 		out.GPUCount = it.Spec.GPU.Count * out.Workers
 		out.CPU = it.Spec.CPU.String()
 	}
-	return out, nil
+	return out
 }
 
 // podMessage explains a pod that is not running.

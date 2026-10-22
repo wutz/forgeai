@@ -92,6 +92,8 @@ export const en = {
   'images.deleteImageTags': 'This image also carries {tags}; deleting it removes all of those tags.',
   'images.deleteImageMessage': 'Its tags, if any, are removed with it. This cannot be undone.',
   'images.deleteImage': 'Delete image',
+  'images.repoError': 'Could not list the images of this repository: {error}',
+  'images.notListed': 'Not listed',
 }
 
 export const zh: Record<keyof typeof en, string> = {
@@ -185,4 +187,6 @@ export const zh: Record<keyof typeof en, string> = {
   'images.deleteImageTags': '该镜像还带有标签 {tags}，删除后这些标签都会被移除。',
   'images.deleteImageMessage': '其标签（如有）会一并移除，此操作无法撤销。',
   'images.deleteImage': '删除镜像',
+  'images.repoError': '无法列出此仓库的镜像：{error}',
+  'images.notListed': '未能列出',
 }

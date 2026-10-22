@@ -35,6 +35,8 @@ type fileTarget struct {
 	base *url.URL
 	user string
 	pass string
+	// insecure skips TLS verification of the file server (private CA).
+	insecure bool
 }
 
 // fileProxy is a reverse proxy on the loopback interface. The file browser
@@ -104,7 +106,12 @@ func (p *fileProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Pages are rewritten below, so they must arrive uncompressed.
+	tr := fileTransport
+	if t.insecure {
+		tr = fileTransportInsecure
+	}
 	rp := &httputil.ReverseProxy{
+		Transport: tr,
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetURL(t.base)
 			pr.Out.SetBasicAuth(t.user, t.pass)

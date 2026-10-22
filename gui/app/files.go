@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"crypto/tls"
 	"net/http"
 	"net/url"
 	"time"
@@ -74,13 +75,14 @@ func (a *App) Files() (*Files, error) {
 		// The pod can be Ready before the ingress routes to it; until then the
 		// browser gets 503 and the frame would never recover. Report Starting
 		// until the server answers through the ingress.
-		if !fileServerServing(ctx, base) {
+		if !fileServerServing(ctx, base, c.insecure) {
 			out.Phase = string(v1.FileServerStarting)
 		} else {
 			target = &fileTarget{
-				base: base,
-				user: string(sec.Data[corev1.BasicAuthUsernameKey]),
-				pass: string(sec.Data[corev1.BasicAuthPasswordKey]),
+				base:     base,
+				user:     string(sec.Data[corev1.BasicAuthUsernameKey]),
+				pass:     string(sec.Data[corev1.BasicAuthPasswordKey]),
+				insecure: c.insecure,
 			}
 		}
 	}
@@ -95,17 +97,37 @@ func (a *App) Files() (*Files, error) {
 	return out, nil
 }
 
+// fileServerTransport is the transport to the file server. The ingress serves
+// the same private CA as the registry, so insecure skips verification the way
+// the registry setting does.
+func fileServerTransport(insecure bool) *http.Transport {
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	if insecure {
+		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // private CA, opt-in
+	}
+	return tr
+}
+
+var (
+	fileTransport         = fileServerTransport(false)
+	fileTransportInsecure = fileServerTransport(true)
+)
+
 // fileServerServing reports whether the file server answers at base. dufs
 // serves its health check before authentication, so no credentials are needed.
 // Any failure, including a 503 from the ingress, counts as not serving.
-func fileServerServing(ctx context.Context, base *url.URL) bool {
+func fileServerServing(ctx context.Context, base *url.URL, insecure bool) bool {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base.JoinPath("__dufs__", "health").String(), nil)
 	if err != nil {
 		return false
 	}
-	resp, err := http.DefaultClient.Do(req)
+	tr := fileTransport
+	if insecure {
+		tr = fileTransportInsecure
+	}
+	resp, err := (&http.Client{Transport: tr}).Do(req)
 	if err != nil {
 		return false
 	}

@@ -9,6 +9,9 @@ const knownErrors: [RegExp, MessageKey][] = [
   [/"[^"]*" already exists/, 'error.alreadyExists'],
   [/context deadline exceeded|Client\.Timeout exceeded/, 'error.timeout'],
   [/was not created by forgeai and cannot be (edited|deleted) here/, 'error.notCreatedByForgeai'],
+  [/registry is not configured for this project/, 'error.registryNotConfigured'],
+  [/was superseded by a newer connect/, 'error.connectionSuperseded'],
+  [/has no pod: it is stopped or still starting/, 'error.sandboxNoPod'],
 ]
 
 export function errText(e: unknown): string {

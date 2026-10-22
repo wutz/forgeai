@@ -182,6 +182,7 @@ export namespace app {
 	    count: number;
 	    pulls: number;
 	    images: Image[];
+	    error?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ImageRepo(source);
@@ -193,6 +194,7 @@ export namespace app {
 	        this.count = source["count"];
 	        this.pulls = source["pulls"];
 	        this.images = this.convertValues(source["images"], Image);
+	        this.error = source["error"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

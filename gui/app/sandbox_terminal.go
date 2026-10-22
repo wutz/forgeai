@@ -155,14 +155,23 @@ func (a *App) OpenSandboxTerminal(name, id string, cols, rows int) error {
 		cancel: scancel,
 	}
 	t.sizes.set(remotecommand.TerminalSize{Width: clampSize(cols), Height: clampSize(rows)})
-	a.terminals.Store(id, t)
+	// The lookup above only fails fast: two opens with one id can both pass it
+	// while the pod is read. Registering is the step that must be atomic.
+	if _, busy := a.terminals.LoadOrStore(id, t); busy {
+		scancel()
+		_ = pr.Close()
+		_ = pw.Close()
+		return fmt.Errorf("terminal session %s is already open", id)
+	}
 
 	out := &eventWriter{ctx: a.ctx, event: "sandbox-terminal:" + id}
 	go func() {
 		err := exec.StreamWithContext(sctx, remotecommand.StreamOptions{
 			Stdin: pr, Stdout: out, Tty: true, TerminalSizeQueue: t.sizes,
 		})
-		a.terminals.Delete(id)
+		// Only the entry this session registered is removed: a later session with
+		// the same id must not lose its entry to this one's exit.
+		a.terminals.CompareAndDelete(id, t)
 		_ = pr.Close()
 		scancel()
 		msg := ""

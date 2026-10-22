@@ -119,13 +119,18 @@ export function Images() {
           <details key={r.name} className="repo">
             <summary>
               <span className="mono">{reg?.url}/{r.name}</span>
-              <Badge>{t('images.tagsCount', {count: tagCount(r)})}</Badge>
+              {r.error
+                ? <Badge tone="error">{t('images.notListed')}</Badge>
+                : <Badge>{t('images.tagsCount', {count: tagCount(r)})}</Badge>}
               <span className="muted" style={{fontSize: 12}}>{t('images.pullsCount', {count: r.pulls})}</span>
               <button className="btn btn-sm btn-danger" onClick={e => {
                 e.preventDefault()
                 deleteRepo(r)
               }}>{t('images.deleteAll')}</button>
             </summary>
+            {r.error && <div className="banner banner-error" role="alert">
+              {t('images.repoError', {error: r.error})}
+            </div>}
             <table className="table">
               <thead><tr><th>{t('images.tag')}</th><th>{t('images.digest')}</th><th>{t('images.size')}</th><th>{t('images.pushed')}</th><th/></tr></thead>
               <tbody>

@@ -2,7 +2,7 @@
 // segmented filters, tabs, badges, empty state and dialogs. Everything here
 // renders from tokens in style.css (gui/DESIGN.md).
 
-import {ReactNode, createContext, useContext, useEffect, useRef, useState} from 'react'
+import {KeyboardEvent as ReactKeyboardEvent, ReactNode, createContext, useContext, useEffect, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {t} from './i18n'
 
@@ -143,15 +143,35 @@ export function Meter({value, max, tone = 'accent', label, right}: {
   )
 }
 
+// tabKeyDown gives a tab row the ARIA tabs keys: the arrows, Home and End move
+// the selection and the focus together. Only the selected tab is in the Tab
+// order (see tabIndex at the call sites), so the row costs one stop.
+function tabKeyDown<T extends string>(e: ReactKeyboardEvent<HTMLDivElement>, values: T[], onChange: (v: T) => void) {
+  const tabs = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'))
+  const at = tabs.indexOf(document.activeElement as HTMLButtonElement)
+  if (at < 0) return
+  let next: number
+  switch (e.key) {
+    case 'ArrowRight': next = (at + 1) % tabs.length; break
+    case 'ArrowLeft': next = (at - 1 + tabs.length) % tabs.length; break
+    case 'Home': next = 0; break
+    case 'End': next = tabs.length - 1; break
+    default: return
+  }
+  e.preventDefault()
+  tabs[next].focus()
+  onChange(values[next])
+}
+
 // Segmented is the pill filter row (Jobs: All / Running / Queued / Failed).
 export function Segmented<T extends string>({options, value, onChange, counts}: {
   options: {value: T, label: string}[], value: T, onChange: (v: T) => void,
   counts?: Partial<Record<T, number>>
 }) {
   return (
-    <div className="segmented" role="tablist">
+    <div className="segmented" role="tablist" onKeyDown={e => tabKeyDown(e, options.map(o => o.value), onChange)}>
       {options.map(o => (
-        <button key={o.value} role="tab" aria-selected={value === o.value}
+        <button key={o.value} role="tab" aria-selected={value === o.value} tabIndex={value === o.value ? 0 : -1}
                 className={`segment ${value === o.value ? 'active' : ''}`}
                 onClick={() => onChange(o.value)}>
           {o.label}
@@ -167,9 +187,9 @@ export function Tabs<T extends string>({tabs, value, onChange}: {
   tabs: {value: T, label: string, icon?: IconName}[], value: T, onChange: (v: T) => void
 }) {
   return (
-    <div className="tabs" role="tablist">
+    <div className="tabs" role="tablist" onKeyDown={e => tabKeyDown(e, tabs.map(tab => tab.value), onChange)}>
       {tabs.map(tab => (
-        <button key={tab.value} role="tab" aria-selected={value === tab.value}
+        <button key={tab.value} role="tab" aria-selected={value === tab.value} tabIndex={value === tab.value ? 0 : -1}
                 className={`tab ${value === tab.value ? 'active' : ''}`}
                 onClick={() => onChange(tab.value)}>
           {tab.icon && <Icon name={tab.icon} size={14}/>}{tab.label}
@@ -295,12 +315,17 @@ function ConfirmDialog({request, onClose}: {request: ConfirmRequest, onClose: ()
 // an edit inside the body, closing asks first, so typed input is not discarded
 // by a stray click. Edits are the change events of the body's fields; values
 // filled in by a load do not count.
+// focusable lists the elements a keyboard user can reach inside an element.
+const focusableSelector = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), ' +
+  'textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+
 export function Dialog({title, subtitle, onClose, children, footer, width, busy}: {
   title: string, subtitle?: ReactNode, onClose: () => void, children: ReactNode,
   footer?: ReactNode, width?: number, busy?: boolean
 }) {
   const [edited, setEdited] = useState(false)
   const [asking, setAsking] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
   const close = () => {
     // While the discard prompt is up, only its own buttons or Escape act.
     if (busy || asking) return
@@ -316,9 +341,45 @@ export function Dialog({title, subtitle, onClose, children, footer, width, busy}
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
+  // Focus moves into the dialog when it opens (an autoFocus field keeps it)
+  // and goes back to the opener when it closes. The opener is read while
+  // rendering: autoFocus runs at commit, before the effects, and would
+  // otherwise be taken for the opener. The first field of the body gets focus,
+  // not the close button in the title bar.
+  const [opener] = useState(() => document.activeElement as HTMLElement | null)
+  useEffect(() => {
+    const el = box.current
+    if (el && !el.contains(document.activeElement)) {
+      const first = el.querySelector('.dialog-body')?.querySelector<HTMLElement>(focusableSelector)
+        ?? el.querySelector<HTMLElement>(focusableSelector)
+      first?.focus()
+    }
+    return () => opener?.focus?.()
+  }, [])
+  // Tab and Shift+Tab stay inside the dialog while it is open.
+  useEffect(() => {
+    const onTab = (e: KeyboardEvent) => {
+      const el = box.current
+      if (e.key !== 'Tab' || !el) return
+      const items = el.querySelectorAll<HTMLElement>(focusableSelector)
+      if (items.length === 0) return
+      const first = items[0], last = items[items.length - 1]
+      const active = document.activeElement
+      const outside = !el.contains(active)
+      if (e.shiftKey && (active === first || outside)) {
+        e.preventDefault()
+        last.focus()
+      } else if (!e.shiftKey && (active === last || outside)) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+    window.addEventListener('keydown', onTab)
+    return () => window.removeEventListener('keydown', onTab)
+  }, [])
   return (
     <div className="overlay" onMouseDown={e => e.target === e.currentTarget && close()}>
-      <div className="dialog" style={width ? {width} : undefined} role="dialog" aria-modal aria-label={title}>
+      <div ref={box} className="dialog" style={width ? {width} : undefined} role="dialog" aria-modal aria-label={title}>
         <div className="dialog-head">
           <div>
             <h2>{title}</h2>

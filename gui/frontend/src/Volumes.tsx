@@ -277,9 +277,12 @@ function ExpiryDialog({volume, onClose, onDone}: {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const tomorrow = localDay(new Date(Date.now() + 24 * 3600 * 1000))
+  // Dates are YYYY-MM-DD, so a string compare orders them.
+  const dayOK = !!day && day >= tomorrow
 
   const save = (e: FormEvent) => {
     e.preventDefault()
+    if (!dayOK) return
     setBusy(true)
     SetVolumeExpiry(volume.name, new Date(`${day}T00:00:00`)).then(() => {
       onDone()
@@ -292,7 +295,7 @@ function ExpiryDialog({volume, onClose, onDone}: {
     <Dialog title={t('volumes.expiryTitle', {name: volume.name})} subtitle={t('volumes.expirySubtitle')}
             width={400} onClose={onClose} busy={busy} footer={<>
               <CancelButton/>
-              <button type="submit" form="expiry-volume" className="btn btn-primary" disabled={busy || !day}>
+              <button type="submit" form="expiry-volume" className="btn btn-primary" disabled={busy || !dayOK}>
                 {busy ? t('volumes.saving') : t('common.save')}
               </button>
             </>}>
@@ -301,7 +304,8 @@ function ExpiryDialog({volume, onClose, onDone}: {
         <div className="field">
           <label htmlFor="v-expiry">{t('volumes.purgeDay')}</label>
           <input id="v-expiry" className="input" type="date" min={tomorrow} value={day}
-                 onChange={e => setDay(e.target.value)} required/>
+                 onChange={e => setDay(e.target.value)} aria-invalid={!dayOK} required/>
+          {day !== '' && !dayOK && <span className="hint hint-error">{t('volumes.purgeDayTooSoon')}</span>}
         </div>
       </form>
     </Dialog>

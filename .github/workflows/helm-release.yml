@@ -5,12 +5,22 @@ name: Helm release
 #   ghcr.io/wutz/forgeai:<version>
 #   oci://ghcr.io/wutz/charts/forgeai:<version>
 # The chart's default image is the one above. The GUI installs the chart at
-# the version pinned in gui/app/deps.go, which has to be bumped with the tag.
+# the version pinned in gui/app/chart.go, which has to be bumped with the tag.
+#
+# A manual run (workflow_dispatch) publishes the version typed in, from main,
+# without moving a tag. It is for publishing a version whose tag's own run
+# failed.
 
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish, MAJOR.MINOR.PATCH, from main"
+        required: true
+        type: string
 
 permissions: {}
 
@@ -35,12 +45,20 @@ jobs:
       - name: Resolve version
         id: version
         env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
           REF_NAME: ${{ github.ref_name }}
         run: |
-          version="${REF_NAME#v}"
+          # A manual run publishes the version typed in, and only from main.
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "Manual runs publish from main, not $GITHUB_REF" >&2; exit 1; }
+            version="$INPUT_VERSION"
+          else
+            version="${REF_NAME#v}"
+          fi
           # The chart and image tags are plain semantic versions.
           if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Tag $REF_NAME is not of the form vMAJOR.MINOR.PATCH" >&2
+            echo "Version $version is not of the form MAJOR.MINOR.PATCH" >&2
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
@@ -50,8 +68,22 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # The prebuilt binary, not go install: ko v0.19.1 needs a newer Go than
+      # the runner's toolchain, and GOTOOLCHAIN=local forbids fetching one.
       - name: Install ko
-        run: go install github.com/google/ko@v0.19.1
+        env:
+          KO_VERSION: 0.19.1
+        run: |
+          dir="$(mktemp -d)"
+          cd "$dir"
+          base="https://github.com/ko-build/ko/releases/download/v${KO_VERSION}"
+          archive="ko_${KO_VERSION}_Linux_x86_64.tar.gz"
+          curl -fsSLO "$base/$archive"
+          curl -fsSLO "$base/checksums.txt"
+          grep " $archive\$" checksums.txt | sha256sum -c -
+          tar -xzf "$archive" ko
+          sudo install -m 0755 ko /usr/local/bin/ko
+          ko version
 
       - name: Log in to ghcr.io
         env:
@@ -83,11 +115,19 @@ jobs:
       - name: Resolve version
         id: version
         env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
           REF_NAME: ${{ github.ref_name }}
         run: |
-          version="${REF_NAME#v}"
+          # A manual run publishes the version typed in, and only from main.
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "Manual runs publish from main, not $GITHUB_REF" >&2; exit 1; }
+            version="$INPUT_VERSION"
+          else
+            version="${REF_NAME#v}"
+          fi
           if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Tag $REF_NAME is not of the form vMAJOR.MINOR.PATCH" >&2
+            echo "Version $version is not of the form MAJOR.MINOR.PATCH" >&2
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"

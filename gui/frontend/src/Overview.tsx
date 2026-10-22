@@ -63,8 +63,11 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
   const readyWorkers = active.reduce((n, j) => n + (j.ready || 0), 0)
   const wantedWorkers = active.reduce((n, j) => n + (j.workers || 0), 0)
 
-  const gpuTotal = types.reduce((n, ty) => n + ty.total, 0)
-  const gpuFree = types.reduce((n, ty) => n + ty.free, 0)
+  // total and free count instances; the GPU tiles count GPUs, so each GPU type
+  // is weighted by its GPUs per instance, as on Resources. CPU-only types have none.
+  const gpuTypes = types.filter(ty => ty.gpuCount > 0)
+  const gpuTotal = gpuTypes.reduce((n, ty) => n + ty.total * ty.gpuCount, 0)
+  const gpuFree = gpuTypes.reduce((n, ty) => n + ty.free * ty.gpuCount, 0)
   const gpuUsed = Math.max(0, gpuTotal - gpuFree)
 
   const storageGiB = vols.reduce((n, v) => n + (v.capacityGiB || v.requestedGiB || 0), 0)
@@ -143,14 +146,15 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
                        label={<span className="mono">{t('overview.gpusOfClass', {cls: g.class})}</span>}
                        right={<span>{quota.gpuQuota ? `${g.used} / ${quota.gpuQuota}` : g.used}</span>}/>
               ))}
-              <Meter value={toGiB(quota.storageUsed)} max={Math.max(toGiB(quota.storage), 1)} tone="muted"
+              {/* A zero or empty limit means unlimited: the bar stays empty rather than full. */}
+              <Meter value={toGiB(quota.storageUsed)} max={toGiB(quota.storage)} tone="muted"
                      label={<span className="mono">{t('overview.volumeStorage')}</span>}
                      right={<span>{quota.storageUsed || '0'} / {quota.storage || t('overview.unlimited')}</span>}/>
-              <Meter value={quota.volumes} max={Math.max(quota.volumeMax, quota.volumes, 1)} tone="muted"
+              <Meter value={quota.volumes} max={quota.volumeMax} tone="muted"
                      label={<span className="mono">{t('overview.volumes')}</span>}
                      right={<span>{quota.volumes} / {quota.volumeMax || t('overview.unlimited')}</span>}/>
-              <Meter value={quota.pods} max={Math.max(quota.podMax, quota.pods, 1)} tone="muted"
-                     label={<span className="mono">Pods</span>}
+              <Meter value={quota.pods} max={quota.podMax} tone="muted"
+                     label={<span className="mono">{t('overview.pods')}</span>}
                      right={<span>{quota.pods} / {quota.podMax || t('overview.unlimited')}</span>}/>
             </div>
           )}

@@ -4,7 +4,7 @@ import {app} from '../wailsjs/go/models'
 import {EventsOn} from '../wailsjs/runtime/runtime'
 import {errText} from './util'
 import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Spinner, useActive, useConfirm} from './ui'
-import {MessageKey, t} from './i18n'
+import {MessageKey, getLocale, t} from './i18n'
 
 // Progress is one deps:progress event: a step of an install, or its outcome
 // when done is set (app.DependencyProgress). Wails only generates models for
@@ -123,7 +123,7 @@ export function Dependencies() {
                       {d.namespace}
                     </div>}
                     {d.appliedBy && <div className="muted" style={{fontSize: 12, marginTop: 4}}>
-                      {t('deps.appliedBy', {user: d.appliedBy, time: new Date(d.appliedAt).toLocaleString()})}
+                      {t('deps.appliedBy', {user: d.appliedBy, time: new Date(d.appliedAt).toLocaleString(getLocale())})}
                     </div>}
                   </td>
                   <td className="mono">{d.pinned || <span className="muted">—</span>}</td>

@@ -1,4 +1,4 @@
-import {MessageKey, t} from './i18n'
+import {MessageKey, getLocale, t} from './i18n'
 
 // knownErrors maps the backend messages users hit most to catalogue keys, so
 // they read well in both languages. Other backend text is shown as written.
@@ -107,7 +107,7 @@ export function generateName(prefix: string): string {
 export function fmtDate(iso?: string): string {
   if (!iso) return '—'
   const d = new Date(iso)
-  return isNaN(+d) ? iso : d.toLocaleString()
+  return isNaN(+d) ? iso : d.toLocaleString(getLocale())
 }
 
 // toGiB reads a Kubernetes storage quantity ("500Gi", "1Ti", "2G", "1000") as

@@ -650,6 +650,15 @@ td:first-child {
   box-shadow: none;
 }
 
+.download-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  list-style: none;
+  padding: 0;
+  margin: 1.25rem 0 0;
+}
+
 .note {
   margin-top: 2rem;
   font-size: 0.9375rem;

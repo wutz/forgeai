@@ -65,7 +65,8 @@ export function Sandboxes() {
       <div className="split">
         <SandboxTable boxes={boxes} selected={selected} onSelect={n =>
           setSelected(prev => prev === n ? null : n)}/>
-        {selected && <SandboxDetail name={selected} onDone={refresh}
+        {/* Keyed by name: a read still in flight for the previous sandbox must not land on this detail, where Stop and Delete would act on it. */}
+        {selected && <SandboxDetail key={selected} name={selected} onDone={refresh}
                                     onDeleted={() => { setSelected(null); refresh() }}/>}
       </div>
     </div>
@@ -139,16 +140,17 @@ function SandboxDetail({name, onDone, onDeleted}: {
   // its target, because suspending or resuming takes the controller a while.
   const [pending, setPending] = useState<'start' | 'stop' | null>(null)
   const active = useActive()
-  const act = (p: Promise<unknown>) => p.then(onDone).catch(e => setError(errText(e)))
   const confirm = useConfirm()
+  const phase = box?.phase
+  // reload reads the sandbox now, so an action's result shows without waiting for the poll.
+  const reload = () => GetSandbox(name).then(setBox).catch(e => setError(errText(e)))
   const transition = (kind: 'start' | 'stop', p: Promise<unknown>) => {
     setPending(kind)
-    p.then(onDone).catch(e => {
+    p.then(() => { onDone(); return reload() }).catch(e => {
       setError(errText(e))
       setPending(null)
     })
   }
-  const phase = box?.phase
 
   useEffect(() => {
     if (!phase || !pending) return
@@ -173,9 +175,8 @@ function SandboxDetail({name, onDone, onDeleted}: {
   // detail lets the sandbox go idle, as it does when the detail closes.
   useEffect(() => {
     if (!active) return
-    const load = () => GetSandbox(name).then(setBox).catch(e => setError(errText(e)))
-    load()
-    const timer = setInterval(load, 5000)
+    reload()
+    const timer = setInterval(reload, 5000)
     // Keep the sandbox awake while its detail is open and running.
     const beat = setInterval(() => KeepSandboxAwake(name).catch(() => {}), HEARTBEAT)
     KeepSandboxAwake(name).catch(() => {})
@@ -185,7 +186,9 @@ function SandboxDetail({name, onDone, onDeleted}: {
     }
   }, [name, active])
 
-  if (!box) return <Card><Spinner label={error || t('sandboxes.loading')}/></Card>
+  if (!box) return <Card>{error
+    ? <div className="banner banner-error" role="alert">{error}</div>
+    : <Spinner label={t('sandboxes.loading')}/>}</Card>
   const running = box.phase === 'Running' || box.phase === 'Pending'
   // showLog rejects when the logs cannot be read; the banner shows why.
   const showLog = () =>

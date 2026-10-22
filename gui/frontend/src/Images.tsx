@@ -43,7 +43,8 @@ export function Images() {
 
   const deleteRepo = (r: app.ImageRepo) => confirm.ask({
     title: t('images.deleteRepoTitle', {name: r.name}),
-    message: t('images.deleteRepoMessage', {count: tagCount(r)}),
+    // A repository that failed to list has no known tag count to show.
+    message: r.error ? t('images.deleteRepoUnlisted') : t('images.deleteRepoMessage', {count: tagCount(r)}),
     action: t('images.deleteRepo'), danger: true,
     run: () => DeleteImageRepo(r.name).then(refresh).catch(e => setError(errText(e))),
   })
@@ -126,7 +127,7 @@ export function Images() {
               <button className="btn btn-sm btn-danger" onClick={e => {
                 e.preventDefault()
                 deleteRepo(r)
-              }}>{t('images.deleteAll')}</button>
+              }}>{t('images.deleteRepo')}</button>
             </summary>
             {r.error && <div className="banner banner-error" role="alert">
               {t('images.repoError', {error: r.error})}
@@ -134,27 +135,38 @@ export function Images() {
             <table className="table">
               <thead><tr><th>{t('images.tag')}</th><th>{t('images.digest')}</th><th>{t('images.size')}</th><th>{t('images.pushed')}</th><th/></tr></thead>
               <tbody>
-              {r.images?.map(img => (img.tags?.length ? img.tags : ['']).map(tag => (
-                <tr key={img.digest + tag}>
-                  <td className="mono">{(tag || '').split(',')[0] || <span className="muted">{t('images.untagged')}</span>}</td>
+              {r.images?.map(img => {
+                const tags = img.tags?.filter(Boolean) ?? []
+                return (
+                <tr key={img.digest}>
+                  <td>
+                    {tags.length
+                      ? <div style={{display: 'flex', flexWrap: 'wrap', gap: 6}}>
+                        {tags.map(tag => {
+                          const key = `address-${img.digest}-${tag}`
+                          return (
+                            <button key={tag} className="btn btn-sm mono" title={t('images.copyAddress')}
+                                    onClick={() => copy(address(r.name, tag), key)}>
+                              <Icon name={copied === key ? 'check' : 'copy'} size={12}/>{tag}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      : <span className="muted">{t('images.untagged')}</span>}
+                  </td>
                   <td className="mono trunc" title={img.digest}>{img.digest.slice(7, 19)}</td>
                   <td>{img.sizeMiB ? `${img.sizeMiB} MiB` : '—'}</td>
                   <td className="muted">{fmtDate(img.pushedAt)}</td>
                   <td>
                     <div className="actions">
-                      <button className="btn btn-sm" disabled={!tag}
-                              title={tag ? undefined : t('images.untaggedNoAddress')}
-                              onClick={() => copy(address(r.name, tag), `address-${img.digest}-${tag}`)}>
-                        <Icon name={copied === `address-${img.digest}-${tag}` ? 'check' : 'copy'} size={13}/>
-                        {copied === `address-${img.digest}-${tag}` ? t('common.copied') : t('images.copyAddress')}
-                      </button>
                       <button className="btn btn-sm btn-danger" onClick={() => deleteImage(r, img)}>
                         {t('common.delete')}
                       </button>
                     </div>
                   </td>
                 </tr>
-              )))}
+                )
+              })}
               </tbody>
             </table>
           </details>

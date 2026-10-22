@@ -130,7 +130,7 @@ export function Dependencies() {
                   <td>
                     <Badge tone={tone(d.status)}>{label(d.status)}</Badge>
                     {(installing || step) && <div className="muted" style={{fontSize: 12, marginTop: 4}}>
-                      {step ? t(`deps.step.${step}` as MessageKey) : t('deps.installing')}
+                      {t(`deps.step.${step ?? 'starting'}` as MessageKey)}
                     </div>}
                     {note && <div className="muted" style={{fontSize: 12, marginTop: 4}}>
                       {note}

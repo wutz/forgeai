@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {ListTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, DeleteSandboxTemplate, SandboxTemplates as ListSandboxTemplates, ListInstanceTypes} from '../wailsjs/go/app/App'
 import {app, sandbox, training} from '../wailsjs/go/models'
-import {envErrors, envToLines, linesToEnv, fmtDate, errText, generateName} from './util'
+import {envErrors, envToLines, linesToEnv, fmtDate, errText, generateName, NAME_MAX, NAME_PATTERN} from './util'
 import {Card, Dialog, Empty, Icon, PageHeader, Segmented, useActive, useConfirm} from './ui'
 import {SandboxTemplateDialog, SandboxTemplateTable} from './SandboxTemplates'
 import {t} from './i18n'
@@ -174,9 +174,17 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
   }, [])
 
   const envBad = envErrors(envText)
+  const nameOK = NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= NAME_MAX
+  // blocker says why Save is off. A bad name or env line already has a hint
+  // under its field, so the footer only names the blockers that have none.
+  const blocker = !f.name ? t('common.nameRequired')
+    : !nameOK ? t('common.nameInvalid')
+    : !f.image ? t('common.imageRequired')
+    : envBad.length ? t('common.envInvalid', {lines: envBad.join(', ')}) : ''
+  const hasFieldHint = (!nameOK && (f.name ?? '') !== '') || envBad.length > 0
 
   const save = () => {
-    if (envBad.length) return
+    if (blocker) return
     setBusy(true)
     const payload = training.Form.createFrom({
       ...f,
@@ -196,8 +204,9 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
               ? t('templates.jobEditSubtitle')
               : t('templates.jobNewSubtitle')}
             onClose={onClose} busy={busy} footer={<>
+              {blocker && !busy && !hasFieldHint && <span className="hint hint-error" role="status">{blocker}</span>}
               <button className="btn" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
-              <button type="submit" form="template-form" className="btn btn-primary" disabled={busy || !f.name || !f.image || envBad.length > 0}>
+              <button type="submit" form="template-form" className="btn btn-primary" disabled={busy || !!blocker}>
                 {busy ? t('templates.saving') : t('templates.saveTemplate')}
               </button>
             </>}>
@@ -207,8 +216,10 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
           <div className="field">
             <label htmlFor="t-name">{t('common.name')}</label>
             <input id="t-name" className="input mono" value={f.name} disabled={!!existing}
-                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                   autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={NAME_MAX}
+                   aria-invalid={!nameOK}
                    onChange={e => set('name', e.target.value)} required/>
+            {!nameOK && (f.name ?? '') !== '' && <span className="hint hint-error">{t('common.nameInvalid')}</span>}
           </div>
           <div className="field">
             <label htmlFor="t-desc">{t('templates.description')}</label>

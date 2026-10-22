@@ -20,14 +20,19 @@ const filterOptions = (): {value: Filter, label: string}[] => [
 ]
 
 
+// settling reports a phase that changes within seconds, so the lists poll faster
+// until it passes. Queued can last hours and keeps the normal interval.
+const settling = (phase: string) => phase === 'Stopping' || phase === 'Restarting'
+
 function bucket(phase: string): Filter {
   switch (phase) {
+    // Stopping pods are still running, so the job counts as running until it stops.
     case 'Running':
+    case 'Stopping':
       return 'running'
     case 'Queued':
     case 'Pending':
     case 'Restarting':
-    case 'Stopping':
       return 'queued'
     case 'Stopped':
       return 'stopped'
@@ -69,12 +74,13 @@ export function Jobs() {
       setError('')
     }).catch(e => setError(errText(e)))
   }
+  const busy = jobs.some(j => settling(j.phase))
   useEffect(() => {
     if (!active) return
     refresh()
-    const timer = setInterval(refresh, 5000)
+    const timer = setInterval(refresh, busy ? 1500 : 5000)
     return () => clearInterval(timer)
-  }, [active])
+  }, [active, busy])
 
   const counts = useMemo(() => {
     const c: Record<Filter, number> = {all: jobs.length, running: 0, queued: 0, stopped: 0, failed: 0, done: 0}
@@ -209,13 +215,14 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
   }, [name])
 
   // The poll pauses while the view is hidden and restarts with a fresh read.
+  const busy = !!job && settling(job.phase)
   useEffect(() => {
     if (!active) return
     GetJob(name).then(setJob).catch(e => setError(errText(e)))
     // A failed poll is shown: the job may have been deleted elsewhere, and its actions then fail.
-    const timer = setInterval(() => GetJob(name).then(setJob).catch(e => setError(errText(e))), 5000)
+    const timer = setInterval(() => GetJob(name).then(setJob).catch(e => setError(errText(e))), busy ? 1500 : 5000)
     return () => clearInterval(timer)
-  }, [name, active])
+  }, [name, active, busy])
 
   if (!job) return <Card>{error
     ? <div className="banner banner-error" role="alert">{error}</div>
@@ -286,14 +293,18 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
           <Icon name="layers" size={13}/>{t('jobs.saveAsTemplate')}
         </button>
         <span className="spacer"/>
-        <button className="btn btn-sm btn-danger" onClick={() => confirm.ask({
+        <button className="btn btn-sm btn-danger" disabled={!!pending} onClick={() => confirm.ask({
           title: t('jobs.deleteTitle', {name: job.name}),
           message: t('jobs.deleteMessage') + (job.retries?.length
             ? ' ' + t('jobs.deleteRetries', {count: job.retries.length}) : ''),
           action: t('jobs.deleteAction'), danger: true,
-          run: () => DeleteJob(job.name).then(onDeleted).catch(e => setError(errText(e))),
+          run: () => {
+            setPending('delete')
+            setError('')
+            DeleteJob(job.name).then(onDeleted).catch(e => setError(errText(e))).finally(() => setPending(''))
+          },
         })}>
-          <Icon name="trash" size={13}/>{t('common.delete')}
+          <Icon name="trash" size={13}/>{pending === 'delete' ? t('jobs.deleting') : t('common.delete')}
         </button>
       </div>
 

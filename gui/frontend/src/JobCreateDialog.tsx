@@ -1,14 +1,11 @@
 import {FormEvent, useEffect, useRef, useState} from 'react'
 import {CreateJob, ListInstanceTypes, ListTemplates, TemplateNames, ListVolumes} from '../wailsjs/go/app/App'
 import {app, training, volumes} from '../wailsjs/go/models'
-import {envErrors, envMap, envToLines, linesToEnv, errText, generateName} from './util'
+import {envErrors, envMap, envToLines, linesToEnv, errText, generateName, NAME_MAX, NAME_PATTERN} from './util'
 import {t} from './i18n'
 import {Dialog} from './ui'
 import {ImageField} from './ImageField'
 import {Mount, VolumeMountsField, mountProblems} from './VolumeMounts'
-
-const NAME_PATTERN = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/
-const NAME_MAX = 50
 
 // JobCreateDialog is the "New job" form: template prefill, instance type,
 // workers, volumes, env and retry defaults.
@@ -72,10 +69,18 @@ export function JobCreateDialog({onClose, onCreated}: {
   const envBad = envErrors(envText)
   // The name is a DNS label of at most 50 characters, the TrainJob name limit.
   const nameOK = NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= NAME_MAX
+  // blocker says why Create is off. A bad name or env line already has a hint
+  // under its field, so the footer only names the blockers that have none.
+  const blocker = !f.name ? t('common.nameRequired')
+    : !nameOK ? t('common.nameInvalid')
+    : !f.image ? t('common.imageRequired')
+    : !mountsOK ? (vols === null ? t('mounts.loading') : t('mounts.fixFirst'))
+    : envBad.length ? t('common.envInvalid', {lines: envBad.join(', ')}) : ''
+  const hasFieldHint = (!nameOK && (f.name ?? '') !== '') || envBad.length > 0
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (!mountsOK || !nameOK || envBad.length) return
+    if (blocker) return
     setBusy(true)
     const form = training.Form.createFrom({
       ...f,
@@ -94,8 +99,9 @@ export function JobCreateDialog({onClose, onCreated}: {
   return (
     <Dialog title={t('jobCreate.title')} subtitle={t('jobCreate.subtitle')}
             onClose={onClose} busy={busy} footer={<>
+              {blocker && !busy && !hasFieldHint && <span className="hint hint-error" role="status">{blocker}</span>}
               <button className="btn" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
-              <button type="submit" form="job-form" className="btn btn-primary" disabled={busy || !f.image || !nameOK || !mountsOK || envBad.length > 0}>
+              <button type="submit" form="job-form" className="btn btn-primary" disabled={busy || !!blocker}>
                 {busy ? t('jobCreate.creating') : t('jobCreate.create')}
               </button>
             </>}>
@@ -108,7 +114,7 @@ export function JobCreateDialog({onClose, onCreated}: {
                    onChange={e => set('name', e.target.value)} maxLength={NAME_MAX}
                    aria-invalid={!nameOK} placeholder={t('jobCreate.namePlaceholder')} required/>
             <span className="hint">{t('jobCreate.nameHint')}</span>
-            {!nameOK && (f.name ?? '') !== '' && <span className="hint hint-error">{t('jobCreate.nameInvalid')}</span>}
+            {!nameOK && (f.name ?? '') !== '' && <span className="hint hint-error">{t('common.nameInvalid')}</span>}
           </div>
           <div className="row">
             <div className="field">
@@ -124,10 +130,12 @@ export function JobCreateDialog({onClose, onCreated}: {
               <select id="j-instance" className="select mono" value={f.instanceType}
                       onChange={e => set('instanceType', e.target.value)} required>
                 {types.map(it => <option key={it.name} value={it.name}>
-                  {t('jobCreate.instanceOption', {
-                    name: it.name, gpuCount: it.gpuCount, gpuClass: it.class,
-                    cpu: it.cpu, memory: it.memory, free: it.free,
-                  })}
+                  {it.gpuCount
+                    ? t('jobCreate.instanceOption', {
+                      name: it.name, gpuCount: it.gpuCount, gpuClass: it.class,
+                      cpu: it.cpu, memory: it.memory, free: it.free,
+                    })
+                    : t('jobCreate.instanceOptionCPU', {name: it.name, cpu: it.cpu, memory: it.memory, free: it.free})}
                 </option>)}
               </select>
             </div>

@@ -28,6 +28,9 @@ export const en = {
   'error.sandboxNoPod': 'This sandbox has no running pod. It is stopped or still starting.',
   'common.create': 'Create',
   'common.delete': 'Delete',
+  'common.nameRequired': 'Enter a name.',
+  'common.nameInvalid': 'Use up to 50 lowercase letters, digits and dashes, starting and ending with a letter or digit.',
+  'common.imageRequired': 'Choose an image.',
   'common.edit': 'Edit',
   'common.close': 'Close',
   'common.refresh': 'Refresh',
@@ -111,6 +114,7 @@ export const en = {
   'mounts.loading': 'Loading volumes…',
   'mounts.jobHint': 'Every worker mounts the volumes at the paths you set.',
   'mounts.sandboxHint': 'Shared volumes stay when the sandbox is deleted.',
+  'mounts.fixFirst': 'Fix the volume mounts first.',
 }
 
 export const zh: Record<keyof typeof en, string> = {
@@ -131,6 +135,9 @@ export const zh: Record<keyof typeof en, string> = {
   'error.sandboxNoPod': '此沙箱没有运行中的 Pod，它已停止或仍在启动。',
   'common.create': '创建',
   'common.delete': '删除',
+  'common.nameRequired': '请输入名称。',
+  'common.nameInvalid': '最多 50 个字符，只能包含小写字母、数字和短横线，且以字母或数字开头和结尾。',
+  'common.imageRequired': '请选择镜像。',
   'common.edit': '编辑',
   'common.close': '关闭',
   'common.refresh': '刷新',
@@ -214,4 +221,5 @@ export const zh: Record<keyof typeof en, string> = {
   'mounts.loading': '正在加载存储卷…',
   'mounts.jobHint': '每个工作实例都会把存储卷挂载到你设置的路径。',
   'mounts.sandboxHint': '删除沙箱后，共享存储卷会保留。',
+  'mounts.fixFirst': '请先修正存储卷挂载。',
 }

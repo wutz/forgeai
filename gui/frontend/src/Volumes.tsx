@@ -238,7 +238,8 @@ function ResizeVolumeDialog({volume, onClose, onDone}: {
             subtitle={t('volumes.growSubtitle', {size: current})}
             width={400} onClose={onClose} footer={<>
               <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
-              <button type="submit" form="resize-volume" className="btn btn-primary" disabled={busy}>
+              <button type="submit" form="resize-volume" className="btn btn-primary"
+                      disabled={busy || !(size > current)}>
                 {busy ? t('volumes.growing') : t('volumes.growVolume')}
               </button>
             </>}>
@@ -247,7 +248,11 @@ function ResizeVolumeDialog({volume, onClose, onDone}: {
         <div className="field">
           <label htmlFor="v-grow">{t('volumes.newSize')}</label>
           <input id="v-grow" className="input" type="number" min={current + 1} step={1} value={size}
+                 aria-invalid={!(size > current)}
                  onChange={e => setSize(+e.target.value)} required/>
+          {!(size > current) && <span className="hint hint-error">
+            {t('volumes.growTooSmall', {size: current})}
+          </span>}
         </div>
       </form>
     </Dialog>

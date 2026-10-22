@@ -245,7 +245,11 @@ function SandboxDetail({name, onDone, onDeleted}: {
           {value: 'terminal', label: t('sandboxes.tabTerminal'), icon: 'terminal'},
           {value: 'log', label: t('sandboxes.tabLog'), icon: 'scroll'},
           {value: 'env', label: t('sandboxes.tabEnv'), icon: 'layers'},
-        ]} value={tab} onChange={setTab}/>
+        ]} value={tab} onChange={v => {
+          setTab(v)
+          // The log tab shows what was last read, so opening it reads the logs.
+          if (v === 'log') showLog().catch(() => {})
+        }}/>
 
         {tab === 'overview' && (
           <dl className="kv">

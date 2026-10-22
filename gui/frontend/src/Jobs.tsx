@@ -303,7 +303,11 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
           {value: 'workers', label: t('jobs.tabWorkers'), icon: 'cpu'},
           {value: 'log', label: t('jobs.tabLog'), icon: 'scroll'},
           {value: 'env', label: t('jobs.tabEnv'), icon: 'layers'},
-        ]} value={tab} onChange={setTab}/>
+        ]} value={tab} onChange={v => {
+          setTab(v)
+          // Opening the log tab reads the log of the worker it last showed (worker 0 at first).
+          if (v === 'log') viewLog(logWorker, logTitle || t('jobs.workerLabel', {index: 0})).catch(() => {})
+        }}/>
 
         {tab === 'overview' && (
           <>

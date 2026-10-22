@@ -155,6 +155,11 @@ function ProjectDialog({form, onClose, onSaved}: {
 
   const save = (e?: FormEvent) => {
     e?.preventDefault()
+    // A member row left empty would be saved as a nameless member; reject it here.
+    if ((p.members || []).some(m => !m.name.trim())) {
+      setError(t('admin.memberNameRequired'))
+      return
+    }
     let project: app.Project
     try {
       project = app.Project.createFrom({

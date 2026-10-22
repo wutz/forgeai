@@ -133,6 +133,12 @@ function parseGPUs(text: string): Record<string, number> {
   return gpus
 }
 
+// The forms the backend reads: resource.ParseQuantity for storage and
+// time.ParseDuration for trash retention. Checking them here means a bad value
+// is named under its field, not returned by the server after Save.
+const quantityRE = /^[+-]?(\d+(\.\d*)?|\.\d+)(Ki|Mi|Gi|Ti|Pi|Ei|[numkMGTPE]|[eE][+-]?\d+)?$/
+const durationRE = /^(\d+(\.\d+)?(ns|us|µs|ms|s|m|h))+$|^0$/
+
 function ProjectDialog({form, onClose, onSaved}: {
   form: app.Project, onClose: () => void, onSaved: () => void
 }) {
@@ -143,6 +149,13 @@ function ProjectDialog({form, onClose, onSaved}: {
   const [busy, setBusy] = useState(false)
   const [kube, setKube] = useState('')
   const create = !form.name
+  const gpuBad = gpuText.split(/\s+/).filter(Boolean).find(pair => !/^([^:]+):(\d+)$/.test(pair))
+  const storageOK = !p.quota?.storage || quantityRE.test(p.quota.storage)
+  const registryOK = !p.quota?.registryStorage || quantityRE.test(p.quota.registryStorage)
+  const trashOK = !p.trashRetention || durationRE.test(p.trashRetention)
+  const volumesOK = (p.quota?.volumes ?? 0) >= 0
+  const podsOK = (p.quota?.pods ?? 0) >= 0
+  const formOK = !gpuBad && storageOK && registryOK && trashOK && volumesOK && podsOK
 
   const set = <K extends keyof app.Project>(k: K, v: app.Project[K]) =>
     setP(prev => app.Project.createFrom({...prev, [k]: v}))
@@ -190,7 +203,7 @@ function ProjectDialog({form, onClose, onSaved}: {
             subtitle={t('admin.dialogSubtitle')}
             onClose={onClose} busy={busy} footer={<>
               <CancelButton disabled={busy}/>
-              <button type="submit" form="project-form" className="btn btn-primary" disabled={busy || !p.name}>
+              <button type="submit" form="project-form" className="btn btn-primary" disabled={busy || !p.name || !formOK}>
                 {busy ? t('admin.saving') : create ? t('admin.createProject') : t('common.save')}
               </button>
             </>}>
@@ -214,9 +227,10 @@ function ProjectDialog({form, onClose, onSaved}: {
           <label htmlFor="p-gpus">{t('admin.gpuQuotaLabel')}</label>
           <input id="p-gpus" className="input mono" value={gpuText}
                  autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                 onChange={e => setGpuText(e.target.value)}
+                 onChange={e => setGpuText(e.target.value)} aria-invalid={!!gpuBad}
                  placeholder="rtx-5090:8 a100:2"/>
           <span className="hint">{t('admin.jobsOverQuota')}</span>
+          {gpuBad && <span className="hint hint-error">{t('admin.gpuFormatError', {pair: gpuBad})}</span>}
         </div>
         <div className="row">
           <div className="field">
@@ -224,16 +238,18 @@ function ProjectDialog({form, onClose, onSaved}: {
             <input id="p-storage" className="input mono" value={p.quota?.storage || ''}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('quota', app.ProjectQuota.createFrom({...p.quota, storage: e.target.value}))}
-                   placeholder="1Ti"/>
+                   aria-invalid={!storageOK} placeholder="1Ti"/>
             <span className="hint">{t('admin.emptyNoLimit')}</span>
+            {!storageOK && <span className="hint hint-error">{t('admin.quantityInvalid')}</span>}
           </div>
           <div className="field">
             <label htmlFor="p-registry-storage">{t('admin.registryStorage')}</label>
             <input id="p-registry-storage" className="input mono" value={p.quota?.registryStorage || ''}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('quota', app.ProjectQuota.createFrom({...p.quota, registryStorage: e.target.value}))}
-                   placeholder="100Gi"/>
+                   aria-invalid={!registryOK} placeholder="100Gi"/>
             <span className="hint">{t('admin.emptyNoLimit')}</span>
+            {!registryOK && <span className="hint hint-error">{t('admin.quantityInvalid')}</span>}
           </div>
         </div>
         <div className="row">
@@ -241,15 +257,19 @@ function ProjectDialog({form, onClose, onSaved}: {
             <label htmlFor="p-volumes">{t('admin.volumes')}</label>
             <input id="p-volumes" className="input" type="number" min={0}
                    value={p.quota?.volumes || 0}
+                   aria-invalid={!volumesOK}
                    onChange={e => set('quota', app.ProjectQuota.createFrom({...p.quota, volumes: +e.target.value}))}/>
             <span className="hint">{t('admin.zeroNoLimit')}</span>
+            {!volumesOK && <span className="hint hint-error">{t('admin.countNegative')}</span>}
           </div>
           <div className="field">
             <label htmlFor="p-pods">{t('admin.pods')}</label>
             <input id="p-pods" className="input" type="number" min={0}
                    value={p.quota?.pods || 0}
+                   aria-invalid={!podsOK}
                    onChange={e => set('quota', app.ProjectQuota.createFrom({...p.quota, pods: +e.target.value}))}/>
             <span className="hint">{t('admin.zeroNoLimit')}</span>
+            {!podsOK && <span className="hint hint-error">{t('admin.countNegative')}</span>}
           </div>
         </div>
         <div className="row">
@@ -257,8 +277,10 @@ function ProjectDialog({form, onClose, onSaved}: {
             <label htmlFor="p-trash">{t('admin.trashRetention')}</label>
             <input id="p-trash" className="input mono" value={p.trashRetention || ''}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                   onChange={e => set('trashRetention', e.target.value)} placeholder="168h"/>
+                   onChange={e => set('trashRetention', e.target.value)} aria-invalid={!trashOK}
+                   placeholder="168h"/>
             <span className="hint">{t('admin.trashHint')}</span>
+            {!trashOK && <span className="hint hint-error">{t('admin.durationInvalid')}</span>}
           </div>
           <div className="field">
             <label htmlFor="p-deletion">{t('admin.deletionPolicy')}</label>

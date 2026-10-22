@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {CreateSandboxTemplate, UpdateSandboxTemplate, SandboxOptions} from '../wailsjs/go/app/App'
 import {app, sandbox} from '../wailsjs/go/models'
-import {envMap, envToLines, linesToEnv, fmtDate, errText, generateName} from './util'
+import {envErrors, envMap, envToLines, linesToEnv, fmtDate, errText, generateName} from './util'
 import {Dialog, Empty, useConfirm} from './ui'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
@@ -89,7 +89,10 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
   const set = <K extends keyof sandbox.TemplateForm>(k: K, v: sandbox.TemplateForm[K]) =>
     setF(prev => sandbox.TemplateForm.createFrom({...prev, [k]: v}))
 
+  const envBad = envErrors(envText)
+
   const save = () => {
+    if (envBad.length) return
     setBusy(true)
     const payload = sandbox.TemplateForm.createFrom({
       ...f,
@@ -108,7 +111,7 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
               : t('sandboxTemplates.newSubtitle')}
             onClose={onClose} busy={busy} footer={<>
               <button className="btn" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
-              <button type="submit" form="sandbox-template-form" className="btn btn-primary" disabled={busy || !f.name || !f.image}>
+              <button type="submit" form="sandbox-template-form" className="btn btn-primary" disabled={busy || !f.name || !f.image || envBad.length > 0}>
                 {busy ? t('templates.saving') : t('templates.saveTemplate')}
               </button>
             </>}>
@@ -155,7 +158,11 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
           <label htmlFor="st-env">{t('templates.environment')}</label>
           <textarea id="st-env" className="textarea" rows={3} value={envText}
                     autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                    onChange={e => setEnvText(e.target.value)} placeholder="KEY=value"/>
+                    onChange={e => setEnvText(e.target.value)} placeholder="KEY=value"
+                    aria-invalid={envBad.length > 0}/>
+          {envBad.length > 0 && <span className="hint hint-error">
+            {t('common.envInvalid', {lines: envBad.join(', ')})}
+          </span>}
         </div>
       </form>
     </Dialog>

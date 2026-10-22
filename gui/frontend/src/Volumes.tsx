@@ -39,14 +39,15 @@ export function Volumes() {
 
   // The file server serves ReadWriteMany volumes, so trashing one rebuilds it
   // and ends any transfer in progress. The phase read does not wake or
-  // heartbeat the server.
+  // heartbeat the server. When the phase cannot be read, the warning is shown
+  // anyway: the server may be running.
   const trashVolume = (v: vol.Volume) => FileServerPhase()
-    .catch(() => '')
+    .catch(() => null)
     .then(phase => confirm.ask({
       title: t('volumes.trashTitle', {name: v.name}),
       message: <>
         {t('volumes.trashStays')}
-        {(phase === 'Ready' || phase === 'Starting') && v.accessMode === 'ReadWriteMany' && <>
+        {(phase === null || phase === 'Ready' || phase === 'Starting') && v.accessMode === 'ReadWriteMany' && <>
           <br/><br/>
           <span className="banner banner-warn" style={{display: 'block'}}>
             {t('volumes.trashServerWarn')}

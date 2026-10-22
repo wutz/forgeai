@@ -5,10 +5,12 @@ import (
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/wutz/forgeai/pkg/harbor"
 	"github.com/wutz/forgeai/pkg/naming"
+	"github.com/wutz/forgeai/pkg/platform"
 )
 
 // Image is one pushed image tag.
@@ -31,11 +33,14 @@ type ImageRepo struct {
 
 // Registry is the project registry: the robot credentials and how to push.
 type Registry struct {
-	Enabled  bool   `json:"enabled"`
-	URL      string `json:"url"` // cr.example.com:7443/forge-foo
-	Username string `json:"username,omitempty"`
-	Password string `json:"password,omitempty"`
-	Secret   string `json:"secret"`
+	Enabled bool   `json:"enabled"`
+	URL     string `json:"url"` // cr.example.com:7443/forge-foo
+	// Credentials is false for view-only members, who cannot read the robot
+	// Secret. They get the push address but cannot list or push images.
+	Credentials bool   `json:"credentials"`
+	Username    string `json:"username,omitempty"`
+	Password    string `json:"password,omitempty"`
+	Secret      string `json:"secret"`
 }
 
 // Registry returns the push target of the project. The robot credentials come
@@ -50,13 +55,27 @@ func (a *App) Registry() (*Registry, error) {
 	out := &Registry{Secret: naming.RegistrySecretName}
 	sec := &corev1.Secret{}
 	secKey := client.ObjectKey{Namespace: c.namespace(), Name: naming.RegistrySecretName}
-	if err := c.k8s.Get(ctx, secKey, sec); err != nil {
-		if !isNotFound(err) {
+	err = c.k8s.Get(ctx, secKey, sec)
+	switch {
+	case isNotFound(err):
+		return out, nil // registry not set up for this project
+	case apierrors.IsForbidden(err):
+		// The push address comes from the platform config, which members can read.
+		cfg, err := platform.Load(ctx, c.k8s, c.namespace())
+		if err != nil {
 			return nil, err
 		}
-		return out, nil // registry not set up for this project
+		if !cfg.Registry.Enabled() {
+			return out, nil
+		}
+		out.Enabled = true
+		out.URL = cfg.Registry.Domain + "/" + c.namespace()
+		return out, nil
+	case err != nil:
+		return nil, err
 	}
 	out.Enabled = true
+	out.Credentials = true
 	out.URL = string(sec.Data["server"]) + "/" + c.namespace()
 	out.Username = string(sec.Data["username"])
 	out.Password = string(sec.Data["password"])
@@ -75,7 +94,7 @@ func (a *App) ListImages() ([]ImageRepo, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !reg.Enabled {
+	if !reg.Enabled || !reg.Credentials {
 		return []ImageRepo{}, nil
 	}
 	ctx, cancel := a.call()

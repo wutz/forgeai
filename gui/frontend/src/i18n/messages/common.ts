@@ -12,7 +12,16 @@
 
 export const en = {
   'common.cancel': 'Cancel',
+  'common.discardMessage': 'Discard the unsaved changes?',
+  'common.keepEditing': 'Keep editing',
+  'common.discard': 'Discard',
   'common.save': 'Save',
+  'common.envInvalid': 'Each line must be KEY=value (line {lines})',
+  'error.notConnected': 'No cluster is selected. Choose a cluster in the sidebar.',
+  'error.forbidden': 'Your account is not allowed to do this in the project.',
+  'error.conflict': 'It was changed by someone else. Reload and try again.',
+  'error.timeout': 'The cluster did not answer in time. Try again.',
+  'error.notCreatedByForgeai': 'Only objects created by forgeai can be edited here.',
   'common.create': 'Create',
   'common.delete': 'Delete',
   'common.edit': 'Edit',
@@ -102,7 +111,16 @@ export const en = {
 
 export const zh: Record<keyof typeof en, string> = {
   'common.cancel': '取消',
+  'common.discardMessage': '放弃尚未保存的更改？',
+  'common.keepEditing': '继续编辑',
+  'common.discard': '放弃',
   'common.save': '保存',
+  'common.envInvalid': '每行须为 KEY=value（第 {lines} 行有误）',
+  'error.notConnected': '尚未选择集群，请在侧边栏选择一个集群。',
+  'error.forbidden': '您的账户无权在该项目中执行此操作。',
+  'error.conflict': '内容已被他人修改，请刷新后重试。',
+  'error.timeout': '集群未在限定时间内响应，请重试。',
+  'error.notCreatedByForgeai': '只能在此修改由 forgeai 创建的对象。',
   'common.create': '创建',
   'common.delete': '删除',
   'common.edit': '编辑',

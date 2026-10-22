@@ -323,14 +323,25 @@ func (a *App) UpdateSandboxTemplate(name string, f sandbox.TemplateForm) (*Sandb
 	if err != nil {
 		return nil, err
 	}
-	// The resource version makes the update fail if someone changed the
-	// template since it was loaded into the form.
-	u.SetResourceVersion(cur.GetResourceVersion())
-	if err := c.k8s.Update(ctx, u); err != nil {
+	// The stored object keeps its metadata (annotations, owner references and
+	// labels set by others); the form replaces the spec and the labels it
+	// renders. The resource version makes the update fail if someone changed
+	// the template since it was loaded into the form.
+	upd := cur.DeepCopy()
+	upd.Object["spec"] = u.Object["spec"]
+	labels := upd.GetLabels()
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	for k, v := range u.GetLabels() {
+		labels[k] = v
+	}
+	upd.SetLabels(labels)
+	if err := c.k8s.Update(ctx, upd); err != nil {
 		return nil, err
 	}
 	t := &sandbox.SandboxTemplate{}
-	if err := sandbox.FromUnstructured(u.Object, t); err != nil {
+	if err := sandbox.FromUnstructured(upd.Object, t); err != nil {
 		return nil, err
 	}
 	out := toSandboxTemplate(t)
@@ -398,12 +409,17 @@ func (a *App) mutateSandbox(name string, fn func(*sandbox.Sandbox)) (*Sandbox, e
 	if sb.Annotations == nil {
 		sb.Annotations = map[string]string{}
 	}
+	mode := sb.Spec.OperatingMode
 	fn(sb)
-	out, err := sandbox.ToUnstructured(sb)
-	if err != nil {
-		return nil, err
+	// Only the annotations and the operating mode are written back. A typed
+	// round trip would drop the fields the Go model does not carry.
+	out := u.DeepCopy()
+	out.SetAnnotations(sb.Annotations)
+	if sb.Spec.OperatingMode != mode {
+		if err := unstructured.SetNestedField(out.Object, string(sb.Spec.OperatingMode), "spec", "operatingMode"); err != nil {
+			return nil, err
+		}
 	}
-	out.SetResourceVersion(u.GetResourceVersion())
 	if err := c.k8s.Update(ctx, out); err != nil {
 		return nil, err
 	}

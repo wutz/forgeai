@@ -1,7 +1,7 @@
 import {FormEvent, useEffect, useState} from 'react'
 import {CreateSandbox, ListInstanceTypes, ListVolumes, SandboxOptions, SandboxTemplates} from '../wailsjs/go/app/App'
 import {app, sandbox, volumes, v1} from '../wailsjs/go/models'
-import {envToLines, linesToEnv, errText, generateName} from './util'
+import {envErrors, envToLines, linesToEnv, errText, generateName} from './util'
 import {Dialog} from './ui'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
@@ -66,9 +66,11 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   const mountsOK = mounts.length === 0 ||
     (vols !== null && mountProblems(mounts, vols, 1).every(p => !p))
 
+  const envBad = envErrors(envText)
+
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (!mountsOK) return
+    if (!mountsOK || envBad.length) return
     setBusy(true)
     const form = sandbox.Form.createFrom({
       ...f,
@@ -93,7 +95,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
     <Dialog title={t('sandboxCreate.title')} subtitle={t('sandboxCreate.subtitle')}
             onClose={onClose} busy={busy} footer={<>
               <button className="btn" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
-              <button type="submit" form="sandbox-form" className="btn btn-primary" disabled={busy || !f.name || !f.image || !mountsOK}>
+              <button type="submit" form="sandbox-form" className="btn btn-primary" disabled={busy || !f.name || !f.image || !mountsOK || envBad.length > 0}>
                 {busy ? t('sandboxCreate.creating') : t('sandboxCreate.create')}
               </button>
             </>}>
@@ -156,7 +158,11 @@ export function SandboxCreateDialog({onClose, onCreated}: {
             <label htmlFor="s-env">{t('sandboxCreate.environment')}</label>
             <textarea id="s-env" className="textarea" rows={3} value={envText}
                       autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                      onChange={e => setEnvText(e.target.value)} placeholder="KEY=value"/>
+                      onChange={e => setEnvText(e.target.value)} placeholder="KEY=value"
+                      aria-invalid={envBad.length > 0}/>
+            {envBad.length > 0 && <span className="hint hint-error">
+              {t('common.envInvalid', {lines: envBad.join(', ')})}
+            </span>}
           </div>
           <div className="field">
             <label>{t('sandboxCreate.volumeMounts')}</label>

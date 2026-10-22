@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react'
+import {useEffect, useRef, useState} from 'react'
 import {InstallDependency, ListDependencies} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {EventsOn} from '../wailsjs/runtime/runtime'
@@ -9,7 +9,7 @@ import {MessageKey, t} from './i18n'
 // Progress is one deps:progress event: a step of an install, or its outcome
 // when done is set (app.DependencyProgress). Wails only generates models for
 // bound methods, so the event payload is typed here.
-type Progress = {name: string, message: string, done: boolean, error?: string}
+type Progress = {cluster: string, name: string, message: string, done: boolean, error?: string}
 
 // Dependencies installs and checks the cluster components forgeai runs on:
 // Kubeflow Trainer v2 with JobSet, Kueue and agent-sandbox at the versions
@@ -20,12 +20,18 @@ export function Dependencies() {
   const [error, setError] = useState('')
   // steps is the latest progress message of each component that is installing.
   const [steps, setSteps] = useState<Record<string, string>>({})
+  // cluster is the context the list was read from. The progress listener reads
+  // it from a ref, since it is subscribed once.
+  const cluster = useRef('')
   const confirm = useConfirm()
   const active = useActive()
 
   // refresh does not clear error: the install outcome is refreshed right after
   // it is set, and the banner must still show it.
-  const refresh = () => ListDependencies().then(setData).catch(e => {
+  const refresh = () => ListDependencies().then(d => {
+    cluster.current = d.cluster
+    setData(d)
+  }).catch(e => {
     setError(errText(e))
     throw e
   })
@@ -38,6 +44,9 @@ export function Dependencies() {
   // Installs run in the background; their steps arrive as events, and the
   // final one refreshes the list with the outcome.
   useEffect(() => EventsOn('deps:progress', (p: Progress) => {
+    // An install on another cluster is not shown here; its steps would mix
+    // into this list. Its outcome is seen when that cluster is connected.
+    if (p.cluster !== cluster.current) return
     if (!p.done) {
       setSteps(s => ({...s, [p.name]: p.message}))
       return

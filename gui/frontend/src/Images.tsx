@@ -100,7 +100,12 @@ export function Images() {
       )}
 
       <Card title={t('images.repositories')} className="card-spaced">
-        {repos.length === 0 && reg?.enabled && (
+        {reg?.enabled && !reg.credentials && (
+          <Empty icon="shield" title={t('images.viewOnlyTitle')}>
+            {t('images.viewOnlyHint')}
+          </Empty>
+        )}
+        {repos.length === 0 && reg?.enabled && reg.credentials && (
           <Empty icon="image" title={t('images.noneTitle')}>
             {t('images.noneHintBefore')} <code className="mono">{reg?.url}</code>{t('images.noneHintAfter')}
           </Empty>

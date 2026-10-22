@@ -155,7 +155,7 @@ export function JobCreateDialog({onClose, onCreated}: {
                       onChange={e => setEnvText(e.target.value)} placeholder="KEY=value"
                       aria-invalid={envBad.length > 0}/>
             {envBad.length > 0 && <span className="hint hint-error">
-              {t('jobCreate.envInvalid', {lines: envBad.join(', ')})}
+              {t('common.envInvalid', {lines: envBad.join(', ')})}
             </span>}
           </div>
           <div className="field">

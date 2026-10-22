@@ -1,10 +1,21 @@
 import {MessageKey, t} from './i18n'
 
+// knownErrors maps the backend messages users hit most to catalogue keys, so
+// they read well in both languages. Other backend text is shown as written.
+const knownErrors: [RegExp, MessageKey][] = [
+  [/not connected: select a kubeconfig context/, 'error.notConnected'],
+  [/is forbidden: /, 'error.forbidden'],
+  [/has been modified; please apply your changes/, 'error.conflict'],
+  [/context deadline exceeded|Client\.Timeout exceeded/, 'error.timeout'],
+  [/was not created by forgeai and cannot be edited here/, 'error.notCreatedByForgeai'],
+]
+
 export function errText(e: unknown): string {
-  if (typeof e === 'string') return e
-  if (e instanceof Error) return e.message
-  const any = e as { message?: string }
-  return any?.message || JSON.stringify(e)
+  const raw = typeof e === 'string' ? e
+    : e instanceof Error ? e.message
+    : (e as { message?: string })?.message || JSON.stringify(e)
+  for (const [re, key] of knownErrors) if (re.test(raw)) return t(key)
+  return raw
 }
 
 const phaseKeys = new Map<string, MessageKey>([

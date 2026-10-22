@@ -291,14 +291,28 @@ function ConfirmDialog({request, onClose}: {request: ConfirmRequest, onClose: ()
 
 // Dialog is the modal frame: title bar, scrolling body, footer.
 // Dialog closes on Escape, the X and a click outside it. While busy (a save in
-// flight) every close is ignored, so a typed form is not lost mid-request.
+// flight) every close is ignored, so a typed form is not lost mid-request. After
+// an edit inside the body, closing asks first, so typed input is not discarded
+// by a stray click. Edits are the change events of the body's fields; values
+// filled in by a load do not count.
 export function Dialog({title, subtitle, onClose, children, footer, width, busy}: {
   title: string, subtitle?: ReactNode, onClose: () => void, children: ReactNode,
   footer?: ReactNode, width?: number, busy?: boolean
 }) {
-  const close = () => { if (!busy) onClose() }
+  const [edited, setEdited] = useState(false)
+  const [asking, setAsking] = useState(false)
+  const close = () => {
+    // While the discard prompt is up, only its own buttons or Escape act.
+    if (busy || asking) return
+    if (edited) setAsking(true)
+    else onClose()
+  }
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      if (asking) setAsking(false)
+      else close()
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   })
@@ -312,7 +326,15 @@ export function Dialog({title, subtitle, onClose, children, footer, width, busy}
           </div>
           <button className="icon-btn" onClick={close} disabled={busy} aria-label={t('common.close')}><Icon name="close"/></button>
         </div>
-        <div className="dialog-body">{children}</div>
+        <div className="dialog-body" onChangeCapture={() => setEdited(true)}>
+          {asking && <div className="banner banner-warn" role="alertdialog">
+            <span>{t('common.discardMessage')}</span>
+            <span className="spacer"/>
+            <button className="btn btn-sm" onClick={() => setAsking(false)} autoFocus>{t('common.keepEditing')}</button>
+            <button className="btn btn-sm btn-danger-tint" onClick={onClose}>{t('common.discard')}</button>
+          </div>}
+          {children}
+        </div>
         {footer && <div className="dialog-foot">{footer}</div>}
       </div>
     </div>

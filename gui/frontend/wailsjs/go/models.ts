@@ -59,6 +59,7 @@ export namespace app {
 	    }
 	}
 	export class Dependencies {
+	    cluster: string;
 	    clusterAdmin: boolean;
 	    items: Dependency[];
 	
@@ -68,6 +69,7 @@ export namespace app {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cluster = source["cluster"];
 	        this.clusterAdmin = source["clusterAdmin"];
 	        this.items = this.convertValues(source["items"], Dependency);
 	    }
@@ -629,6 +631,7 @@ export namespace app {
 	export class Registry {
 	    enabled: boolean;
 	    url: string;
+	    credentials: boolean;
 	    username?: string;
 	    password?: string;
 	    secret: string;
@@ -641,6 +644,7 @@ export namespace app {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.enabled = source["enabled"];
 	        this.url = source["url"];
+	        this.credentials = source["credentials"];
 	        this.username = source["username"];
 	        this.password = source["password"];
 	        this.secret = source["secret"];

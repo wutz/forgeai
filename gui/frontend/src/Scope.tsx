@@ -53,7 +53,10 @@ function NamespaceInput({value, disabled, onCommit}: {
   onCommit: (namespace: string) => void,
 }) {
   const [draft, setDraft] = useState(value)
-  useEffect(() => setDraft(value), [value])
+  // Reset the draft whenever a connect attempt ends, so a namespace that failed
+  // to connect does not stay in the field while the old one is connected.
+  // The field is disabled while busy, so no typing is lost.
+  useEffect(() => { if (!disabled) setDraft(value) }, [disabled, value])
 
   const commit = () => {
     const namespace = draft.trim()

@@ -136,12 +136,16 @@ type depRecord struct {
 // Dependencies is the Dependencies view: the components and whether the user
 // may install them. Only cluster administrators may read or change them.
 type Dependencies struct {
+	Cluster      string       `json:"cluster"`
 	ClusterAdmin bool         `json:"clusterAdmin"`
 	Items        []Dependency `json:"items"`
 }
 
 // DependencyProgress is one step of an install, or its outcome when Done is set.
 type DependencyProgress struct {
+	// Cluster is the context the install runs on; a view of another cluster
+	// ignores the event.
+	Cluster string `json:"cluster"`
 	Name    string `json:"name"`
 	Message string `json:"message"`
 	Done    bool   `json:"done"`
@@ -319,7 +323,7 @@ func (a *App) ListDependencies() (*Dependencies, error) {
 	}
 	ctx, cancel := a.call()
 	defer cancel()
-	out := &Dependencies{ClusterAdmin: mustBeClusterAdmin(ctx, c.k8s), Items: []Dependency{}}
+	out := &Dependencies{Cluster: c.Info.Context, ClusterAdmin: mustBeClusterAdmin(ctx, c.k8s), Items: []Dependency{}}
 	if !out.ClusterAdmin {
 		return out, nil
 	}
@@ -546,6 +550,7 @@ func (a *App) InstallDependency(name string) error {
 		return err
 	}
 	key := installKey(c, name)
+	cluster := c.Info.Context
 	if !a.installs.start(key) {
 		return fmt.Errorf("%s is already being installed", name)
 	}
@@ -553,7 +558,7 @@ func (a *App) InstallDependency(name string) error {
 		ctx, cancel := context.WithTimeout(a.ctx, depInstallTimeout)
 		defer cancel()
 		progress := func(msg string) {
-			runtime.EventsEmit(a.ctx, depProgressEvent, DependencyProgress{Name: name, Message: msg})
+			runtime.EventsEmit(a.ctx, depProgressEvent, DependencyProgress{Cluster: cluster, Name: name, Message: msg})
 		}
 		rec, err := installComponent(ctx, c, b, progress)
 		if err == nil {
@@ -569,9 +574,9 @@ func (a *App) InstallDependency(name string) error {
 		// Release the component before the outcome is emitted: the view
 		// refreshes on it and must not still see the install in progress.
 		a.installs.finish(key)
-		done := DependencyProgress{Name: name, Message: "Installed " + rec.Version, Done: true}
+		done := DependencyProgress{Cluster: cluster, Name: name, Message: "Installed " + rec.Version, Done: true}
 		if err != nil {
-			done = DependencyProgress{Name: name, Message: "Install failed", Done: true, Error: err.Error()}
+			done = DependencyProgress{Cluster: cluster, Name: name, Message: "Install failed", Done: true, Error: err.Error()}
 		}
 		runtime.EventsEmit(a.ctx, depProgressEvent, done)
 	}()

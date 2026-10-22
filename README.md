@@ -185,7 +185,7 @@ The desktop client connects with a kubeconfig context and a project namespace (t
 | Images | Push instructions and robot credentials; list and delete images in the project's Harbor project. Their tags are offered in a dropdown as the image of jobs, sandboxes and their templates, which also accept any other address |
 | Resources | Instance types with availability and the project quota usage |
 | Projects | Admins only (may create Projects): manage projects and members, export member kubeconfigs |
-| Dependencies | Cluster admins only: install or upgrade Kueue, Kubeflow Trainer v2 (with JobSet) and agent-sandbox at the versions pinned in the GUI, and see the forgeai operator's status |
+| Dependencies | Cluster admins only: install or upgrade Kueue, Kubeflow Trainer v2 (with JobSet) and agent-sandbox at the versions pinned in the GUI, install the forgeai operator from its Helm chart at the pinned chart version, and see each component's status |
 
 View-only members see the same views read-only and get no registry or file server credentials.
 
@@ -211,6 +211,19 @@ make deploy-dev                # ko build -> ghcr.io/wutz/forgeai (public), kube
 ```
 
 `deploy/dev` combines `config/default` with the platform ConfigMap. `make render-dev` only renders `dist/dev.yaml`; `make undeploy-dev` removes everything, including the CRDs.
+
+### Helm chart
+
+The operator also ships as a Helm chart in `charts/chart`: CRDs, RBAC and the controller Deployment, with the platform config under `platform.config`. The Dependencies view installs the pinned chart version as release `forgeai` in `forgeai-system`; the same install from the CLI:
+
+```sh
+helm install forgeai oci://ghcr.io/wutz/charts/forgeai --version 0.1.0 \
+  --namespace forgeai-system --create-namespace
+```
+
+Pushing a `v<version>` tag runs `.github/workflows/helm-release.yml`, which publishes the operator image (`ghcr.io/wutz/forgeai:<version>`) and the chart (`oci://ghcr.io/wutz/charts/forgeai:<version>`). `make helm-lint` lints and renders the chart; `make helm-package CHART_VERSION=<version>` writes the package to `dist/`.
+
+A cluster set up with `make deploy-dev` runs the operator outside Helm. Helm does not adopt objects it did not create, so the Dependencies view reports that operator as deployed outside Helm and refuses the chart install. Move such a cluster by removing the dev deployment with `make undeploy-dev` (this deletes the Projects and their CRDs, so back them up first) and then installing the chart.
 
 Prerequisites (the Dependencies view installs the first three into a cluster; `make gui-deps` refreshes the pinned manifests embedded in the GUI):
 

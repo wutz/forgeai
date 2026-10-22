@@ -33,6 +33,7 @@ import (
 
 // The cluster components forgeai runs on. Their install manifests are
 // embedded from deps/, rendered at the pinned versions by hack/gui-deps.sh.
+// The forgeai operator itself is installed from its Helm chart (chart.go).
 //
 //go:embed deps
 var depsFS embed.FS
@@ -67,24 +68,36 @@ var (
 		{Group: "admissionregistration.k8s.io", Kind: "MutatingWebhookConfiguration"},
 		{Group: "admissionregistration.k8s.io", Kind: "ValidatingWebhookConfiguration"},
 	}
-	forgeaiCRDs = []string{"projects.forgeai.wutz.dev", "instancetypes.forgeai.wutz.dev"}
+	forgeaiCRDs = []string{"projects.forgeai.wutz.dev", "instancetypes.forgeai.wutz.dev", "fileservers.forgeai.wutz.dev"}
 )
 
-// depInfo describes a component on the admin page. Components without a
-// bundle are only reported on.
+// depInfo describes a component on the admin page.
 type depInfo struct {
 	name        string
 	title       string
 	description string
+	// chart is set for components installed from the forgeai Helm chart
+	// rather than from an embedded bundle.
+	chart bool
 }
 
 // depCatalog lists the components in install order: Kueue's TrainJob
 // integration needs the Trainer CRDs, so Trainer comes first.
 var depCatalog = []depInfo{
-	{"trainer", "Kubeflow Trainer v2", "TrainJobs and the ClusterTrainingRuntimes, with JobSet"},
-	{"kueue", "Kueue", "GPU quota queues that admit TrainJobs"},
-	{"agent-sandbox", "agent-sandbox", "Sandbox controller and CRDs for the Sandboxes view"},
-	{"forgeai", "forgeai operator", "Projects, instance types and the controllers; installed with make deploy-dev"},
+	{name: "trainer", title: "Kubeflow Trainer v2", description: "TrainJobs and the ClusterTrainingRuntimes, with JobSet"},
+	{name: "kueue", title: "Kueue", description: "GPU quota queues that admit TrainJobs"},
+	{name: "agent-sandbox", title: "agent-sandbox", description: "Sandbox controller and CRDs for the Sandboxes view"},
+	{name: "forgeai", title: "forgeai operator", description: "Projects, instance types and the controllers", chart: true},
+}
+
+// depInfoByName returns the catalog entry of a component.
+func depInfoByName(name string) (depInfo, bool) {
+	for _, info := range depCatalog {
+		if info.name == name {
+			return info, true
+		}
+	}
+	return depInfo{}, false
 }
 
 // Dependency is one cluster component as the Dependencies view shows it.
@@ -111,9 +124,11 @@ type Dependency struct {
 
 // depRecord is the provenance of one install, stored in depRecordName.
 type depRecord struct {
-	Version        string `json:"version"`
-	Namespace      string `json:"namespace"`
-	ManifestSHA256 string `json:"manifestSHA256"`
+	Version   string `json:"version"`
+	Namespace string `json:"namespace"`
+	// Source is the chart reference of a component installed from a Helm chart.
+	Source         string `json:"source,omitempty"`
+	ManifestSHA256 string `json:"manifestSHA256,omitempty"`
 	AppliedBy      string `json:"appliedBy,omitempty"`
 	AppliedAt      string `json:"appliedAt"`
 }
@@ -241,7 +256,7 @@ func assess(dep *Dependency, h depHealth) {
 		dep.Message = fmt.Sprintf("%d of %d CRDs installed", h.crdsFound, h.crdsWanted)
 		return
 	}
-	if !dep.Installable && len(h.deployments) == 0 {
+	if dep.Name == "forgeai" && len(h.deployments) == 0 {
 		dep.Status, dep.Message = "degraded", "Operator Deployment not found"
 		return
 	}
@@ -269,6 +284,9 @@ func assess(dep *Dependency, h depHealth) {
 	if dep.Installable && dep.Installed == "" {
 		dep.Status = "unmanaged"
 		dep.Message = "Installed outside forgeai; installing replaces it with the pinned version"
+		if dep.Name == "forgeai" {
+			dep.Message = "Deployed outside Helm (make deploy-dev); remove it before installing the chart"
+		}
 		return
 	}
 	if dep.Installable && dep.Installed != dep.Pinned {
@@ -337,13 +355,16 @@ func (a *App) ListDependencies() (*Dependencies, error) {
 // components are found by their labels; forgeai by its operator Deployment.
 func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *depBundle, expectNamespace string) (Dependency, error) {
 	dep := Dependency{
-		Name: info.name, Title: info.title, Description: info.description, Installable: b != nil,
+		Name: info.name, Title: info.title, Description: info.description, Installable: b != nil || info.chart,
 	}
 	var h depHealth
 	crds := forgeaiCRDs
-	if b != nil {
+	switch {
+	case b != nil:
 		dep.Pinned = b.Version
 		crds = b.crdNames()
+	case info.chart:
+		dep.Pinned = forgeaiChartVersion
 	}
 	h.crdsWanted = len(crds)
 	for _, name := range crds {
@@ -502,18 +523,26 @@ func (a *App) InstallDependency(name string) error {
 	if !mustBeClusterAdmin(ctx, c.k8s) {
 		return errors.New("installing cluster components needs cluster-admin")
 	}
+	info, ok := depInfoByName(name)
+	if !ok {
+		return fmt.Errorf("unknown component %s", name)
+	}
 	b, err := bundleByName(name)
 	if err != nil {
 		return err
 	}
-	if b == nil {
+	if b == nil && !info.chart {
 		return fmt.Errorf("%s is not installed from the GUI", name)
 	}
 	cfg, err := loadPlatform(ctx, c.k8s)
 	if err != nil {
 		return err
 	}
-	if err := checkInstallTarget(b, cfg); err != nil {
+	if b != nil {
+		if err := checkInstallTarget(b, cfg); err != nil {
+			return err
+		}
+	} else if err := checkChartTarget(ctx, c.k8s); err != nil {
 		return err
 	}
 	if !a.installs.start(name) {
@@ -525,16 +554,12 @@ func (a *App) InstallDependency(name string) error {
 		progress := func(msg string) {
 			runtime.EventsEmit(a.ctx, depProgressEvent, DependencyProgress{Name: name, Message: msg})
 		}
-		err := installBundle(ctx, c.k8s, b, progress)
+		rec, err := installComponent(ctx, c, b, progress)
 		if err == nil {
 			progress("Recording the install")
-			err = writeRecord(ctx, c.k8s, b.Name, depRecord{
-				Version:        b.Version,
-				Namespace:      bundleNamespace(b),
-				ManifestSHA256: b.SHA256,
-				AppliedBy:      currentUser(ctx, c.k8s),
-				AppliedAt:      time.Now().UTC().Format(time.RFC3339),
-			})
+			rec.AppliedBy = currentUser(ctx, c.k8s)
+			rec.AppliedAt = time.Now().UTC().Format(time.RFC3339)
+			err = writeRecord(ctx, c.k8s, name, rec)
 		}
 		if err == nil && name == "agent-sandbox" {
 			progress("Restarting the forgeai operator to start the Sandbox controller")
@@ -543,13 +568,24 @@ func (a *App) InstallDependency(name string) error {
 		// Release the component before the outcome is emitted: the view
 		// refreshes on it and must not still see the install in progress.
 		a.installs.finish(name)
-		done := DependencyProgress{Name: name, Message: "Installed " + b.Version, Done: true}
+		done := DependencyProgress{Name: name, Message: "Installed " + rec.Version, Done: true}
 		if err != nil {
 			done = DependencyProgress{Name: name, Message: "Install failed", Done: true, Error: err.Error()}
 		}
 		runtime.EventsEmit(a.ctx, depProgressEvent, done)
 	}()
 	return nil
+}
+
+// installComponent installs a bundled component, or the forgeai operator from
+// its chart when there is no bundle. It returns the record of the install.
+func installComponent(ctx context.Context, c *Connection, b *depBundle, progress func(string)) (depRecord, error) {
+	if b == nil {
+		rec := depRecord{Version: forgeaiChartVersion, Namespace: platform.Namespace(), Source: forgeaiChart}
+		return rec, installChart(ctx, c, progress)
+	}
+	rec := depRecord{Version: b.Version, Namespace: bundleNamespace(b), ManifestSHA256: b.SHA256}
+	return rec, installBundle(ctx, c.k8s, b, progress)
 }
 
 // installBundle applies a bundle in stages. Namespaces and CRDs come first,

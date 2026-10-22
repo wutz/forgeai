@@ -139,6 +139,8 @@ function SandboxDetail({name, onDone, onDeleted}: {
   // pending is the transition in flight. It stays set until the phase reaches
   // its target, because suspending or resuming takes the controller a while.
   const [pending, setPending] = useState<'start' | 'stop' | null>(null)
+  // deleting is the delete call in flight; the view closes once it succeeds.
+  const [deleting, setDeleting] = useState(false)
   const active = useActive()
   const confirm = useConfirm()
   const phase = box?.phase
@@ -167,6 +169,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
     setLog('')
     setTab('overview')
     setPending(null)
+    setDeleting(false)
     setSaving(false)
     setSavedTemplate('')
   }, [name])
@@ -190,6 +193,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
     ? <div className="banner banner-error" role="alert">{error}</div>
     : <Spinner label={t('sandboxes.loading')}/>}</Card>
   const running = box.phase === 'Running' || box.phase === 'Pending'
+  const busy = pending !== null || deleting
   // showLog rejects when the logs cannot be read; the banner shows why.
   const showLog = () =>
     SandboxLogs(box.name, 500).then(v => { setLog(v); setTab('log') }, e => {
@@ -216,7 +220,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
         <button className="btn btn-sm" onClick={() => showLog().catch(() => {})}>
           <Icon name="scroll" size={13}/>{t('common.logs')}
         </button>
-        {running && <button className="btn btn-sm" disabled={pending !== null} onClick={() => confirm.ask({
+        {running && <button className="btn btn-sm" disabled={busy} onClick={() => confirm.ask({
           title: t('sandboxes.stopTitle', {name: box.name}),
           message: t('sandboxes.stopMessage'),
           action: t('common.stop'),
@@ -225,7 +229,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
           {pending === 'stop' ? <span className="spinner" aria-hidden/> : <Icon name="square" size={12}/>}
           {pending === 'stop' ? t('sandboxes.stopping') : t('common.stop')}
         </button>}
-        {!running && <button className="btn btn-sm btn-accent" disabled={pending !== null}
+        {!running && <button className="btn btn-sm btn-accent" disabled={busy}
                              onClick={() => transition('start', StartSandbox(box.name))}>
           {pending === 'start' ? <span className="spinner" aria-hidden/> : <Icon name="play" size={12}/>}
           {pending === 'start' ? t('sandboxes.starting') : t('common.start')}
@@ -234,12 +238,16 @@ function SandboxDetail({name, onDone, onDeleted}: {
           <Icon name="layers" size={13}/>{t('sandboxes.saveAsTemplate')}
         </button>
         <span className="spacer"/>
-        <button className="btn btn-sm btn-danger" onClick={() => confirm.ask({
+        <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => confirm.ask({
           title: t('sandboxes.deleteTitle', {name: box.name}),
           message: t('sandboxes.deleteMessage'),
           action: t('sandboxes.deleteAction'), danger: true,
-          run: () => DeleteSandbox(box.name).then(onDeleted).catch(e => setError(errText(e))),
-        })}><Icon name="trash" size={13}/>{t('common.delete')}</button>
+          run: () => {
+            setDeleting(true)
+            setError('')
+            DeleteSandbox(box.name).then(onDeleted).catch(e => setError(errText(e))).finally(() => setDeleting(false))
+          },
+        })}><Icon name="trash" size={13}/>{deleting ? t('sandboxes.deleting') : t('common.delete')}</button>
       </div>
 
       <div className="section">

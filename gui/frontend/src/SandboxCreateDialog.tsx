@@ -4,6 +4,7 @@ import {app, sandbox, volumes, v1} from '../wailsjs/go/models'
 import {envToLines, linesToEnv, errText, generateName} from './util'
 import {Dialog} from './ui'
 import {t} from './i18n'
+import {ImageField} from './ImageField'
 import {Mount, VolumeMountsField, mountProblems} from './VolumeMounts'
 
 // SandboxCreateDialog is the "New sandbox" form: image, isolation runtime
@@ -120,11 +121,8 @@ export function SandboxCreateDialog({onClose, onCreated}: {
           </div>
           <div className="field">
             <label htmlFor="s-image">{t('common.image')}</label>
-            <input id="s-image" className="input mono" value={f.image}
-                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                   onChange={e => set('image', e.target.value)}
-                   placeholder="cr.example.com:7443/forge-myproj/agent:latest" required/>
-            {opts?.images?.length ? <span className="hint">{t('sandboxCreate.offered', {images: opts.images.join(', ')})}</span> : null}
+            <ImageField id="s-image" value={f.image} onChange={image => set('image', image)}
+                        offered={opts?.images} placeholder="cr.example.com:7443/forge-myproj/agent:latest" required/>
           </div>
           <div className="row">
             <div className="field">

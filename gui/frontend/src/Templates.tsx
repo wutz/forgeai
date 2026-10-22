@@ -5,6 +5,7 @@ import {envToLines, linesToEnv, fmtDate, errText, generateName} from './util'
 import {Card, Dialog, Empty, Icon, PageHeader, Segmented, useActive, useConfirm} from './ui'
 import {SandboxTemplateDialog, SandboxTemplateTable} from './SandboxTemplates'
 import {t} from './i18n'
+import {ImageField} from './ImageField'
 
 type Kind = 'sandbox' | 'job'
 
@@ -214,9 +215,7 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
         </div>
         <div className="field">
           <label htmlFor="t-image">{t('common.image')}</label>
-          <input id="t-image" className="input mono" value={f.image}
-                 autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                 onChange={e => set('image', e.target.value)} required/>
+          <ImageField id="t-image" value={f.image} onChange={image => set('image', image)} required/>
         </div>
         <div className="field">
           <label htmlFor="t-command">{t('templates.commandBash')}</label>

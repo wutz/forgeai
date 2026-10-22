@@ -39,7 +39,6 @@ export const en = {
   'sandboxTemplates.dialogEdit': 'Edit sandbox template',
   'sandboxTemplates.editSubtitle': 'Updates the SandboxTemplate; sandboxes already created from it are not changed',
   'sandboxTemplates.newSubtitle': 'Saved as a SandboxTemplate of the project',
-  'sandboxTemplates.offered': 'Offered: {images}',
   'sandboxTemplates.runcNodeRuntime': 'runc (node runtime)',
   'sandboxTemplates.commandHint': 'Empty runs the image entrypoint.',
 }
@@ -82,7 +81,6 @@ export const zh: Record<keyof typeof en, string> = {
   'sandboxTemplates.dialogEdit': '编辑沙箱模板',
   'sandboxTemplates.editSubtitle': '更新 SandboxTemplate；已由此创建的沙箱保持不变',
   'sandboxTemplates.newSubtitle': '保存为项目中的 SandboxTemplate',
-  'sandboxTemplates.offered': '可选镜像：{images}',
   'sandboxTemplates.runcNodeRuntime': 'runc（节点运行时）',
   'sandboxTemplates.commandHint': '留空则运行镜像的 entrypoint。',
 }

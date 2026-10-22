@@ -475,6 +475,41 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
 .dialog-foot { padding: 12px 18px; background: var(--wash); }
 .dialog form, .dialog .dialog-form { display: flex; flex-direction: column; gap: 14px; }
 
+/* Image picker (ImageField): a combobox whose menu is portalled to the body,
+   so the scrolling dialog body does not clip it. Floating, so Level 2. */
+.combo { position: relative; }
+.combo > .input { width: 100%; padding-right: 34px; }
+.combo-toggle { position: absolute; right: 3px; top: 3px; }
+.combo-caret { display: inline-flex; transition: transform 120ms ease; transform: rotate(90deg); }
+.combo-caret.open { transform: rotate(-90deg); }
+.combo-menu {
+  position: fixed; z-index: 100; display: flex; flex-direction: column;
+  max-height: 300px; overflow: auto; padding: 4px;
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pop);
+}
+.combo-group {
+  padding: 8px 8px 4px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--faint);
+}
+.combo-option {
+  display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 4px 8px;
+  border-radius: 6px; cursor: pointer; font-size: 12.5px; color: var(--ink);
+}
+.combo-option.active { background: var(--accent-soft); }
+.combo-option > .icon { flex-shrink: 0; color: var(--accent); }
+.combo-label { color: var(--mute); flex-shrink: 0; }
+.combo-address { display: flex; flex: 1; min-width: 0; font-size: 12px; }
+.combo-prefix { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--mute); }
+.combo-name { flex-shrink: 0; white-space: nowrap; color: var(--ink); }
+.combo-meta { flex-shrink: 0; font-size: 11.5px; color: var(--mute); font-variant-numeric: tabular-nums; }
+.combo-note { padding: 6px 8px; font-size: 12px; color: var(--mute); }
+.combo-foot {
+  position: sticky; bottom: -4px; margin-top: 4px; padding: 6px 8px 2px; background: var(--surface);
+  border-top: 1px solid var(--hairline-soft);
+  font-family: var(--mono); font-size: 10.5px; color: var(--faint);
+}
+
 /* Files iframe */
 .files-frame { height: calc(100vh - 230px); }
 

@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {ListTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, DeleteSandboxTemplate, SandboxTemplates as ListSandboxTemplates, ListInstanceTypes} from '../wailsjs/go/app/App'
 import {app, sandbox, training} from '../wailsjs/go/models'
 import {envErrors, envToLines, linesToEnv, fmtDate, errText, generateName, NAME_MAX, NAME_PATTERN} from './util'
-import {Card, Dialog, Empty, Icon, PageHeader, Segmented, useActive, useConfirm} from './ui'
+import {Card, CancelButton, Dialog, Empty, Icon, PageHeader, Segmented, useActive, useConfirm} from './ui'
 import {SandboxTemplateDialog, SandboxTemplateTable} from './SandboxTemplates'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
@@ -205,7 +205,7 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
               : t('templates.jobNewSubtitle')}
             onClose={onClose} busy={busy} footer={<>
               {blocker && !busy && !hasFieldHint && <span className="hint hint-error" role="status">{blocker}</span>}
-              <button className="btn" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
+              <CancelButton disabled={busy}/>
               <button type="submit" form="template-form" className="btn btn-primary" disabled={busy || !!blocker}>
                 {busy ? t('templates.saving') : t('templates.saveTemplate')}
               </button>

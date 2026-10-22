@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {CreateSandboxTemplate, UpdateSandboxTemplate, SandboxOptions} from '../wailsjs/go/app/App'
 import {app, sandbox} from '../wailsjs/go/models'
 import {envErrors, envMap, envToLines, linesToEnv, fmtDate, errText, generateName, NAME_MAX, NAME_PATTERN} from './util'
-import {Dialog, Empty, useConfirm} from './ui'
+import {CancelButton, Dialog, Empty, useConfirm} from './ui'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
 
@@ -120,7 +120,7 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
               : t('sandboxTemplates.newSubtitle')}
             onClose={onClose} busy={busy} footer={<>
               {blocker && !busy && !hasFieldHint && <span className="hint hint-error" role="status">{blocker}</span>}
-              <button className="btn" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
+              <CancelButton disabled={busy}/>
               <button type="submit" form="sandbox-template-form" className="btn btn-primary" disabled={busy || !!blocker}>
                 {busy ? t('templates.saving') : t('templates.saveTemplate')}
               </button>

@@ -4,7 +4,7 @@ import {
 } from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {errText, fmtDate, generateName, phaseLabel} from './util'
-import {Badge, Card, Dialog, Empty, Icon, PageHeader, RefreshButton, useActive, useConfirm} from './ui'
+import {Badge, Card, CancelButton, Dialog, Empty, Icon, PageHeader, RefreshButton, useActive, useConfirm} from './ui'
 import {t} from './i18n'
 
 // Admin manages Projects: quota (GPU classes, storage), network isolation,
@@ -189,7 +189,7 @@ function ProjectDialog({form, onClose, onSaved}: {
     <Dialog title={create ? t('admin.newProject') : t('admin.editProject')}
             subtitle={t('admin.dialogSubtitle')}
             onClose={onClose} busy={busy} footer={<>
-              <button className="btn" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
+              <CancelButton disabled={busy}/>
               <button type="submit" form="project-form" className="btn btn-primary" disabled={busy || !p.name}>
                 {busy ? t('admin.saving') : create ? t('admin.createProject') : t('common.save')}
               </button>

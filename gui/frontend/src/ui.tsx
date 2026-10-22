@@ -329,6 +329,17 @@ function ConfirmDialog({request, onClose}: {request: ConfirmRequest, onClose: ()
 const focusableSelector = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), ' +
   'textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
 
+// DialogCloseContext hands a dialog's guarded close to its footer, so a Cancel
+// button asks before it discards edits, as the header X does.
+const DialogCloseContext = createContext<(() => void) | null>(null)
+
+// CancelButton is the Cancel of a Dialog footer. It closes through the same
+// guard as the header X and Escape.
+export function CancelButton({disabled}: {disabled?: boolean}) {
+  const close = useContext(DialogCloseContext)
+  return <button className="btn" onClick={() => close?.()} disabled={disabled}>{t('common.cancel')}</button>
+}
+
 export function Dialog({title, subtitle, onClose, children, footer, width, busy}: {
   title: string, subtitle?: ReactNode, onClose: () => void, children: ReactNode,
   footer?: ReactNode, width?: number, busy?: boolean
@@ -388,6 +399,7 @@ export function Dialog({title, subtitle, onClose, children, footer, width, busy}
     return () => window.removeEventListener('keydown', onTab)
   }, [])
   return (
+    <DialogCloseContext.Provider value={close}>
     <div className="overlay" onMouseDown={e => e.target === e.currentTarget && close()}>
       <div ref={box} className="dialog" style={width ? {width} : undefined} role="dialog" aria-modal aria-label={title}>
         <div className="dialog-head">
@@ -409,5 +421,6 @@ export function Dialog({title, subtitle, onClose, children, footer, width, busy}
         {footer && <div className="dialog-foot">{footer}</div>}
       </div>
     </div>
+    </DialogCloseContext.Provider>
   )
 }

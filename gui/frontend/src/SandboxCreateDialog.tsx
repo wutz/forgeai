@@ -2,7 +2,7 @@ import {FormEvent, useEffect, useState} from 'react'
 import {CreateSandbox, ListInstanceTypes, ListVolumes, SandboxOptions, SandboxTemplates} from '../wailsjs/go/app/App'
 import {app, sandbox, volumes, v1} from '../wailsjs/go/models'
 import {envErrors, envToLines, linesToEnv, errText, generateName} from './util'
-import {Dialog} from './ui'
+import {CancelButton, Dialog} from './ui'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
 import {Mount, VolumeMountsField, mountProblems} from './VolumeMounts'
@@ -94,7 +94,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   return (
     <Dialog title={t('sandboxCreate.title')} subtitle={t('sandboxCreate.subtitle')}
             onClose={onClose} busy={busy} footer={<>
-              <button className="btn" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
+              <CancelButton disabled={busy}/>
               <button type="submit" form="sandbox-form" className="btn btn-primary" disabled={busy || !f.name || !f.image || !mountsOK || envBad.length > 0}>
                 {busy ? t('sandboxCreate.creating') : t('sandboxCreate.create')}
               </button>

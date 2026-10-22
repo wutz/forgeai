@@ -3,7 +3,7 @@ import {CreateJob, ListInstanceTypes, ListTemplates, TemplateNames, ListVolumes}
 import {app, training, volumes} from '../wailsjs/go/models'
 import {envErrors, envMap, envToLines, linesToEnv, errText, generateName, NAME_MAX, NAME_PATTERN} from './util'
 import {t} from './i18n'
-import {Dialog} from './ui'
+import {CancelButton, Dialog} from './ui'
 import {ImageField} from './ImageField'
 import {Mount, VolumeMountsField, mountProblems} from './VolumeMounts'
 
@@ -100,7 +100,7 @@ export function JobCreateDialog({onClose, onCreated}: {
     <Dialog title={t('jobCreate.title')} subtitle={t('jobCreate.subtitle')}
             onClose={onClose} busy={busy} footer={<>
               {blocker && !busy && !hasFieldHint && <span className="hint hint-error" role="status">{blocker}</span>}
-              <button className="btn" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
+              <CancelButton disabled={busy}/>
               <button type="submit" form="job-form" className="btn btn-primary" disabled={busy || !!blocker}>
                 {busy ? t('jobCreate.creating') : t('jobCreate.create')}
               </button>

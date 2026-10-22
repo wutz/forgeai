@@ -6,7 +6,7 @@ import {
 import {app, volumes as vol} from '../wailsjs/go/models'
 import {fmtDate, errText, generateName, phaseLabel} from './util'
 import {t} from './i18n'
-import {Badge, Card, Dialog, Empty, Icon, Meter, PageHeader, RefreshButton, useActive, useConfirm} from './ui'
+import {Badge, Card, CancelButton, Dialog, Empty, Icon, Meter, PageHeader, RefreshButton, useActive, useConfirm} from './ui'
 
 // Volumes manages shared filesystems: create, grow, trash (recycle bin),
 // restore and purge. Deleting is delayed — the operator purges expired
@@ -189,7 +189,7 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
   return (
     <Dialog title={t('volumes.new')} subtitle={t('volumes.createSubtitle')} width={440}
             onClose={onClose} busy={busy} footer={<>
-              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
+              <CancelButton/>
               <button type="submit" form="create-volume" className="btn btn-primary" disabled={busy}>
                 {busy ? t('volumes.creating') : t('volumes.createVolume')}
               </button>
@@ -246,7 +246,7 @@ function ResizeVolumeDialog({volume, onClose, onDone}: {
     <Dialog title={t('volumes.growTitle', {name: volume.name})}
             subtitle={t('volumes.growSubtitle', {size: current})}
             width={400} onClose={onClose} busy={busy} footer={<>
-              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
+              <CancelButton/>
               <button type="submit" form="resize-volume" className="btn btn-primary"
                       disabled={busy || !(size > current)}>
                 {busy ? t('volumes.growing') : t('volumes.growVolume')}
@@ -291,7 +291,7 @@ function ExpiryDialog({volume, onClose, onDone}: {
   return (
     <Dialog title={t('volumes.expiryTitle', {name: volume.name})} subtitle={t('volumes.expirySubtitle')}
             width={400} onClose={onClose} busy={busy} footer={<>
-              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
+              <CancelButton/>
               <button type="submit" form="expiry-volume" className="btn btn-primary" disabled={busy || !day}>
                 {busy ? t('volumes.saving') : t('common.save')}
               </button>

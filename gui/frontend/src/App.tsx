@@ -11,6 +11,7 @@ import {FilesView} from './FilesView'
 import {Images} from './Images'
 import {Resources} from './Resources'
 import {Admin} from './Admin'
+import {Dependencies} from './Dependencies'
 import {Scope} from './Scope'
 import {errText} from './util'
 import {ActiveView, Empty, HeaderSlot, Icon, IconName, Spinner} from './ui'
@@ -23,7 +24,8 @@ const PREFS = 'forgeai.connection'
 const NAMESPACES = 'forgeai.namespaces'
 const SIDEBAR = 'forgeai.sidebar'
 
-type Area = 'overview' | 'jobs' | 'sandboxes' | 'templates' | 'volumes' | 'files' | 'images' | 'resources' | 'admin'
+type Area = 'overview' | 'jobs' | 'sandboxes' | 'templates' | 'volumes' | 'files' | 'images' | 'resources'
+  | 'admin' | 'dependencies'
 
 type NavItem = {area: Area, label: string, icon: IconName}
 
@@ -37,11 +39,22 @@ function pickNamespace(list: app.ProjectNamespace[], requested: string, remember
   return known ?? list[0].namespace
 }
 
+// adminAreas lists the admin areas the connection offers: Projects needs the
+// forgeai CRDs and admin rights, Dependencies needs cluster-admin.
+function adminAreas(info: app.ConnInfo): Area[] {
+  return [
+    ...(info.admin && info.forgeai ? ['admin' as const] : []),
+    ...(info.clusterAdmin ? ['dependencies' as const] : []),
+  ]
+}
+
 // areaFor keeps the open view when the new connection offers it. A connection
-// without a project only has the admin area.
+// without a project only has the admin areas, and opens on the first of them.
 function areaFor(current: Area, info: app.ConnInfo): Area {
-  if (!info.project) return 'admin'
-  if (current === 'admin' && !info.admin) return 'overview'
+  const offered = adminAreas(info)
+  if (!info.project) return offered.includes(current) ? current : offered[0] ?? 'dependencies'
+  if (offered.includes(current)) return current
+  if (current === 'admin' || current === 'dependencies') return 'overview'
   if (current === 'sandboxes' && !info.sandboxes) return 'overview'
   return current
 }
@@ -173,9 +186,10 @@ export default function App() {
       items: [{area: 'resources', label: t('nav.resources'), icon: 'cpu'}],
     },
   ] : []
-  if (conn?.admin) {
-    groups.push({label: t('nav.admin'), items: [{area: 'admin', label: t('nav.projects'), icon: 'shield'}]})
-  }
+  const admin: NavItem[] = conn ? adminAreas(conn).map(a => a === 'admin'
+    ? {area: a, label: t('nav.projects'), icon: 'shield'}
+    : {area: a, label: t('nav.dependencies'), icon: 'layers'}) : []
+  if (admin.length) groups.push({label: t('nav.admin'), items: admin})
 
   return (
     <HeaderSlot.Provider value={headerSlot}>
@@ -225,6 +239,7 @@ export default function App() {
                 {shown('images', <Images/>)}
                 {shown('resources', <Resources/>)}
                 {shown('admin', <Admin/>)}
+                {shown('dependencies', <Dependencies/>)}
               </Fragment>
             ) : loading ? (
               <Spinner label={t('app.connecting')}/>

@@ -38,6 +38,8 @@ type App struct {
 	terminals sync.Map
 	// files is the loopback proxy the file browser is embedded through.
 	files fileProxy
+	// installs tracks the cluster component installs in progress.
+	installs depInstalls
 }
 
 // New creates the bound application.
@@ -79,7 +81,13 @@ type ConnInfo struct {
 	Server    string `json:"server"`
 	Namespace string `json:"namespace"`
 	Project   string `json:"project"`
-	Admin     bool   `json:"admin"`
+	// Admin is set when the user may manage Projects.
+	Admin bool `json:"admin"`
+	// ClusterAdmin is set when the user may install cluster components.
+	ClusterAdmin bool `json:"clusterAdmin"`
+	// Forgeai is set when the forgeai CRDs are installed; without them only
+	// the Dependencies view is useful.
+	Forgeai bool `json:"forgeai"`
 	// Sandboxes is set when the cluster runs agent-sandbox and the user may
 	// use it; the Sandboxes view is hidden otherwise.
 	Sandboxes bool `json:"sandboxes"`

@@ -111,7 +111,8 @@ export function Jobs() {
       <div className="split">
         <JobTable jobs={shown} filtered={filter !== 'all'} selected={selected} onSelect={n =>
           setSelected(prev => prev === n ? null : n)}/>
-        {selected && <JobDetail name={selected} onDone={refresh} onOpen={n => { setSelected(n); refresh() }}
+        {/* Keyed by name: a read still in flight for the previous job lands on an unmounted detail. */}
+        {selected && <JobDetail key={selected} name={selected} onDone={refresh} onOpen={n => { setSelected(n); refresh() }}
                                 onDeleted={() => { setSelected(null); refresh() }}/>}
       </div>
     </div>

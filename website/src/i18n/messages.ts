@@ -21,6 +21,7 @@ const en = {
     mainNav: 'Main',
     features: 'Features',
     how: 'How it works',
+    download: 'Download',
     start: 'Get started',
     github: 'GitHub',
     language: 'Language',
@@ -145,6 +146,43 @@ const en = {
     caption: 'Example Sandbox resource',
   },
 
+  download: {
+    eyebrow: 'Desktop console',
+    title: 'Download the forgeai console',
+    lead: 'The console manages projects, jobs, sandboxes and volumes through a kubeconfig context. The installers are served from this site, so you can download them without reaching GitHub.',
+    platforms: [
+      {
+        icon: 'MAC',
+        title: 'macOS',
+        body: 'A universal build for Apple silicon and Intel. It is signed ad hoc, so macOS asks you to approve it on first launch.',
+        links: [{ label: 'Download .dmg', key: 'macos' }],
+      },
+      {
+        icon: 'WIN',
+        title: 'Windows',
+        body: '64-bit. Run the installer, or use the portable build without installing it.',
+        links: [
+          { label: 'Installer (.exe)', key: 'windows' },
+          { label: 'Portable (.exe)', key: 'windows-portable' },
+        ],
+      },
+      {
+        icon: 'LNX',
+        title: 'Linux',
+        body: '64-bit. Needs GTK 3 and WebKitGTK 4.1 at runtime. The Debian package adds a menu entry.',
+        links: [
+          { label: 'Debian package (.deb)', key: 'linux-deb' },
+          { label: 'Archive (.tar.gz)', key: 'linux-tar' },
+        ],
+      },
+    ],
+    note: {
+      lead: 'Each release also includes',
+      checksums: 'SHA-256 checksums',
+      tail: '. The console needs a kubeconfig for a cluster that runs forgeai.',
+    },
+  },
+
   start: {
     eyebrow: 'Get started',
     title: 'Install the operator and the console',
@@ -198,6 +236,7 @@ const zh: Messages = {
     mainNav: '主导航',
     features: '功能',
     how: '工作原理',
+    download: '下载',
     start: '快速开始',
     github: 'GitHub',
     language: '语言',
@@ -320,6 +359,43 @@ const zh: Messages = {
       '<strong>文件服务器</strong>通过 HTTPS 提供每个存储卷的访问，并使用基础认证；不使用时缩容至零。',
     ],
     caption: 'Sandbox 资源示例',
+  },
+
+  download: {
+    eyebrow: '桌面控制台',
+    title: '下载 forgeai 控制台',
+    lead: '控制台通过 kubeconfig 上下文管理项目、任务、沙箱和存储卷。安装包由本站提供，无需直接访问 GitHub 即可下载。',
+    platforms: [
+      {
+        icon: 'MAC',
+        title: 'macOS',
+        body: '同时适用于 Apple 芯片和 Intel 芯片的通用版本。应用采用 ad hoc 签名，首次启动时 macOS 会要求你确认。',
+        links: [{ label: '下载 .dmg', key: 'macos' }],
+      },
+      {
+        icon: 'WIN',
+        title: 'Windows',
+        body: '64 位。可以运行安装程序，也可以直接使用免安装的便携版。',
+        links: [
+          { label: '安装程序 (.exe)', key: 'windows' },
+          { label: '便携版 (.exe)', key: 'windows-portable' },
+        ],
+      },
+      {
+        icon: 'LNX',
+        title: 'Linux',
+        body: '64 位。运行时需要 GTK 3 和 WebKitGTK 4.1。Debian 软件包会添加应用菜单项。',
+        links: [
+          { label: 'Debian 软件包 (.deb)', key: 'linux-deb' },
+          { label: '压缩包 (.tar.gz)', key: 'linux-tar' },
+        ],
+      },
+    ],
+    note: {
+      lead: '每个版本还附带',
+      checksums: 'SHA-256 校验和',
+      tail: '。控制台需要一个运行 forgeai 的集群的 kubeconfig。',
+    },
   },
 
   start: {

@@ -191,6 +191,39 @@ spec:
     </div>
   </section>
 
+  <section class="section" id="download">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow-text">{t.download.eyebrow}</span>
+        <h2>{t.download.title}</h2>
+        <p>{t.download.lead}</p>
+      </div>
+      <ul class="cards">
+        {
+          t.download.platforms.map((p) => (
+            <li class="card">
+              <span class="card-icon" aria-hidden="true">{p.icon}</span>
+              <h3>{p.title}</h3>
+              <p>{p.body}</p>
+              <ul class="download-links">
+                {p.links.map((link) => (
+                  <li>
+                    <a class="button button-secondary" href={`/download/gui/${link.key}`}>{link.label}</a>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="note">
+        {t.download.note.lead}{' '}
+        <a href="/download/gui/checksums">{t.download.note.checksums}</a>
+        {t.download.note.tail}
+      </p>
+    </div>
+  </section>
+
   <section class="section" id="get-started">
     <div class="container">
       <div class="section-head">

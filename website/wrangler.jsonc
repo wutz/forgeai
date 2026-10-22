@@ -2,9 +2,12 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "forgeai-website",
   "compatibility_date": "2026-10-20",
-  // Static site: no Worker script, only the Astro build output.
+  // The Worker only proxies the GUI installers from GitHub releases (/download/*). Everything else is the Astro build.
+  "main": "./worker/index.ts",
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/download/*"],
     "not_found_handling": "404-page",
     "html_handling": "auto-trailing-slash",
   },

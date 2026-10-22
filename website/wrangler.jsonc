@@ -16,4 +16,6 @@
   // forgeai.wutz.dev is a custom domain on the wutz.dev zone (Cloudflare manages the DNS record and certificate).
   "routes": [{ "pattern": "forgeai.wutz.dev", "custom_domain": true }],
   "observability": { "enabled": true },
+  // Workers Builds runs `wrangler preview` for non-production branches (pull requests), which requires this block. Assets and settings stay at the top level.
+  "previews": {},
 }

@@ -1,5 +1,7 @@
 ---
 import { messages, type Locale } from '../i18n/messages';
+import Icon from './Icon.astro';
+import Shot from './Shot.astro';
 
 interface Props {
   lang: Locale;
@@ -47,34 +49,27 @@ spec:
 
 <main>
   <section class="hero">
-    <div class="container hero-grid">
-      <div>
-        <span class="eyebrow">{t.hero.eyebrow}</span>
-        <h1>{t.hero.title}</h1>
-        <p class="lead">{t.hero.lead}</p>
-        <div class="hero-actions">
-          <a class="button button-primary" href="#get-started">{t.hero.primary}</a>
-          <a class="button button-secondary" href={repo} rel="noopener">{t.hero.secondary}</a>
-        </div>
-        <div class="built-on">
-          {t.hero.builtOn}
-          <ul>
-            <li>Kubeflow Trainer v2</li>
-            <li>Kueue</li>
-            <li>agent-sandbox</li>
-            <li>Harbor</li>
-            <li>dufs</li>
-          </ul>
-        </div>
+    <div class="container hero-copy">
+      <span class="eyebrow">{t.hero.eyebrow}</span>
+      <h1>{t.hero.title}</h1>
+      <p class="lead">{t.hero.lead}</p>
+      <div class="hero-actions">
+        <a class="button button-primary" href="#get-started">{t.hero.primary}</a>
+        <a class="button button-secondary" href={repo} rel="noopener"><Icon name="github" size={18} />{t.hero.secondary}</a>
       </div>
-
-      <figure class="code-panel" aria-label={t.hero.projectCaption}>
-        <figcaption class="code-panel-head">
-          <span>project.yaml</span>
-          <span>forgeai.wutz.dev/v1alpha1</span>
-        </figcaption>
-        <pre><code>{projectYaml}</code></pre>
-      </figure>
+      <div class="built-on">
+        {t.hero.builtOn}
+        <ul>
+          <li>Kubeflow Trainer v2</li>
+          <li>Kueue</li>
+          <li>agent-sandbox</li>
+          <li>Harbor</li>
+          <li>dufs</li>
+        </ul>
+      </div>
+    </div>
+    <div class="container hero-shot">
+      <Shot lang={lang} name="overview" alt={t.hero.shotAlt} eager />
     </div>
   </section>
 
@@ -89,9 +84,66 @@ spec:
         {
           t.features.items.map((f) => (
             <li class="card">
-              <span class="card-icon" aria-hidden="true">{f.icon}</span>
+              <span class="card-icon"><Icon name={f.icon} /></span>
               <h3>{f.title}</h3>
               <p>{f.body}</p>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id="console">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow-text">{t.console.eyebrow}</span>
+        <h2>{t.console.title}</h2>
+        <p>{t.console.lead}</p>
+      </div>
+      <div class="showcase" data-showcase>
+        <div class="showcase-tabs" role="tablist" aria-label={t.console.tabsLabel}>
+          {
+            t.console.items.map((item, i) => (
+              <button
+                type="button"
+                role="tab"
+                id={`tab-${item.key}`}
+                aria-controls={`panel-${item.key}`}
+                aria-selected={i === 0 ? 'true' : 'false'}
+                tabindex={i === 0 ? 0 : -1}
+              >
+                {item.tab}
+              </button>
+            ))
+          }
+        </div>
+        {
+          t.console.items.map((item, i) => (
+            <div class="showcase-panel" role="tabpanel" id={`panel-${item.key}`} aria-labelledby={`tab-${item.key}`} hidden={i !== 0}>
+              <div class="showcase-copy">
+                <div>
+                  <h3>{item.title}</h3>
+                  <p>{item.body}</p>
+                </div>
+                <ul class="checks">
+                  {item.bullets.map((b) => <li>{b}</li>)}
+                </ul>
+              </div>
+              <Shot lang={lang} name={item.key} alt={item.alt} />
+            </div>
+          ))
+        }
+      </div>
+      <ul class="perks">
+        {
+          t.console.perks.map((perk) => (
+            <li>
+              <span class="perk-icon"><Icon name={perk.icon} size={18} /></span>
+              <div>
+                <h3>{perk.title}</h3>
+                <p>{perk.body}</p>
+              </div>
             </li>
           ))
         }
@@ -116,6 +168,36 @@ spec:
           ))
         }
       </ol>
+      <div class="how-detail">
+        <figure class="arch" aria-label={t.how.arch.caption}>
+          <figcaption class="arch-caption">{t.how.arch.caption}</figcaption>
+          <div class="arch-clients">
+            <span class="arch-label">{t.how.arch.clients}</span>
+            {t.how.arch.clientItems.map((c) => <span class="arch-chip">{c}</span>)}
+          </div>
+          <div class="arch-link"><Icon name="down" size={16} />{t.how.arch.credentials}</div>
+          <div class="arch-node">
+            <strong>{t.how.arch.api}</strong>
+            <span>{t.how.arch.apiBody}</span>
+          </div>
+          <div class="arch-link"><Icon name="down" size={16} />{t.how.arch.watches}</div>
+          <div class="arch-node arch-node-accent">
+            <strong>{t.how.arch.operator}</strong>
+            <span>{t.how.arch.operatorBody}</span>
+          </div>
+          <div class="arch-link"><Icon name="down" size={16} />{t.how.arch.provisions}</div>
+          <ul class="arch-tiles">
+            {t.how.arch.tiles.map((tile) => <li>{tile}</li>)}
+          </ul>
+        </figure>
+        <figure class="code-panel" aria-label={t.hero.projectCaption}>
+          <figcaption class="code-panel-head">
+            <span>project.yaml</span>
+            <span>forgeai.wutz.dev/v1alpha1</span>
+          </figcaption>
+          <pre><code>{projectYaml}</code></pre>
+        </figure>
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
@@ -202,13 +284,13 @@ spec:
         {
           t.download.platforms.map((p) => (
             <li class="card">
-              <span class="card-icon" aria-hidden="true">{p.icon}</span>
+              <span class="card-icon"><Icon name={p.icon} /></span>
               <h3>{p.title}</h3>
               <p>{p.body}</p>
               <ul class="download-links">
                 {p.links.map((link) => (
                   <li>
-                    <a class="button button-secondary" href={`/download/gui/${link.key}`}>{link.label}</a>
+                    <a class="button button-secondary" href={`/download/gui/${link.key}`}><Icon name="download" size={16} />{link.label}</a>
                   </li>
                 ))}
               </ul>
@@ -265,4 +347,20 @@ kubectl get fproj`}</code></pre>
       </p>
     </div>
   </section>
+  <section class="section cta" aria-labelledby="cta-title">
+    <div class="container">
+      <div class="cta-card">
+        <h2 id="cta-title">{t.cta.title}</h2>
+        <p>{t.cta.body}</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#download"><Icon name="download" size={18} />{t.cta.primary}</a>
+          <a class="button button-secondary" href={`${repo}#readme`} rel="noopener">{t.cta.secondary}<Icon name="arrow" size={16} /></a>
+        </div>
+      </div>
+    </div>
+  </section>
 </main>
+
+<script>
+  import '../scripts/showcase';
+</script>

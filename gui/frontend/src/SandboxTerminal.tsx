@@ -8,6 +8,7 @@ import {
 import {EventsOn} from '../wailsjs/runtime/runtime'
 import {errText} from './util'
 import {Icon} from './ui'
+import {t} from './i18n'
 
 // SandboxTerminal is an interactive shell in a running sandbox. The session
 // lives as long as the component: leaving the tab closes the shell.
@@ -36,10 +37,15 @@ export function SandboxTerminal({name}: {name: string}) {
     fit.fit()
 
     const offData = EventsOn(`sandbox-terminal:${id}`, (data: string) => term.write(data))
-    const offExit = EventsOn(`sandbox-terminal:${id}:exit`, (msg: string) =>
-      term.write(`\r\n\x1b[90m[session ended${msg ? `: ${msg}` : ''}]\x1b[0m\r\n`))
+    const offExit = EventsOn(`sandbox-terminal:${id}:exit`, (msg: string) => {
+      const ended = msg ? t('terminal.sessionEndedWith', {message: msg}) : t('terminal.sessionEnded')
+      term.write(`\r\n\x1b[90m[${ended}]\x1b[0m\r\n`)
+    })
     const onData = term.onData(data => SandboxTerminalInput(id, data).catch(() => {}))
     const ro = new ResizeObserver(() => {
+      // A hidden view has no size; fitting it would resize the shell to a
+      // couple of columns until the view is shown again.
+      if (!el.offsetWidth || !el.offsetHeight) return
       fit.fit()
       ResizeSandboxTerminal(id, term.cols, term.rows).catch(() => {})
     })
@@ -66,9 +72,9 @@ export function SandboxTerminal({name}: {name: string}) {
       <div className="term-bar">
         <span className="spacer"/>
         <button className="btn btn-sm" onClick={() => setMaximized(m => !m)}
-                aria-label={maximized ? 'Restore terminal' : 'Maximize terminal'}>
+                aria-label={maximized ? t('terminal.restoreLabel') : t('terminal.maximizeLabel')}>
           <Icon name={maximized ? 'minimize' : 'maximize'} size={13}/>
-          {maximized ? 'Restore' : 'Maximize'}
+          {maximized ? t('terminal.restore') : t('terminal.maximize')}
         </button>
       </div>
       {error && <div className="banner banner-error" role="alert">{error}</div>}

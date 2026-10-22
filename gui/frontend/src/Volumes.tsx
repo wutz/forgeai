@@ -4,8 +4,9 @@ import {
   TrashVolume, PurgeVolume, Config, FileServerPhase,
 } from '../wailsjs/go/app/App'
 import {app, volumes as vol} from '../wailsjs/go/models'
-import {fmtDate, errText, generateName} from './util'
-import {Badge, Card, Dialog, Empty, Icon, Meter, PageHeader, useConfirm} from './ui'
+import {fmtDate, errText, generateName, phaseLabel} from './util'
+import {t} from './i18n'
+import {Badge, Card, Dialog, Empty, Icon, Meter, PageHeader, useActive, useConfirm} from './ui'
 
 // Volumes manages shared filesystems: create, grow, trash (recycle bin),
 // restore and purge. Deleting is delayed — the operator purges expired
@@ -20,17 +21,19 @@ export function Volumes() {
   const [growing, setGrowing] = useState<vol.Volume | null>(null)
   const [expiring, setExpiring] = useState<vol.Volume | null>(null)
   const confirm = useConfirm()
+  const active = useActive()
 
   const refresh = () => {
     ListVolumes(false).then(vs => { setItems(vs); setError('') }).catch(e => setError(errText(e)))
     ListVolumes(true).then(vs => setTrash(vs)).catch(e => setError(errText(e)))
   }
   useEffect(() => {
+    if (!active) return
     refresh()
     Config().then(setConfig).catch(e => setConfigError(errText(e)))
-    const t = setInterval(refresh, 10000)
-    return () => clearInterval(t)
-  }, [])
+    const timer = setInterval(refresh, 10000)
+    return () => clearInterval(timer)
+  }, [active])
 
   const totalGiB = items.reduce((n, v) => n + (v.capacityGiB || v.requestedGiB || 0), 0)
 
@@ -40,35 +43,34 @@ export function Volumes() {
   const trashVolume = (v: vol.Volume) => FileServerPhase()
     .catch(() => '')
     .then(phase => confirm.ask({
-      title: `Move ${v.name} to the recycle bin?`,
+      title: t('volumes.trashTitle', {name: v.name}),
       message: <>
-        It stays restorable until it expires; the purge time follows the platform trash retention.
+        {t('volumes.trashStays')}
         {(phase === 'Ready' || phase === 'Starting') && v.accessMode === 'ReadWriteMany' && <>
           <br/><br/>
           <span className="banner banner-warn" style={{display: 'block'}}>
-            The file server is running. Moving this volume restarts it,
-            which interrupts file transfers in progress.
+            {t('volumes.trashServerWarn')}
           </span>
         </>}
       </>,
-      action: 'Move to recycle bin', danger: true,
+      action: t('volumes.moveToTrash'), danger: true,
       run: () => TrashVolume(v.name).then(refresh).catch(e => setError(errText(e))),
     }))
   const purgeVolume = (v: vol.Volume) => confirm.ask({
-    title: `Permanently delete ${v.name}?`,
-    message: 'Its data is removed now. This cannot be undone.',
-    action: 'Purge now', danger: true,
+    title: t('volumes.purgeTitle', {name: v.name}),
+    message: t('volumes.purgeMessage'),
+    action: t('volumes.purgeNow'), danger: true,
     run: () => PurgeVolume(v.name).then(refresh).catch(e => setError(errText(e))),
   })
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Storage" title="Volumes"
+      <PageHeader eyebrow={t('storage.eyebrow')} title={t('volumes.title')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>
-                    {items.length} volumes · {totalGiB} GiB
+                    {t('volumes.summary', {count: items.length, size: totalGiB})}
                   </span>}
                   actions={<button className="btn btn-primary" onClick={() => setCreating(true)}>
-                    <Icon name="plus" size={14}/>New volume
+                    <Icon name="plus" size={14}/>{t('volumes.new')}
                   </button>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {configError && <div className="banner banner-error" role="alert">{configError}</div>}
@@ -80,14 +82,13 @@ export function Volumes() {
 
       <Card>
         {items.length === 0 ? (
-          <Empty icon="database" title="No volumes">Create one to share files between jobs;
-            deleted volumes move to the recycle bin first.</Empty>
+          <Empty icon="database" title={t('volumes.emptyTitle')}>{t('volumes.emptyHint')}</Empty>
         ) : (
           <table className="table">
             <thead>
             <tr>
-              <th>Name</th><th>Type</th><th>Size</th><th>Phase</th>
-              <th>Used by</th><th>Created</th><th/>
+              <th>{t('common.name')}</th><th>{t('volumes.type')}</th><th>{t('volumes.size')}</th><th>{t('volumes.phase')}</th>
+              <th>{t('volumes.usedBy')}</th><th>{t('common.created')}</th><th/>
             </tr>
             </thead>
             <tbody>
@@ -102,17 +103,17 @@ export function Volumes() {
                   {v.phase === 'Resizing' && <span className="muted"> → {v.requestedGiB} GiB</span>}
                 </td>
                 <td><span className={`status status-${v.phase === 'Bound' ? 'running' : v.phase.toLowerCase()}`}>
-                  <span className="dot" aria-hidden/>{v.phase}</span></td>
+                  <span className="dot" aria-hidden/>{v.phase === 'Bound' ? t('volumes.bound') : phaseLabel(v.phase)}</span></td>
                 <td className="muted mono trunc" title={v.users?.join(', ')}>{v.users?.join(', ') || '—'}</td>
                 <td className="muted">{fmtDate(v.created)}</td>
                 <td>
                   <div className="actions">
                     <button className="btn btn-sm" disabled={v.phase !== 'Bound' && v.phase !== 'Resizing'}
-                            title={v.phase === 'Pending' ? 'Available once the volume is provisioned' : undefined}
-                            onClick={() => setGrowing(v)}>Grow</button>
+                            title={v.phase === 'Pending' ? t('volumes.pendingHint') : undefined}
+                            onClick={() => setGrowing(v)}>{t('volumes.grow')}</button>
                     <button className="btn btn-sm btn-danger" disabled={!!v.users?.length}
-                            title={v.users?.length ? 'In use by running pods' : undefined}
-                            onClick={() => trashVolume(v)}>Delete</button>
+                            title={v.users?.length ? t('volumes.inUseHint') : undefined}
+                            onClick={() => trashVolume(v)}>{t('common.delete')}</button>
                   </div>
                 </td>
               </tr>
@@ -122,15 +123,15 @@ export function Volumes() {
         )}
       </Card>
 
-      <h2 className="subtitle">Recycle bin</h2>
+      <h2 className="subtitle">{t('volumes.recycleBin')}</h2>
       <Card>
         {trash.length === 0 ? (
-          <Empty icon="trash" title="Recycle bin is empty">
-            Deleted volumes stay here and can be restored until they expire.
+          <Empty icon="trash" title={t('volumes.trashEmpty')}>
+            {t('volumes.trashEmptyHint')}
           </Empty>
         ) : (
           <table className="table">
-            <thead><tr><th>Name</th><th>Size</th><th>Purge at</th><th/></tr></thead>
+            <thead><tr><th>{t('common.name')}</th><th>{t('volumes.size')}</th><th>{t('volumes.purgeAt')}</th><th/></tr></thead>
             <tbody>
             {trash.map(v => (
               <tr key={v.name} className="trashed">
@@ -140,9 +141,9 @@ export function Volumes() {
                 <td>
                   <div className="actions">
                     <button className="btn btn-sm" onClick={() =>
-                      RestoreVolume(v.name).then(refresh).catch(e => setError(errText(e)))}>Restore</button>
-                    <button className="btn btn-sm" onClick={() => setExpiring(v)}>Set expiry</button>
-                    <button className="btn btn-sm btn-danger" onClick={() => purgeVolume(v)}>Purge now</button>
+                      RestoreVolume(v.name).then(refresh).catch(e => setError(errText(e)))}>{t('volumes.restore')}</button>
+                    <button className="btn btn-sm" onClick={() => setExpiring(v)}>{t('volumes.setExpiry')}</button>
+                    <button className="btn btn-sm btn-danger" onClick={() => purgeVolume(v)}>{t('volumes.purgeNow')}</button>
                   </div>
                 </td>
               </tr>
@@ -176,37 +177,37 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
   }
   const types = Object.entries(config.storageTypes || {})
   return (
-    <Dialog title="New volume" subtitle="Backed by a project PersistentVolumeClaim" width={440}
+    <Dialog title={t('volumes.new')} subtitle={t('volumes.createSubtitle')} width={440}
             onClose={onClose} footer={<>
-              <button className="btn" onClick={onClose}>Cancel</button>
+              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
               <button type="submit" form="create-volume" className="btn btn-primary" disabled={busy}>
-                {busy ? 'Creating…' : 'Create volume'}
+                {busy ? t('volumes.creating') : t('volumes.createVolume')}
               </button>
             </>}>
       <form id="create-volume" className="dialog-form" onSubmit={save}>
         {error && <div className="banner banner-error">{error}</div>}
         <div className="field">
-          <label htmlFor="v-name">Name</label>
+          <label htmlFor="v-name">{t('common.name')}</label>
           <input id="v-name" className="input mono" value={name} pattern="[a-z0-9]([a-z0-9\-]*[a-z0-9])?"
                  autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                 maxLength={50} title="Lowercase letters, digits and dashes; up to 50 characters"
+                 maxLength={50} title={t('volumes.nameHint')}
                  onChange={e => setName(e.target.value)} required/>
         </div>
         <div className="field">
-          <label htmlFor="v-type">Type</label>
+          <label htmlFor="v-type">{t('volumes.type')}</label>
           <select id="v-type" className="select" value={type} onChange={e => setType(e.target.value)}>
-            {types.map(([t, info]) => <option key={t} value={t}>
-              {t}{info.description ? ` — ${info.description}` : ''}
+            {types.map(([kind, info]) => <option key={kind} value={kind}>
+              {kind}{info.description ? ` — ${info.description}` : ''}
             </option>)}
           </select>
         </div>
         <div className="field">
-          <label htmlFor="v-size">Size (GiB)</label>
+          <label htmlFor="v-size">{t('volumes.sizeGiB')}</label>
           <input id="v-size" className="input" type="number" min={1} step={1} value={size}
                  onChange={e => setSize(+e.target.value)} required/>
         </div>
         <Meter value={size} max={Math.max(size, 100)} tone="muted"
-               label={<span>Requested storage</span>} right={<span>{size} GiB</span>}/>
+               label={<span>{t('volumes.requestedStorage')}</span>} right={<span>{size} GiB</span>}/>
       </form>
     </Dialog>
   )
@@ -232,17 +233,18 @@ function ResizeVolumeDialog({volume, onClose, onDone}: {
     })
   }
   return (
-    <Dialog title={`Grow ${volume.name}`} subtitle={`Currently ${current} GiB; volumes only grow`}
+    <Dialog title={t('volumes.growTitle', {name: volume.name})}
+            subtitle={t('volumes.growSubtitle', {size: current})}
             width={400} onClose={onClose} footer={<>
-              <button className="btn" onClick={onClose}>Cancel</button>
+              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
               <button type="submit" form="resize-volume" className="btn btn-primary" disabled={busy}>
-                {busy ? 'Growing…' : 'Grow volume'}
+                {busy ? t('volumes.growing') : t('volumes.growVolume')}
               </button>
             </>}>
       <form id="resize-volume" className="dialog-form" onSubmit={save}>
         {error && <div className="banner banner-error">{error}</div>}
         <div className="field">
-          <label htmlFor="v-grow">New size (GiB)</label>
+          <label htmlFor="v-grow">{t('volumes.newSize')}</label>
           <input id="v-grow" className="input" type="number" min={current + 1} step={1} value={size}
                  onChange={e => setSize(+e.target.value)} required/>
         </div>
@@ -272,17 +274,17 @@ function ExpiryDialog({volume, onClose, onDone}: {
     })
   }
   return (
-    <Dialog title={`Purge ${volume.name} on`} subtitle="Restore keeps the volume; purge is final"
+    <Dialog title={t('volumes.expiryTitle', {name: volume.name})} subtitle={t('volumes.expirySubtitle')}
             width={400} onClose={onClose} footer={<>
-              <button className="btn" onClick={onClose}>Cancel</button>
+              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
               <button type="submit" form="expiry-volume" className="btn btn-primary" disabled={busy || !day}>
-                {busy ? 'Saving…' : 'Save'}
+                {busy ? t('volumes.saving') : t('common.save')}
               </button>
             </>}>
       <form id="expiry-volume" className="dialog-form" onSubmit={save}>
         {error && <div className="banner banner-error">{error}</div>}
         <div className="field">
-          <label htmlFor="v-expiry">Purge day</label>
+          <label htmlFor="v-expiry">{t('volumes.purgeDay')}</label>
           <input id="v-expiry" className="input" type="date" min={tomorrow} value={day}
                  onChange={e => setDay(e.target.value)} required/>
         </div>

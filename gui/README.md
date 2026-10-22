@@ -27,3 +27,16 @@ make gui    # from the repository root: wails build -clean -> build/bin/forgeai.
 ```
 
 The wails CLI must be built with `golang.org/x/tools >= v0.52` and be first on `PATH`.
+
+## Releases
+
+Pushing a `v<major>.<minor>.<patch>` tag runs `.github/workflows/gui-release.yml`. It builds the client for macOS (universal), Windows (x64) and Linux (x64) and publishes them as a GitHub release with the installers and `SHA256SUMS.txt` attached:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The tag's version becomes the app version (`info.productVersion` in `wails.json`, set by CI) and the installer file names. Pull requests that touch the GUI build the same installers as workflow artifacts without publishing them. The CI build also pins the wails CLI to v2.16.0 with `golang.org/x/tools` v0.52.0, as described above.
+
+Installers are not code-signed or notarized. `hack/gui-package.sh <version> <darwin|windows|linux>` packages the output of `wails build` the way CI does; the release notes text is in `hack/gui-release-notes.md`.

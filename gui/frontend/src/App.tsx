@@ -1,4 +1,4 @@
-import {Fragment, useEffect, useRef, useState} from 'react'
+import {Fragment, ReactNode, useContext, useEffect, useRef, useState, useSyncExternalStore} from 'react'
 import {Connect, Contexts, Projects} from '../wailsjs/go/app/App'
 import {Environment} from '../wailsjs/runtime/runtime'
 import {app} from '../wailsjs/go/models'
@@ -14,7 +14,9 @@ import {Admin} from './Admin'
 import {Dependencies} from './Dependencies'
 import {Scope} from './Scope'
 import {errText} from './util'
-import {Empty, HeaderSlot, Icon, IconName, Spinner} from './ui'
+import {ActiveView, Empty, HeaderSlot, Icon, IconName, Spinner} from './ui'
+import {Preferences} from './Preferences'
+import {getLocale, subscribeLocale, t} from './i18n'
 
 // PREFS is the last connection. NAMESPACES maps each kubeconfig context to the
 // project last opened in it, so switching clusters returns to that project.
@@ -57,7 +59,23 @@ function areaFor(current: Area, info: app.ConnInfo): Area {
   return current
 }
 
+// Pane keeps a view mounted while another area is on screen, so the view keeps
+// its selections, filters and drafts. Only the view on screen owns the header.
+function Pane({on, children}: {on: boolean, children: ReactNode}) {
+  const slot = useContext(HeaderSlot)
+  return (
+    <ActiveView.Provider value={on}>
+      <HeaderSlot.Provider value={on ? slot : null}>
+        <div hidden={!on}>{children}</div>
+      </HeaderSlot.Provider>
+    </ActiveView.Provider>
+  )
+}
+
 export default function App() {
+  // Subscribing re-renders the whole tree when the language is switched, so
+  // every t() call below picks up the new catalog.
+  useSyncExternalStore(subscribeLocale, getLocale)
   const [contexts, setContexts] = useState<app.KubeContext[]>([])
   // cluster is the kubeconfig context shown in the sidebar. It leads the
   // connection while a switch is in flight.
@@ -65,6 +83,9 @@ export default function App() {
   const [projects, setProjects] = useState<app.ProjectNamespace[]>([])
   const [conn, setConn] = useState<app.ConnInfo | null>(null)
   const [area, setArea] = useState<Area>('overview')
+  // visited lists the areas opened on this connection. A view mounts on its
+  // first visit and stays mounted after that.
+  const [visited, setVisited] = useState<Area[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   // The rail remembers its state across launches, like the connection does.
@@ -116,12 +137,20 @@ export default function App() {
       const last: {ctx?: string, ns?: string} = JSON.parse(localStorage.getItem(PREFS) || '{}')
       const start = list.find(c => c.name === last.ctx) || list.find(c => c.current) || list[0]
       if (!start) {
-        setError('No kubeconfig context found. Add one to $KUBECONFIG or ~/.kube/config.')
+        setError(t('app.noContext'))
         return
       }
       connectTo(start.name, start.name === last.ctx ? last.ns : '')
     }).catch(e => setError(errText(e)))
   }, [])
+
+  // The current area counts as visited on the render it opens, so its view
+  // mounts at once; the effect records it for the renders after.
+  useEffect(() => {
+    setVisited(v => v.includes(area) ? v : [...v, area])
+  }, [area])
+  const opened = visited.includes(area) ? visited : [...visited, area]
+  const shown = (a: Area, view: ReactNode) => opened.includes(a) && <Pane on={area === a}>{view}</Pane>
 
   const switchCluster = (name: string) => {
     if (name !== conn?.context) connectTo(name)
@@ -136,31 +165,31 @@ export default function App() {
   // cluster runs agents.x-k8s.io.
   const groups: {label: string, items: NavItem[]}[] = conn?.project ? [
     {
-      label: 'Workspace',
+      label: t('nav.workspace'),
       items: [
-        {area: 'overview', label: 'Overview', icon: 'grid'},
-        {area: 'jobs', label: 'Jobs', icon: 'play'},
-        ...(conn.sandboxes ? [{area: 'sandboxes', label: 'Sandboxes', icon: 'box'} as NavItem] : []),
-        {area: 'templates', label: 'Templates', icon: 'scroll'},
+        {area: 'overview', label: t('nav.overview'), icon: 'grid'},
+        {area: 'jobs', label: t('nav.jobs'), icon: 'play'},
+        ...(conn.sandboxes ? [{area: 'sandboxes', label: t('nav.sandboxes'), icon: 'box'} as NavItem] : []),
+        {area: 'templates', label: t('nav.templates'), icon: 'scroll'},
       ],
     },
     {
-      label: 'Storage',
+      label: t('nav.storage'),
       items: [
-        {area: 'volumes', label: 'Volumes', icon: 'database'},
-        {area: 'files', label: 'Files', icon: 'folder'},
-        {area: 'images', label: 'Images', icon: 'image'},
+        {area: 'volumes', label: t('nav.volumes'), icon: 'database'},
+        {area: 'files', label: t('nav.files'), icon: 'folder'},
+        {area: 'images', label: t('nav.images'), icon: 'image'},
       ],
     },
     {
-      label: 'Cluster',
-      items: [{area: 'resources', label: 'Resources', icon: 'cpu'}],
+      label: t('nav.cluster'),
+      items: [{area: 'resources', label: t('nav.resources'), icon: 'cpu'}],
     },
   ] : []
   const admin: NavItem[] = conn ? adminAreas(conn).map(a => a === 'admin'
-    ? {area: a, label: 'Projects', icon: 'shield'}
-    : {area: a, label: 'Dependencies', icon: 'layers'}) : []
-  if (admin.length) groups.push({label: 'Admin', items: admin})
+    ? {area: a, label: t('nav.projects'), icon: 'shield'}
+    : {area: a, label: t('nav.dependencies'), icon: 'layers'}) : []
+  if (admin.length) groups.push({label: t('nav.admin'), items: admin})
 
   return (
     <HeaderSlot.Provider value={headerSlot}>
@@ -168,8 +197,8 @@ export default function App() {
         <header className="header header-shell">
           <div className="header-side">
             <button className="icon-btn header-toggle" onClick={toggleSidebar}
-                    aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                    aria-expanded={!collapsed} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+                    aria-label={collapsed ? t('app.expandSidebar') : t('app.collapseSidebar')}
+                    aria-expanded={!collapsed} title={collapsed ? t('app.expandSidebar') : t('app.collapseSidebar')}>
               <Icon name="panel"/>
             </button>
           </div>
@@ -194,28 +223,29 @@ export default function App() {
                 ))}
               </div>
             ))}
+            <Preferences/>
           </nav>
           <main className="main">
             {error && <div className="banner banner-error" role="alert">{error}</div>}
             {conn ? (
               // Keyed by the connection so every view refetches after a switch.
               <Fragment key={`${conn.context}/${conn.namespace}`}>
-                {area === 'overview' && <Overview onOpen={setArea}/>}
-                {area === 'jobs' && <Jobs/>}
-                {area === 'sandboxes' && <Sandboxes/>}
-                {area === 'templates' && <Templates sandboxes={conn.sandboxes}/>}
-                {area === 'volumes' && <Volumes/>}
-                {area === 'files' && <FilesView/>}
-                {area === 'images' && <Images/>}
-                {area === 'resources' && <Resources/>}
-                {area === 'admin' && <Admin/>}
-                {area === 'dependencies' && <Dependencies/>}
+                {shown('overview', <Overview onOpen={setArea}/>)}
+                {shown('jobs', <Jobs/>)}
+                {shown('sandboxes', <Sandboxes/>)}
+                {shown('templates', <Templates sandboxes={conn.sandboxes}/>)}
+                {shown('volumes', <Volumes/>)}
+                {shown('files', <FilesView/>)}
+                {shown('images', <Images/>)}
+                {shown('resources', <Resources/>)}
+                {shown('admin', <Admin/>)}
+                {shown('dependencies', <Dependencies/>)}
               </Fragment>
             ) : loading ? (
-              <Spinner label="Connecting…"/>
+              <Spinner label={t('app.connecting')}/>
             ) : (
-              <Empty icon="server" title="Not connected">
-                Choose a cluster and project in the sidebar.
+              <Empty icon="server" title={t('app.notConnected')}>
+                {t('app.chooseHint')}
               </Empty>
             )}
           </main>

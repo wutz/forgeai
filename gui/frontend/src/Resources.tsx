@@ -2,7 +2,8 @@ import {useEffect, useState} from 'react'
 import {ListInstanceTypes, Quota} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {errText, pct, toGiB} from './util'
-import {Badge, Card, Empty, Icon, Meter, MetricTile, PageHeader, RefreshButton} from './ui'
+import {Badge, Card, Empty, Icon, Meter, MetricTile, PageHeader, RefreshButton, useActive} from './ui'
+import {t} from './i18n'
 
 // Resources shows the cluster GPU catalogue (instance types with free
 // counts) and the project's quota and its use.
@@ -10,6 +11,7 @@ export function Resources() {
   const [types, setTypes] = useState<app.InstanceType[]>([])
   const [quota, setQuota] = useState<app.QuotaUsage | null>(null)
   const [error, setError] = useState('')
+  const active = useActive()
 
   // load rejects when either list failed; the banner already shows why.
   const load = () => Promise.all([
@@ -20,63 +22,64 @@ export function Resources() {
     throw e
   })
   useEffect(() => {
+    if (!active) return
     const poll = () => load().catch(() => {})
     poll()
-    const t = setInterval(poll, 10000)
-    return () => clearInterval(t)
-  }, [])
+    const timer = setInterval(poll, 10000)
+    return () => clearInterval(timer)
+  }, [active])
 
-  const total = types.reduce((n, t) => n + t.total, 0)
-  const free = types.reduce((n, t) => n + t.free, 0)
+  const total = types.reduce((n, ty) => n + ty.total, 0)
+  const free = types.reduce((n, ty) => n + ty.free, 0)
   const used = Math.max(0, total - free)
   const gpuQuota = (quota?.gpuClasses || []).reduce((n, g) => n + g.quota, 0)
   const gpuUsed = (quota?.gpuClasses || []).reduce((n, g) => n + g.used, 0)
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Cluster" title="Resources"
-                  meta={<span className="muted" style={{fontSize: 12.5}}>live · every 10s</span>}
+      <PageHeader eyebrow={t('common.cluster')} title={t('resources.title')}
+                  meta={<span className="muted" style={{fontSize: 12.5}}>{t('resources.live')}</span>}
                   actions={<RefreshButton onRefresh={load}/>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
 
       <div className="metrics">
-        <MetricTile icon="cpu" label="GPUs in the cluster" tone="accent"
-                    value={total} detail={`${types.length} instance types`}/>
-        <MetricTile icon="check" label="Free now" tone="success"
-                    value={free} detail={total ? `${pct(used, total)}% in use` : 'no GPU nodes'}/>
-        <MetricTile icon="shield" label="Project GPU quota" tone="violet"
-                    value={gpuQuota || '—'} detail={gpuQuota ? `${gpuUsed} used by this project` : 'no quota set'}/>
-        <MetricTile icon="database" label="Storage quota" tone="warning"
-                    value={quota?.storage || '∞'} detail={quota?.storageUsed ? `${quota.storageUsed} used` : 'nothing used'}/>
+        <MetricTile icon="cpu" label={t('resources.gpusInCluster')} tone="accent"
+                    value={total} detail={t('resources.instanceTypeCount', {count: types.length})}/>
+        <MetricTile icon="check" label={t('resources.freeNow')} tone="success"
+                    value={free} detail={total ? t('resources.percentInUse', {percent: pct(used, total)}) : t('resources.noGpuNodes')}/>
+        <MetricTile icon="shield" label={t('resources.projectGpuQuota')} tone="violet"
+                    value={gpuQuota || '—'} detail={gpuQuota ? t('resources.usedByProject', {used: gpuUsed}) : t('resources.noQuotaSet')}/>
+        <MetricTile icon="database" label={t('resources.storageQuota')} tone="warning"
+                    value={quota?.storage || '∞'} detail={quota?.storageUsed ? t('resources.storageUsed', {used: quota.storageUsed}) : t('resources.nothingUsed')}/>
       </div>
 
-      <Card title="Instance types" subtitle="GPU classes the scheduler can place workers on">
+      <Card title={t('resources.instanceTypes')} subtitle={t('resources.instanceTypesSubtitle')}>
         {types.length === 0 ? (
-          <Empty icon="cpu" title="No GPU nodes detected">
-            Install the GPU operator or add nodes labelled with a forgeai instance type.
+          <Empty icon="cpu" title={t('resources.noGpuNodesTitle')}>
+            {t('resources.noGpuNodesHint')}
           </Empty>
         ) : (
           <table className="table">
             <thead>
-            <tr><th>Type</th><th>GPU</th><th>CPU / worker</th><th>Memory / worker</th>
-              <th>Capacity</th><th style={{width: 200}}>Free</th></tr>
+            <tr><th>{t('resources.colType')}</th><th>{t('resources.colGpu')}</th><th>{t('resources.colCpuPerWorker')}</th><th>{t('resources.colMemoryPerWorker')}</th>
+              <th>{t('resources.colCapacity')}</th><th style={{width: 200}}>{t('resources.colFree')}</th></tr>
             </thead>
             <tbody>
-            {types.map(t => (
-              <tr key={t.name} className={t.free >= 1 ? '' : 'row-full'}>
+            {types.map(ty => (
+              <tr key={ty.name} className={ty.free >= 1 ? '' : 'row-full'}>
                 <td className="mono">
-                  <span className="cell-main">{t.name}</span>
-                  <span className="cell-sub">{t.class}</span>
+                  <span className="cell-main">{ty.name}</span>
+                  <span className="cell-sub">{ty.class}</span>
                 </td>
-                <td><Badge>{t.gpuCount}× {t.product}</Badge></td>
-                <td>{t.cpu}</td>
-                <td>{t.memory}</td>
-                <td className="mono">{t.total}</td>
+                <td><Badge>{ty.gpuCount}× {ty.product}</Badge></td>
+                <td>{ty.cpu}</td>
+                <td>{ty.memory}</td>
+                <td className="mono">{ty.total}</td>
                 <td>
-                  <Meter value={t.total - t.free} max={Math.max(t.total, 1)}
-                         tone={t.free >= 1 ? 'success' : 'muted'}
-                         label={<span><strong className={t.free >= 1 ? 'free' : 'muted'}>{t.free}</strong> free</span>}
-                         right={<span>{pct(t.total - t.free, t.total)}%</span>}/>
+                  <Meter value={ty.total - ty.free} max={Math.max(ty.total, 1)}
+                         tone={ty.free >= 1 ? 'success' : 'muted'}
+                         label={<span><strong className={ty.free >= 1 ? 'free' : 'muted'}>{ty.free}</strong> {t('resources.free')}</span>}
+                         right={<span>{pct(ty.total - ty.free, ty.total)}%</span>}/>
                 </td>
               </tr>
             ))}
@@ -86,14 +89,14 @@ export function Resources() {
       </Card>
 
       {quota && (
-        <Card title="Project quota" subtitle="Kueue queue limit and its backstop ResourceQuota"
+        <Card title={t('resources.projectQuota')} subtitle={t('resources.projectQuotaSubtitle')}
               className="card-spaced">
           <table className="table">
-            <thead><tr><th>Resource</th><th style={{width: 260}}>Use</th><th>Used</th><th>Limit</th></tr></thead>
+            <thead><tr><th>{t('resources.colResource')}</th><th style={{width: 260}}>{t('resources.colUse')}</th><th>{t('resources.colUsed')}</th><th>{t('resources.colLimit')}</th></tr></thead>
             <tbody>
             {quota.gpuClasses?.map(g => (
               <tr key={g.class}>
-                <td className="mono">GPUs ({g.class})</td>
+                <td className="mono">{t('resources.gpusOfClass', {cls: g.class})}</td>
                 <td>
                   <Meter value={g.used} max={Math.max(g.quota, 1)}
                          tone={g.used >= g.quota ? 'warning' : 'accent'}
@@ -104,16 +107,16 @@ export function Resources() {
               </tr>
             ))}
             <tr>
-              <td className="mono">Volume storage</td>
+              <td className="mono">{t('resources.volumeStorage')}</td>
               <td>
                 <Meter value={toGiB(quota.storageUsed)} max={Math.max(toGiB(quota.storage), 1)} tone="muted"
                        right={<span>{pct(toGiB(quota.storageUsed), toGiB(quota.storage))}%</span>}/>
               </td>
               <td>{quota.storageUsed || '0'}</td>
-              <td>{quota.storage || 'unlimited'}</td>
+              <td>{quota.storage || t('resources.unlimited')}</td>
             </tr>
             <tr>
-              <td className="mono">Volumes</td>
+              <td className="mono">{t('resources.volumes')}</td>
               <td><Meter value={quota.volumes} max={Math.max(quota.volumeMax, quota.volumes, 1)} tone="muted"/></td>
               <td>{quota.volumes}</td>
               <td>{quota.volumeMax || '—'}</td>

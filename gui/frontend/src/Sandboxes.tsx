@@ -7,7 +7,8 @@ import {SandboxCreateDialog} from './SandboxCreateDialog'
 import {SandboxTemplateDialog} from './SandboxTemplates'
 import {SandboxTerminal} from './SandboxTerminal'
 import {Status, envToLines, fmtDate, errText} from './util'
-import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Spinner, Tabs, useConfirm} from './ui'
+import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Spinner, Tabs, useActive, useConfirm} from './ui'
+import {t} from './i18n'
 
 // HEARTBEAT is how often an open sandbox detail resets the sandbox's idle
 // clock. The operator suspends a sandbox once it has been idle for its idle
@@ -20,6 +21,7 @@ export function Sandboxes() {
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const active = useActive()
 
   const refresh = () => {
     ListSandboxes().then(bs => {
@@ -28,22 +30,23 @@ export function Sandboxes() {
     }).catch(e => setError(errText(e)))
   }
   useEffect(() => {
+    if (!active) return
     refresh()
-    const t = setInterval(refresh, 5000)
-    return () => clearInterval(t)
-  }, [])
+    const timer = setInterval(refresh, 5000)
+    return () => clearInterval(timer)
+  }, [active])
 
   // Same definition as the detail view: a Pending sandbox is on its way up.
   const running = boxes.filter(b => b.phase === 'Running' || b.phase === 'Pending').length
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Workspace" title="Sandboxes"
+      <PageHeader eyebrow={t('sandboxes.eyebrow')} title={t('sandboxes.title')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>
-                    {running} running of {boxes.length}
+                    {t('sandboxes.runningCount', {running, total: boxes.length})}
                   </span>}
                   actions={<button className="btn btn-primary" onClick={() => setCreating(true)}>
-                    <Icon name="plus" size={14}/>New sandbox
+                    <Icon name="plus" size={14}/>{t('sandboxes.new')}
                   </button>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {creating && <SandboxCreateDialog onClose={() => setCreating(false)} onCreated={name => {
@@ -65,20 +68,20 @@ function SandboxTable({boxes, selected, onSelect}: {
   boxes: app.Sandbox[], selected: string | null, onSelect: (name: string) => void
 }) {
   if (!boxes.length) {
-    return <Card><Empty icon="box" title="No sandboxes yet">
-      Create one to run an agent in an isolated, resumable environment.</Empty></Card>
+    return <Card><Empty icon="box" title={t('sandboxes.emptyTitle')}>
+      {t('sandboxes.emptyHint')}</Empty></Card>
   }
   return (
     <Card>
       <table className="table">
         <thead>
         <tr>
-          <th>Name</th>
-          <th>Status</th>
-          <th>Isolation</th>
-          <th>Resources</th>
-          <th>Endpoint</th>
-          <th>Age</th>
+          <th>{t('common.name')}</th>
+          <th>{t('common.status')}</th>
+          <th>{t('sandboxes.isolation')}</th>
+          <th>{t('sandboxes.resources')}</th>
+          <th>{t('sandboxes.endpoint')}</th>
+          <th>{t('sandboxes.age')}</th>
         </tr>
         </thead>
         <tbody>
@@ -127,6 +130,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
   // pending is the transition in flight. It stays set until the phase reaches
   // its target, because suspending or resuming takes the controller a while.
   const [pending, setPending] = useState<'start' | 'stop' | null>(null)
+  const active = useActive()
   const act = (p: Promise<unknown>) => p.then(onDone).catch(e => setError(errText(e)))
   const confirm = useConfirm()
   const transition = (kind: 'start' | 'stop', p: Promise<unknown>) => {
@@ -151,19 +155,25 @@ function SandboxDetail({name, onDone, onDeleted}: {
     setPending(null)
     setSaving(false)
     setSavedTemplate('')
+  }, [name])
+
+  // The poll and heartbeat run only while the view is on screen: a hidden
+  // detail lets the sandbox go idle, as it does when the detail closes.
+  useEffect(() => {
+    if (!active) return
     const load = () => GetSandbox(name).then(setBox).catch(e => setError(errText(e)))
     load()
-    const t = setInterval(load, 5000)
+    const timer = setInterval(load, 5000)
     // Keep the sandbox awake while its detail is open and running.
     const beat = setInterval(() => KeepSandboxAwake(name).catch(() => {}), HEARTBEAT)
     KeepSandboxAwake(name).catch(() => {})
     return () => {
-      clearInterval(t)
+      clearInterval(timer)
       clearInterval(beat)
     }
-  }, [name])
+  }, [name, active])
 
-  if (!box) return <Card><Spinner label={error || 'Loading sandbox…'}/></Card>
+  if (!box) return <Card><Spinner label={error || t('sandboxes.loading')}/></Card>
   const running = box.phase === 'Running' || box.phase === 'Pending'
   // showLog rejects when the logs cannot be read; the banner shows why.
   const showLog = () =>
@@ -177,79 +187,79 @@ function SandboxDetail({name, onDone, onDeleted}: {
       <div className="card-head">
         <div className="detail-title">
           <h3 className="mono">{box.name}</h3>
-          <div className="card-sub">{box.runtimeClass || 'runc'} · created {fmtDate(box.created)}</div>
+          <div className="card-sub">{box.runtimeClass || 'runc'} · {t('sandboxes.createdAt', {date: fmtDate(box.created)})}</div>
         </div>
         <div className="card-head-actions"><Status phase={box.phase}/></div>
       </div>
       {error && <div className="banner banner-error">{error}</div>}
-      {savedTemplate && <div className="banner" role="status">Saved sandbox template {savedTemplate}.</div>}
+      {savedTemplate && <div className="banner" role="status">{t('sandboxes.savedTemplate', {name: savedTemplate})}</div>}
       {confirm.dialog}
       {saving && <SandboxTemplateDialog initial={sandboxTemplateForm(box)} onClose={() => setSaving(false)}
                                         onSaved={n => { setSaving(false); setSavedTemplate(n) }}/>}
 
       <div className="detail-actions">
         <button className="btn btn-sm" onClick={() => showLog().catch(() => {})}>
-          <Icon name="scroll" size={13}/>Logs
+          <Icon name="scroll" size={13}/>{t('common.logs')}
         </button>
         {running && <button className="btn btn-sm" disabled={pending !== null}
                            onClick={() => transition('stop', StopSandbox(box.name))}>
           {pending === 'stop' ? <span className="spinner" aria-hidden/> : <Icon name="square" size={12}/>}
-          {pending === 'stop' ? 'Stopping…' : 'Stop'}
+          {pending === 'stop' ? t('sandboxes.stopping') : t('common.stop')}
         </button>}
         {!running && <button className="btn btn-sm btn-accent" disabled={pending !== null}
                              onClick={() => transition('start', StartSandbox(box.name))}>
           {pending === 'start' ? <span className="spinner" aria-hidden/> : <Icon name="play" size={12}/>}
-          {pending === 'start' ? 'Starting…' : 'Start'}
+          {pending === 'start' ? t('sandboxes.starting') : t('common.start')}
         </button>}
         <button className="btn btn-sm" onClick={() => setSaving(true)}>
-          <Icon name="layers" size={13}/>Save as template
+          <Icon name="layers" size={13}/>{t('sandboxes.saveAsTemplate')}
         </button>
         <span className="spacer"/>
         <button className="btn btn-sm btn-danger" onClick={() => confirm.ask({
-          title: `Delete sandbox ${box.name}?`,
-          message: 'Its pod and service stop, and the volumes it created from its claim templates are deleted. Shared volumes stay. This cannot be undone.',
-          action: 'Delete sandbox', danger: true,
+          title: t('sandboxes.deleteTitle', {name: box.name}),
+          message: t('sandboxes.deleteMessage'),
+          action: t('sandboxes.deleteAction'), danger: true,
           run: () => DeleteSandbox(box.name).then(onDeleted).catch(e => setError(errText(e))),
-        })}><Icon name="trash" size={13}/>Delete</button>
+        })}><Icon name="trash" size={13}/>{t('common.delete')}</button>
       </div>
 
       <div className="section">
         <Tabs tabs={[
-          {value: 'overview', label: 'Overview', icon: 'grid'},
-          {value: 'terminal', label: 'Terminal', icon: 'terminal'},
-          {value: 'log', label: 'Log', icon: 'scroll'},
-          {value: 'env', label: 'Env', icon: 'layers'},
+          {value: 'overview', label: t('sandboxes.tabOverview'), icon: 'grid'},
+          {value: 'terminal', label: t('sandboxes.tabTerminal'), icon: 'terminal'},
+          {value: 'log', label: t('sandboxes.tabLog'), icon: 'scroll'},
+          {value: 'env', label: t('sandboxes.tabEnv'), icon: 'layers'},
         ]} value={tab} onChange={setTab}/>
 
         {tab === 'overview' && (
           <dl className="kv">
-            <dt>Image</dt><dd className="mono">{box.image}</dd>
-            <dt>Isolation</dt><dd className="mono">{box.runtimeClass || 'runc (node runtime)'}</dd>
-            <dt>Instance</dt><dd className="mono">{box.instanceType || '—'}</dd>
-            <dt>CPU / memory</dt><dd className="mono">{box.cpu || '—'} / {box.memory || '—'}
+            <dt>{t('common.image')}</dt><dd className="mono">{box.image}</dd>
+            <dt>{t('sandboxes.isolation')}</dt><dd className="mono">{box.runtimeClass || t('sandboxes.runcNode')}</dd>
+            <dt>{t('sandboxes.instance')}</dt><dd className="mono">{box.instanceType || '—'}</dd>
+            <dt>{t('sandboxes.cpuMemory')}</dt><dd className="mono">{box.cpu || '—'} / {box.memory || '—'}
               {box.gpu ? ` · ${box.gpu} GPU` : ''}</dd>
-            <dt>Volumes</dt><dd className="mono">{box.volumes?.join(', ') || '—'}</dd>
-            {box.serviceFQDN && <><dt>Service</dt><dd className="mono">{box.serviceFQDN}</dd></>}
-            {box.podIPs && box.podIPs.length > 0 && <><dt>Pod IPs</dt><dd className="mono">{box.podIPs.join(', ')}</dd></>}
-            {box.nodeName && <><dt>Node</dt><dd className="mono">{box.nodeName}</dd></>}
-            <dt>Pod</dt><dd className="mono">{box.podName || '—'}{box.podPhase ? ` · ${box.podPhase}` : ''}</dd>
-            {box.stopped && <><dt>Stopped</dt><dd>suspended; start it to resume where it left off</dd></>}
-            {box.idleSince && <><dt>Idle since</dt><dd>{fmtDate(box.idleSince)}</dd></>}
-            {box.shutdownTime && <><dt>Auto-stop</dt><dd>{fmtDate(box.shutdownTime)}</dd></>}
-            {box.message && <><dt>Status</dt><dd>{box.message}</dd></>}
-            <dt>Created</dt><dd>{fmtDate(box.created)}</dd>
+            <dt>{t('sandboxes.volumes')}</dt><dd className="mono">{box.volumes?.join(', ') || '—'}</dd>
+            {box.serviceFQDN && <><dt>{t('sandboxes.service')}</dt><dd className="mono">{box.serviceFQDN}</dd></>}
+            {box.podIPs && box.podIPs.length > 0 && <><dt>{t('sandboxes.podIps')}</dt><dd className="mono">{box.podIPs.join(', ')}</dd></>}
+            {box.nodeName && <><dt>{t('sandboxes.node')}</dt><dd className="mono">{box.nodeName}</dd></>}
+            <dt>{t('sandboxes.pod')}</dt><dd className="mono">{box.podName || '—'}{box.podPhase ? ` · ${box.podPhase}` : ''}</dd>
+            {box.stopped && <><dt>{t('sandboxes.stoppedLabel')}</dt><dd>{t('sandboxes.suspendedNote')}</dd></>}
+            {box.idleSince && <><dt>{t('sandboxes.idleSince')}</dt><dd>{fmtDate(box.idleSince)}</dd></>}
+            {box.shutdownTime && <><dt>{t('sandboxes.autoStop')}</dt><dd>{fmtDate(box.shutdownTime)}</dd></>}
+            {box.message && <><dt>{t('common.status')}</dt><dd>{box.message}</dd></>}
+            <dt>{t('common.created')}</dt><dd>{fmtDate(box.created)}</dd>
           </dl>
         )}
         {tab === 'terminal' && (box.podPhase === 'Running'
           ? <SandboxTerminal name={box.name}/>
-          : <p className="muted">Start the sandbox to open a terminal.</p>)}
+          : <p className="muted">{t('sandboxes.startToOpenTerminal')}</p>)}
         {tab === 'log' && (
           <>
             <div className="log-bar">
               <span className="spacer"/>
               <RefreshButton label="Reload" onRefresh={showLog}/>
             </div>
-            <pre className="logs">{log || 'No output'}</pre>
+            <pre className="logs">{log || t('sandboxes.noOutput')}</pre>
           </>
         )}
         {tab === 'env' && <pre className="code">{box.command ? `$ ${box.command}\n\n` : ''}

@@ -4,11 +4,18 @@
 
 import {ReactNode, createContext, useContext, useEffect, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
+import {t} from './i18n'
 
 // HeaderSlot is the node in the app header that PageHeader renders into, so
 // every view shows its title and actions in the top bar instead of repeating
 // a title band at the top of the content.
 export const HeaderSlot = createContext<HTMLElement | null>(null)
+
+// ActiveView is true while the view is on screen. Views stay mounted when the
+// user switches away, so they stop their timers while it is false and refresh
+// when it turns true again.
+export const ActiveView = createContext(true)
+export const useActive = () => useContext(ActiveView)
 
 // Icon is a 16px stroke icon (Lucide-style paths, 1.75 stroke).
 const ICONS = {
@@ -40,6 +47,9 @@ const ICONS = {
   terminal: 'M4 5h16v14H4zM7.5 10l2.5 2-2.5 2M12.5 15h4',
   maximize: 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5',
   minimize: 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5',
+  monitor: 'M3 4h18v12H3zM8 20h8M12 16v4',
+  sun: 'M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4',
+  moon: 'M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z',
 } as const
 
 export type IconName = keyof typeof ICONS
@@ -158,11 +168,11 @@ export function Tabs<T extends string>({tabs, value, onChange}: {
 }) {
   return (
     <div className="tabs" role="tablist">
-      {tabs.map(t => (
-        <button key={t.value} role="tab" aria-selected={value === t.value}
-                className={`tab ${value === t.value ? 'active' : ''}`}
-                onClick={() => onChange(t.value)}>
-          {t.icon && <Icon name={t.icon} size={14}/>}{t.label}
+      {tabs.map(tab => (
+        <button key={tab.value} role="tab" aria-selected={value === tab.value}
+                className={`tab ${value === tab.value ? 'active' : ''}`}
+                onClick={() => onChange(tab.value)}>
+          {tab.icon && <Icon name={tab.icon} size={14}/>}{tab.label}
         </button>
       ))}
     </div>
@@ -219,13 +229,13 @@ export function RefreshButton({label = 'Refresh', onRefresh}: {
   }
 
   const words = label === 'Reload'
-    ? {idle: 'Reload', busy: 'Reloading…', done: 'Reloaded'}
-    : {idle: 'Refresh', busy: 'Refreshing…', done: 'Refreshed'}
+    ? {idle: t('common.reload'), busy: t('ui.reloading'), done: t('ui.reloaded')}
+    : {idle: t('common.refresh'), busy: t('ui.refreshing'), done: t('ui.refreshed')}
   const shown = {
     idle: {icon: 'refresh', text: words.idle},
     busy: {icon: 'refresh', text: words.busy},
     done: {icon: 'check', text: words.done},
-    failed: {icon: 'warning', text: 'Failed'},
+    failed: {icon: 'warning', text: t('ui.failed')},
   } as const
   const current = shown[state]
 
@@ -268,7 +278,7 @@ function ConfirmDialog({request, onClose}: {request: ConfirmRequest, onClose: ()
   }
   return (
     <Dialog title={request.title} onClose={onClose} width={420} footer={<>
-      <button className="btn" onClick={onClose}>Cancel</button>
+      <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
       <button className={`btn ${request.danger ? 'btn-danger-tint' : 'btn-primary'}`} onClick={go} autoFocus>
         {request.action}
       </button>
@@ -291,7 +301,7 @@ export function Dialog({title, subtitle, onClose, children, footer, width}: {
             <h2>{title}</h2>
             {subtitle && <div className="dialog-sub">{subtitle}</div>}
           </div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close"><Icon name="close"/></button>
+          <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}><Icon name="close"/></button>
         </div>
         <div className="dialog-body">{children}</div>
         {footer && <div className="dialog-foot">{footer}</div>}

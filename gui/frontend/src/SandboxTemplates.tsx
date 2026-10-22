@@ -3,6 +3,8 @@ import {CreateSandboxTemplate, UpdateSandboxTemplate, SandboxOptions} from '../w
 import {app, sandbox} from '../wailsjs/go/models'
 import {envMap, envToLines, linesToEnv, fmtDate, errText, generateName} from './util'
 import {Dialog, Empty, useConfirm} from './ui'
+import {t} from './i18n'
+import {ImageField} from './ImageField'
 
 // SandboxTemplateTable lists SandboxTemplates (agent blueprints new sandboxes
 // start from) inside the Templates page.
@@ -12,8 +14,8 @@ export function SandboxTemplateTable({items, onEdit, onDelete}: {
   const confirm = useConfirm()
   if (items.length === 0) {
     return (
-      <Empty icon="layers" title="No sandbox templates yet">
-        A template captures an image, command and environment so new sandboxes start from it.
+      <Empty icon="layers" title={t('sandboxTemplates.emptyTitle')}>
+        {t('sandboxTemplates.emptyBody')}
       </Empty>
     )
   }
@@ -22,28 +24,28 @@ export function SandboxTemplateTable({items, onEdit, onDelete}: {
     {confirm.dialog}
     <table className="table">
       <thead>
-      <tr><th>Name</th><th>Image</th><th>Isolation</th><th>Created</th><th/></tr>
+      <tr><th>{t('common.name')}</th><th>{t('common.image')}</th><th>{t('sandboxTemplates.colIsolation')}</th><th>{t('common.created')}</th><th/></tr>
       </thead>
       <tbody>
-      {items.map(t => (
-        <tr key={t.name}>
+      {items.map(tpl => (
+        <tr key={tpl.name}>
           <td className="mono">
-            <span className="cell-main">{t.name}</span>
-            {t.description && <span className="cell-sub">{t.description}</span>}
+            <span className="cell-main">{tpl.name}</span>
+            {tpl.description && <span className="cell-sub">{tpl.description}</span>}
           </td>
-          <td className="mono trunc" title={t.form?.image}>{t.form?.image || '—'}</td>
-          <td className="mono">{t.form?.runtimeClass || 'runc'}</td>
-          <td className="muted">{fmtDate(t.created)}</td>
+          <td className="mono trunc" title={tpl.form?.image}>{tpl.form?.image || '—'}</td>
+          <td className="mono">{tpl.form?.runtimeClass || 'runc'}</td>
+          <td className="muted">{fmtDate(tpl.created)}</td>
           <td>
             <div className="actions">
-              <button className="btn btn-sm" onClick={() => onEdit(t)}>Edit</button>
+              <button className="btn btn-sm" onClick={() => onEdit(tpl)}>{t('common.edit')}</button>
               <button className="btn btn-sm btn-danger" onClick={() => confirm.ask({
-                title: `Delete sandbox template ${t.name}?`,
-                message: 'Existing sandboxes keep running.',
-                action: 'Delete template', danger: true,
-                run: () => onDelete(t.name),
+                title: t('sandboxTemplates.deleteTitle', {name: tpl.name}),
+                message: t('sandboxTemplates.deleteMessage'),
+                action: t('templates.deleteAction'), danger: true,
+                run: () => onDelete(tpl.name),
               })}>
-                Delete
+                {t('common.delete')}
               </button>
             </div>
           </td>
@@ -100,27 +102,27 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
   }
 
   return (
-    <Dialog title={`${existing ? 'Edit' : 'New'} sandbox template`}
+    <Dialog title={existing ? t('sandboxTemplates.dialogEdit') : t('sandboxTemplates.dialogNew')}
             subtitle={existing
-              ? 'Updates the SandboxTemplate; sandboxes already created from it are not changed'
-              : 'Saved as a SandboxTemplate of the project'}
+              ? t('sandboxTemplates.editSubtitle')
+              : t('sandboxTemplates.newSubtitle')}
             onClose={onClose} footer={<>
-              <button className="btn" onClick={onClose}>Cancel</button>
+              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
               <button type="submit" form="sandbox-template-form" className="btn btn-primary" disabled={busy || !f.name || !f.image}>
-                {busy ? 'Saving…' : 'Save template'}
+                {busy ? t('templates.saving') : t('templates.saveTemplate')}
               </button>
             </>}>
       <form id="sandbox-template-form" className="dialog-form" onSubmit={e => { e.preventDefault(); save() }}>
         {error && <div className="banner banner-error">{error}</div>}
         <div className="row">
           <div className="field">
-            <label htmlFor="st-name">Name</label>
+            <label htmlFor="st-name">{t('common.name')}</label>
             <input id="st-name" className="input mono" value={f.name} disabled={!!existing}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('name', e.target.value)} placeholder="agent" required/>
           </div>
           <div className="field">
-            <label htmlFor="st-desc">Description</label>
+            <label htmlFor="st-desc">{t('templates.description')}</label>
             <input id="st-desc" className="input" value={f.description || ''}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('description', e.target.value)}/>
@@ -128,31 +130,29 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
         </div>
         <div className="row">
           <div className="field">
-            <label htmlFor="st-image">Image</label>
-            <input id="st-image" className="input mono" value={f.image}
-                   autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                   onChange={e => set('image', e.target.value)} required/>
-            {opts?.images?.length ? <span className="hint">Offered: {opts.images.join(', ')}</span> : null}
+            <label htmlFor="st-image">{t('common.image')}</label>
+            <ImageField id="st-image" value={f.image} onChange={image => set('image', image)}
+                        offered={opts?.images} required/>
           </div>
           <div className="field">
-            <label htmlFor="st-runtime">Isolation</label>
+            <label htmlFor="st-runtime">{t('sandboxTemplates.colIsolation')}</label>
             <select id="st-runtime" className="select mono" value={f.runtimeClass || ''}
                     onChange={e => set('runtimeClass', e.target.value)}>
-              <option value="">runc (node runtime)</option>
+              <option value="">{t('sandboxTemplates.runcNodeRuntime')}</option>
               {(opts?.runtimeClasses || []).map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
         </div>
         <div className="field">
-          <label htmlFor="st-command">Command (bash)</label>
+          <label htmlFor="st-command">{t('templates.commandBash')}</label>
           <textarea id="st-command" className="textarea" rows={3} value={f.command || ''}
                     autoCapitalize="none" autoCorrect="off" spellCheck={false}
                     onChange={e => set('command', e.target.value)}
                     placeholder="python agent.py"/>
-          <span className="hint">Empty runs the image entrypoint.</span>
+          <span className="hint">{t('sandboxTemplates.commandHint')}</span>
         </div>
         <div className="field">
-          <label htmlFor="st-env">Environment</label>
+          <label htmlFor="st-env">{t('templates.environment')}</label>
           <textarea id="st-env" className="textarea" rows={3} value={envText}
                     autoCapitalize="none" autoCorrect="off" spellCheck={false}
                     onChange={e => setEnvText(e.target.value)} placeholder="KEY=value"/>

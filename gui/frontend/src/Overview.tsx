@@ -1,8 +1,9 @@
 import {useEffect, useState} from 'react'
 import {ListInstanceTypes, ListJobs, ListVolumes, ListImages, Quota} from '../wailsjs/go/app/App'
 import {app, volumes} from '../wailsjs/go/models'
-import {Card, Icon, MetricTile, Meter, PageHeader, RefreshButton, Spinner} from './ui'
-import {Status, errText, fmtDate, pct, toGiB} from './util'
+import {Card, Icon, MetricTile, Meter, PageHeader, RefreshButton, Spinner, useActive} from './ui'
+import {Status, errText, fmtDate, pct, phaseLabel, toGiB} from './util'
+import {t} from './i18n'
 
 // Overview is the landing view of a project: what is running now, the GPU
 // catalogue and the quota it may still use. Every figure is derived from the
@@ -15,6 +16,7 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
   const [quota, setQuota] = useState<app.QuotaUsage | null>(null)
   const [error, setError] = useState('')
   const [loaded, setLoaded] = useState(false)
+  const onScreen = useActive()
 
   // refresh rejects when any list failed; the banner already shows why.
   const refresh = () => Promise.allSettled([
@@ -29,19 +31,21 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
     if (failed) throw failed.reason
   })
   useEffect(() => {
+    if (!onScreen) return
     const poll = () => refresh().catch(() => {})
     poll()
-    const t = setInterval(poll, 8000)
-    return () => clearInterval(t)
-  }, [])
+    const timer = setInterval(poll, 8000)
+    return () => clearInterval(timer)
+  }, [onScreen])
 
   // Images cost a Harbor call per repository, so they refresh on a slower beat.
   useEffect(() => {
+    if (!onScreen) return
     const load = () => ListImages().then(setImages).catch(() => {})
     load()
-    const t = setInterval(load, 60000)
-    return () => clearInterval(t)
-  }, [])
+    const timer = setInterval(load, 60000)
+    return () => clearInterval(timer)
+  }, [onScreen])
 
   const running = jobs.filter(j => j.phase === 'Running')
   const queued = jobs.filter(j => j.phase === 'Queued' || j.phase === 'Pending')
@@ -52,111 +56,111 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
   const readyWorkers = active.reduce((n, j) => n + (j.ready || 0), 0)
   const wantedWorkers = active.reduce((n, j) => n + (j.workers || 0), 0)
 
-  const gpuTotal = types.reduce((n, t) => n + t.total, 0)
-  const gpuFree = types.reduce((n, t) => n + t.free, 0)
+  const gpuTotal = types.reduce((n, ty) => n + ty.total, 0)
+  const gpuFree = types.reduce((n, ty) => n + ty.free, 0)
   const gpuUsed = Math.max(0, gpuTotal - gpuFree)
 
   const storageGiB = vols.reduce((n, v) => n + (v.capacityGiB || v.requestedGiB || 0), 0)
   const totalTags = images.reduce((n, r) => n + r.count, 0)
 
-  if (!loaded) return <div className="page"><Spinner label="Loading overview…"/></div>
+  if (!loaded) return <div className="page"><Spinner label={t('overview.loading')}/></div>
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Workspace" title="Overview"
-                  meta={<span className="muted" style={{fontSize: 12.5}}>live · every 8s</span>}
+      <PageHeader eyebrow={t('overview.eyebrow')} title={t('overview.title')}
+                  meta={<span className="muted" style={{fontSize: 12.5}}>{t('overview.live')}</span>}
                   actions={<RefreshButton onRefresh={refresh}/>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
 
       <div className="metrics">
-        <MetricTile icon="play" label="Running jobs" tone="success"
+        <MetricTile icon="play" label={t('overview.runningJobs')} tone="success"
                     value={running.length} unit={`/ ${jobs.length}`}
-                    detail={`${readyWorkers} of ${wantedWorkers} workers ready`}>
+                    detail={t('overview.workersReady', {ready: readyWorkers, wanted: wantedWorkers})}>
           <Meter value={running.length} max={Math.max(jobs.length, 1)} tone="success"/>
         </MetricTile>
-        <MetricTile icon="clock" label="Queued" tone="warning"
+        <MetricTile icon="clock" label={phaseLabel('Queued')} tone="warning"
                     value={queued.length}
-                    detail={queued.length ? 'Waiting for GPU quota' : 'Nothing waiting'}>
+                    detail={queued.length ? t('overview.waitingForQuota') : t('overview.nothingWaiting')}>
           <Meter value={queued.length} max={Math.max(jobs.length, 1)} tone="warning"/>
         </MetricTile>
-        <MetricTile icon="warning" label="Failed" tone={failed.length ? 'error' : undefined}
+        <MetricTile icon="warning" label={phaseLabel('Failed')} tone={failed.length ? 'error' : undefined}
                     value={failed.length}
-                    detail={failed.length ? 'Open Jobs to inspect' : 'No failures'}>
+                    detail={failed.length ? t('overview.openJobs') : t('overview.noFailures')}>
           <Meter value={failed.length} max={Math.max(jobs.length, 1)} tone={failed.length ? 'error' : 'muted'}/>
         </MetricTile>
-        <MetricTile icon="cpu" label="GPUs in use" tone="accent"
+        <MetricTile icon="cpu" label={t('overview.gpusInUse')} tone="accent"
                     value={gpuUsed} unit={gpuTotal ? `/ ${gpuTotal}` : undefined}
-                    detail={gpuTotal ? `${gpuFree} free in the cluster` : 'No GPU nodes detected'}>
+                    detail={gpuTotal ? t('overview.freeInCluster', {free: gpuFree}) : t('overview.noGpuNodes')}>
           <Meter value={gpuUsed} max={Math.max(gpuTotal, 1)} tone="accent"/>
         </MetricTile>
       </div>
 
       <div className="overview-grid">
-        <Card title="GPU pools" subtitle="Instance types the cluster offers"
+        <Card title={t('overview.gpuPools')} subtitle={t('overview.gpuPoolsSubtitle')}
               actions={<button className="btn btn-sm btn-ghost" onClick={() => onOpen('resources')}>
-                Resources<Icon name="chevron" size={13}/>
+                {t('overview.resourcesButton')}<Icon name="chevron" size={13}/>
               </button>}>
           {types.length === 0 ? (
-            <div className="empty"><div className="empty-title">No GPU nodes detected</div></div>
+            <div className="empty"><div className="empty-title">{t('overview.noGpuNodes')}</div></div>
           ) : (
             <div className="pool-list">
-              {types.map(t => (
-                <div className="pool" key={t.name}>
+              {types.map(pool => (
+                <div className="pool" key={pool.name}>
                   <div className="pool-head">
-                    <span className="mono pool-name">{t.name}</span>
-                    <span className="badge">{t.gpuCount}× {t.product}</span>
+                    <span className="mono pool-name">{pool.name}</span>
+                    <span className="badge">{pool.gpuCount}× {pool.product}</span>
                     <span className="spacer"/>
                     <span className="pool-free">
-                      <strong className={t.free >= 1 ? 'free' : 'muted'}>{t.free}</strong>
-                      <span className="muted"> / {t.total} free</span>
+                      <strong className={pool.free >= 1 ? 'free' : 'muted'}>{pool.free}</strong>
+                      <span className="muted"> {t('overview.freeOfTotal', {total: pool.total})}</span>
                     </span>
                   </div>
-                  <Meter value={t.total - t.free} max={Math.max(t.total, 1)}
-                         tone={t.free >= 1 ? 'success' : 'muted'}
-                         label={<span>{t.cpu} · {t.memory} per worker</span>}
-                         right={<span>{pct(t.total - t.free, t.total)}% used</span>}/>
+                  <Meter value={pool.total - pool.free} max={Math.max(pool.total, 1)}
+                         tone={pool.free >= 1 ? 'success' : 'muted'}
+                         label={<span>{t('overview.resourcesPerWorker', {cpu: pool.cpu, memory: pool.memory})}</span>}
+                         right={<span>{t('overview.percentUsed', {percent: pct(pool.total - pool.free, pool.total)})}</span>}/>
                 </div>
               ))}
             </div>
           )}
         </Card>
 
-        <Card title="Quota" subtitle="What this project may still use">
-          {!quota ? <div className="empty"><div className="empty-title">Quota unavailable</div></div> : (
+        <Card title={t('overview.quota')} subtitle={t('overview.quotaSubtitle')}>
+          {!quota ? <div className="empty"><div className="empty-title">{t('overview.quotaUnavailable')}</div></div> : (
             <div className="quota-list">
               {(quota.gpuClasses || []).map(g => (
                 <Meter key={g.class} value={g.used} max={Math.max(g.quota, 1)}
                        tone={g.used >= g.quota ? 'warning' : 'accent'}
-                       label={<span className="mono">GPUs · {g.class}</span>}
+                       label={<span className="mono">{t('overview.gpusOfClass', {cls: g.class})}</span>}
                        right={<span>{g.used} / {g.quota}</span>}/>
               ))}
               <Meter value={toGiB(quota.storageUsed)} max={Math.max(toGiB(quota.storage), 1)} tone="muted"
-                     label={<span className="mono">Volume storage</span>}
-                     right={<span>{quota.storageUsed || '0'} / {quota.storage || 'unlimited'}</span>}/>
+                     label={<span className="mono">{t('overview.volumeStorage')}</span>}
+                     right={<span>{quota.storageUsed || '0'} / {quota.storage || t('overview.unlimited')}</span>}/>
               <Meter value={quota.volumes} max={Math.max(quota.volumeMax, quota.volumes, 1)} tone="muted"
-                     label={<span className="mono">Volumes</span>}
-                     right={<span>{quota.volumes} / {quota.volumeMax || 'unlimited'}</span>}/>
+                     label={<span className="mono">{t('overview.volumes')}</span>}
+                     right={<span>{quota.volumes} / {quota.volumeMax || t('overview.unlimited')}</span>}/>
               <Meter value={quota.pods} max={Math.max(quota.podMax, quota.pods, 1)} tone="muted"
                      label={<span className="mono">Pods</span>}
-                     right={<span>{quota.pods} / {quota.podMax || 'unlimited'}</span>}/>
+                     right={<span>{quota.pods} / {quota.podMax || t('overview.unlimited')}</span>}/>
             </div>
           )}
         </Card>
       </div>
 
       <div className="overview-grid overview-grid-even">
-        <Card title="Recent jobs" subtitle="Newest first"
+        <Card title={t('overview.recentJobs')} subtitle={t('overview.newestFirst')}
               actions={<button className="btn btn-sm btn-ghost" onClick={() => onOpen('jobs')}>
-                All jobs<Icon name="chevron" size={13}/>
+                {t('overview.allJobs')}<Icon name="chevron" size={13}/>
               </button>}>
           {jobs.length === 0 ? (
             <div className="empty">
-              <div className="empty-title">No jobs yet</div>
-              <div className="empty-text">Create one from Jobs to start training.</div>
+              <div className="empty-title">{t('overview.noJobs')}</div>
+              <div className="empty-text">{t('overview.createJobHint')}</div>
             </div>
           ) : (
             <table className="table">
-              <thead><tr><th>Job</th><th>Status</th><th>Ready</th><th>Created</th></tr></thead>
+              <thead><tr><th>{t('overview.colJob')}</th><th>{t('common.status')}</th><th>{t('overview.colReady')}</th><th>{t('common.created')}</th></tr></thead>
               <tbody>
               {jobs.slice(0, 6).map(j => (
                 <tr key={j.name} onClick={() => onOpen('jobs')}>
@@ -171,27 +175,27 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
           )}
         </Card>
 
-        <Card title="Storage" subtitle="Volumes and the project registry">
+        <Card title={t('overview.storage')} subtitle={t('overview.storageSubtitle')}>
           <div className="stat-row">
             <div className="stat">
-              <div className="stat-label">Volumes</div>
+              <div className="stat-label">{t('overview.volumes')}</div>
               <div className="stat-value">{vols.length}</div>
-              <div className="stat-detail">{storageGiB ? `${storageGiB} GiB allocated` : 'none yet'}</div>
+              <div className="stat-detail">{storageGiB ? t('overview.allocated', {size: storageGiB}) : t('overview.noneYet')}</div>
               <button className="btn btn-sm btn-ghost" onClick={() => onOpen('volumes')}>
-                Manage<Icon name="chevron" size={13}/>
+                {t('overview.manage')}<Icon name="chevron" size={13}/>
               </button>
             </div>
             <div className="stat">
-              <div className="stat-label">Storage quota</div>
+              <div className="stat-label">{t('overview.storageQuota')}</div>
               <div className="stat-value">{quota?.storage || '∞'}</div>
-              <div className="stat-detail">{quota?.storageUsed ? `${quota.storageUsed} used` : 'nothing used'}</div>
+              <div className="stat-detail">{quota?.storageUsed ? t('overview.storageUsed', {used: quota.storageUsed}) : t('overview.nothingUsed')}</div>
             </div>
             <div className="stat">
-              <div className="stat-label">Image tags</div>
+              <div className="stat-label">{t('overview.imageTags')}</div>
               <div className="stat-value">{totalTags}</div>
-              <div className="stat-detail">{images.length} repositories</div>
+              <div className="stat-detail">{t('overview.repositories', {count: images.length})}</div>
               <button className="btn btn-sm btn-ghost" onClick={() => onOpen('images')}>
-                Images<Icon name="chevron" size={13}/>
+                {t('overview.imagesButton')}<Icon name="chevron" size={13}/>
               </button>
             </div>
           </div>

@@ -6,6 +6,7 @@ forgeai is a Kubernetes-native AI platform covering development, training, RL an
 |---|---|---|
 | Operator | `api/`, `internal/`, `cmd/` | `Project`, `InstanceType` and `FileServer` CRDs; adds stop/resume, failure classification and retries to `TrainJob`s; purges trashed volumes |
 | GUI | `gui/` | [Wails](https://wails.io) desktop client that talks to Kubernetes directly through a kubeconfig context |
+| Website | `website/` | Official site ([Astro](https://astro.build)), deployed to Cloudflare Workers at https://forgeai.wutz.dev |
 | Shared library | `pkg/` | Naming, platform config, instance types, job rendering and status, sandboxes, volumes, Harbor client, kubeconfig export |
 
 There is no API server of its own: the operator reconciles Kubernetes objects and the GUI (or `kubectl`) creates them with the member's own credentials.
@@ -181,7 +182,7 @@ The desktop client connects with a kubeconfig context and a project namespace (t
 | Templates | Sandbox templates (prefill the sandbox form) and job templates (`TrainingRuntime`s, prefill the job form) in one view; create and delete both, each sorted by name |
 | Volumes | Create, resize, trash, restore and purge volumes |
 | Files | Opens the on-demand file server |
-| Images | Push instructions and robot credentials; list and delete images in the project's Harbor project |
+| Images | Push instructions and robot credentials; list and delete images in the project's Harbor project. Their tags are offered in a dropdown as the image of jobs, sandboxes and their templates, which also accept any other address |
 | Resources | Instance types with availability and the project quota usage |
 | Projects | Admins only (may create Projects): manage projects and members, export member kubeconfigs |
 | Dependencies | Cluster admins only: install or upgrade Kueue, Kubeflow Trainer v2 (with JobSet) and agent-sandbox at the versions pinned in the GUI, and see the forgeai operator's status |

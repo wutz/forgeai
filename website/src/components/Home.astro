@@ -1,0 +1,268 @@
+---
+import { messages, type Locale } from '../i18n/messages';
+
+interface Props {
+  lang: Locale;
+}
+
+const { lang } = Astro.props;
+const t = messages[lang];
+const repo = 'https://github.com/wutz/forgeai';
+
+const projectYaml = `apiVersion: forgeai.wutz.dev/v1alpha1
+kind: Project
+metadata:
+  name: demo
+spec:
+  displayName: Demo project
+  quota:
+    gpus:
+    - class: rtx-5090
+      count: 8
+    storage: 1Ti
+    volumes: 10
+  network:
+    isolation: Isolated
+  members:
+  - name: alice
+    role: edit
+  deletionPolicy: Retain`;
+
+const sandboxYaml = `apiVersion: agents.x-k8s.io/v1beta1
+kind: Sandbox
+metadata:
+  name: agent
+  namespace: forge-demo
+  labels:
+    forgeai.wutz.dev/project: demo
+spec:
+  operatingMode: Running
+  podTemplate:
+    spec:
+      runtimeClassName: gvisor
+      containers:
+      - name: sandbox
+        image: <registry>/forge-demo/agent:latest`;
+---
+
+<main>
+  <section class="hero">
+    <div class="container hero-grid">
+      <div>
+        <span class="eyebrow">{t.hero.eyebrow}</span>
+        <h1>{t.hero.title}</h1>
+        <p class="lead">{t.hero.lead}</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#get-started">{t.hero.primary}</a>
+          <a class="button button-secondary" href={repo} rel="noopener">{t.hero.secondary}</a>
+        </div>
+        <div class="built-on">
+          {t.hero.builtOn}
+          <ul>
+            <li>Kubeflow Trainer v2</li>
+            <li>Kueue</li>
+            <li>agent-sandbox</li>
+            <li>Harbor</li>
+            <li>dufs</li>
+          </ul>
+        </div>
+      </div>
+
+      <figure class="code-panel" aria-label={t.hero.projectCaption}>
+        <figcaption class="code-panel-head">
+          <span>project.yaml</span>
+          <span>forgeai.wutz.dev/v1alpha1</span>
+        </figcaption>
+        <pre><code>{projectYaml}</code></pre>
+      </figure>
+    </div>
+  </section>
+
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow-text">{t.features.eyebrow}</span>
+        <h2>{t.features.title}</h2>
+        <p>{t.features.lead}</p>
+      </div>
+      <ul class="cards">
+        {
+          t.features.items.map((f) => (
+            <li class="card">
+              <span class="card-icon" aria-hidden="true">{f.icon}</span>
+              <h3>{f.title}</h3>
+              <p>{f.body}</p>
+            </li>
+          ))
+        }
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id="how-it-works">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow-text">{t.how.eyebrow}</span>
+        <h2>{t.how.title}</h2>
+        <p>{t.how.lead}</p>
+      </div>
+      <ol class="steps">
+        {
+          t.how.steps.map((s) => (
+            <li>
+              <h3>{s.title}</h3>
+              <p>{s.body}</p>
+            </li>
+          ))
+        }
+      </ol>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">{t.how.tableObject}</th>
+              <th scope="col">{t.how.tableName}</th>
+              <th scope="col">{t.how.tablePurpose}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              t.how.objects.map(([object, name, purpose]) => (
+                <tr>
+                  <td>{object}</td>
+                  <td><code>{name}</code></td>
+                  <td>{purpose}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="training">
+    <div class="container two-col">
+      <div>
+        <span class="eyebrow-text">{t.training.eyebrow}</span>
+        <h2>{t.training.title}</h2>
+        <p class="section-lead">{t.training.lead}</p>
+        <ul class="bullets">
+          {t.training.bullets.map((b) => <li set:html={b} />)}
+        </ul>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">{t.training.tableReason}</th>
+              <th scope="col">{t.training.tableRetried}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>NodeFailure</td><td>{t.training.yes}</td></tr>
+            <tr><td>Evicted</td><td>{t.training.yes}</td></tr>
+            <tr><td>OOMKilled</td><td set:html={t.training.onlyAny} /></tr>
+            <tr><td>ExitCode</td><td set:html={t.training.onlyAny} /></tr>
+            <tr><td>ImagePullFailed</td><td>{t.training.never}</td></tr>
+            <tr><td>ConfigError</td><td>{t.training.never}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="sandboxes">
+    <div class="container two-col">
+      <div>
+        <span class="eyebrow-text">{t.sandboxes.eyebrow}</span>
+        <h2>{t.sandboxes.title}</h2>
+        <ul class="bullets">
+          {t.sandboxes.bullets.map((b) => <li set:html={b} />)}
+        </ul>
+      </div>
+      <figure class="code-panel" aria-label={t.sandboxes.caption}>
+        <figcaption class="code-panel-head">
+          <span>sandbox.yaml</span>
+          <span>agents.x-k8s.io/v1beta1</span>
+        </figcaption>
+        <pre><code>{sandboxYaml}</code></pre>
+      </figure>
+    </div>
+  </section>
+
+  <section class="section" id="download">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow-text">{t.download.eyebrow}</span>
+        <h2>{t.download.title}</h2>
+        <p>{t.download.lead}</p>
+      </div>
+      <ul class="cards">
+        {
+          t.download.platforms.map((p) => (
+            <li class="card">
+              <span class="card-icon" aria-hidden="true">{p.icon}</span>
+              <h3>{p.title}</h3>
+              <p>{p.body}</p>
+              <ul class="download-links">
+                {p.links.map((link) => (
+                  <li>
+                    <a class="button button-secondary" href={`/download/gui/${link.key}`}>{link.label}</a>
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="note">
+        {t.download.note.lead}{' '}
+        <a href="/download/gui/checksums">{t.download.note.checksums}</a>
+        {t.download.note.tail}
+      </p>
+    </div>
+  </section>
+
+  <section class="section" id="get-started">
+    <div class="container">
+      <div class="section-head">
+        <span class="eyebrow-text">{t.start.eyebrow}</span>
+        <h2>{t.start.title}</h2>
+        <p>{t.start.lead}</p>
+      </div>
+      <div class="install">
+        <div class="install-step">
+          <h3>{t.start.steps[0].title}</h3>
+          <p>{t.start.steps[0].body}</p>
+          <figure class="code-panel">
+            <pre><code>{`make install
+make deploy IMG=<registry>/forgeai:<tag>`}</code></pre>
+          </figure>
+        </div>
+        <div class="install-step">
+          <h3>{t.start.steps[1].title}</h3>
+          <p>{t.start.steps[1].body}</p>
+          <figure class="code-panel">
+            <pre><code>{`kubectl apply -f config/samples/forgeai_v1alpha1_project.yaml
+kubectl get fproj`}</code></pre>
+          </figure>
+        </div>
+        <div class="install-step">
+          <h3>{t.start.steps[2].title}</h3>
+          <p>{t.start.steps[2].body}</p>
+          <figure class="code-panel">
+            <pre><code>make gui</code></pre>
+          </figure>
+        </div>
+      </div>
+      <p class="note">
+        {t.start.note.lead}{' '}
+        <a href={`${repo}#readme`} rel="noopener">{t.start.note.readme}</a>{' '}
+        {t.start.note.middle}{' '}
+        <a href={`${repo}/tree/main/gui`} rel="noopener">{t.start.note.gui}</a>{' '}
+        {t.start.note.tail}
+      </p>
+    </div>
+  </section>
+</main>

@@ -3,7 +3,8 @@ import {InstallDependency, ListDependencies} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {EventsOn} from '../wailsjs/runtime/runtime'
 import {errText} from './util'
-import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Spinner, useConfirm} from './ui'
+import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Spinner, useActive, useConfirm} from './ui'
+import {MessageKey, t} from './i18n'
 
 // Progress is one deps:progress event: a step of an install, or its outcome
 // when done is set (app.DependencyProgress). Wails only generates models for
@@ -20,6 +21,7 @@ export function Dependencies() {
   // steps is the latest progress message of each component that is installing.
   const [steps, setSteps] = useState<Record<string, string>>({})
   const confirm = useConfirm()
+  const active = useActive()
 
   const refresh = () => ListDependencies().then(d => {
     setData(d); setError('')
@@ -27,7 +29,7 @@ export function Dependencies() {
     setError(errText(e))
     throw e
   })
-  useEffect(() => { refresh().catch(() => undefined) }, [])
+  useEffect(() => { if (active) refresh().catch(() => undefined) }, [active])
 
   // Installs run in the background; their steps arrive as events, and the
   // final one refreshes the list with the outcome.
@@ -42,15 +44,14 @@ export function Dependencies() {
   }), [])
 
   const install = (d: app.Dependency) => confirm.ask({
-    title: `${verb(d)} ${d.title}?`,
+    title: t('deps.confirmTitle', {action: verb(d), name: text(d, 'title')}),
     message: <>
-      Applies {d.pinned} to the connected cluster with server-side apply: objects with the same
-      names are overwritten, and nothing is removed.
-      {d.name === 'agent-sandbox' && ' The forgeai operator restarts afterwards to start the Sandbox controller.'}
+      {t('deps.confirmMessage', {version: d.pinned})}
+      {d.name === 'agent-sandbox' && ` ${t('deps.restartNote')}`}
     </>,
     action: verb(d),
     run: () => {
-      setSteps(s => ({...s, [d.name]: 'Starting'}))
+      setSteps(s => ({...s, [d.name]: t('deps.starting')}))
       InstallDependency(d.name).catch(e => {
         setSteps(({[d.name]: _, ...rest}) => rest)
         setError(errText(e))
@@ -61,8 +62,8 @@ export function Dependencies() {
   if (data && !data.clusterAdmin) {
     return (
       <div className="page">
-        <Empty icon="shield" title="Cluster admins only">
-          Installing cluster components needs cluster-admin on this cluster.
+        <Empty icon="shield" title={t('deps.adminsOnly')}>
+          {t('deps.adminsOnlyHint')}
         </Empty>
       </div>
     )
@@ -73,9 +74,9 @@ export function Dependencies() {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Admin" title="Dependencies"
+      <PageHeader eyebrow={t('nav.admin')} title={t('deps.title')}
                   meta={data && <span className="muted" style={{fontSize: 12.5}}>
-                    {items.length} components · {ready} ready
+                    {t('deps.meta', {total: items.length, ready})}
                   </span>}
                   actions={<RefreshButton onRefresh={refresh}/>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
@@ -83,11 +84,12 @@ export function Dependencies() {
 
       <Card>
         {!data ? (
-          error ? null : <Spinner label="Checking the cluster…"/>
+          error ? null : <Spinner label={t('deps.checking')}/>
         ) : (
           <table className="table">
             <thead>
-            <tr><th>Component</th><th>Installed</th><th>Pinned</th><th>Status</th><th/></tr>
+            <tr><th>{t('deps.component')}</th><th>{t('deps.installed')}</th><th>{t('deps.pinned')}</th>
+              <th>{t('deps.status')}</th><th/></tr>
             </thead>
             <tbody>
             {items.map(d => {
@@ -96,15 +98,15 @@ export function Dependencies() {
               return (
                 <tr key={d.name}>
                   <td>
-                    <span className="cell-main">{d.title}</span>
-                    <span className="cell-sub">{d.description}</span>
+                    <span className="cell-main">{text(d, 'title')}</span>
+                    <span className="cell-sub">{text(d, 'desc')}</span>
                   </td>
                   <td className="mono">{d.installed || <span className="muted">—</span>}</td>
                   <td className="mono">{d.pinned || <span className="muted">—</span>}</td>
                   <td>
                     <Badge tone={tone(d.status)}>{label(d.status)}</Badge>
                     {(installing || step) && <div className="muted" style={{fontSize: 12, marginTop: 4}}>
-                      {step || 'Installing'}
+                      {step || t('deps.installing')}
                     </div>}
                     {!installing && d.message && <div className="muted" style={{fontSize: 12, marginTop: 4}}>
                       {d.message}
@@ -130,20 +132,23 @@ export function Dependencies() {
   )
 }
 
+// text is the translated title or description of a component; the names are
+// the ones in the Go catalog.
+function text(d: app.Dependency, part: 'title' | 'desc'): string {
+  return t(`deps.${d.name}.${part}` as MessageKey)
+}
+
 // verb is the action a component offers, from its status.
 function verb(d: app.Dependency): string {
   switch (d.status) {
-    case 'outdated': return 'Upgrade'
-    case 'degraded': return 'Reinstall'
-    default: return 'Install'
+    case 'outdated': return t('deps.action.upgrade')
+    case 'degraded': return t('deps.action.reinstall')
+    default: return t('deps.action.install')
   }
 }
 
 function label(status: string): string {
-  return ({
-    ready: 'Ready', missing: 'Not installed', degraded: 'Degraded', unmanaged: 'Unmanaged',
-    outdated: 'Outdated', installing: 'Installing',
-  } as Record<string, string>)[status] ?? status
+  return t(`deps.status.${status}` as MessageKey)
 }
 
 function tone(status: string): 'success' | 'warning' | 'error' | 'accent' | 'neutral' {

@@ -6,6 +6,12 @@
       "runtimeExecutable": "sh",
       "runtimeArgs": ["-c", "hack/gui-dev.sh -browser=false"],
       "port": 34115
+    },
+    {
+      "name": "website",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd website && npm run dev -- --port 4321"],
+      "port": 4321
     }
   ]
 }

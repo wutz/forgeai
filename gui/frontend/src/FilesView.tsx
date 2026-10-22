@@ -1,8 +1,9 @@
 import {useEffect, useState} from 'react'
 import {Files} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
-import {errText} from './util'
-import {Card, Empty, PageHeader, Spinner} from './ui'
+import {errText, phaseLabel} from './util'
+import {t} from './i18n'
+import {Card, Empty, PageHeader, Spinner, useActive} from './ui'
 
 // Files shows the project's on-demand file server (dufs). It wakes the server
 // and keeps it up while the view is open. The browser is embedded through a
@@ -12,8 +13,12 @@ export function FilesView() {
   const [state, setState] = useState<app.Files | null>(null)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
+  const active = useActive()
 
+  // Polling wakes the server and keeps it up, so it stops while the view is
+  // hidden and the server can go idle.
   useEffect(() => {
+    if (!active) return
     let stopped = false
     let timer = 0
     // Poll quickly until the server is Ready, then at a slower pace; the
@@ -35,7 +40,7 @@ export function FilesView() {
       stopped = true
       window.clearTimeout(timer)
     }
-  }, [attempt])
+  }, [attempt, active])
 
   const ready = state?.phase === 'Ready'
   // Only a ready server has an address: an idle one has no pod behind it.
@@ -43,39 +48,38 @@ export function FilesView() {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Storage" title="Files"
+      <PageHeader eyebrow={t('storage.eyebrow')} title={t('files.title')}
                   meta={state && (
                     <span className={`status status-${ready ? 'running' : state.phase.toLowerCase()}`}>
-                      <span className="dot" aria-hidden/>{state.phase}
+                      <span className="dot" aria-hidden/>{phaseLabel(state.phase)}
                     </span>
                   )}
                   actions={error && (
-                    <button className="btn btn-sm" onClick={() => setAttempt(n => n + 1)}>Retry</button>
+                    <button className="btn btn-sm" onClick={() => setAttempt(n => n + 1)}>{t('common.retry')}</button>
                   )}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       <p className="muted note">
-        {state?.volumes?.length ? `Serving ${state.volumes.join(', ')}. ` : ''}
-        Shared volumes are served over HTTPS and scaled to zero when idle. Activity in the
-        browser keeps the server up.
+        {state?.volumes?.length ? t('files.serving', {volumes: state.volumes.join(', ')}) : ''}
+        {t('files.note')}
       </p>
       {!state ? (
         <Card>
-          <Empty icon="folder" title="Opening the file browser…"/>
+          <Empty icon="folder" title={t('files.opening')}/>
         </Card>
       ) : frame ? (
         <div className="files-frame card">
-          <iframe src={frame} title="Files" allow="clipboard-write"/>
+          <iframe src={frame} title={t('files.title')} allow="clipboard-write"/>
         </div>
       ) : ready ? (
         <Card>
-          <Empty icon="folder" title="No file server access for your role">
-            The server is up. Ask a project admin for access.
+          <Empty icon="folder" title={t('files.noAccess')}>
+            {t('files.noAccessHint')}
           </Empty>
         </Card>
       ) : (
         <Card>
-          <Spinner label={state.phase === 'Starting' ? 'Starting the file server…' :
-            state.phase === 'Idle' ? 'Waking the file server…' : 'Waiting for the file server…'}/>
+          <Spinner label={state.phase === 'Starting' ? t('files.starting') :
+            state.phase === 'Idle' ? t('files.waking') : t('files.waiting')}/>
         </Card>
       )}
     </div>

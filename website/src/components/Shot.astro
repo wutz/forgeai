@@ -1,6 +1,5 @@
 ---
 import type { Locale } from '../i18n/messages';
-import { messages } from '../i18n/messages';
 
 interface Props {
   lang: Locale;
@@ -12,7 +11,6 @@ interface Props {
 }
 
 const { lang, name, alt, eager = false } = Astro.props;
-const title = messages[lang].console.frameTitle;
 const loading = eager ? 'eager' : 'lazy';
 const src = (theme: 'light' | 'dark') => `/screenshots/${name}-${lang}-${theme}.webp`;
 ---
@@ -22,10 +20,6 @@ const src = (theme: 'light' | 'dark') => `/screenshots/${name}-${lang}-${theme}.
   and the browser only fetches the visible one. Screenshots are made by hack/gui-screenshots.
 -->
 <figure class="window">
-  <div class="window-bar" aria-hidden="true">
-    <span class="window-dots"><i></i><i></i><i></i></span>
-    <span class="window-title">{title}</span>
-  </div>
   <div class="window-body">
     <img class="shot-light" src={src('light')} alt={alt} width="2160" height="1500" loading={loading} decoding="async" />
     <img class="shot-dark" src={src('dark')} alt={alt} width="2160" height="1500" loading={loading} decoding="async" />

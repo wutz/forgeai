@@ -657,7 +657,7 @@ td:first-child {
   font-weight: 600;
 }
 
-/* Window frame around console screenshots */
+/* Frame around console screenshots. The desktop console hides the OS title bar, so the frame has no bar either. */
 
 .window {
   margin: 0;
@@ -666,36 +666,6 @@ td:first-child {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-panel);
   overflow: hidden;
-}
-
-.window-bar {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 2.25rem;
-  background: var(--hairline-soft);
-  border-bottom: 1px solid var(--hairline);
-}
-
-.window-dots {
-  position: absolute;
-  left: 0.9rem;
-  display: flex;
-  gap: 0.4rem;
-}
-
-.window-dots i {
-  width: 0.65rem;
-  height: 0.65rem;
-  border-radius: 50%;
-  background: light-dark(#d4d4d8, #3a3a42);
-}
-
-.window-title {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--mute);
 }
 
 .window-body img {

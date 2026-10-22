@@ -5,7 +5,7 @@ The official website of forgeai, at https://forgeai.wutz.dev. It is a static [As
 | Path | Description |
 |---|---|
 | `src/pages/` | `index.astro` (English landing page), `zh/index.astro` (Chinese landing page), `404.astro` (both languages) |
-| `src/components/` | `Home.astro` (landing page sections, shared by both languages), `SiteHeader.astro` (brand and navigation), `Preferences.astro` (theme and language controls, shown in the footer), `Shot.astro` (a console screenshot in a window frame, light and dark variants) and `Icon.astro` (inline SVG icons) |
+| `src/components/` | `Home.astro` (landing page sections, shared by both languages), `SiteHeader.astro` (brand and navigation), `Preferences.astro` (theme and language controls, shown in the footer), `Shot.astro` (a console screenshot in a plain window frame without a title bar, light and dark variants) and `Icon.astro` (inline SVG icons) |
 | `src/i18n/messages.ts` | All copy, in English and Chinese. `zh` is typed against `en`, so an editor flags a missing key |
 | `src/layouts/Base.astro` | HTML shell, metadata, hreflang links, footer, and the inline script that applies the saved theme and language before paint |
 | `src/scripts/preferences.ts` | Theme and language controls in the browser |

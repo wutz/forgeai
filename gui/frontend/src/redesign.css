@@ -254,6 +254,21 @@ a { color: inherit; text-decoration: none; }
 .checkbox { height: 34px; }
 .checkbox input { accent-color: var(--accent); }
 
+/* Volume mounts: one hairline row per mount, its volume's facts under it. */
+.mounts { display: flex; flex-direction: column; gap: 8px; }
+.mount-row {
+  display: flex; flex-direction: column; gap: 6px; padding: 10px;
+  border: 1px solid var(--hairline); border-radius: 10px; background: var(--canvas);
+}
+.mount-line {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 8px; align-items: center;
+}
+.mount-line + .mount-line { grid-template-columns: minmax(0, 1fr) auto; }
+.mount-line .checkbox { font-size: 12.5px; white-space: nowrap; }
+.mount-hint { font-size: 12px; line-height: 16px; color: var(--mute); }
+.mount-hint-error { color: var(--error); }
+.mounts-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+
 /* Cards */
 .card { border-radius: var(--radius-lg); box-shadow: var(--shadow-1); }
 .card-head { padding: 14px 18px; border-bottom: 1px solid var(--hairline-soft); }

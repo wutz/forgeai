@@ -125,7 +125,7 @@ function JobTemplateTable({items, onEdit, onDelete}: {
             {tpl.description && <span className="cell-sub">{tpl.description}</span>}
           </td>
           <td className="mono trunc" title={tpl.form?.image}>{tpl.form?.image || '—'}</td>
-          <td>{tpl.form?.workers || 1}</td>
+          <td>{tpl.form?.workers ?? 1}</td>
           <td className="mono">{tpl.form?.instanceType || '—'}</td>
           <td className="muted">{fmtDate(tpl.created)}</td>
           <td>
@@ -175,13 +175,16 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
 
   const envBad = envErrors(envText)
   const nameOK = NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= NAME_MAX
-  // blocker says why Save is off. A bad name or env line already has a hint
-  // under its field, so the footer only names the blockers that have none.
+  // A template prefills the New job form, which needs at least one worker.
+  const workersOK = f.workers >= 1
+  // blocker says why Save is off. A bad name, worker count or env line already
+  // has a hint under its field, so the footer only names the blockers that have none.
   const blocker = !f.name ? t('common.nameRequired')
     : !nameOK ? t('common.nameInvalid', {max: NAME_MAX})
     : !f.image ? t('common.imageRequired')
+    : !workersOK ? t('jobCreate.workersInvalid')
     : envBad.length ? t('common.envInvalid', {lines: envBad.join(', ')}) : ''
-  const hasFieldHint = (!nameOK && (f.name ?? '') !== '') || envBad.length > 0
+  const hasFieldHint = (!nameOK && (f.name ?? '') !== '') || !workersOK || envBad.length > 0
 
   const save = () => {
     if (blocker) return
@@ -252,7 +255,9 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
           <div className="field">
             <label htmlFor="t-workers">{t('templates.workers')}</label>
             <input id="t-workers" className="input" type="number" min={1}
-                   value={f.workers} onChange={e => set('workers', +e.target.value)}/>
+                   value={f.workers} onChange={e => set('workers', +e.target.value)}
+                   aria-invalid={!workersOK}/>
+            {!workersOK && <span className="hint hint-error">{t('jobCreate.workersInvalid')}</span>}
           </div>
         </div>
         <div className="field">

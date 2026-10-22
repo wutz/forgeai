@@ -29,8 +29,11 @@ export function Resources() {
     return () => clearInterval(timer)
   }, [active])
 
-  const total = types.reduce((n, ty) => n + ty.total, 0)
-  const free = types.reduce((n, ty) => n + ty.free, 0)
+  // total and free count instances; the GPU tiles count GPUs, so each GPU type
+  // is weighted by its GPUs per instance. CPU-only types have no GPUs to count.
+  const gpuTypes = types.filter(ty => ty.gpuCount > 0)
+  const total = gpuTypes.reduce((n, ty) => n + ty.total * ty.gpuCount, 0)
+  const free = gpuTypes.reduce((n, ty) => n + ty.free * ty.gpuCount, 0)
   const used = Math.max(0, total - free)
   const gpuQuota = quota?.gpuQuota ?? 0
   const gpuUsed = (quota?.gpuClasses || []).reduce((n, g) => n + g.used, 0)
@@ -81,7 +84,7 @@ export function Resources() {
                   <Meter value={ty.total - ty.free} max={Math.max(ty.total, 1)}
                          tone={ty.free >= 1 ? 'success' : 'muted'}
                          label={<span><strong className={ty.free >= 1 ? 'free' : 'muted'}>{ty.free}</strong> {t('resources.free')}</span>}
-                         right={<span>{pct(ty.total - ty.free, ty.total)}%</span>}/>
+                         right={<span>{t('resources.percentInUse', {percent: pct(ty.total - ty.free, ty.total)})}</span>}/>
                 </td>
               </tr>
             ))}

@@ -182,6 +182,7 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
   const blocker = !f.name ? t('common.nameRequired')
     : !nameOK ? t('common.nameInvalid', {max: NAME_MAX})
     : !f.image ? t('common.imageRequired')
+    : !f.instanceType ? t('templates.instanceRequired')
     : !workersOK ? t('jobCreate.workersInvalid')
     : envBad.length ? t('common.envInvalid', {lines: envBad.join(', ')}) : ''
   const hasFieldHint = (!nameOK && (f.name ?? '') !== '') || !workersOK || envBad.length > 0

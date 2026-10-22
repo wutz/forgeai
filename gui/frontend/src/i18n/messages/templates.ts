@@ -27,6 +27,7 @@ export const en = {
   'templates.commandBash': 'Command (bash)',
   'templates.defaultInstanceType': 'Default instance type',
   'templates.chooseType': 'Choose a type',
+  'templates.instanceRequired': 'Choose a default instance type.',
   'templates.typeUnavailable': '{name} (not available)',
   'templates.environment': 'Environment',
 
@@ -69,6 +70,7 @@ export const zh: Record<keyof typeof en, string> = {
   'templates.commandBash': '命令（bash）',
   'templates.defaultInstanceType': '默认实例类型',
   'templates.chooseType': '选择类型',
+  'templates.instanceRequired': '请选择默认实例类型。',
   'templates.typeUnavailable': '{name}（不可用）',
   'templates.environment': '环境变量',
 

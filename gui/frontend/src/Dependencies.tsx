@@ -138,7 +138,8 @@ export function Dependencies() {
                   </td>
                   <td>
                     <div className="actions">
-                      {d.installable && d.status !== 'ready' && d.status !== 'installing' && d.status !== 'mismatch' && (
+                      {d.installable && d.status !== 'ready' && d.status !== 'installing' && d.status !== 'mismatch'
+                        && d.reason !== 'unmanagedHelm' && (
                         <button className="btn btn-sm btn-accent" onClick={() => install(d)}>
                           <Icon name="download" size={13}/>{verb(d)}
                         </button>
@@ -166,11 +167,16 @@ function desc(name: string): string {
   return t(`deps.${name}.desc` as MessageKey)
 }
 
-// detail is the line under a component's status. The view words the outdated
-// case itself; the other messages are backend diagnostics, shown as written.
+// detail is the line under a component's status. The view words the cases it
+// has a reason for; the other messages are backend diagnostics, shown as written.
 function detail(d: app.Dependency): string {
   if (d.status === 'missing') return '' // the status label already says it
   if (d.status === 'outdated') return t('deps.outdated', {installed: d.installed, pinned: d.pinned})
+  switch (d.reason) {
+    case 'unmanaged': return t('deps.reason.unmanaged')
+    case 'unmanagedHelm': return t('deps.reason.unmanagedHelm')
+    case 'namespaceMismatch': return t('deps.reason.namespaceMismatch', {namespace: d.namespace, expected: d.expectedNamespace ?? ''})
+  }
   return d.message
 }
 

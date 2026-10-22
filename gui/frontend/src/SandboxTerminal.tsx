@@ -39,8 +39,6 @@ export function SandboxTerminal({name}: {name: string}) {
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
-    term.open(el)
-    fit.fit()
 
     const offData = EventsOn(`sandbox-terminal:${id}`, (data: string) => term.write(data))
     const offExit = EventsOn(`sandbox-terminal:${id}:exit`, (msg: string) => {
@@ -49,28 +47,38 @@ export function SandboxTerminal({name}: {name: string}) {
       setEnded(true)
     })
     const onData = term.onData(data => SandboxTerminalInput(id, data).catch(() => {}))
-    const ro = new ResizeObserver(() => {
-      // A hidden view has no size; fitting it would resize the shell to a
-      // couple of columns until the view is shown again.
-      if (!el.offsetWidth || !el.offsetHeight) return
-      fit.fit()
-      ResizeSandboxTerminal(id, term.cols, term.rows).catch(() => {})
-    })
-    ro.observe(el)
 
+    // The terminal opens in a later task, not here. StrictMode runs this effect
+    // twice, and a terminal disposed right after open leaves its viewport with a
+    // refresh still scheduled, which then reads the renderer it no longer has.
+    // Clearing the timer also means a view torn down at once opens no shell.
     // closed is set when the view goes away. If the shell opens after that,
     // the cleanup's close found no session yet, so this one closes it.
     let closed = false
-    OpenSandboxTerminal(name, id, term.cols, term.rows).then(() => {
-      if (closed) CloseSandboxTerminal(id).catch(() => {})
-      else term.focus()
-    }, e => {
-      if (!closed) setError(errText(e))
-    })
+    let ro: ResizeObserver | undefined
+    const open = window.setTimeout(() => {
+      term.open(el)
+      fit.fit()
+      ro = new ResizeObserver(() => {
+        // A hidden view has no size; fitting it would resize the shell to a
+        // couple of columns until the view is shown again.
+        if (!el.offsetWidth || !el.offsetHeight) return
+        fit.fit()
+        ResizeSandboxTerminal(id, term.cols, term.rows).catch(() => {})
+      })
+      ro.observe(el)
+      OpenSandboxTerminal(name, id, term.cols, term.rows).then(() => {
+        if (closed) CloseSandboxTerminal(id).catch(() => {})
+        else term.focus()
+      }, e => {
+        if (!closed) setError(errText(e))
+      })
+    }, 0)
 
     return () => {
       closed = true
-      ro.disconnect()
+      window.clearTimeout(open)
+      ro?.disconnect()
       onData.dispose()
       offData()
       offExit()

@@ -132,9 +132,16 @@ type Dependency struct {
 	AppliedAt string `json:"appliedAt"`
 	// Status is missing, degraded, mismatch, unmanaged, outdated, installing or ready.
 	// mismatch means the component runs where the platform config does not expect it.
-	Status      string `json:"status"`
-	Message     string `json:"message"`
-	Installable bool   `json:"installable"`
+	Status string `json:"status"`
+	// Reason names the state the GUI explains in its own words: unmanaged,
+	// unmanagedHelm or namespaceMismatch. Empty for the other states. Message
+	// stays the English diagnostic.
+	Reason string `json:"reason,omitempty"`
+	// ExpectedNamespace is where the platform config expects the component when
+	// Reason is namespaceMismatch.
+	ExpectedNamespace string `json:"expectedNamespace,omitempty"`
+	Message           string `json:"message"`
+	Installable       bool   `json:"installable"`
 }
 
 // depRecord is the provenance of one install, stored in depRecordName.
@@ -298,14 +305,18 @@ func assess(dep *Dependency, h depHealth) {
 	}
 	if h.expectNamespace != "" && h.namespace != "" && h.namespace != h.expectNamespace {
 		dep.Status = "mismatch"
+		dep.Reason = "namespaceMismatch"
+		dep.ExpectedNamespace = h.expectNamespace
 		dep.Message = fmt.Sprintf("Runs in %s, but the platform config sets sandbox.namespace to %s",
 			h.namespace, h.expectNamespace)
 		return
 	}
 	if dep.Installable && dep.Installed == "" {
 		dep.Status = "unmanaged"
+		dep.Reason = "unmanaged"
 		dep.Message = "Installed outside forgeai; installing replaces it with the pinned version"
 		if dep.Name == "forgeai" {
+			dep.Reason = "unmanagedHelm"
 			dep.Message = "Deployed outside Helm (make deploy-dev); remove it before installing the chart"
 		}
 		return

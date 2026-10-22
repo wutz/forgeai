@@ -5,7 +5,7 @@ import {JobCreateDialog} from './JobCreateDialog'
 import {TemplateDialog} from './Templates'
 import {Status, envToLines, fmtDate, errText} from './util'
 import {t} from './i18n'
-import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Segmented, Spinner, Tabs, useActive, useConfirm} from './ui'
+import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Segmented, Spinner, Tabs, tabPanelProps, useActive, useConfirm} from './ui'
 
 type Filter = 'all' | 'running' | 'queued' | 'stopped' | 'failed' | 'done'
 
@@ -298,7 +298,7 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
       </div>
 
       <div className="section">
-        <Tabs tabs={[
+        <Tabs idPrefix="job" tabs={[
           {value: 'overview', label: t('jobs.tabOverview'), icon: 'grid'},
           {value: 'workers', label: t('jobs.tabWorkers'), icon: 'cpu'},
           {value: 'log', label: t('jobs.tabLog'), icon: 'scroll'},
@@ -309,73 +309,75 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
           if (v === 'log') viewLog(logWorker, logTitle || t('jobs.workerLabel', {index: 0})).catch(() => {})
         }}/>
 
-        {tab === 'overview' && (
-          <>
-            <dl className="kv">
-              <dt>{t('common.image')}</dt><dd className="mono">{job.image}</dd>
-              <dt>{t('jobs.instance')}</dt><dd className="mono">{job.instanceType}
-                {job.gpuCount ? ` (${job.gpuCount}× ${job.gpuClass})` : ''}</dd>
-              <dt>{t('jobs.workers')}</dt><dd>{t('jobs.workersReady', {ready: job.ready, total: job.workers})}</dd>
-              <dt>{t('jobs.volumes')}</dt><dd className="mono">{job.volumes?.join(', ') || '—'}</dd>
-              <dt>{t('jobs.command')}</dt><dd><pre className="code">{job.command || '—'}</pre></dd>
-              {job.failureReason && <><dt>{t('jobs.failure')}</dt><dd>{t('jobs.failureDetail', {reason: job.failureReason, message: job.message || ''})}</dd></>}
-              {job.retriedAs && <><dt>{t('jobs.retriedAs')}</dt><dd>
-                <button className="btn btn-sm mono" onClick={() => onOpen(job.retriedAs ?? '')}>{job.retriedAs}</button>
-              </dd></>}
-              <dt>{t('common.created')}</dt><dd>{fmtDate(job.created)}</dd>
-            </dl>
+        <div {...tabPanelProps('job', tab)}>
+          {tab === 'overview' && (
+            <>
+              <dl className="kv">
+                <dt>{t('common.image')}</dt><dd className="mono">{job.image}</dd>
+                <dt>{t('jobs.instance')}</dt><dd className="mono">{job.instanceType}
+                  {job.gpuCount ? ` (${job.gpuCount}× ${job.gpuClass})` : ''}</dd>
+                <dt>{t('jobs.workers')}</dt><dd>{t('jobs.workersReady', {ready: job.ready, total: job.workers})}</dd>
+                <dt>{t('jobs.volumes')}</dt><dd className="mono">{job.volumes?.join(', ') || '—'}</dd>
+                <dt>{t('jobs.command')}</dt><dd><pre className="code">{job.command || '—'}</pre></dd>
+                {job.failureReason && <><dt>{t('jobs.failure')}</dt><dd>{t('jobs.failureDetail', {reason: job.failureReason, message: job.message || ''})}</dd></>}
+                {job.retriedAs && <><dt>{t('jobs.retriedAs')}</dt><dd>
+                  <button className="btn btn-sm mono" onClick={() => onOpen(job.retriedAs ?? '')}>{job.retriedAs}</button>
+                </dd></>}
+                <dt>{t('common.created')}</dt><dd>{fmtDate(job.created)}</dd>
+              </dl>
 
-            {job.retries?.length > 0 && (
-              <>
-                <h4 className="sub-head">{t('jobs.retries')}</h4>
-                <div className="mini-table">
-                  {job.retries.map(r => (
-                    <button key={r.name} className="mini-row" onClick={() => onOpen(r.name)}>
-                      <span className="mono">{r.name}</span>
-                      <Status phase={r.phase}/>
-                      <span className="muted">{r.failureReason || ''}</span>
-                      <span className="muted">{fmtDate(r.created)}</span>
-                      <Icon name="chevron" size={13}/>
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </>
-        )}
+              {job.retries?.length > 0 && (
+                <>
+                  <h4 className="sub-head">{t('jobs.retries')}</h4>
+                  <div className="mini-table">
+                    {job.retries.map(r => (
+                      <button key={r.name} className="mini-row" onClick={() => onOpen(r.name)}>
+                        <span className="mono">{r.name}</span>
+                        <Status phase={r.phase}/>
+                        <span className="muted">{r.failureReason || ''}</span>
+                        <span className="muted">{fmtDate(r.created)}</span>
+                        <Icon name="chevron" size={13}/>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          )}
 
-        {tab === 'workers' && (
-          job.workerPods?.length ? (
-            <div className="mini-table">
-              {job.workerPods.map(w => (
-                <div key={w.podName} className="mini-row">
-                  <span className="mono">{w.podName}</span>
-                  <Status phase={w.phase || 'Pending'}/>
-                  <span className="mono muted">{w.nodeName || '—'}</span>
-                  <span className="muted trunc" title={w.message}>{w.message || ''}</span>
-                  <button className="btn btn-sm" onClick={() => viewLog(w.index, w.podName).catch(() => {})}>{t('jobs.logButton')}</button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="empty">
-              <div className="empty-title">{job.phase === 'Queued' ? t('jobs.noPodsQueued') : t('jobs.noPodsYet')}</div>
-            </div>
-          )
-        )}
+          {tab === 'workers' && (
+            job.workerPods?.length ? (
+              <div className="mini-table">
+                {job.workerPods.map(w => (
+                  <div key={w.podName} className="mini-row">
+                    <span className="mono">{w.podName}</span>
+                    <Status phase={w.phase || 'Pending'}/>
+                    <span className="mono muted">{w.nodeName || '—'}</span>
+                    <span className="muted trunc" title={w.message}>{w.message || ''}</span>
+                    <button className="btn btn-sm" onClick={() => viewLog(w.index, w.podName).catch(() => {})}>{t('jobs.logButton')}</button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty">
+                <div className="empty-title">{job.phase === 'Queued' ? t('jobs.noPodsQueued') : t('jobs.noPodsYet')}</div>
+              </div>
+            )
+          )}
 
-        {tab === 'log' && (
-          <>
-            <div className="log-bar">
-              <span className="mono muted">{logTitle || t('jobs.workerLabel', {index: 0})}</span>
-              <span className="spacer"/>
-              <RefreshButton label="Reload" onRefresh={() => viewLog(logWorker, logTitle || t('jobs.workerLabel', {index: 0}))}/>
-            </div>
-            <pre className="logs">{log || t('jobs.noOutput')}</pre>
-          </>
-        )}
+          {tab === 'log' && (
+            <>
+              <div className="log-bar">
+                <span className="mono muted">{logTitle || t('jobs.workerLabel', {index: 0})}</span>
+                <span className="spacer"/>
+                <RefreshButton label="Reload" onRefresh={() => viewLog(logWorker, logTitle || t('jobs.workerLabel', {index: 0}))}/>
+              </div>
+              <pre className="logs">{log || t('jobs.noOutput')}</pre>
+            </>
+          )}
 
-        {tab === 'env' && <pre className="code">{envToLines(job.env) || '—'}</pre>}
+          {tab === 'env' && <pre className="code">{envToLines(job.env) || '—'}</pre>}
+        </div>
       </div>
     </Card>
   )

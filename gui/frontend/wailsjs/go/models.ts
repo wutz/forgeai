@@ -36,13 +36,15 @@ export namespace app {
 	    appliedBy: string;
 	    appliedAt: string;
 	    status: string;
+	    reason?: string;
+	    expectedNamespace?: string;
 	    message: string;
 	    installable: boolean;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Dependency(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -54,6 +56,8 @@ export namespace app {
 	        this.appliedBy = source["appliedBy"];
 	        this.appliedAt = source["appliedAt"];
 	        this.status = source["status"];
+	        this.reason = source["reason"];
+	        this.expectedNamespace = source["expectedNamespace"];
 	        this.message = source["message"];
 	        this.installable = source["installable"];
 	    }

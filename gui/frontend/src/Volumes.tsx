@@ -6,7 +6,7 @@ import {
 import {app, volumes as vol} from '../wailsjs/go/models'
 import {fmtDate, errText, generateName, phaseLabel} from './util'
 import {t} from './i18n'
-import {Badge, Card, Dialog, Empty, Icon, Meter, PageHeader, useActive, useConfirm} from './ui'
+import {Badge, Card, Dialog, Empty, Icon, Meter, PageHeader, RefreshButton, useActive, useConfirm} from './ui'
 
 // Volumes manages shared filesystems: create, grow, trash (recycle bin),
 // restore and purge. Deleting is delayed — the operator purges expired
@@ -23,15 +23,21 @@ export function Volumes() {
   const confirm = useConfirm()
   const active = useActive()
 
-  const refresh = () => {
-    ListVolumes(false).then(vs => { setItems(vs); setError('') }).catch(e => setError(errText(e)))
-    ListVolumes(true).then(vs => setTrash(vs)).catch(e => setError(errText(e)))
-  }
+  // refresh rejects when a list fails, so the refresh button reports it; reload
+  // is for the callers that have no place to show a rejection.
+  const refresh = () => Promise.all([
+    ListVolumes(false).then(vs => { setItems(vs); setError('') }),
+    ListVolumes(true).then(vs => setTrash(vs)),
+  ]).catch(e => {
+    setError(errText(e))
+    throw e
+  })
+  const reload = () => refresh().catch(() => undefined)
   useEffect(() => {
     if (!active) return
-    refresh()
+    reload()
     Config().then(setConfig).catch(e => setConfigError(errText(e)))
-    const timer = setInterval(refresh, 10000)
+    const timer = setInterval(reload, 10000)
     return () => clearInterval(timer)
   }, [active])
 
@@ -55,13 +61,13 @@ export function Volumes() {
         </>}
       </>,
       action: t('volumes.moveToTrash'), danger: true,
-      run: () => TrashVolume(v.name).then(refresh).catch(e => setError(errText(e))),
+      run: () => TrashVolume(v.name).then(reload).catch(e => setError(errText(e))),
     }))
   const purgeVolume = (v: vol.Volume) => confirm.ask({
     title: t('volumes.purgeTitle', {name: v.name}),
     message: t('volumes.purgeMessage'),
     action: t('volumes.purgeNow'), danger: true,
-    run: () => PurgeVolume(v.name).then(refresh).catch(e => setError(errText(e))),
+    run: () => PurgeVolume(v.name).then(reload).catch(e => setError(errText(e))),
   })
 
   return (
@@ -70,15 +76,18 @@ export function Volumes() {
                   meta={<span className="muted" style={{fontSize: 12.5}}>
                     {t('volumes.summary', {count: items.length, size: totalGiB})}
                   </span>}
-                  actions={<button className="btn btn-primary" onClick={() => setCreating(true)}>
-                    <Icon name="plus" size={14}/>{t('volumes.new')}
-                  </button>}/>
+                  actions={<>
+                    <RefreshButton onRefresh={refresh}/>
+                    <button className="btn btn-primary" onClick={() => setCreating(true)}>
+                      <Icon name="plus" size={14}/>{t('volumes.new')}
+                    </button>
+                  </>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {configError && <div className="banner banner-error" role="alert">{configError}</div>}
       {creating && config && <CreateVolumeDialog config={config} onClose={() => setCreating(false)}
-                                                 onCreated={refresh}/>}
-      {growing && <ResizeVolumeDialog volume={growing} onClose={() => setGrowing(null)} onDone={refresh}/>}
-      {expiring && <ExpiryDialog volume={expiring} onClose={() => setExpiring(null)} onDone={refresh}/>}
+                                                 onCreated={reload}/>}
+      {growing && <ResizeVolumeDialog volume={growing} onClose={() => setGrowing(null)} onDone={reload}/>}
+      {expiring && <ExpiryDialog volume={expiring} onClose={() => setExpiring(null)} onDone={reload}/>}
       {confirm.dialog}
 
       <Card>
@@ -142,7 +151,7 @@ export function Volumes() {
                 <td>
                   <div className="actions">
                     <button className="btn btn-sm" onClick={() =>
-                      RestoreVolume(v.name).then(refresh).catch(e => setError(errText(e)))}>{t('volumes.restore')}</button>
+                      RestoreVolume(v.name).then(reload).catch(e => setError(errText(e)))}>{t('volumes.restore')}</button>
                     <button className="btn btn-sm" onClick={() => setExpiring(v)}>{t('volumes.setExpiry')}</button>
                     <button className="btn btn-sm btn-danger" onClick={() => purgeVolume(v)}>{t('volumes.purgeNow')}</button>
                   </div>
@@ -179,7 +188,7 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
   const types = Object.entries(config.storageTypes || {})
   return (
     <Dialog title={t('volumes.new')} subtitle={t('volumes.createSubtitle')} width={440}
-            onClose={onClose} footer={<>
+            onClose={onClose} busy={busy} footer={<>
               <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
               <button type="submit" form="create-volume" className="btn btn-primary" disabled={busy}>
                 {busy ? t('volumes.creating') : t('volumes.createVolume')}
@@ -236,7 +245,7 @@ function ResizeVolumeDialog({volume, onClose, onDone}: {
   return (
     <Dialog title={t('volumes.growTitle', {name: volume.name})}
             subtitle={t('volumes.growSubtitle', {size: current})}
-            width={400} onClose={onClose} footer={<>
+            width={400} onClose={onClose} busy={busy} footer={<>
               <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
               <button type="submit" form="resize-volume" className="btn btn-primary"
                       disabled={busy || !(size > current)}>
@@ -281,7 +290,7 @@ function ExpiryDialog({volume, onClose, onDone}: {
   }
   return (
     <Dialog title={t('volumes.expiryTitle', {name: volume.name})} subtitle={t('volumes.expirySubtitle')}
-            width={400} onClose={onClose} footer={<>
+            width={400} onClose={onClose} busy={busy} footer={<>
               <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
               <button type="submit" form="expiry-volume" className="btn btn-primary" disabled={busy || !day}>
                 {busy ? t('volumes.saving') : t('common.save')}

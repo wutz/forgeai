@@ -164,6 +164,40 @@ func TestAssess(t *testing.T) {
 	}
 }
 
+// TestAssessReason checks the reason codes the GUI explains in its own words,
+// and the namespace a mismatched component should run in.
+func TestAssessReason(t *testing.T) {
+	bundled := Dependency{Name: "kueue", Pinned: "v0.20.2", Installable: true}
+	operator := Dependency{Name: "forgeai", Installable: true, Pinned: forgeaiChartVersion}
+	sandbox := Dependency{Name: "agent-sandbox", Pinned: "v1.0.7", Installable: true}
+	tests := []struct {
+		name   string
+		dep    Dependency
+		h      depHealth
+		reason string
+		expect string
+	}{
+		{"installed outside forgeai", bundled, depHealth{crdsWanted: 2, crdsFound: 2}, "unmanaged", ""},
+		{"operator deployed outside Helm", operator, depHealth{crdsWanted: 2, crdsFound: 2,
+			deployments: []appsv1.Deployment{testDeployment("", true)}}, "unmanagedHelm", ""},
+		{"runs elsewhere than the config expects", sandbox, depHealth{crdsWanted: 1, crdsFound: 1,
+			deployments: []appsv1.Deployment{testDeployment("v1.0.7", true)},
+			namespace:   "other", expectNamespace: "agent-sandbox-system"}, "namespaceMismatch", "agent-sandbox-system"},
+		{"pinned and available", bundled, depHealth{crdsWanted: 2, crdsFound: 2,
+			deployments: []appsv1.Deployment{testDeployment("v0.20.2", true)}}, "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dep := tt.dep
+			assess(&dep, tt.h)
+			if dep.Reason != tt.reason || dep.ExpectedNamespace != tt.expect {
+				t.Errorf("assess = reason %q expected namespace %q, want %q %q",
+					dep.Reason, dep.ExpectedNamespace, tt.reason, tt.expect)
+			}
+		})
+	}
+}
+
 func TestRecordRoundTrip(t *testing.T) {
 	s := runtime.NewScheme()
 	if err := clientgoscheme.AddToScheme(s); err != nil {

@@ -182,6 +182,7 @@ function ProjectDialog({form, onClose, onSaved}: {
     a.href = URL.createObjectURL(blob)
     a.download = `${p.name}-${kube.split(':')[0]}.yaml`
     a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 0)
   }
 
   return (
@@ -244,7 +245,7 @@ function ProjectDialog({form, onClose, onSaved}: {
             <span className="hint">{t('admin.zeroNoLimit')}</span>
           </div>
           <div className="field">
-            <label htmlFor="p-pods">Pods</label>
+            <label htmlFor="p-pods">{t('admin.pods')}</label>
             <input id="p-pods" className="input" type="number" min={0}
                    value={p.quota?.pods || 0}
                    onChange={e => set('quota', app.ProjectQuota.createFrom({...p.quota, pods: +e.target.value}))}/>
@@ -304,7 +305,7 @@ function ProjectDialog({form, onClose, onSaved}: {
                 <option value="view">{t('admin.roleView')}</option>
               </select>
               {!create && <button type="button" className="btn btn-sm"
-                                  onClick={() => exportKube(m.name)} disabled={!m.name}>Kubeconfig</button>}
+                                  onClick={() => exportKube(m.name)} disabled={!m.name}>{t('admin.kubeconfig')}</button>}
               <button type="button" className="btn btn-sm btn-danger" aria-label={t('admin.removeMember')}
                       title={t('admin.removeMember')}
                       onClick={() => set('members', (p.members || []).filter((_, j) => j !== i))}>

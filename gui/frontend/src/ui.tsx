@@ -182,14 +182,18 @@ export function Segmented<T extends string>({options, value, onChange, counts}: 
   )
 }
 
-// Tabs is the underline tab row used in detail panes.
-export function Tabs<T extends string>({tabs, value, onChange}: {
-  tabs: {value: T, label: string, icon?: IconName}[], value: T, onChange: (v: T) => void
+// Tabs is the underline tab row used in detail panes. Each tab gets the id
+// `<idPrefix>-tab-<value>`, and the row points at the panel `<idPrefix>-panel`
+// that tabPanelProps renders around the selected content.
+export function Tabs<T extends string>({idPrefix, tabs, value, onChange}: {
+  idPrefix: string, tabs: {value: T, label: string, icon?: IconName}[], value: T, onChange: (v: T) => void
 }) {
   return (
     <div className="tabs" role="tablist" onKeyDown={e => tabKeyDown(e, tabs.map(tab => tab.value), onChange)}>
       {tabs.map(tab => (
-        <button key={tab.value} role="tab" aria-selected={value === tab.value} tabIndex={value === tab.value ? 0 : -1}
+        <button key={tab.value} id={`${idPrefix}-tab-${tab.value}`} role="tab"
+                aria-selected={value === tab.value} aria-controls={`${idPrefix}-panel`}
+                tabIndex={value === tab.value ? 0 : -1}
                 className={`tab ${value === tab.value ? 'active' : ''}`}
                 onClick={() => onChange(tab.value)}>
           {tab.icon && <Icon name={tab.icon} size={14}/>}{tab.label}
@@ -197,6 +201,12 @@ export function Tabs<T extends string>({tabs, value, onChange}: {
       ))}
     </div>
   )
+}
+
+// tabPanelProps are the attributes of the element that holds the selected
+// tab's content; it is labelled by that tab.
+export function tabPanelProps(idPrefix: string, value: string) {
+  return {id: `${idPrefix}-panel`, role: 'tabpanel', 'aria-labelledby': `${idPrefix}-tab-${value}`, tabIndex: 0}
 }
 
 // Badge is a small pill: neutral by default, toned for status.

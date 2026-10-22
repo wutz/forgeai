@@ -7,7 +7,7 @@ import {SandboxCreateDialog} from './SandboxCreateDialog'
 import {SandboxTemplateDialog} from './SandboxTemplates'
 import {SandboxTerminal} from './SandboxTerminal'
 import {Status, envToLines, fmtDate, errText} from './util'
-import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Spinner, Tabs, useActive, useConfirm} from './ui'
+import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Spinner, Tabs, tabPanelProps, useActive, useConfirm} from './ui'
 import {t} from './i18n'
 
 // HEARTBEAT is how often an open sandbox detail resets the sandbox's idle
@@ -240,7 +240,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
       </div>
 
       <div className="section">
-        <Tabs tabs={[
+        <Tabs idPrefix="sandbox" tabs={[
           {value: 'overview', label: t('sandboxes.tabOverview'), icon: 'grid'},
           {value: 'terminal', label: t('sandboxes.tabTerminal'), icon: 'terminal'},
           {value: 'log', label: t('sandboxes.tabLog'), icon: 'scroll'},
@@ -251,39 +251,41 @@ function SandboxDetail({name, onDone, onDeleted}: {
           if (v === 'log') showLog().catch(() => {})
         }}/>
 
-        {tab === 'overview' && (
-          <dl className="kv">
-            <dt>{t('common.image')}</dt><dd className="mono">{box.image}</dd>
-            <dt>{t('sandboxes.isolation')}</dt><dd className="mono">{box.runtimeClass || t('sandboxes.runcNode')}</dd>
-            <dt>{t('sandboxes.instance')}</dt><dd className="mono">{box.instanceType || '—'}</dd>
-            <dt>{t('sandboxes.cpuMemory')}</dt><dd className="mono">{box.cpu || '—'} / {box.memory || '—'}
-              {box.gpu ? ` · ${box.gpu} GPU` : ''}</dd>
-            <dt>{t('sandboxes.volumes')}</dt><dd className="mono">{box.volumes?.join(', ') || '—'}</dd>
-            {box.serviceFQDN && <><dt>{t('sandboxes.service')}</dt><dd className="mono">{box.serviceFQDN}</dd></>}
-            {box.podIPs && box.podIPs.length > 0 && <><dt>{t('sandboxes.podIps')}</dt><dd className="mono">{box.podIPs.join(', ')}</dd></>}
-            {box.nodeName && <><dt>{t('sandboxes.node')}</dt><dd className="mono">{box.nodeName}</dd></>}
-            <dt>{t('sandboxes.pod')}</dt><dd className="mono">{box.podName || '—'}{box.podPhase ? ` · ${box.podPhase}` : ''}</dd>
-            {box.stopped && <><dt>{t('sandboxes.stoppedLabel')}</dt><dd>{t('sandboxes.suspendedNote')}</dd></>}
-            {box.idleSince && <><dt>{t('sandboxes.idleSince')}</dt><dd>{fmtDate(box.idleSince)}</dd></>}
-            {box.shutdownTime && <><dt>{t('sandboxes.autoStop')}</dt><dd>{fmtDate(box.shutdownTime)}</dd></>}
-            {box.message && <><dt>{t('common.status')}</dt><dd>{box.message}</dd></>}
-            <dt>{t('common.created')}</dt><dd>{fmtDate(box.created)}</dd>
-          </dl>
-        )}
-        {tab === 'terminal' && (box.podPhase === 'Running'
-          ? <SandboxTerminal name={box.name}/>
-          : <p className="muted">{t('sandboxes.startToOpenTerminal')}</p>)}
-        {tab === 'log' && (
-          <>
-            <div className="log-bar">
-              <span className="spacer"/>
-              <RefreshButton label="Reload" onRefresh={showLog}/>
-            </div>
-            <pre className="logs">{log || t('sandboxes.noOutput')}</pre>
-          </>
-        )}
-        {tab === 'env' && <pre className="code">{box.command ? `$ ${box.command}\n\n` : ''}
-          {envToLines(box.env) || '—'}</pre>}
+        <div {...tabPanelProps('sandbox', tab)}>
+          {tab === 'overview' && (
+            <dl className="kv">
+              <dt>{t('common.image')}</dt><dd className="mono">{box.image}</dd>
+              <dt>{t('sandboxes.isolation')}</dt><dd className="mono">{box.runtimeClass || t('sandboxes.runcNode')}</dd>
+              <dt>{t('sandboxes.instance')}</dt><dd className="mono">{box.instanceType || '—'}</dd>
+              <dt>{t('sandboxes.cpuMemory')}</dt><dd className="mono">{box.cpu || '—'} / {box.memory || '—'}
+                {box.gpu ? ` · ${box.gpu} GPU` : ''}</dd>
+              <dt>{t('sandboxes.volumes')}</dt><dd className="mono">{box.volumes?.join(', ') || '—'}</dd>
+              {box.serviceFQDN && <><dt>{t('sandboxes.service')}</dt><dd className="mono">{box.serviceFQDN}</dd></>}
+              {box.podIPs && box.podIPs.length > 0 && <><dt>{t('sandboxes.podIps')}</dt><dd className="mono">{box.podIPs.join(', ')}</dd></>}
+              {box.nodeName && <><dt>{t('sandboxes.node')}</dt><dd className="mono">{box.nodeName}</dd></>}
+              <dt>{t('sandboxes.pod')}</dt><dd className="mono">{box.podName || '—'}{box.podPhase ? ` · ${box.podPhase}` : ''}</dd>
+              {box.stopped && <><dt>{t('sandboxes.stoppedLabel')}</dt><dd>{t('sandboxes.suspendedNote')}</dd></>}
+              {box.idleSince && <><dt>{t('sandboxes.idleSince')}</dt><dd>{fmtDate(box.idleSince)}</dd></>}
+              {box.shutdownTime && <><dt>{t('sandboxes.autoStop')}</dt><dd>{fmtDate(box.shutdownTime)}</dd></>}
+              {box.message && <><dt>{t('common.status')}</dt><dd>{box.message}</dd></>}
+              <dt>{t('common.created')}</dt><dd>{fmtDate(box.created)}</dd>
+            </dl>
+          )}
+          {tab === 'terminal' && (box.podPhase === 'Running'
+            ? <SandboxTerminal name={box.name}/>
+            : <p className="muted">{t('sandboxes.startToOpenTerminal')}</p>)}
+          {tab === 'log' && (
+            <>
+              <div className="log-bar">
+                <span className="spacer"/>
+                <RefreshButton label="Reload" onRefresh={showLog}/>
+              </div>
+              <pre className="logs">{log || t('sandboxes.noOutput')}</pre>
+            </>
+          )}
+          {tab === 'env' && <pre className="code">{box.command ? `$ ${box.command}\n\n` : ''}
+            {envToLines(box.env) || '—'}</pre>}
+        </div>
       </div>
     </Card>
   )

@@ -108,6 +108,7 @@ export function JobCreateDialog({onClose, onCreated}: {
                    onChange={e => set('name', e.target.value)} maxLength={NAME_MAX}
                    aria-invalid={!nameOK} placeholder={t('jobCreate.namePlaceholder')} required/>
             <span className="hint">{t('jobCreate.nameHint')}</span>
+            {!nameOK && (f.name ?? '') !== '' && <span className="hint hint-error">{t('jobCreate.nameInvalid')}</span>}
           </div>
           <div className="row">
             <div className="field">

@@ -439,6 +439,7 @@ export namespace app {
 	    ingress: platform.Ingress;
 	    registry: RegistryInfo;
 	    storageTypes: Record<string, StorageTypeInfo>;
+	    defaultStorageType: string;
 	    fileServer: FileServerInfo;
 	    trash: v1.Duration;
 	    training: TrainingInfo;
@@ -454,6 +455,7 @@ export namespace app {
 	        this.ingress = this.convertValues(source["ingress"], platform.Ingress);
 	        this.registry = this.convertValues(source["registry"], RegistryInfo);
 	        this.storageTypes = this.convertValues(source["storageTypes"], StorageTypeInfo, true);
+	        this.defaultStorageType = source["defaultStorageType"];
 	        this.fileServer = this.convertValues(source["fileServer"], FileServerInfo);
 	        this.trash = this.convertValues(source["trash"], v1.Duration);
 	        this.training = this.convertValues(source["training"], TrainingInfo);

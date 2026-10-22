@@ -6,6 +6,7 @@ const knownErrors: [RegExp, MessageKey][] = [
   [/not connected: select a kubeconfig context/, 'error.notConnected'],
   [/is forbidden: /, 'error.forbidden'],
   [/has been modified; please apply your changes/, 'error.conflict'],
+  [/volume "[^"]*" already exists \(check the trash\)/, 'volumes.errInTrash'],
   [/"[^"]*" already exists/, 'error.alreadyExists'],
   [/context deadline exceeded|Client\.Timeout exceeded/, 'error.timeout'],
   [/was not created by forgeai and cannot be (edited|deleted) here/, 'error.notCreatedByForgeai'],

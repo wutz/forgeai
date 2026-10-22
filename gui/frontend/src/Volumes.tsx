@@ -6,7 +6,7 @@ import {
 import {app, volumes as vol} from '../wailsjs/go/models'
 import {fmtDate, errText, generateName, phaseLabel} from './util'
 import {t} from './i18n'
-import {Badge, Card, CancelButton, Dialog, Empty, Icon, Meter, PageHeader, RefreshButton, useActive, useConfirm} from './ui'
+import {Badge, Card, CancelButton, Dialog, Empty, Icon, PageHeader, RefreshButton, useActive, useConfirm} from './ui'
 
 // Volumes manages shared filesystems: create, grow, trash (recycle bin),
 // restore and purge. Deleting is delayed — the operator purges expired
@@ -170,7 +170,11 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
   config: app.PlatformConfig, onClose: () => void, onCreated: () => void
 }) {
   const [name, setName] = useState(() => generateName('volume'))
-  const [type, setType] = useState(Object.keys(config.storageTypes || {})[0] || 'shared')
+  const types = Object.entries(config.storageTypes || {})
+  // The platform's default type is preselected; the first offered type is the
+  // fallback for a config that names none.
+  const [type, setType] = useState(() => config.defaultStorageType && config.storageTypes?.[config.defaultStorageType]
+    ? config.defaultStorageType : types[0]?.[0] || '')
   const [size, setSize] = useState(100)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -178,10 +182,11 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
   // instead of a native browser bubble or a failed create.
   const nameOK = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(name) && name.length <= 50
   const sizeOK = Number.isInteger(size) && size >= 1
+  const typeOK = type !== ''
 
   const save = (e: FormEvent) => {
     e.preventDefault()
-    if (!nameOK || !sizeOK) return
+    if (!nameOK || !sizeOK || !typeOK) return
     setBusy(true)
     CreateVolume(name, type, size).then(() => {
       onCreated()
@@ -190,30 +195,34 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
       setError(errText(e)); setBusy(false)
     })
   }
-  const types = Object.entries(config.storageTypes || {})
   return (
     <Dialog title={t('volumes.new')} subtitle={t('volumes.createSubtitle')} width={440}
             onClose={onClose} busy={busy} footer={<>
               <CancelButton/>
-              <button type="submit" form="create-volume" className="btn btn-primary" disabled={busy || !nameOK || !sizeOK}>
+              <button type="submit" form="create-volume" className="btn btn-primary"
+                      disabled={busy || !nameOK || !sizeOK || !typeOK}>
                 {busy ? t('volumes.creating') : t('volumes.createVolume')}
               </button>
             </>}>
       <form id="create-volume" className="dialog-form" onSubmit={save}>
-        {error && <div className="banner banner-error">{error}</div>}
+        {error && <div className="banner banner-error" role="alert">{error}</div>}
+        {!typeOK && <div className="banner banner-warn">{t('volumes.noTypes')}</div>}
         <div className="field">
           <label htmlFor="v-name">{t('common.name')}</label>
           <input id="v-name" className="input mono" value={name}
                  autoCapitalize="none" autoCorrect="off" spellCheck={false}
                  maxLength={50} aria-invalid={!nameOK}
                  onChange={e => setName(e.target.value)} required/>
-          {!nameOK && name !== '' && <span className="hint hint-error">{t('volumes.nameHint')}</span>}
+          {!nameOK && name !== ''
+            ? <span className="hint hint-error">{t('volumes.nameHint')}</span>
+            : <span className="hint">{t('volumes.nameHelp')}</span>}
         </div>
         <div className="field">
           <label htmlFor="v-type">{t('volumes.type')}</label>
-          <select id="v-type" className="select" value={type} onChange={e => setType(e.target.value)}>
+          <select id="v-type" className="select" value={type} disabled={!typeOK}
+                  onChange={e => setType(e.target.value)}>
             {types.map(([kind, info]) => <option key={kind} value={kind}>
-              {kind}{info.description ? ` — ${info.description}` : ''}
+              {info.description || kind}
             </option>)}
           </select>
         </div>
@@ -221,10 +230,10 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
           <label htmlFor="v-size">{t('volumes.sizeGiB')}</label>
           <input id="v-size" className="input" type="number" min={1} step={1} value={size}
                  aria-invalid={!sizeOK} onChange={e => setSize(+e.target.value)} required/>
-          {!sizeOK && <span className="hint hint-error">{t('volumes.sizeInvalid')}</span>}
+          {!sizeOK
+            ? <span className="hint hint-error">{t('volumes.sizeInvalid')}</span>
+            : <span className="hint">{t('volumes.sizeHelp')}</span>}
         </div>
-        <Meter value={size} max={Math.max(size, 100)} tone="muted"
-               label={<span>{t('volumes.requestedStorage')}</span>} right={<span>{size} GiB</span>}/>
       </form>
     </Dialog>
   )

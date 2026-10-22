@@ -275,9 +275,11 @@ type PlatformConfig struct {
 	Ingress         platform.Ingress           `json:"ingress"`
 	Registry        RegistryInfo               `json:"registry"`
 	StorageTypes    map[string]StorageTypeInfo `json:"storageTypes"`
-	FileServer      FileServerInfo             `json:"fileServer"`
-	Trash           metav1.Duration            `json:"trash"`
-	Training        TrainingInfo               `json:"training"`
+	// DefaultStorageType is the type a volume gets when none is named.
+	DefaultStorageType string          `json:"defaultStorageType"`
+	FileServer         FileServerInfo  `json:"fileServer"`
+	Trash              metav1.Duration `json:"trash"`
+	Training           TrainingInfo    `json:"training"`
 }
 
 // RegistryInfo is the Harbor registry of the platform.
@@ -319,13 +321,14 @@ func (a *App) Config() (PlatformConfig, error) {
 		return PlatformConfig{}, err
 	}
 	out := PlatformConfig{
-		APIServer:       cfg.APIServer,
-		NamespacePrefix: cfg.NamespacePrefix,
-		Ingress:         cfg.Ingress,
-		Registry:        RegistryInfo{Enabled: cfg.Registry.Enabled(), URL: cfg.Registry.Domain},
-		StorageTypes:    map[string]StorageTypeInfo{},
-		FileServer:      FileServerInfo{IdleTimeout: cfg.FileServer.IdleTimeout},
-		Trash:           cfg.TrashRetention,
+		APIServer:          cfg.APIServer,
+		NamespacePrefix:    cfg.NamespacePrefix,
+		Ingress:            cfg.Ingress,
+		Registry:           RegistryInfo{Enabled: cfg.Registry.Enabled(), URL: cfg.Registry.Domain},
+		StorageTypes:       map[string]StorageTypeInfo{},
+		DefaultStorageType: cfg.DefaultStorageType,
+		FileServer:         FileServerInfo{IdleTimeout: cfg.FileServer.IdleTimeout},
+		Trash:              cfg.TrashRetention,
 		Training: TrainingInfo{
 			DefaultRuntime: cfg.Training.DefaultRuntime,
 			ShmSize:        cfg.Training.ShmSize.String(),

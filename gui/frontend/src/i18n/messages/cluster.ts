@@ -152,6 +152,7 @@ export const en = {
   'deps.action.reinstall': 'Reinstall',
   'deps.confirmTitle': '{action} {name}?',
   'deps.confirmMessage': 'Applies {version} to the connected cluster with server-side apply: objects with the same names are overwritten, and nothing is removed.',
+  'deps.chartConfirmMessage': 'Installs the forgeai Helm chart {version} from ghcr.io into the platform namespace and waits for the operator. An existing release is upgraded; uninstalling the release keeps the CRDs.',
   'deps.restartNote': 'The forgeai operator restarts afterwards to start the Sandbox controller.',
   'deps.trainer.title': 'Kubeflow Trainer v2',
   'deps.trainer.desc': 'TrainJobs and the ClusterTrainingRuntimes, with JobSet',
@@ -160,7 +161,7 @@ export const en = {
   'deps.agent-sandbox.title': 'agent-sandbox',
   'deps.agent-sandbox.desc': 'Sandbox controller and CRDs for the Sandboxes view',
   'deps.forgeai.title': 'forgeai operator',
-  'deps.forgeai.desc': 'Projects, instance types and the controllers; installed with make deploy-dev',
+  'deps.forgeai.desc': 'Projects, instance types and the controllers; installed from the Helm chart',
 }
 
 export const zh: Record<keyof typeof en, string> = {
@@ -314,6 +315,7 @@ export const zh: Record<keyof typeof en, string> = {
   'deps.action.reinstall': '重新安装',
   'deps.confirmTitle': '{action} {name}？',
   'deps.confirmMessage': '使用 server-side apply 将 {version} 应用到当前集群：同名对象会被覆盖，不会删除任何对象。',
+  'deps.chartConfirmMessage': '从 ghcr.io 拉取 forgeai Helm chart {version}，安装到平台命名空间并等待 operator 就绪。已有的 release 会被升级；卸载 release 时保留 CRD。',
   'deps.restartNote': '完成后 forgeai operator 会重启，以启动 Sandbox 控制器。',
   'deps.trainer.title': 'Kubeflow Trainer v2',
   'deps.trainer.desc': 'TrainJob 与 ClusterTrainingRuntime，含 JobSet',
@@ -322,5 +324,5 @@ export const zh: Record<keyof typeof en, string> = {
   'deps.agent-sandbox.title': 'agent-sandbox',
   'deps.agent-sandbox.desc': '沙箱视图所需的 Sandbox 控制器与 CRD',
   'deps.forgeai.title': 'forgeai operator',
-  'deps.forgeai.desc': '项目、实例类型与各控制器；通过 make deploy-dev 安装',
+  'deps.forgeai.desc': '项目、实例类型与各控制器；通过 Helm chart 安装',
 }

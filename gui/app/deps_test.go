@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/wutz/forgeai/pkg/platform"
@@ -119,7 +120,7 @@ func testDeployment(version string, available bool) appsv1.Deployment {
 
 func TestAssess(t *testing.T) {
 	bundled := Dependency{Name: "kueue", Pinned: "v0.20.2", Installable: true}
-	operator := Dependency{Name: "forgeai"}
+	operator := Dependency{Name: "forgeai", Installable: true, Pinned: forgeaiChartVersion}
 	sandbox := Dependency{Name: "agent-sandbox", Pinned: "v1.0.7", Installable: true}
 	tests := []struct {
 		name      string
@@ -138,8 +139,12 @@ func TestAssess(t *testing.T) {
 			deployments: []appsv1.Deployment{testDeployment("v0.18.1", true)}}, "outdated", "v0.18.1"},
 		{"not available", bundled, depHealth{crdsWanted: 2, crdsFound: 2,
 			deployments: []appsv1.Deployment{testDeployment("v0.20.2", false)}}, "degraded", "v0.20.2"},
-		{"operator running", operator, depHealth{crdsWanted: 2, crdsFound: 2,
-			deployments: []appsv1.Deployment{testDeployment("", true)}}, "ready", ""},
+		{"operator from the chart", operator, depHealth{crdsWanted: 2, crdsFound: 2,
+			deployments: []appsv1.Deployment{testDeployment(forgeaiChartVersion, true)}}, "ready", forgeaiChartVersion},
+		{"older operator chart", operator, depHealth{crdsWanted: 2, crdsFound: 2,
+			deployments: []appsv1.Deployment{testDeployment("0.0.9", true)}}, "outdated", "0.0.9"},
+		{"operator deployed outside Helm", operator, depHealth{crdsWanted: 2, crdsFound: 2,
+			deployments: []appsv1.Deployment{testDeployment("", true)}}, "unmanaged", ""},
 		{"runs where the config expects", sandbox, depHealth{crdsWanted: 1, crdsFound: 1,
 			deployments: []appsv1.Deployment{testDeployment("v1.0.7", true)},
 			namespace:   "agent-sandbox-system", expectNamespace: "agent-sandbox-system"}, "ready", "v1.0.7"},
@@ -224,6 +229,36 @@ func TestCheckInstallTarget(t *testing.T) {
 	}
 	if err := checkInstallTarget(sandbox, moved); err == nil {
 		t.Error("install accepted while sandbox.namespace names another namespace")
+	}
+}
+
+func TestCheckChartTarget(t *testing.T) {
+	s := runtime.NewScheme()
+	if err := clientgoscheme.AddToScheme(s); err != nil {
+		t.Fatal(err)
+	}
+	operator := func(labels map[string]string) client.Client {
+		d := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{
+			Namespace: "forgeai-system", Name: forgeaiDeployment, Labels: labels,
+		}}
+		return fake.NewClientBuilder().WithScheme(s).WithObjects(d).Build()
+	}
+	tests := []struct {
+		name    string
+		k8s     client.Client
+		wantErr bool
+	}{
+		{"nothing installed", fake.NewClientBuilder().WithScheme(s).Build(), false},
+		{"installed from the chart", operator(map[string]string{depLabel: "forgeai"}), false},
+		{"deployed outside Helm", operator(map[string]string{"app": "forgeai"}), true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := checkChartTarget(context.Background(), tt.k8s)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("checkChartTarget = %v, want error %v", err, tt.wantErr)
+			}
+		})
 	}
 }
 

@@ -13,8 +13,8 @@ type Progress = {name: string, message: string, done: boolean, error?: string}
 
 // Dependencies installs and checks the cluster components forgeai runs on:
 // Kubeflow Trainer v2 with JobSet, Kueue and agent-sandbox at the versions
-// pinned in the GUI, and the forgeai operator, which is only reported on.
-// Shown to cluster administrators only.
+// pinned in the GUI, and the forgeai operator at the Helm chart version pinned
+// in the GUI. Shown to cluster administrators only.
 export function Dependencies() {
   const [data, setData] = useState<app.Dependencies | null>(null)
   const [error, setError] = useState('')
@@ -46,7 +46,7 @@ export function Dependencies() {
   const install = (d: app.Dependency) => confirm.ask({
     title: t('deps.confirmTitle', {action: verb(d), name: text(d, 'title')}),
     message: <>
-      {t('deps.confirmMessage', {version: d.pinned})}
+      {t(d.name === 'forgeai' ? 'deps.chartConfirmMessage' : 'deps.confirmMessage', {version: d.pinned})}
       {d.name === 'agent-sandbox' && ` ${t('deps.restartNote')}`}
     </>,
     action: verb(d),

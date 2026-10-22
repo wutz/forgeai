@@ -32,6 +32,9 @@ export namespace app {
 	    description: string;
 	    pinned: string;
 	    installed: string;
+	    namespace: string;
+	    appliedBy: string;
+	    appliedAt: string;
 	    status: string;
 	    message: string;
 	    installable: boolean;
@@ -47,6 +50,9 @@ export namespace app {
 	        this.description = source["description"];
 	        this.pinned = source["pinned"];
 	        this.installed = source["installed"];
+	        this.namespace = source["namespace"];
+	        this.appliedBy = source["appliedBy"];
+	        this.appliedAt = source["appliedAt"];
 	        this.status = source["status"];
 	        this.message = source["message"];
 	        this.installable = source["installable"];

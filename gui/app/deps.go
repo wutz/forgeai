@@ -15,12 +15,15 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	authnv1 "k8s.io/api/authentication/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -43,6 +46,10 @@ const (
 	fieldOwner = "forgeai-gui"
 	// depProgressEvent carries DependencyProgress to the frontend.
 	depProgressEvent = "deps:progress"
+	// depRecordName is the ConfigMap in the platform namespace that records how
+	// each component was installed: one JSON entry per component. It lives in
+	// the cluster so every client sees the same record.
+	depRecordName = "forgeai-dependencies"
 
 	depInstallTimeout      = 30 * time.Minute
 	crdEstablishedTimeout  = 2 * time.Minute
@@ -89,10 +96,26 @@ type Dependency struct {
 	Pinned string `json:"pinned"`
 	// Installed is the version the cluster runs, empty when the GUI did not install it.
 	Installed string `json:"installed"`
-	// Status is missing, degraded, unmanaged, outdated, installing or ready.
+	// Namespace is where the cluster runs the component, empty when unknown.
+	Namespace string `json:"namespace"`
+	// AppliedBy and AppliedAt come from the install record: who installed the
+	// component and when. Empty for components installed outside forgeai.
+	AppliedBy string `json:"appliedBy"`
+	AppliedAt string `json:"appliedAt"`
+	// Status is missing, degraded, mismatch, unmanaged, outdated, installing or ready.
+	// mismatch means the component runs where the platform config does not expect it.
 	Status      string `json:"status"`
 	Message     string `json:"message"`
 	Installable bool   `json:"installable"`
+}
+
+// depRecord is the provenance of one install, stored in depRecordName.
+type depRecord struct {
+	Version        string `json:"version"`
+	Namespace      string `json:"namespace"`
+	ManifestSHA256 string `json:"manifestSHA256"`
+	AppliedBy      string `json:"appliedBy,omitempty"`
+	AppliedAt      string `json:"appliedAt"`
 }
 
 // Dependencies is the Dependencies view: the components and whether the user
@@ -202,6 +225,9 @@ func bundleByName(name string) (*depBundle, error) {
 type depHealth struct {
 	crdsWanted, crdsFound int
 	deployments           []appsv1.Deployment
+	// namespace is where the component runs; expectNamespace is where the
+	// platform config says it must. The check is skipped when expectNamespace is empty.
+	namespace, expectNamespace string
 }
 
 // assess sets the status of a component from its cluster state.
@@ -232,6 +258,12 @@ func assess(dep *Dependency, h depHealth) {
 	if len(notReady) > 0 {
 		dep.Status = "degraded"
 		dep.Message = fmt.Sprintf("Not available: %v", notReady)
+		return
+	}
+	if h.expectNamespace != "" && h.namespace != "" && h.namespace != h.expectNamespace {
+		dep.Status = "mismatch"
+		dep.Message = fmt.Sprintf("Runs in %s, but the platform config sets sandbox.namespace to %s",
+			h.namespace, h.expectNamespace)
 		return
 	}
 	if dep.Installable && dep.Installed == "" {
@@ -273,14 +305,25 @@ func (a *App) ListDependencies() (*Dependencies, error) {
 	if !out.ClusterAdmin {
 		return out, nil
 	}
+	cfg, err := loadPlatform(ctx, c.k8s)
+	if err != nil {
+		return nil, err
+	}
+	records, err := readRecords(ctx, c.k8s)
+	if err != nil {
+		return nil, err
+	}
 	for _, info := range depCatalog {
 		b, err := bundleByName(info.name)
 		if err != nil {
 			return nil, err
 		}
-		dep, err := probeDependency(ctx, c.k8s, info, b)
+		dep, err := probeDependency(ctx, c.k8s, info, b, expectedNamespace(cfg, info.name))
 		if err != nil {
 			return nil, err
+		}
+		if r, ok := records[info.name]; ok {
+			dep.AppliedBy, dep.AppliedAt = r.AppliedBy, r.AppliedAt
 		}
 		if a.installs.active(info.name) {
 			dep.Status, dep.Message = "installing", "Installing"
@@ -292,7 +335,7 @@ func (a *App) ListDependencies() (*Dependencies, error) {
 
 // probeDependency reads the CRDs and Deployments of a component. Bundled
 // components are found by their labels; forgeai by its operator Deployment.
-func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *depBundle) (Dependency, error) {
+func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *depBundle, expectNamespace string) (Dependency, error) {
 	dep := Dependency{
 		Name: info.name, Title: info.title, Description: info.description, Installable: b != nil,
 	}
@@ -330,8 +373,120 @@ func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *de
 			return dep, err
 		}
 	}
+	h.expectNamespace = expectNamespace
+	if len(h.deployments) > 0 {
+		h.namespace = h.deployments[0].Namespace
+	}
+	dep.Namespace = h.namespace
 	assess(&dep, h)
 	return dep, nil
+}
+
+// loadPlatform reads the platform config. Without the ConfigMap the defaults apply.
+func loadPlatform(ctx context.Context, k8s client.Reader) (*platform.Config, error) {
+	cfg, err := platform.Load(ctx, k8s, platform.Namespace())
+	if apierrors.IsNotFound(err) {
+		return platform.Parse([]byte{})
+	}
+	return cfg, err
+}
+
+// expectedNamespace is where the platform config says a component runs, empty
+// when it says nothing. agent-sandbox's namespace is sandbox.namespace.
+func expectedNamespace(cfg *platform.Config, name string) string {
+	if name == "agent-sandbox" {
+		return cfg.Sandbox.NamespaceOrDefault()
+	}
+	return ""
+}
+
+// bundleNamespace is the namespace a bundle's Deployments run in, empty when it has none.
+func bundleNamespace(b *depBundle) string {
+	for _, o := range b.objects {
+		if o.GetKind() == "Deployment" && o.GroupVersionKind().Group == appsv1.GroupName {
+			return o.GetNamespace()
+		}
+	}
+	return ""
+}
+
+// checkInstallTarget refuses an install that would run a component where the
+// platform config does not expect it. The GUI installs agent-sandbox into its
+// bundled namespace only, so sandbox.namespace must name that namespace.
+func checkInstallTarget(b *depBundle, cfg *platform.Config) error {
+	want, got := expectedNamespace(cfg, b.Name), bundleNamespace(b)
+	if want != "" && got != "" && want != got {
+		return fmt.Errorf("%s installs into %s, but the platform config sets sandbox.namespace to %s",
+			b.Name, got, want)
+	}
+	return nil
+}
+
+// readRecords returns the install records by component. A missing record
+// ConfigMap means nothing was recorded.
+func readRecords(ctx context.Context, k8s client.Reader) (map[string]depRecord, error) {
+	cm := &corev1.ConfigMap{}
+	err := k8s.Get(ctx, client.ObjectKey{Namespace: platform.Namespace(), Name: depRecordName}, cm)
+	if apierrors.IsNotFound(err) {
+		return map[string]depRecord{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]depRecord, len(cm.Data))
+	for name, raw := range cm.Data {
+		var r depRecord
+		if err := json.Unmarshal([]byte(raw), &r); err != nil {
+			return nil, fmt.Errorf("%s: record of %s: %w", depRecordName, name, err)
+		}
+		out[name] = r
+	}
+	return out, nil
+}
+
+// writeRecord stores the record of a component's install, creating the record
+// ConfigMap on first use. Other components' entries are left as they are.
+func writeRecord(ctx context.Context, k8s client.Client, name string, r depRecord) error {
+	raw, err := json.Marshal(r)
+	if err != nil {
+		return err
+	}
+	key := client.ObjectKey{Namespace: platform.Namespace(), Name: depRecordName}
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		cm := &corev1.ConfigMap{}
+		err := k8s.Get(ctx, key, cm)
+		switch {
+		case apierrors.IsNotFound(err):
+			cm = &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{Namespace: key.Namespace, Name: key.Name},
+				Data:       map[string]string{name: string(raw)},
+			}
+			// Another install may create the ConfigMap first; a conflict makes
+			// RetryOnConflict read it again and update it.
+			err = k8s.Create(ctx, cm)
+			if apierrors.IsAlreadyExists(err) {
+				return apierrors.NewConflict(schema.GroupResource{Resource: "configmaps"}, key.Name, err)
+			}
+			return err
+		case err != nil:
+			return err
+		}
+		if cm.Data == nil {
+			cm.Data = map[string]string{}
+		}
+		cm.Data[name] = string(raw)
+		return k8s.Update(ctx, cm)
+	})
+}
+
+// currentUser names the user the connection authenticates as, for the install
+// record. It is empty when the API server does not say.
+func currentUser(ctx context.Context, k8s client.Client) string {
+	r := &authnv1.SelfSubjectReview{}
+	if err := k8s.Create(ctx, r); err != nil {
+		return ""
+	}
+	return r.Status.UserInfo.Username
 }
 
 // InstallDependency installs or upgrades a bundled component on the connected
@@ -354,6 +509,13 @@ func (a *App) InstallDependency(name string) error {
 	if b == nil {
 		return fmt.Errorf("%s is not installed from the GUI", name)
 	}
+	cfg, err := loadPlatform(ctx, c.k8s)
+	if err != nil {
+		return err
+	}
+	if err := checkInstallTarget(b, cfg); err != nil {
+		return err
+	}
 	if !a.installs.start(name) {
 		return fmt.Errorf("%s is already being installed", name)
 	}
@@ -364,6 +526,16 @@ func (a *App) InstallDependency(name string) error {
 			runtime.EventsEmit(a.ctx, depProgressEvent, DependencyProgress{Name: name, Message: msg})
 		}
 		err := installBundle(ctx, c.k8s, b, progress)
+		if err == nil {
+			progress("Recording the install")
+			err = writeRecord(ctx, c.k8s, b.Name, depRecord{
+				Version:        b.Version,
+				Namespace:      bundleNamespace(b),
+				ManifestSHA256: b.SHA256,
+				AppliedBy:      currentUser(ctx, c.k8s),
+				AppliedAt:      time.Now().UTC().Format(time.RFC3339),
+			})
+		}
 		if err == nil && name == "agent-sandbox" {
 			progress("Restarting the forgeai operator to start the Sandbox controller")
 			err = restartOperator(ctx, c.k8s)

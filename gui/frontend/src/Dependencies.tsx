@@ -101,7 +101,15 @@ export function Dependencies() {
                     <span className="cell-main">{text(d, 'title')}</span>
                     <span className="cell-sub">{text(d, 'desc')}</span>
                   </td>
-                  <td className="mono">{d.installed || <span className="muted">—</span>}</td>
+                  <td className="mono">
+                    {d.installed || <span className="muted">—</span>}
+                    {d.namespace && <div className="muted" style={{fontSize: 12, marginTop: 4}}>
+                      {d.namespace}
+                    </div>}
+                    {d.appliedBy && <div className="muted" style={{fontSize: 12, marginTop: 4}}>
+                      {t('deps.appliedBy', {user: d.appliedBy, time: new Date(d.appliedAt).toLocaleString()})}
+                    </div>}
+                  </td>
                   <td className="mono">{d.pinned || <span className="muted">—</span>}</td>
                   <td>
                     <Badge tone={tone(d.status)}>{label(d.status)}</Badge>
@@ -114,7 +122,7 @@ export function Dependencies() {
                   </td>
                   <td>
                     <div className="actions">
-                      {d.installable && d.status !== 'ready' && d.status !== 'installing' && (
+                      {d.installable && d.status !== 'ready' && d.status !== 'installing' && d.status !== 'mismatch' && (
                         <button className="btn btn-sm btn-primary" onClick={() => install(d)}>
                           <Icon name="download" size={13}/>{verb(d)}
                         </button>
@@ -155,6 +163,7 @@ function tone(status: string): 'success' | 'warning' | 'error' | 'accent' | 'neu
   switch (status) {
     case 'ready': return 'success'
     case 'outdated':
+    case 'mismatch':
     case 'unmanaged': return 'warning'
     case 'degraded': return 'error'
     case 'installing': return 'accent'

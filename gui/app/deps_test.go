@@ -2,7 +2,9 @@ package app
 
 import (
 	"bytes"
+	"context"
 	"io/fs"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -12,7 +14,12 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/wutz/forgeai/pkg/platform"
 )
 
 func TestEmbeddedBundlesVerify(t *testing.T) {
@@ -113,6 +120,7 @@ func testDeployment(version string, available bool) appsv1.Deployment {
 func TestAssess(t *testing.T) {
 	bundled := Dependency{Name: "kueue", Pinned: "v0.20.2", Installable: true}
 	operator := Dependency{Name: "forgeai"}
+	sandbox := Dependency{Name: "agent-sandbox", Pinned: "v1.0.7", Installable: true}
 	tests := []struct {
 		name      string
 		dep       Dependency
@@ -132,6 +140,12 @@ func TestAssess(t *testing.T) {
 			deployments: []appsv1.Deployment{testDeployment("v0.20.2", false)}}, "degraded", "v0.20.2"},
 		{"operator running", operator, depHealth{crdsWanted: 2, crdsFound: 2,
 			deployments: []appsv1.Deployment{testDeployment("", true)}}, "ready", ""},
+		{"runs where the config expects", sandbox, depHealth{crdsWanted: 1, crdsFound: 1,
+			deployments: []appsv1.Deployment{testDeployment("v1.0.7", true)},
+			namespace:   "agent-sandbox-system", expectNamespace: "agent-sandbox-system"}, "ready", "v1.0.7"},
+		{"runs elsewhere than the config expects", sandbox, depHealth{crdsWanted: 1, crdsFound: 1,
+			deployments: []appsv1.Deployment{testDeployment("v1.0.7", true)},
+			namespace:   "other", expectNamespace: "agent-sandbox-system"}, "mismatch", "v1.0.7"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -142,6 +156,74 @@ func TestAssess(t *testing.T) {
 					dep.Status, dep.Installed, tt.status, tt.installed, dep.Message)
 			}
 		})
+	}
+}
+
+func TestRecordRoundTrip(t *testing.T) {
+	s := runtime.NewScheme()
+	if err := clientgoscheme.AddToScheme(s); err != nil {
+		t.Fatal(err)
+	}
+	k8s := fake.NewClientBuilder().WithScheme(s).Build()
+	ctx := context.Background()
+
+	if got, err := readRecords(ctx, k8s); err != nil || len(got) != 0 {
+		t.Fatalf("readRecords without the ConfigMap = %v, %v; want empty", got, err)
+	}
+	trainer := depRecord{Version: "v2.3.0", Namespace: "kubeflow-system", ManifestSHA256: "aa",
+		AppliedBy: "alice", AppliedAt: "2026-10-22T00:00:00Z"}
+	kueue := depRecord{Version: "v0.20.2", Namespace: "kueue-system", ManifestSHA256: "bb",
+		AppliedAt: "2026-10-22T01:00:00Z"}
+	if err := writeRecord(ctx, k8s, "trainer", trainer); err != nil {
+		t.Fatalf("create record: %v", err)
+	}
+	if err := writeRecord(ctx, k8s, "kueue", kueue); err != nil {
+		t.Fatalf("add record: %v", err)
+	}
+	// Reinstalling a component replaces its entry and keeps the others.
+	trainer.Version = "v2.4.0"
+	if err := writeRecord(ctx, k8s, "trainer", trainer); err != nil {
+		t.Fatalf("update record: %v", err)
+	}
+	got, err := readRecords(ctx, k8s)
+	if err != nil {
+		t.Fatalf("readRecords: %v", err)
+	}
+	if want := map[string]depRecord{"trainer": trainer, "kueue": kueue}; !reflect.DeepEqual(got, want) {
+		t.Errorf("records = %+v, want %+v", got, want)
+	}
+}
+
+func TestCheckInstallTarget(t *testing.T) {
+	bs, err := bundles()
+	if err != nil {
+		t.Fatalf("bundles: %v", err)
+	}
+	var sandbox *depBundle
+	for _, b := range bs {
+		if b.Name == "agent-sandbox" {
+			sandbox = b
+		}
+	}
+	if sandbox == nil {
+		t.Fatal("no agent-sandbox bundle")
+	}
+	if got := bundleNamespace(sandbox); got != "agent-sandbox-system" {
+		t.Fatalf("bundleNamespace = %q, want agent-sandbox-system", got)
+	}
+	defaults, err := platform.Parse([]byte{})
+	if err != nil {
+		t.Fatalf("parse defaults: %v", err)
+	}
+	if err := checkInstallTarget(sandbox, defaults); err != nil {
+		t.Errorf("default config refused: %v", err)
+	}
+	moved, err := platform.Parse([]byte("sandbox:\n  namespace: sandbox-system\n"))
+	if err != nil {
+		t.Fatalf("parse sandbox.namespace: %v", err)
+	}
+	if err := checkInstallTarget(sandbox, moved); err == nil {
+		t.Error("install accepted while sandbox.namespace names another namespace")
 	}
 }
 

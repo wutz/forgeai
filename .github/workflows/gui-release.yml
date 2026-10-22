@@ -1,31 +1,15 @@
 name: GUI release
 
-# Builds the Wails desktop client for macOS, Windows and Linux. Pushing a
-# v<major>.<minor>.<patch> tag also publishes a GitHub release with the
-# installers attached. Pull requests that touch the GUI and manual runs only
-# upload the installers as workflow artifacts.
+# Builds the Wails desktop client for macOS, Windows and Linux and publishes
+# them as a GitHub release. Only pushing a v<major>.<minor>.<patch> tag runs
+# this workflow; pushes to main and pull requests do not.
 
 on:
   push:
     tags:
       - "v*"
-  pull_request:
-    paths:
-      - ".github/workflows/gui-release.yml"
-      - "hack/gui-package.sh"
-      - "gui/**"
-      - "api/**"
-      - "internal/**"
-      - "pkg/**"
-      - "go.mod"
-      - "go.sum"
-  workflow_dispatch:
 
 permissions: {}
-
-concurrency:
-  group: gui-release-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 defaults:
   run:
@@ -60,18 +44,13 @@ jobs:
       - name: Resolve version
         id: version
         env:
-          REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
         run: |
-          if [[ "$REF_TYPE" == "tag" ]]; then
-            version="${REF_NAME#v}"
-            # Windows and Debian versions must be plain numbers.
-            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "Tag $REF_NAME is not of the form vMAJOR.MINOR.PATCH" >&2
-              exit 1
-            fi
-          else
-            version="0.0.0"
+          version="${REF_NAME#v}"
+          # Windows and Debian versions must be plain numbers.
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag $REF_NAME is not of the form vMAJOR.MINOR.PATCH" >&2
+            exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
@@ -167,7 +146,6 @@ jobs:
   release:
     name: Publish release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

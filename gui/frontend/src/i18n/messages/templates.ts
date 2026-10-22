@@ -84,5 +84,5 @@ export const zh: Record<keyof typeof en, string> = {
   'sandboxTemplates.editSubtitle': '更新 SandboxTemplate；已由此创建的沙箱保持不变',
   'sandboxTemplates.newSubtitle': '保存为项目中的 SandboxTemplate',
   'sandboxTemplates.runcNodeRuntime': 'runc（节点运行时）',
-  'sandboxTemplates.commandHint': '留空则运行镜像的 entrypoint。',
+  'sandboxTemplates.commandHint': '留空则运行镜像的入口程序。',
 }

@@ -9,6 +9,7 @@ const knownErrors: [RegExp, MessageKey][] = [
   [/volume "[^"]*" already exists \(check the trash\)/, 'volumes.errInTrash'],
   [/"[^"]*" already exists/, 'error.alreadyExists'],
   [/context deadline exceeded|Client\.Timeout exceeded/, 'error.timeout'],
+  [/dial tcp|connection refused|no such host|i\/o timeout/, 'error.unreachable'],
   [/was not created by forgeai and cannot be (edited|deleted) here/, 'error.notCreatedByForgeai'],
   [/registry is not configured for this project/, 'error.registryNotConfigured'],
   [/was superseded by a newer connect/, 'error.connectionSuperseded'],

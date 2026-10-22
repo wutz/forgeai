@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {Files} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {errText, phaseLabel} from './util'
-import {t} from './i18n'
+import {getLocale, t} from './i18n'
 import {Card, Empty, PageHeader, Spinner, useActive} from './ui'
 
 // Files shows the project's on-demand file server (dufs). It wakes the server
@@ -45,6 +45,9 @@ export function FilesView() {
   const ready = state?.phase === 'Ready'
   // Only a ready server has an address: an idle one has no pod behind it.
   const frame = ready && state?.address ? state.address : ''
+  // The volumes read as a list in the language of the page: "a and b", "a、b".
+  const volumes = new Intl.ListFormat(getLocale(), {style: 'long', type: 'conjunction'})
+    .format(state?.volumes ?? [])
 
   return (
     <div className="page">
@@ -60,13 +63,17 @@ export function FilesView() {
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       <p className="muted note">
         {state?.volumes?.length
-          ? t(ready ? 'files.serving' : 'files.servingOnWake', {volumes: state.volumes.join(', ')})
+          ? t(ready ? 'files.serving' : 'files.servingOnWake', {volumes})
           : ''}
         {t('files.note')}
       </p>
       {!state ? (
+        // Until the first answer the view says it is opening; a failed first
+        // answer says so instead, while the loop keeps polling in the background.
         <Card>
-          <Empty icon="folder" title={t('files.opening')}/>
+          {error
+            ? <Empty icon="warning" title={t('files.unavailable')}>{t('files.unavailableHint')}</Empty>
+            : <Empty icon="folder" title={t('files.opening')}/>}
         </Card>
       ) : frame ? (
         <div className="files-frame card">

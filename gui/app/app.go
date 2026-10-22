@@ -34,6 +34,9 @@ type App struct {
 
 	mu   sync.RWMutex
 	conn *Connection
+	// connGen counts the Connect and Logout calls. A Connect that finishes
+	// after a newer call started must not install its connection.
+	connGen uint64
 	// terminals are the open sandbox shells, by session id.
 	terminals sync.Map
 	// files is the loopback proxy the file browser is embedded through.

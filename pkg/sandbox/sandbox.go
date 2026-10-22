@@ -131,6 +131,13 @@ func (f *Form) Validate() error {
 	if strings.TrimSpace(f.Image) == "" {
 		return fmt.Errorf("image is required")
 	}
+	seen := map[string]bool{}
+	for _, e := range f.Env {
+		if e.Name == "" || seen[e.Name] {
+			return fmt.Errorf("environment variable names must be unique and non-empty")
+		}
+		seen[e.Name] = true
+	}
 	paths := map[string]bool{}
 	for _, m := range f.Volumes {
 		if m.Volume == "" || !strings.HasPrefix(m.MountPath, "/") || paths[m.MountPath] {

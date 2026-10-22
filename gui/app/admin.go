@@ -152,19 +152,24 @@ func applyProjectQuota(q *v1.ProjectQuota, f ProjectQuota) error {
 	}
 	q.Storage, q.RegistryStorage, q.Volumes, q.Pods = nil, nil, nil, nil
 	for _, field := range []struct {
-		s   string
-		set func(resource.Quantity)
+		name string
+		s    string
+		set  func(resource.Quantity)
 	}{
-		{f.Storage, func(v resource.Quantity) { q.Storage = &v }},
-		{f.RegistryStorage, func(v resource.Quantity) { q.RegistryStorage = &v }},
+		{"storage", f.Storage, func(v resource.Quantity) { q.Storage = &v }},
+		{"registry storage", f.RegistryStorage, func(v resource.Quantity) { q.RegistryStorage = &v }},
 	} {
 		if field.s != "" {
 			v, err := resource.ParseQuantity(field.s)
 			if err != nil {
-				return err
+				// Name the field: the parser's message alone does not say which quota is wrong.
+				return fmt.Errorf("%s %q: %w", field.name, field.s, err)
 			}
 			field.set(v)
 		}
+	}
+	if f.Volumes < 0 || f.Pods < 0 {
+		return fmt.Errorf("volumes and pods cannot be negative; 0 means no limit")
 	}
 	if f.Volumes > 0 {
 		q.Volumes = &f.Volumes

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/wutz/forgeai/pkg/kf"
@@ -116,7 +117,8 @@ func (a *App) UpdateTemplate(name string, f training.Form) (*Template, error) {
 	return &Template{Name: rt.Name, Description: f.Description, Form: form}, nil
 }
 
-// DeleteTemplate deletes a job template.
+// DeleteTemplate deletes a job template. Like UpdateTemplate, it only deletes
+// the templates forgeai created.
 func (a *App) DeleteTemplate(name string) error {
 	c, err := a.current()
 	if err != nil {
@@ -124,7 +126,20 @@ func (a *App) DeleteTemplate(name string) error {
 	}
 	ctx, cancel := a.call()
 	defer cancel()
-	return c.k8s.Delete(ctx, runtimeStub(kf.TrainingRuntimeGVK, c.namespace(), name))
+	cur := runtimeStub(kf.TrainingRuntimeGVK, c.namespace(), name)
+	if err := c.k8s.Get(ctx, client.ObjectKeyFromObject(cur), cur); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if cur.GetLabels()[naming.LabelManagedBy] != naming.ManagedBy {
+		return fmt.Errorf("template %s was not created by forgeai and cannot be deleted here", name)
+	}
+	if err := c.k8s.Delete(ctx, cur); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	return nil
 }
 
 // TemplateNames returns the templates selectable when creating a job

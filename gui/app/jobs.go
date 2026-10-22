@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -330,8 +331,41 @@ func (a *App) Logs(name string, worker int32, tailLines int64) (string, error) {
 		return "", err
 	}
 	defer func() { _ = rc.Close() }()
-	b, err := io.ReadAll(io.LimitReader(rc, 4<<20))
-	return string(b), err
+	return readTail(rc, logTailLimit)
+}
+
+// logTailLimit bounds the log text sent to the GUI. tailLines bounds the lines,
+// not their length, so a long log is cut to its newest output.
+const logTailLimit = 4 << 20
+
+// readTail reads r to its end and keeps the last limit bytes. When it cuts,
+// the partial line it starts with is dropped.
+func readTail(r io.Reader, limit int) (string, error) {
+	var buf []byte
+	chunk := make([]byte, 32<<10)
+	cut := false
+	for {
+		n, err := r.Read(chunk)
+		buf = append(buf, chunk[:n]...)
+		if len(buf) > 2*limit {
+			buf = append([]byte(nil), buf[len(buf)-limit:]...)
+			cut = true
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	if len(buf) > limit {
+		buf = buf[len(buf)-limit:]
+		cut = true
+	}
+	if i := bytes.IndexByte(buf, '\n'); cut && i >= 0 {
+		buf = buf[i+1:]
+	}
+	return string(buf), nil
 }
 
 func (a *App) mutateJob(c *Connection, name string, fn func(*kf.TrainJob)) (*Job, error) {

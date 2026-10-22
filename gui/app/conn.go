@@ -121,6 +121,11 @@ func projectOf(ctx context.Context, k8s client.Client, namespace string) (string
 // returns the resolved connection info, including whether the user may
 // administer Projects (used to show the admin area).
 func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
+	a.mu.Lock()
+	a.connGen++
+	gen := a.connGen
+	a.mu.Unlock()
+
 	rest, defaultNamespace, err := clientConfig(contextName)
 	if err != nil {
 		return ConnInfo{}, err
@@ -178,8 +183,12 @@ func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
 		conn.insecure = cfg.Registry.Insecure
 	}
 	a.mu.Lock()
+	defer a.mu.Unlock()
+	if gen != a.connGen {
+		return ConnInfo{}, fmt.Errorf("connection to %s was superseded by a newer connect", contextName)
+	}
+	a.closeConnectionState()
 	a.conn = conn
-	a.mu.Unlock()
 	return info, nil
 }
 
@@ -238,11 +247,24 @@ func mustBeClusterAdmin(ctx context.Context, k8s client.Client) bool {
 	return sar.Status.Allowed
 }
 
-// Logout forgets the connection.
+// Logout forgets the connection and ends what it had open.
 func (a *App) Logout() {
 	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.connGen++
+	a.closeConnectionState()
 	a.conn = nil
-	a.mu.Unlock()
+}
+
+// closeConnectionState ends the sandbox shells and the file server target of
+// the connection being replaced: they belong to its cluster, not the next one.
+// The caller holds a.mu.
+func (a *App) closeConnectionState() {
+	a.terminals.Range(func(id, _ any) bool {
+		a.CloseSandboxTerminal(id.(string))
+		return true
+	})
+	a.files.SetTarget(nil)
 }
 
 // PlatformConfig is the platform configuration relevant to the GUI.

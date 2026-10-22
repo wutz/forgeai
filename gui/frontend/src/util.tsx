@@ -8,7 +8,7 @@ const knownErrors: [RegExp, MessageKey][] = [
   [/has been modified; please apply your changes/, 'error.conflict'],
   [/"[^"]*" already exists/, 'error.alreadyExists'],
   [/context deadline exceeded|Client\.Timeout exceeded/, 'error.timeout'],
-  [/was not created by forgeai and cannot be edited here/, 'error.notCreatedByForgeai'],
+  [/was not created by forgeai and cannot be (edited|deleted) here/, 'error.notCreatedByForgeai'],
 ]
 
 export function errText(e: unknown): string {

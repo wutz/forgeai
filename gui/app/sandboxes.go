@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"io"
 	"slices"
 	"strings"
 	"time"
@@ -236,8 +235,7 @@ func (a *App) SandboxLogs(name string, tailLines int64) (string, error) {
 		return "", err
 	}
 	defer func() { _ = rc.Close() }()
-	b, err := io.ReadAll(io.LimitReader(rc, 4<<20))
-	return string(b), err
+	return readTail(rc, logTailLimit)
 }
 
 // SandboxTemplates lists the SandboxTemplates of the project, for the GUI.
@@ -361,6 +359,15 @@ func (a *App) DeleteSandboxTemplate(name string) error {
 	u.SetGroupVersionKind(sandbox.SandboxTemplateGVK)
 	u.SetNamespace(c.namespace())
 	u.SetName(name)
+	if err := c.k8s.Get(ctx, client.ObjectKeyFromObject(u), u); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if u.GetLabels()[naming.LabelManagedBy] != naming.ManagedBy {
+		return fmt.Errorf("sandbox template %s was not created by forgeai and cannot be deleted here", name)
+	}
 	err = c.k8s.Delete(ctx, u)
 	if apierrors.IsNotFound(err) {
 		return nil

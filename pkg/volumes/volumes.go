@@ -137,6 +137,21 @@ func toVolume(pvc *corev1.PersistentVolumeClaim, users []string) Volume {
 	return v
 }
 
+// maxSizeGiB bounds a volume size: larger sizes overflow the byte count
+// (sizeGiB<<30) that a claim is sized with.
+const maxSizeGiB = 1 << 20
+
+// checkSize rejects a size outside 1 GiB..maxSizeGiB.
+func checkSize(sizeGiB int64) error {
+	if sizeGiB < 1 {
+		return fmt.Errorf("size must be at least 1 GiB")
+	}
+	if sizeGiB > maxSizeGiB {
+		return fmt.Errorf("size must be at most %d GiB (1 PiB)", maxSizeGiB)
+	}
+	return nil
+}
+
 // Create creates a volume of the given type and size.
 func (c *Client) Create(
 	ctx context.Context, cfg *platform.Config, name, volType string, sizeGiB int64,
@@ -144,8 +159,8 @@ func (c *Client) Create(
 	if !nameRE.MatchString(name) || len(name) > 50 {
 		return nil, fmt.Errorf("invalid volume name %q: lowercase alphanumeric or '-', at most 50 characters", name)
 	}
-	if sizeGiB < 1 {
-		return nil, fmt.Errorf("size must be at least 1 GiB")
+	if err := checkSize(sizeGiB); err != nil {
+		return nil, err
 	}
 	volType, st, err := cfg.StorageType(volType)
 	if err != nil {
@@ -287,6 +302,9 @@ func (c *Client) Resize(ctx context.Context, name string, sizeGiB int64) (*Volum
 	}
 	if pvc.Status.Phase != corev1.ClaimBound {
 		return nil, fmt.Errorf("%w: %s is still being provisioned, grow it once it is Bound", ErrNotReady, name)
+	}
+	if err := checkSize(sizeGiB); err != nil {
+		return nil, err
 	}
 	cur := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
 	if sizeGiB<<30 < cur.Value() {

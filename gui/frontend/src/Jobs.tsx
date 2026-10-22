@@ -193,7 +193,10 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
   name: string, onDone: () => void, onOpen: (name: string) => void, onDeleted: () => void
 }) {
   const [job, setJob] = useState<app.Job | null>(null)
+  // error is an action's failure; loadError is a failed read. A read clears only
+  // its own error, so a failed Stop stays shown until the next action.
   const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState('')
   const [tab, setTab] = useState<DetailTab>('overview')
   const [log, setLog] = useState('')
   const [logTitle, setLogTitle] = useState('')
@@ -204,7 +207,10 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
   // pending is the action in flight; its button stays disabled until it answers.
   const [pending, setPending] = useState('')
   const confirm = useConfirm()
-  const detailOf = (n: string) => GetJob(n).then(setJob).catch(e => setError(errText(e)))
+  const detailOf = (n: string) => GetJob(n).then(j => {
+    setJob(j)
+    setLoadError('')
+  }).catch(e => setLoadError(errText(e)))
   const act = (kind: string, p: Promise<unknown>) => {
     setPending(kind)
     setError('')
@@ -219,6 +225,7 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
     setSaving(false)
     setSavedTemplate('')
     setError('')
+    setLoadError('')
     setPending('')
   }, [name])
 
@@ -226,14 +233,15 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
   const busy = !!job && settling(job.phase)
   useEffect(() => {
     if (!active) return
-    GetJob(name).then(setJob).catch(e => setError(errText(e)))
+    detailOf(name)
     // A failed poll is shown: the job may have been deleted elsewhere, and its actions then fail.
-    const timer = setInterval(() => GetJob(name).then(setJob).catch(e => setError(errText(e))), busy ? 1500 : 5000)
+    const timer = setInterval(() => detailOf(name), busy ? 1500 : 5000)
     return () => clearInterval(timer)
   }, [name, active, busy])
 
-  if (!job) return <Card>{error
-    ? <div className="banner banner-error" role="alert">{error}</div>
+  const failure = error || loadError
+  if (!job) return <Card>{failure
+    ? <div className="banner banner-error" role="alert">{failure}</div>
     : <Spinner label={t('jobs.loadingJob')}/>}</Card>
 
   const live = job.phase !== 'Failed' && job.phase !== 'Succeeded'
@@ -269,8 +277,7 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
         </div>
         <div className="card-head-actions"><Status phase={job.phase}/></div>
       </div>
-      {error && <div className="banner banner-error">{error}</div>}
-      {savedTemplate && <div className="banner" role="status">{t('jobs.savedTemplate', {name: savedTemplate})}</div>}
+      {failure && <div className="banner banner-error">{failure}</div>}
       {confirm.dialog}
       {saving && <TemplateDialog form={jobTemplateForm(job)} onClose={() => setSaving(false)} onSaved={n => {
         setSaving(false); setSavedTemplate(n)

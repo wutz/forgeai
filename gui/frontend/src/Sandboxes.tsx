@@ -138,7 +138,10 @@ function SandboxDetail({name, onDone, onDeleted}: {
   name: string, onDone: () => void, onDeleted: () => void
 }) {
   const [box, setBox] = useState<app.Sandbox | null>(null)
+  // error is an action's failure; loadError is a failed read. A read clears only
+  // its own error, so a failed Stop stays shown until the next action.
   const [error, setError] = useState('')
+  const [loadError, setLoadError] = useState('')
   const [tab, setTab] = useState<Tab>('overview')
   const [log, setLog] = useState('')
   const [saving, setSaving] = useState(false)
@@ -152,9 +155,13 @@ function SandboxDetail({name, onDone, onDeleted}: {
   const confirm = useConfirm()
   const phase = box?.phase
   // reload reads the sandbox now, so an action's result shows without waiting for the poll.
-  const reload = () => GetSandbox(name).then(setBox).catch(e => setError(errText(e)))
+  const reload = () => GetSandbox(name).then(b => {
+    setBox(b)
+    setLoadError('')
+  }).catch(e => setLoadError(errText(e)))
   const transition = (kind: 'start' | 'stop', p: Promise<unknown>) => {
     setPending(kind)
+    setError('')
     p.then(() => { onDone(); return reload() }).catch(e => {
       setError(errText(e))
       setPending(null)
@@ -179,6 +186,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
     setDeleting(false)
     setSaving(false)
     setSavedTemplate('')
+    setLoadError('')
   }, [name])
 
   // The poll and heartbeat run only while the view is on screen: a hidden
@@ -196,8 +204,9 @@ function SandboxDetail({name, onDone, onDeleted}: {
     }
   }, [name, active])
 
-  if (!box) return <Card>{error
-    ? <div className="banner banner-error" role="alert">{error}</div>
+  const failure = error || loadError
+  if (!box) return <Card>{failure
+    ? <div className="banner banner-error" role="alert">{failure}</div>
     : <Spinner label={t('sandboxes.loading')}/>}</Card>
   const running = box.phase === 'Running' || box.phase === 'Pending'
   const busy = pending !== null || deleting
@@ -217,7 +226,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
         </div>
         <div className="card-head-actions"><Status phase={box.phase}/></div>
       </div>
-      {error && <div className="banner banner-error">{error}</div>}
+      {failure && <div className="banner banner-error">{failure}</div>}
       {savedTemplate && <div className="banner" role="status">{t('sandboxes.savedTemplate', {name: savedTemplate})}</div>}
       {confirm.dialog}
       {saving && <SandboxTemplateDialog initial={sandboxTemplateForm(box)} onClose={() => setSaving(false)}

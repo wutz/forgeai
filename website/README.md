@@ -50,6 +50,8 @@ npm run build     # writes dist/
 npm run deploy    # builds, then runs wrangler deploy
 ```
 
+`wrangler.jsonc` also sets `build.command`, so `wrangler deploy` builds `dist/` itself. Cloudflare's automatic builds (Workers Builds) rely on this: set the project root to `website` and the deploy command to `npx wrangler deploy`; no separate build command is needed.
+
 Deploying needs a Cloudflare account that owns the `wutz.dev` zone and a login with `npx wrangler login` (or `CLOUDFLARE_API_TOKEN`). The custom domain route is declared in `wrangler.jsonc`; Cloudflare creates its DNS record and certificate on the first deploy.
 
 Keep the copy in step with the repository: the README is the source for the object model, and the feature descriptions come from it.

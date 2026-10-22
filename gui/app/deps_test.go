@@ -183,6 +183,7 @@ func TestAssessReason(t *testing.T) {
 		{"runs elsewhere than the config expects", sandbox, depHealth{crdsWanted: 1, crdsFound: 1,
 			deployments: []appsv1.Deployment{testDeployment("v1.0.7", true)},
 			namespace:   "other", expectNamespace: "agent-sandbox-system"}, "namespaceMismatch", "agent-sandbox-system"},
+		{"operator deployment missing", operator, depHealth{crdsWanted: 2, crdsFound: 2}, "operatorMissing", ""},
 		{"pinned and available", bundled, depHealth{crdsWanted: 2, crdsFound: 2,
 			deployments: []appsv1.Deployment{testDeployment("v0.20.2", true)}}, "", ""},
 	}

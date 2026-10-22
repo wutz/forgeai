@@ -190,6 +190,7 @@ function detail(d: app.Dependency): string {
     case 'unmanaged': return t('deps.reason.unmanaged')
     case 'unmanagedHelm': return t('deps.reason.unmanagedHelm')
     case 'namespaceMismatch': return t('deps.reason.namespaceMismatch', {namespace: d.namespace, expected: d.expectedNamespace ?? ''})
+    case 'operatorMissing': return t('deps.reason.operatorMissing')
   }
   return d.message
 }

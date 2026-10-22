@@ -41,6 +41,14 @@ export function phaseLabel(phase: string): string {
   return key ? t(key) : phase
 }
 
+// failureLabel is the text shown for a job's failure reason. The reasons are
+// the stable codes the backend writes; an unknown code is shown as it arrives.
+const failureReasons = new Set(['NodeFailure', 'Evicted', 'OOMKilled', 'ImagePullFailed', 'ConfigError', 'ExitCode', 'Unknown'])
+
+export function failureLabel(reason: string): string {
+  return failureReasons.has(reason) ? t(`jobs.reason.${reason}` as MessageKey) : reason
+}
+
 export function Status({phase}: {phase: string}) {
   return (
     <span className={`status status-${phase.toLowerCase()}`}>

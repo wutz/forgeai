@@ -134,8 +134,8 @@ type Dependency struct {
 	// mismatch means the component runs where the platform config does not expect it.
 	Status string `json:"status"`
 	// Reason names the state the GUI explains in its own words: unmanaged,
-	// unmanagedHelm or namespaceMismatch. Empty for the other states. Message
-	// stays the English diagnostic.
+	// unmanagedHelm, namespaceMismatch or operatorMissing. Empty for the other
+	// states. Message stays the English diagnostic.
 	Reason string `json:"reason,omitempty"`
 	// ExpectedNamespace is where the platform config expects the component when
 	// Reason is namespaceMismatch.
@@ -286,6 +286,7 @@ func assess(dep *Dependency, h depHealth) {
 	}
 	if dep.Name == "forgeai" && len(h.deployments) == 0 {
 		dep.Status, dep.Message = "degraded", "Operator Deployment not found"
+		dep.Reason = "operatorMissing"
 		return
 	}
 	var notReady []string

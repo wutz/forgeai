@@ -1,6 +1,7 @@
 import {useEffect, useMemo, useRef, useState} from 'react'
 import {GetJob, ListJobs, Logs, DeleteJob, StopJob, StartJob, RerunJob} from '../wailsjs/go/app/App'
 import {app, training} from '../wailsjs/go/models'
+import {failureLabel} from './util'
 import {JobCreateDialog} from './JobCreateDialog'
 import {TemplateDialog} from './Templates'
 import {Status, envToLines, fmtDate, errText} from './util'
@@ -160,7 +161,7 @@ function JobTable({jobs, filtered, selected, onSelect}: {
               </span>
             </td>
             <td><Status phase={j.phase}/>{j.failureReason && j.phase === 'Failed' &&
-              <div className="cell-sub" title={j.message}>{j.failureReason}</div>}</td>
+              <div className="cell-sub" title={j.message}>{failureLabel(j.failureReason)}</div>}</td>
             <td className="mono">{j.instanceType}</td>
             <td className="mono">{j.ready}/{j.workers}</td>
             <td>{j.maxRetries
@@ -347,7 +348,7 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
                 <dt>{t('jobs.workers')}</dt><dd>{t('jobs.workersReady', {ready: job.ready, total: job.workers})}</dd>
                 <dt>{t('jobs.volumes')}</dt><dd className="mono">{job.volumes?.join(', ') || '—'}</dd>
                 <dt>{t('jobs.command')}</dt><dd><pre className="code">{job.command || '—'}</pre></dd>
-                {job.failureReason && <><dt>{t('jobs.failure')}</dt><dd>{t('jobs.failureDetail', {reason: job.failureReason, message: job.message || ''})}</dd></>}
+                {job.failureReason && <><dt>{t('jobs.failure')}</dt><dd>{t('jobs.failureDetail', {reason: failureLabel(job.failureReason), message: job.message || ''})}</dd></>}
                 {job.retryOf && <><dt>{t('jobs.retryOf')}</dt><dd>
                   <button className="btn btn-sm mono" onClick={() => onOpen(job.retryOf ?? '')}>{job.retryOf}</button>
                 </dd></>}
@@ -365,7 +366,7 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
                       <button key={r.name} className="mini-row" onClick={() => onOpen(r.name)}>
                         <span className="mono">{r.name}</span>
                         <Status phase={r.phase}/>
-                        <span className="muted">{r.failureReason || ''}</span>
+                        <span className="muted">{r.failureReason ? failureLabel(r.failureReason) : ''}</span>
                         <span className="muted">{fmtDate(r.created)}</span>
                         <Icon name="chevron" size={13}/>
                       </button>

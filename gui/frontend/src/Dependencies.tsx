@@ -18,6 +18,7 @@ type Progress = {cluster: string, name: string, step?: string, done: boolean, er
 export function Dependencies() {
   const [data, setData] = useState<app.Dependencies | null>(null)
   const [error, setError] = useState('')
+  const [failed, setFailed] = useState('')
   // steps is the latest install step of each component that is installing, as
   // the step key the backend sent.
   const [steps, setSteps] = useState<Record<string, string>>({})
@@ -27,18 +28,25 @@ export function Dependencies() {
   const confirm = useConfirm()
   const active = useActive()
 
+  // fail sets the banner. name is the component whose install failed; its
+  // banner offers a retry. Without a name the banner is a plain error.
+  const fail = (message: string, name = '') => {
+    setError(message)
+    setFailed(name)
+  }
+
   // refresh does not clear error: the install outcome is refreshed right after
   // it is set, and the banner must still show it.
   const refresh = () => ListDependencies().then(d => {
     cluster.current = d.cluster
     setData(d)
   }).catch(e => {
-    setError(errText(e))
+    fail(errText(e))
     throw e
   })
   useEffect(() => {
     if (!active) return
-    setError('')
+    fail('')
     refresh().catch(() => undefined)
   }, [active])
 
@@ -53,7 +61,7 @@ export function Dependencies() {
       return
     }
     setSteps(({[p.name]: _, ...rest}) => rest)
-    if (p.error) setError(`${title(p.name)}: ${p.error}`)
+    if (p.error) fail(`${title(p.name)}: ${errText(p.error)}`, p.name)
     refresh().catch(() => undefined)
   }), [])
 
@@ -65,11 +73,11 @@ export function Dependencies() {
     </>,
     action: verb(d),
     run: () => {
-      setError('')
+      fail('')
       setSteps(s => ({...s, [d.name]: 'starting'}))
       InstallDependency(d.name).catch(e => {
         setSteps(({[d.name]: _, ...rest}) => rest)
-        setError(errText(e))
+        fail(errText(e), d.name)
       }).then(() => refresh().catch(() => undefined))
     },
   })
@@ -86,6 +94,7 @@ export function Dependencies() {
 
   const items = data?.items ?? []
   const ready = items.filter(d => d.status === 'ready').length
+  const retry = failed ? items.find(d => d.name === failed) : undefined
 
   return (
     <div className="page">
@@ -94,7 +103,13 @@ export function Dependencies() {
                     {t('deps.meta', {total: items.length, ready})}
                   </span>}
                   actions={<RefreshButton onRefresh={refresh}/>}/>
-      {error && <div className="banner banner-error" role="alert">{error}</div>}
+      {error && <div className="banner banner-error" role="alert">
+        <span>{error}</span>
+        {retry && offersInstall(retry) && !steps[retry.name] && <>
+          <span className="spacer"/>
+          <button className="btn btn-sm" onClick={() => install(retry)}>{t('common.retry')}</button>
+        </>}
+      </div>}
       {confirm.dialog}
 
       <Card>
@@ -138,8 +153,7 @@ export function Dependencies() {
                   </td>
                   <td>
                     <div className="actions">
-                      {d.installable && d.status !== 'ready' && d.status !== 'installing' && d.status !== 'mismatch'
-                        && d.reason !== 'unmanagedHelm' && !step && (
+                      {offersInstall(d) && !step && (
                         <button className="btn btn-sm btn-accent" onClick={() => install(d)}>
                           <Icon name="download" size={13}/>{verb(d)}
                         </button>
@@ -178,6 +192,13 @@ function detail(d: app.Dependency): string {
     case 'namespaceMismatch': return t('deps.reason.namespaceMismatch', {namespace: d.namespace, expected: d.expectedNamespace ?? ''})
   }
   return d.message
+}
+
+// offersInstall reports whether a component can be installed or upgraded from
+// its status. The row and the failure banner both use it.
+function offersInstall(d: app.Dependency): boolean {
+  return d.installable && d.status !== 'ready' && d.status !== 'installing' && d.status !== 'mismatch'
+    && d.reason !== 'unmanagedHelm'
 }
 
 // verb is the action a component offers, from its status.

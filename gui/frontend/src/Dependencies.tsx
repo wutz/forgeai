@@ -139,7 +139,7 @@ export function Dependencies() {
                   <td>
                     <div className="actions">
                       {d.installable && d.status !== 'ready' && d.status !== 'installing' && d.status !== 'mismatch'
-                        && d.reason !== 'unmanagedHelm' && (
+                        && d.reason !== 'unmanagedHelm' && !step && (
                         <button className="btn btn-sm btn-accent" onClick={() => install(d)}>
                           <Icon name="download" size={13}/>{verb(d)}
                         </button>

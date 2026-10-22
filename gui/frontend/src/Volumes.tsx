@@ -108,7 +108,7 @@ export function Volumes() {
                   <span className="cell-main">{v.name}</span>
                   <span className="cell-sub">{v.storageClass}</span>
                 </td>
-                <td><Badge>{v.type}</Badge></td>
+                <td><Badge>{config?.storageTypes?.[v.type]?.description || v.type}</Badge></td>
                 <td className="mono">{v.capacityGiB || v.requestedGiB} GiB
                   {v.phase === 'Resizing' && <span className="muted"> → {v.requestedGiB} GiB</span>}
                 </td>

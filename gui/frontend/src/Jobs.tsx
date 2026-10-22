@@ -277,7 +277,9 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
         </div>
         <div className="card-head-actions"><Status phase={job.phase}/></div>
       </div>
-      {failure && <div className="banner banner-error">{failure}</div>}
+      {error && <div className="banner banner-error">{error}</div>}
+      {loadError && <div className="banner banner-error">{loadError}</div>}
+      {savedTemplate && <div className="banner" role="status">{t('jobs.savedTemplate', {name: savedTemplate})}</div>}
       {confirm.dialog}
       {saving && <TemplateDialog form={jobTemplateForm(job)} onClose={() => setSaving(false)} onSaved={n => {
         setSaving(false); setSavedTemplate(n)

@@ -87,10 +87,13 @@ export function envMap(env: {name: string, value: string}[] = []): EnvMap {
 const k8sNameAlphabet = 'bcdfghjklmnpqrstvwxz2456789'
 
 // NAME_PATTERN and NAME_MAX are the rule for names a user types for a Kubernetes
-// object that is a DNS label: lowercase letters, digits and dashes, at most 50
-// characters, starting and ending with a letter or digit.
-export const NAME_PATTERN = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/
+// object that is a DNS label: lowercase letters, digits and dashes, starting
+// with a letter and ending with a letter or digit. The backend (pkg/training,
+// pkg/sandbox) rejects a leading digit, so the form must too. Sandboxes allow
+// SANDBOX_NAME_MAX characters.
+export const NAME_PATTERN = /^[a-z]([-a-z0-9]*[a-z0-9])?$/
 export const NAME_MAX = 50
+export const SANDBOX_NAME_MAX = 63
 
 // generateName returns a Kubernetes-style name, prefix plus five random
 // characters ("sandbox-7xk2m"), a lowercase DNS label as the API server expects.

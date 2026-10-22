@@ -178,7 +178,7 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
   // blocker says why Save is off. A bad name or env line already has a hint
   // under its field, so the footer only names the blockers that have none.
   const blocker = !f.name ? t('common.nameRequired')
-    : !nameOK ? t('common.nameInvalid')
+    : !nameOK ? t('common.nameInvalid', {max: NAME_MAX})
     : !f.image ? t('common.imageRequired')
     : envBad.length ? t('common.envInvalid', {lines: envBad.join(', ')}) : ''
   const hasFieldHint = (!nameOK && (f.name ?? '') !== '') || envBad.length > 0
@@ -219,7 +219,7 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
                    autoCapitalize="none" autoCorrect="off" spellCheck={false} maxLength={NAME_MAX}
                    aria-invalid={!nameOK}
                    onChange={e => set('name', e.target.value)} required/>
-            {!nameOK && (f.name ?? '') !== '' && <span className="hint hint-error">{t('common.nameInvalid')}</span>}
+            {!nameOK && (f.name ?? '') !== '' && <span className="hint hint-error">{t('common.nameInvalid', {max: NAME_MAX})}</span>}
           </div>
           <div className="field">
             <label htmlFor="t-desc">{t('templates.description')}</label>

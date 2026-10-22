@@ -69,14 +69,16 @@ export function JobCreateDialog({onClose, onCreated}: {
   const envBad = envErrors(envText)
   // The name is a DNS label of at most 50 characters, the TrainJob name limit.
   const nameOK = NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= NAME_MAX
-  // blocker says why Create is off. A bad name or env line already has a hint
-  // under its field, so the footer only names the blockers that have none.
+  const workersOK = f.workers >= 1
+  // blocker says why Create is off. A bad name, worker count or env line already
+  // has a hint under its field, so the footer only names the blockers that have none.
   const blocker = !f.name ? t('common.nameRequired')
-    : !nameOK ? t('common.nameInvalid')
+    : !nameOK ? t('common.nameInvalid', {max: NAME_MAX})
     : !f.image ? t('common.imageRequired')
+    : !workersOK ? t('jobCreate.workersInvalid')
     : !mountsOK ? (vols === null ? t('mounts.loading') : t('mounts.fixFirst'))
     : envBad.length ? t('common.envInvalid', {lines: envBad.join(', ')}) : ''
-  const hasFieldHint = (!nameOK && (f.name ?? '') !== '') || envBad.length > 0
+  const hasFieldHint = (!nameOK && (f.name ?? '') !== '') || !workersOK || envBad.length > 0
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -114,7 +116,7 @@ export function JobCreateDialog({onClose, onCreated}: {
                    onChange={e => set('name', e.target.value)} maxLength={NAME_MAX}
                    aria-invalid={!nameOK} placeholder={t('jobCreate.namePlaceholder')} required/>
             <span className="hint">{t('jobCreate.nameHint')}</span>
-            {!nameOK && (f.name ?? '') !== '' && <span className="hint hint-error">{t('common.nameInvalid')}</span>}
+            {!nameOK && (f.name ?? '') !== '' && <span className="hint hint-error">{t('common.nameInvalid', {max: NAME_MAX})}</span>}
           </div>
           <div className="row">
             <div className="field">
@@ -142,7 +144,8 @@ export function JobCreateDialog({onClose, onCreated}: {
             <div className="field">
               <label htmlFor="j-workers">{t('jobCreate.workers')}</label>
               <input id="j-workers" className="input" type="number" min={1} value={f.workers}
-                     onChange={e => set('workers', +e.target.value)}/>
+                     onChange={e => set('workers', +e.target.value)} aria-invalid={!workersOK}/>
+              {!workersOK && <span className="hint hint-error">{t('jobCreate.workersInvalid')}</span>}
             </div>
           </div>
           <div className="field">

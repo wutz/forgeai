@@ -10,6 +10,7 @@ import (
 	authv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/kubernetes"
@@ -142,6 +143,7 @@ func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
 	defer cancel()
 
 	admin := mustBeAdmin(ctx, k8s)
+	clusterAdmin := mustBeClusterAdmin(ctx, k8s)
 	project, err := projectOf(ctx, k8s, namespace)
 	if err == nil && project == "" {
 		err = fmt.Errorf("namespace %q is not a forgeai project", namespace)
@@ -162,12 +164,14 @@ func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
 	}
 
 	// Cluster-wide reads need the forgeai catalogues; probe they work.
-	if err := a.isolate(ctx, k8s); err != nil {
+	forgeai, err := isolate(ctx, k8s, clusterAdmin)
+	if err != nil {
 		return ConnInfo{}, err
 	}
 	info := ConnInfo{
 		Context: contextName, Server: rest.Host, Namespace: namespace, Project: project,
-		Admin: admin, Sandboxes: namespace != "" && sandboxesAvailable(ctx, k8s, namespace),
+		Admin: admin, ClusterAdmin: clusterAdmin, Forgeai: forgeai,
+		Sandboxes: namespace != "" && sandboxesAvailable(ctx, k8s, namespace),
 	}
 	conn := &Connection{Info: info, k8s: k8s, rest: rest, core: core}
 	if cfg, err := platform.Load(ctx, k8s, conn.configNamespace()); err == nil {
@@ -180,13 +184,18 @@ func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
 }
 
 // isolate verifies the connection reaches the resources the GUI needs, so
-// connection errors surface at connect time rather than as broken views.
-func (a *App) isolate(ctx context.Context, k8s client.Client) error {
+// connection errors surface at connect time rather than as broken views. A
+// cluster admin may connect to a cluster without the forgeai CRDs, to install
+// them from the Dependencies view; it reports whether they are installed.
+func isolate(ctx context.Context, k8s client.Client, clusterAdmin bool) (bool, error) {
 	list := &v1.InstanceTypeList{}
 	if err := k8s.List(ctx, list); err != nil {
-		return fmt.Errorf("list InstanceTypes: %w", err)
+		if clusterAdmin && meta.IsNoMatchError(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("list InstanceTypes: %w", err)
 	}
-	return nil
+	return true, nil
 }
 
 // sandboxesAvailable reports whether agent-sandbox is installed and the user
@@ -207,6 +216,20 @@ func mustBeAdmin(ctx context.Context, k8s client.Client) bool {
 	sar := &authv1.SelfSubjectAccessReview{Spec: authv1.SelfSubjectAccessReviewSpec{
 		ResourceAttributes: &authv1.ResourceAttributes{
 			Group: "forgeai.wutz.dev", Resource: "projects", Verb: "create",
+		},
+	}}
+	if err := k8s.Create(ctx, sar); err != nil {
+		return false
+	}
+	return sar.Status.Allowed
+}
+
+// mustBeClusterAdmin reports whether the user may install cluster components:
+// it asks for every verb on every resource, which only cluster-admin grants.
+func mustBeClusterAdmin(ctx context.Context, k8s client.Client) bool {
+	sar := &authv1.SelfSubjectAccessReview{Spec: authv1.SelfSubjectAccessReviewSpec{
+		ResourceAttributes: &authv1.ResourceAttributes{
+			Group: "*", Resource: "*", Verb: "*",
 		},
 	}}
 	if err := k8s.Create(ctx, sar); err != nil {

@@ -166,6 +166,26 @@ func (a *App) DeleteImage(repository, reference string) error {
 	return hc.DeleteArtifact(ctx, harborProject(c), repository, reference)
 }
 
+// DeleteImageTag removes one tag from an image. The image and its other tags
+// stay; only DeleteImage removes the image.
+func (a *App) DeleteImageTag(repository, digest, tag string) error {
+	c, err := a.current()
+	if err != nil {
+		return err
+	}
+	reg, err := a.Registry()
+	if err != nil {
+		return err
+	}
+	if !reg.Enabled {
+		return errNoRegistry
+	}
+	ctx, cancel := a.call()
+	defer cancel()
+	hc := harbor.New(harborAPIURL(reg), reg.Username, reg.Password, a.insecureRegistry())
+	return hc.DeleteTag(ctx, harborProject(c), repository, digest, tag)
+}
+
 // DeleteImageRepo deletes a whole repository with all its tags.
 func (a *App) DeleteImageRepo(repository string) error {
 	c, err := a.current()

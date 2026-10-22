@@ -28,6 +28,8 @@ export function DeleteImage(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteImageRepo(arg1:string):Promise<void>;
 
+export function DeleteImageTag(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function DeleteJob(arg1:string):Promise<void>;
 
 export function DeleteProject(arg1:string):Promise<void>;

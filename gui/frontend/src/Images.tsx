@@ -1,9 +1,14 @@
 import {useEffect, useState} from 'react'
-import {DeleteImage, DeleteImageRepo, ListImages, Registry} from '../wailsjs/go/app/App'
+import {DeleteImage, DeleteImageRepo, DeleteImageTag, ListImages, Registry} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {errText, fmtDate, tagCount} from './util'
 import {t} from './i18n'
 import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, useActive, useConfirm} from './ui'
+
+// countImages and countTags name a count in a sentence, with the singular
+// form of one ("1 image") as the messages do for jobs.
+const countImages = (n: number) => n === 1 ? t('images.imagesOne') : t('images.imagesMany', {count: n})
+const countTags = (n: number) => n === 1 ? t('images.tagsOne') : t('images.tagsMany', {count: n})
 
 // Images shows the project registry: the push command with the robot
 // credentials and the pushed tags with delete buttons.
@@ -43,8 +48,10 @@ export function Images() {
 
   const deleteRepo = (r: app.ImageRepo) => confirm.ask({
     title: t('images.deleteRepoTitle', {name: r.name}),
-    // A repository that failed to list has no known tag count to show.
-    message: r.error ? t('images.deleteRepoUnlisted') : t('images.deleteRepoMessage', {count: tagCount(r)}),
+    // A repository that failed to list has no known image count to show.
+    message: r.error
+      ? t('images.deleteRepoUnlisted')
+      : t('images.deleteRepoMessage', {images: countImages(r.images?.length ?? 0), tags: countTags(tagCount(r))}),
     action: t('images.deleteRepo'), danger: true,
     run: () => DeleteImageRepo(r.name).then(refresh).catch(e => setError(errText(e))),
   })
@@ -58,6 +65,16 @@ export function Images() {
         : t('images.deleteImageMessage'),
       action: t('images.deleteImage'), danger: true,
       run: () => DeleteImage(r.name, img.digest).then(refresh).catch(e => setError(errText(e))),
+    })
+  }
+  // A tag is removed alone: the image and its other tags stay.
+  const deleteTag = (r: app.ImageRepo, img: app.Image, tag: string) => {
+    const others = (img.tags?.filter(Boolean) ?? []).length - 1
+    confirm.ask({
+      title: t('images.deleteTagTitle', {tag, name: r.name}),
+      message: others > 0 ? t('images.deleteTagMessage') : t('images.deleteTagLast'),
+      action: t('images.deleteTag'), danger: true,
+      run: () => DeleteImageTag(r.name, img.digest, tag).then(refresh).catch(e => setError(errText(e))),
     })
   }
 
@@ -97,6 +114,12 @@ export function Images() {
               {copied === 'project' ? t('common.copied') : t('images.copyProject')}
             </button>
           </div>
+          <div className="robot-password">
+            <span className="muted">{t('images.pushThen')}</span>
+            <pre className="code" style={{margin: 0, padding: 0, border: 0, background: 'none'}}>
+              {`docker tag <image>:<tag> ${reg.url}/<repo>:<tag>\ndocker push ${reg.url}/<repo>:<tag>\ndocker pull ${reg.url}/<repo>:<tag>`}
+            </pre>
+          </div>
         </Card>
       )}
 
@@ -106,7 +129,7 @@ export function Images() {
             {t('images.viewOnlyHint')}
           </Empty>
         )}
-        {repos.length === 0 && reg?.enabled && reg.credentials && (
+        {repos.length === 0 && !error && reg?.enabled && reg.credentials && (
           <Empty icon="image" title={t('images.noneTitle')}>
             {t('images.noneHintBefore')} <code className="mono">{reg?.url}</code>{t('images.noneHintAfter')}
           </Empty>
@@ -145,10 +168,17 @@ export function Images() {
                         {tags.map(tag => {
                           const key = `address-${img.digest}-${tag}`
                           return (
-                            <button key={tag} className="btn btn-sm mono" title={t('images.copyAddress')}
-                                    onClick={() => copy(address(r.name, tag), key)}>
-                              <Icon name={copied === key ? 'check' : 'copy'} size={12}/>{tag}
-                            </button>
+                            <span key={tag} style={{display: 'inline-flex', gap: 2}}>
+                              <button className="btn btn-sm mono" title={t('images.copyAddress')}
+                                      onClick={() => copy(address(r.name, tag), key)}>
+                                <Icon name={copied === key ? 'check' : 'copy'} size={12}/>{tag}
+                              </button>
+                              <button className="icon-btn" title={t('images.deleteTagLabel', {tag})}
+                                      aria-label={t('images.deleteTagLabel', {tag})}
+                                      onClick={() => deleteTag(r, img, tag)}>
+                                <Icon name="trash" size={12}/>
+                              </button>
+                            </span>
                           )
                         })}
                       </div>
@@ -160,7 +190,7 @@ export function Images() {
                   <td>
                     <div className="actions">
                       <button className="btn btn-sm btn-danger" onClick={() => deleteImage(r, img)}>
-                        {t('common.delete')}
+                        {t('images.deleteImage')}
                       </button>
                     </div>
                   </td>

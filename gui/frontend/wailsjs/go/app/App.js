@@ -46,6 +46,10 @@ export function DeleteImageRepo(arg1) {
   return window['go']['app']['App']['DeleteImageRepo'](arg1);
 }
 
+export function DeleteImageTag(arg1, arg2, arg3) {
+  return window['go']['app']['App']['DeleteImageTag'](arg1, arg2, arg3);
+}
+
 export function DeleteJob(arg1) {
   return window['go']['app']['App']['DeleteJob'](arg1);
 }

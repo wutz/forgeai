@@ -27,15 +27,22 @@ export function Sandboxes() {
   // was listed and is now gone was deleted elsewhere, so its detail is closed.
   // A sandbox just created is not listed yet and keeps its detail.
   const listed = useRef(new Set<string>())
+  // Each refresh takes a number; a response that is not from the latest refresh
+  // is dropped, so a slow older poll cannot overwrite a newer list.
+  const latest = useRef(0)
   const refresh = () => {
+    const seq = ++latest.current
     ListSandboxes().then(bs => {
+      if (seq !== latest.current) return
       const names = new Set(bs.map(b => b.name))
       const before = listed.current
       listed.current = names
       setBoxes(bs)
       setSelected(cur => cur && before.has(cur) && !names.has(cur) ? null : cur)
       setError('')
-    }).catch(e => setError(errText(e)))
+    }).catch(e => {
+      if (seq === latest.current) setError(errText(e))
+    })
   }
   useEffect(() => {
     if (!active) return

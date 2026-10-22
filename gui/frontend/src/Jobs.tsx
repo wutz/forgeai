@@ -1,4 +1,4 @@
-import {useEffect, useMemo, useState} from 'react'
+import {useEffect, useMemo, useRef, useState} from 'react'
 import {GetJob, ListJobs, Logs, DeleteJob, StopJob, StartJob, RerunJob} from '../wailsjs/go/app/App'
 import {app, training} from '../wailsjs/go/models'
 import {JobCreateDialog} from './JobCreateDialog'
@@ -67,12 +67,19 @@ export function Jobs() {
   const [creating, setCreating] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
   const active = useActive()
+  // Each refresh takes a number; a response that is not from the latest refresh
+  // is dropped, so a slow older poll cannot overwrite a newer list.
+  const latest = useRef(0)
 
   const refresh = () => {
+    const seq = ++latest.current
     ListJobs().then(jobs => {
+      if (seq !== latest.current) return
       setJobs(jobs)
       setError('')
-    }).catch(e => setError(errText(e)))
+    }).catch(e => {
+      if (seq === latest.current) setError(errText(e))
+    })
   }
   const busy = jobs.some(j => settling(j.phase))
   useEffect(() => {

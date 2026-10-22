@@ -332,6 +332,9 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
                 <dt>{t('jobs.volumes')}</dt><dd className="mono">{job.volumes?.join(', ') || '—'}</dd>
                 <dt>{t('jobs.command')}</dt><dd><pre className="code">{job.command || '—'}</pre></dd>
                 {job.failureReason && <><dt>{t('jobs.failure')}</dt><dd>{t('jobs.failureDetail', {reason: job.failureReason, message: job.message || ''})}</dd></>}
+                {job.retryOf && <><dt>{t('jobs.retryOf')}</dt><dd>
+                  <button className="btn btn-sm mono" onClick={() => onOpen(job.retryOf ?? '')}>{job.retryOf}</button>
+                </dd></>}
                 {job.retriedAs && <><dt>{t('jobs.retriedAs')}</dt><dd>
                   <button className="btn btn-sm mono" onClick={() => onOpen(job.retriedAs ?? '')}>{job.retriedAs}</button>
                 </dd></>}

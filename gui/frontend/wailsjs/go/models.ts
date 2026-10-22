@@ -435,6 +435,7 @@ export namespace app {
 	}
 	export class PlatformConfig {
 	    apiServer: string;
+	    namespacePrefix: string;
 	    ingress: platform.Ingress;
 	    registry: RegistryInfo;
 	    storageTypes: Record<string, StorageTypeInfo>;
@@ -449,6 +450,7 @@ export namespace app {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.apiServer = source["apiServer"];
+	        this.namespacePrefix = source["namespacePrefix"];
 	        this.ingress = this.convertValues(source["ingress"], platform.Ingress);
 	        this.registry = this.convertValues(source["registry"], RegistryInfo);
 	        this.storageTypes = this.convertValues(source["storageTypes"], StorageTypeInfo, true);

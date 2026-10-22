@@ -1,6 +1,6 @@
 import {FormEvent, useEffect, useState} from 'react'
 import {
-  DeleteProject, GetProject, ListProjects, MemberKubeconfig, SaveProject,
+  Config, DeleteProject, GetProject, ListProjects, MemberKubeconfig, SaveProject,
 } from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {errText, fmtDate, generateName, phaseLabel} from './util'
@@ -153,9 +153,18 @@ function ProjectDialog({form, onClose, onSaved}: {
   const [busy, setBusy] = useState(false)
   const [kube, setKube] = useState('')
   const [kubeError, setKubeError] = useState('')
+  // prefix is the platform's namespace prefix, so the preview names the namespace
+  // the controller will create. A failed read only hides the preview.
+  const [prefix, setPrefix] = useState('')
+  useEffect(() => {
+    let live = true
+    Config().then(c => { if (live) setPrefix(c.namespacePrefix) }).catch(() => undefined)
+    return () => { live = false }
+  }, [])
   const create = !form.name
   const gpuBad = gpuText.split(/\s+/).filter(Boolean).find(pair => !/^([^:]+):(\d+)$/.test(pair))
   const nameOK = !p.name || dnsLabelOK(p.name)
+  const nsPreview = prefix && p.name && nameOK ? prefix + p.name : ''
   const storageOK = !p.quota?.storage || quantityRE.test(p.quota.storage)
   const registryOK = !p.quota?.registryStorage || quantityRE.test(p.quota.registryStorage)
   const trashOK = !p.trashRetention || durationRE.test(p.trashRetention)
@@ -241,6 +250,7 @@ function ProjectDialog({form, onClose, onSaved}: {
                    onChange={e => set('name', e.target.value)} aria-invalid={!nameOK} required/>
             <span className="hint">{t('admin.nameHint')}</span>
             {!nameOK && <span className="hint hint-error">{t('admin.nameInvalid')}</span>}
+            {nsPreview && <span className="hint">{t('admin.namespacePreview', {namespace: nsPreview})}</span>}
           </div>
           <div className="field">
             <label htmlFor="p-display">{t('admin.displayName')}</label>

@@ -269,13 +269,15 @@ func (a *App) closeConnectionState() {
 
 // PlatformConfig is the platform configuration relevant to the GUI.
 type PlatformConfig struct {
-	APIServer    string                     `json:"apiServer"`
-	Ingress      platform.Ingress           `json:"ingress"`
-	Registry     RegistryInfo               `json:"registry"`
-	StorageTypes map[string]StorageTypeInfo `json:"storageTypes"`
-	FileServer   FileServerInfo             `json:"fileServer"`
-	Trash        metav1.Duration            `json:"trash"`
-	Training     TrainingInfo               `json:"training"`
+	APIServer string `json:"apiServer"`
+	// NamespacePrefix is prepended to a project name to form its namespace.
+	NamespacePrefix string                     `json:"namespacePrefix"`
+	Ingress         platform.Ingress           `json:"ingress"`
+	Registry        RegistryInfo               `json:"registry"`
+	StorageTypes    map[string]StorageTypeInfo `json:"storageTypes"`
+	FileServer      FileServerInfo             `json:"fileServer"`
+	Trash           metav1.Duration            `json:"trash"`
+	Training        TrainingInfo               `json:"training"`
 }
 
 // RegistryInfo is the Harbor registry of the platform.
@@ -317,12 +319,13 @@ func (a *App) Config() (PlatformConfig, error) {
 		return PlatformConfig{}, err
 	}
 	out := PlatformConfig{
-		APIServer:    cfg.APIServer,
-		Ingress:      cfg.Ingress,
-		Registry:     RegistryInfo{Enabled: cfg.Registry.Enabled(), URL: cfg.Registry.Domain},
-		StorageTypes: map[string]StorageTypeInfo{},
-		FileServer:   FileServerInfo{IdleTimeout: cfg.FileServer.IdleTimeout},
-		Trash:        cfg.TrashRetention,
+		APIServer:       cfg.APIServer,
+		NamespacePrefix: cfg.NamespacePrefix,
+		Ingress:         cfg.Ingress,
+		Registry:        RegistryInfo{Enabled: cfg.Registry.Enabled(), URL: cfg.Registry.Domain},
+		StorageTypes:    map[string]StorageTypeInfo{},
+		FileServer:      FileServerInfo{IdleTimeout: cfg.FileServer.IdleTimeout},
+		Trash:           cfg.TrashRetention,
 		Training: TrainingInfo{
 			DefaultRuntime: cfg.Training.DefaultRuntime,
 			ShmSize:        cfg.Training.ShmSize.String(),

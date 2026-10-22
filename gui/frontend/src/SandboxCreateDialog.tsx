@@ -5,6 +5,7 @@ import {envToLines, linesToEnv, errText, generateName} from './util'
 import {Dialog} from './ui'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
+import {Mount, VolumeMountsField, mountProblems} from './VolumeMounts'
 
 // SandboxCreateDialog is the "New sandbox" form: image, isolation runtime
 // class, optional instance type and volumes, and the auto-stop timer.
@@ -15,13 +16,14 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   const [busy, setBusy] = useState(false)
   const [opts, setOpts] = useState<app.SandboxOptions | null>(null)
   const [types, setTypes] = useState<app.InstanceType[]>([])
-  const [vols, setVols] = useState<volumes.Volume[]>([])
+  // vols is null until the project's volumes load.
+  const [vols, setVols] = useState<volumes.Volume[] | null>(null)
   const [f, setF] = useState<sandbox.Form>(sandbox.Form.createFrom({
     name: generateName('sandbox'), image: '', command: '', env: [], instanceType: '', runtimeClass: '', service: true,
     volumes: [], ttl: v1.Duration.createFrom({Duration: 0}),
   }))
   const [envText, setEnvText] = useState('')
-  const [mounts, setMounts] = useState('')
+  const [mounts, setMounts] = useState<Mount[]>([])
   const [ttlHours, setTtlHours] = useState(0)
   // idleMinutes stays null until typed: null uses the platform's idle timeout,
   // 0 turns the idle policy off for this sandbox.
@@ -36,7 +38,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
       }))
     }).catch(e => setError(errText(e)))
     ListInstanceTypes().then(setTypes).catch(() => {})
-    ListVolumes(false).then(setVols).catch(() => {})
+    ListVolumes(false).then(setVols).catch(e => setError(errText(e)))
     SandboxTemplates().then(setTemplates).catch(() => {})
   }, [])
 
@@ -59,17 +61,22 @@ export function SandboxCreateDialog({onClose, onCreated}: {
     setEnvText(envToLines(Object.fromEntries((form.env || []).map(e => [e.name, e.value]))))
   }
 
+  // Mounts need the project's volumes to check against; without any mounts the
+  // form does not wait for them. A sandbox runs on one node.
+  const mountsOK = mounts.length === 0 ||
+    (vols !== null && mountProblems(mounts, vols, 1).every(p => !p))
+
   const submit = (e: FormEvent) => {
     e.preventDefault()
+    if (!mountsOK) return
     setBusy(true)
     const form = sandbox.Form.createFrom({
       ...f,
       env: Object.entries(linesToEnv(envText)).map(([name, value]) => ({name, value})),
-      volumes: mounts.split('\n').map(line => {
-        const [volume, path, sub] = line.trim().split(/\s+/)
-        if (!volume || !path) return null
-        return {volume, mountPath: path, subPath: sub || '', readOnly: false}
-      }).filter(Boolean),
+      volumes: mounts.map(m => ({
+        volume: m.volume.trim(), mountPath: m.mountPath.trim(), subPath: (m.subPath || '').trim(),
+        readOnly: !!m.readOnly,
+      })),
       // The form collects hours; the backend takes a Go duration.
       ttl: v1.Duration.createFrom({Duration: Math.round(ttlHours * 3600 * 1e9)}),
       idleTimeout: idleMinutes === null
@@ -86,7 +93,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
     <Dialog title={t('sandboxCreate.title')} subtitle={t('sandboxCreate.subtitle')}
             onClose={onClose} footer={<>
               <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
-              <button type="submit" form="sandbox-form" className="btn btn-primary" disabled={busy || !f.name || !f.image}>
+              <button type="submit" form="sandbox-form" className="btn btn-primary" disabled={busy || !f.name || !f.image || !mountsOK}>
                 {busy ? t('sandboxCreate.creating') : t('sandboxCreate.create')}
               </button>
             </>}>
@@ -152,12 +159,9 @@ export function SandboxCreateDialog({onClose, onCreated}: {
                       onChange={e => setEnvText(e.target.value)} placeholder="KEY=value"/>
           </div>
           <div className="field">
-            <label htmlFor="s-vols">{t('sandboxCreate.volumeMounts')}</label>
-            <textarea id="s-vols" className="textarea" rows={2} value={mounts}
-                      autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                      onChange={e => setMounts(e.target.value)}
-                      placeholder={t('sandboxCreate.mountsPlaceholder')}/>
-            <span className="hint">{t('sandboxCreate.volumesHint', {volumes: vols.map(v => v.name).join(', ') || t('sandboxCreate.noVolumes')})}</span>
+            <label>{t('sandboxCreate.volumeMounts')}</label>
+            <VolumeMountsField mounts={mounts} onChange={setMounts} vols={vols}/>
+            <span className="hint">{t('mounts.sandboxHint')}</span>
           </div>
           <div className="row">
             <div className="field">

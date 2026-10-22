@@ -11,6 +11,12 @@ import {t} from './i18n'
 // a title band at the top of the content.
 export const HeaderSlot = createContext<HTMLElement | null>(null)
 
+// ActiveView is true while the view is on screen. Views stay mounted when the
+// user switches away, so they stop their timers while it is false and refresh
+// when it turns true again.
+export const ActiveView = createContext(true)
+export const useActive = () => useContext(ActiveView)
+
 // Icon is a 16px stroke icon (Lucide-style paths, 1.75 stroke).
 const ICONS = {
   grid: 'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',

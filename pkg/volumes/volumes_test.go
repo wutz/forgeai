@@ -193,3 +193,49 @@ func TestTrashIgnoresFileServerPods(t *testing.T) {
 		t.Fatalf("job pod must block trash, got %v", err)
 	}
 }
+
+func TestMountable(t *testing.T) {
+	ctx := context.Background()
+	pvc := func(name string, phase corev1.PersistentVolumeClaimPhase, mode corev1.PersistentVolumeAccessMode, trashed bool) *corev1.PersistentVolumeClaim {
+		p := &corev1.PersistentVolumeClaim{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: "forge-a"},
+			Spec:       corev1.PersistentVolumeClaimSpec{AccessModes: []corev1.PersistentVolumeAccessMode{mode}},
+			Status:     corev1.PersistentVolumeClaimStatus{Phase: phase},
+		}
+		if trashed {
+			p.Labels = map[string]string{naming.LabelTrash: "true"}
+		}
+		return p
+	}
+	k8s := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(
+		pvc("shared", corev1.ClaimBound, corev1.ReadWriteMany, false),
+		pvc("local", corev1.ClaimBound, corev1.ReadWriteOnce, false),
+		pvc("pending", corev1.ClaimPending, corev1.ReadWriteMany, false),
+		pvc("gone-soon", corev1.ClaimBound, corev1.ReadWriteMany, true),
+	).Build()
+	c := &Client{K8s: k8s, Namespace: "forge-a"}
+
+	cases := []struct {
+		name  string
+		names []string
+		nodes int32
+		want  error
+	}{
+		{"no volumes", nil, 4, nil},
+		{"bound shared on many nodes", []string{"shared"}, 4, nil},
+		{"bound single-node volume on one node", []string{"local"}, 1, nil},
+		{"single-node volume on several nodes", []string{"local"}, 2, ErrNotShared},
+		{"missing volume", []string{"nope"}, 1, ErrNotFound},
+		{"trashed volume", []string{"gone-soon"}, 1, ErrInTrash},
+		{"provisioning volume", []string{"pending"}, 1, ErrNotReady},
+	}
+	for _, tc := range cases {
+		err := c.Mountable(ctx, tc.names, tc.nodes)
+		if tc.want == nil && err != nil {
+			t.Errorf("%s: unexpected error %v", tc.name, err)
+		}
+		if tc.want != nil && !errors.Is(err, tc.want) {
+			t.Errorf("%s: got %v, want %v", tc.name, err, tc.want)
+		}
+	}
+}

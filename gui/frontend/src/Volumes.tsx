@@ -6,7 +6,7 @@ import {
 import {app, volumes as vol} from '../wailsjs/go/models'
 import {fmtDate, errText, generateName, phaseLabel} from './util'
 import {t} from './i18n'
-import {Badge, Card, Dialog, Empty, Icon, Meter, PageHeader, useConfirm} from './ui'
+import {Badge, Card, Dialog, Empty, Icon, Meter, PageHeader, useActive, useConfirm} from './ui'
 
 // Volumes manages shared filesystems: create, grow, trash (recycle bin),
 // restore and purge. Deleting is delayed — the operator purges expired
@@ -21,17 +21,19 @@ export function Volumes() {
   const [growing, setGrowing] = useState<vol.Volume | null>(null)
   const [expiring, setExpiring] = useState<vol.Volume | null>(null)
   const confirm = useConfirm()
+  const active = useActive()
 
   const refresh = () => {
     ListVolumes(false).then(vs => { setItems(vs); setError('') }).catch(e => setError(errText(e)))
     ListVolumes(true).then(vs => setTrash(vs)).catch(e => setError(errText(e)))
   }
   useEffect(() => {
+    if (!active) return
     refresh()
     Config().then(setConfig).catch(e => setConfigError(errText(e)))
     const timer = setInterval(refresh, 10000)
     return () => clearInterval(timer)
-  }, [])
+  }, [active])
 
   const totalGiB = items.reduce((n, v) => n + (v.capacityGiB || v.requestedGiB || 0), 0)
 

@@ -133,6 +133,13 @@ func (a *App) CreateSandbox(f sandbox.Form) (*Sandbox, error) {
 	if f.InstanceType != "" && it == nil {
 		return nil, fmt.Errorf("instance type %q not found", f.InstanceType)
 	}
+	names := make([]string, 0, len(f.Volumes))
+	for _, m := range f.Volumes {
+		names = append(names, m.Volume)
+	}
+	if err := volumesClient(c).Mountable(ctx, names, 1); err != nil {
+		return nil, err
+	}
 	u, err := sandbox.Render(&f, sandbox.Context{
 		Namespace: c.namespace(), Project: c.Info.Project, InstanceType: it, Platform: cfg,
 		RegistrySecret: registrySecretName(ctx, c),

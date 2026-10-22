@@ -43,6 +43,9 @@ export function SandboxTerminal({name}: {name: string}) {
     })
     const onData = term.onData(data => SandboxTerminalInput(id, data).catch(() => {}))
     const ro = new ResizeObserver(() => {
+      // A hidden view has no size; fitting it would resize the shell to a
+      // couple of columns until the view is shown again.
+      if (!el.offsetWidth || !el.offsetHeight) return
       fit.fit()
       ResizeSandboxTerminal(id, term.cols, term.rows).catch(() => {})
     })

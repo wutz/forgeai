@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {ListTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, DeleteSandboxTemplate, SandboxTemplates as ListSandboxTemplates, ListInstanceTypes} from '../wailsjs/go/app/App'
 import {app, sandbox, training} from '../wailsjs/go/models'
 import {envToLines, linesToEnv, fmtDate, errText, generateName} from './util'
-import {Card, Dialog, Empty, Icon, PageHeader, Segmented, useConfirm} from './ui'
+import {Card, Dialog, Empty, Icon, PageHeader, Segmented, useActive, useConfirm} from './ui'
 import {SandboxTemplateDialog, SandboxTemplateTable} from './SandboxTemplates'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
@@ -28,6 +28,7 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
   const [error, setError] = useState('')
   const [sandboxDialog, setSandboxDialog] = useState<SandboxDialogState | null>(null)
   const [jobDialog, setJobDialog] = useState<JobDialogState | null>(null)
+  const active = useActive()
 
   const refresh = () => Promise.all([
     sandboxes ? ListSandboxTemplates() : Promise.resolve<app.SandboxTemplate[]>([]),
@@ -35,7 +36,7 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
   ]).then(([s, j]) => {
     setSandboxItems(byName(s)); setJobItems(byName(j)); setError('')
   }).catch(e => setError(errText(e)))
-  useEffect(() => { refresh() }, [])
+  useEffect(() => { if (active) refresh() }, [active])
 
   const onDeleteSandbox = (name: string) =>
     DeleteSandboxTemplate(name).then(refresh).catch(e => setError(errText(e)))

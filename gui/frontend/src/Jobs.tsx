@@ -5,7 +5,7 @@ import {JobCreateDialog} from './JobCreateDialog'
 import {TemplateDialog} from './Templates'
 import {Status, envToLines, fmtDate, errText} from './util'
 import {t} from './i18n'
-import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Segmented, Spinner, Tabs, useConfirm} from './ui'
+import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Segmented, Spinner, Tabs, useActive, useConfirm} from './ui'
 
 type Filter = 'all' | 'running' | 'queued' | 'stopped' | 'failed' | 'done'
 
@@ -61,6 +61,7 @@ export function Jobs() {
   const [selected, setSelected] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
+  const active = useActive()
 
   const refresh = () => {
     ListJobs().then(jobs => {
@@ -69,10 +70,11 @@ export function Jobs() {
     }).catch(e => setError(errText(e)))
   }
   useEffect(() => {
+    if (!active) return
     refresh()
     const timer = setInterval(refresh, 5000)
     return () => clearInterval(timer)
-  }, [])
+  }, [active])
 
   const counts = useMemo(() => {
     const c: Record<Filter, number> = {all: jobs.length, running: 0, queued: 0, stopped: 0, failed: 0, done: 0}
@@ -181,6 +183,7 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
   const [logWorker, setLogWorker] = useState(0)
   const [saving, setSaving] = useState(false)
   const [savedTemplate, setSavedTemplate] = useState('')
+  const active = useActive()
   // pending is the action in flight; its button stays disabled until it answers.
   const [pending, setPending] = useState('')
   const confirm = useConfirm()
@@ -200,10 +203,15 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
     setSavedTemplate('')
     setError('')
     setPending('')
+  }, [name])
+
+  // The poll pauses while the view is hidden and restarts with a fresh read.
+  useEffect(() => {
+    if (!active) return
     GetJob(name).then(setJob).catch(e => setError(errText(e)))
     const timer = setInterval(() => GetJob(name).then(setJob).catch(() => {}), 5000)
     return () => clearInterval(timer)
-  }, [name])
+  }, [name, active])
 
   if (!job) return <Card><Spinner label={error || t('jobs.loadingJob')}/></Card>
   const live = job.phase !== 'Failed' && job.phase !== 'Succeeded'

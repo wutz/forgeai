@@ -20,6 +20,7 @@ const en = {
     home: 'forgeai home',
     mainNav: 'Main',
     features: 'Features',
+    console: 'Console',
     how: 'How it works',
     download: 'Download',
     start: 'Get started',
@@ -46,6 +47,7 @@ const en = {
     secondary: 'View on GitHub',
     builtOn: 'Built on',
     projectCaption: 'Example Project resource',
+    shotAlt: 'The forgeai console showing the overview of a project: running jobs, GPU pools, quota and recent jobs',
   },
 
   features: {
@@ -54,42 +56,102 @@ const en = {
     lead: 'forgeai is a Kubernetes operator with a desktop console. It adds the parts that Trainer, Kueue and the sandbox controller leave out: tenancy, lifecycle, retries and access.',
     items: [
       {
-        icon: 'PRJ',
+        icon: 'layers',
         title: 'Multi-tenant projects',
         body: 'A Project is a tenant: its own namespace, GPU quota per class, storage and volume limits, network isolation, a registry robot and members with edit or view access.',
       },
       {
-        icon: 'TRN',
+        icon: 'cpu',
         title: 'Distributed training',
         body: 'Jobs are plain Kubeflow Trainer v2 TrainJobs, admitted by Kueue. Jobs over quota wait in the queue instead of failing.',
       },
       {
-        icon: 'RTY',
+        icon: 'refresh',
         title: 'Failure handling',
         body: 'Stuck jobs are detected and stopped. Failures are classified (node failure, eviction, OOM, image pull, config, exit code) and retried when the policy allows.',
       },
       {
-        icon: 'SBX',
+        icon: 'box',
         title: 'Agent sandboxes',
         body: 'Interactive workloads run as agent-sandbox Sandboxes under gVisor or Kata. Idle sandboxes suspend, and a TTL stops them on schedule.',
       },
       {
-        icon: 'VOL',
+        icon: 'database',
         title: 'Volumes and files',
         body: 'Shared ReadWriteMany volumes resize, go to a trash with an expiry, and restore. An on-demand file server browses them and scales to zero when idle.',
       },
       {
-        icon: 'GPU',
+        icon: 'gauge',
         title: 'Instance types',
         body: 'GPU classes and sizes are generated from the nodes of the cluster, with live capacity per node. Members pick an instance type; they never edit the catalogue.',
       },
     ],
   },
 
+  console: {
+    eyebrow: 'Desktop console',
+    title: 'Every job, sandbox and GPU in one window',
+    lead: 'The console is a desktop app for macOS, Windows and Linux. It talks to Kubernetes through your kubeconfig and nothing sits in between, so what you see is what the cluster says.',
+    tabsLabel: 'Console views',
+    frameTitle: 'forgeai console',
+    items: [
+      {
+        key: 'jobs',
+        tab: 'Jobs',
+        title: 'Training jobs that queue and retry themselves',
+        body: 'Submit a job from a form, watch its workers and read their logs. Jobs over quota wait in the Kueue queue, and failed jobs are retried as new attempts nested under the first one.',
+        bullets: ['Stop, start, rerun and delete', 'Failure reason and retry policy at a glance', 'Templates for the jobs you launch often'],
+        alt: 'The Jobs view listing running, queued, failed and finished training jobs with their instance type, ready workers and retry policy',
+      },
+      {
+        key: 'sandboxes',
+        tab: 'Sandboxes',
+        title: 'Sandboxes for agents and notebooks',
+        body: 'Start an isolated sandbox under gVisor or Kata with an image, a command, volumes and optionally a GPU. Idle sandboxes suspend on their own, and you can open a shell in a running one.',
+        bullets: ['Isolation runtime and resources per sandbox', 'Stable endpoint for sandboxes that serve traffic', 'Idle suspend and TTL keep GPUs free'],
+        alt: 'The Sandboxes view listing running, idle and suspended sandboxes with isolation runtime, resources and endpoint',
+      },
+      {
+        key: 'volumes',
+        tab: 'Volumes',
+        title: 'Shared volumes with a safety net',
+        body: 'Create ReadWriteMany volumes from the platform storage types, grow them in place and see which jobs and sandboxes use them. Deleted volumes go to a recycle bin until they expire.',
+        bullets: ['Grow, restore and set an expiry', 'Browse files over HTTPS without mounting', 'Registry images of the project in the same place'],
+        alt: 'The Volumes view with the project volumes, the jobs and sandboxes that use them, and the recycle bin',
+      },
+      {
+        key: 'resources',
+        tab: 'Resources',
+        title: 'Know what the cluster can place',
+        body: 'Instance types are generated from the GPU nodes, with live free capacity. The project quota shows GPUs per class, storage, volumes and pods against their limits.',
+        bullets: ['GPU class, CPU and memory per worker', 'Free capacity per instance type', 'Project quota next to cluster capacity'],
+        alt: 'The Resources view with instance types, free GPU capacity and the project quota',
+      },
+    ],
+    perks: [
+      { icon: 'key', title: 'Your kubeconfig', body: 'Uses the contexts you already have. Kubernetes RBAC decides what you can do.' },
+      { icon: 'moon', title: 'Light and dark', body: 'Follows the system theme, or pick one.' },
+      { icon: 'globe', title: 'English and 中文', body: 'Follows the system language, or pick one.' },
+      { icon: 'laptop', title: 'macOS, Windows, Linux', body: 'Installers and portable builds for each.' },
+    ],
+  },
   how: {
     eyebrow: 'How it works',
     title: 'No API server of its own',
     lead: "The operator reconciles Kubernetes objects. The desktop console and kubectl create those objects with each member's own credentials, so Kubernetes RBAC decides what everyone can do.",
+    arch: {
+      caption: 'How a request becomes a tenant',
+      clients: 'Clients',
+      clientItems: ['Desktop console', 'kubectl', 'Your own tools'],
+      api: 'Kubernetes API server',
+      apiBody: "Each member's own credentials. RBAC decides.",
+      operator: 'forgeai operator',
+      operatorBody: 'Reconciles projects, retries failed jobs, suspends idle sandboxes, empties the trash.',
+      tiles: ['Namespace and network policy', 'Kueue queues and quota', 'Kubeflow Trainer jobs', 'agent-sandbox sandboxes', 'Harbor registry project', 'dufs file server'],
+      credentials: 'own credentials',
+      watches: 'watches and reconciles',
+      provisions: 'provisions',
+    },
     steps: [
       {
         title: 'An admin creates a Project',
@@ -152,13 +214,13 @@ const en = {
     lead: 'The console manages projects, jobs, sandboxes and volumes through a kubeconfig context. The installers are served from this site, so you can download them without reaching GitHub.',
     platforms: [
       {
-        icon: 'MAC',
+        icon: 'laptop',
         title: 'macOS',
         body: 'A universal build for Apple silicon and Intel. It is signed ad hoc, so macOS asks you to approve it on first launch.',
         links: [{ label: 'Download .dmg', key: 'macos' }],
       },
       {
-        icon: 'WIN',
+        icon: 'monitor',
         title: 'Windows',
         body: '64-bit. Run the installer, or use the portable build without installing it.',
         links: [
@@ -167,7 +229,7 @@ const en = {
         ],
       },
       {
-        icon: 'LNX',
+        icon: 'terminal',
         title: 'Linux',
         body: '64-bit. Needs GTK 3 and WebKitGTK 4.1 at runtime. The Debian package adds a menu entry.',
         links: [
@@ -210,6 +272,12 @@ const en = {
     },
   },
 
+  cta: {
+    title: 'Give every team its own slice of the GPU cluster',
+    body: 'Install the operator, create a Project and hand members a kubeconfig. The console is one download away.',
+    primary: 'Download the console',
+    secondary: 'Read the documentation',
+  },
   notFound: {
     eyebrow: '404',
     title: 'Page not found',
@@ -235,6 +303,7 @@ const zh: Messages = {
     home: 'forgeai 首页',
     mainNav: '主导航',
     features: '功能',
+    console: '控制台',
     how: '工作原理',
     download: '下载',
     start: '快速开始',
@@ -261,6 +330,7 @@ const zh: Messages = {
     secondary: '在 GitHub 查看',
     builtOn: '基于',
     projectCaption: 'Project 资源示例',
+    shotAlt: 'forgeai 控制台中的项目概览：运行中的任务、GPU 资源池、配额和最近任务',
   },
 
   features: {
@@ -269,42 +339,102 @@ const zh: Messages = {
     lead: 'forgeai 是一个 Kubernetes Operator，并配有桌面控制台。它补充了 Trainer、Kueue 和沙箱控制器没有提供的部分：多租户、生命周期、重试与访问控制。',
     items: [
       {
-        icon: 'PRJ',
+        icon: 'layers',
         title: '多租户项目',
         body: '项目就是一个租户：拥有独立的命名空间、按 GPU 类型划分的配额、存储与卷的上限、网络隔离、镜像仓库机器人账号，以及具有编辑或只读权限的成员。',
       },
       {
-        icon: 'TRN',
+        icon: 'cpu',
         title: '分布式训练',
         body: '任务是标准的 Kubeflow Trainer v2 TrainJob，由 Kueue 调度准入。超出配额的任务会在队列中等待，而不是直接失败。',
       },
       {
-        icon: 'RTY',
+        icon: 'refresh',
         title: '故障处理',
         body: '卡住的任务会被检测并停止。失败会被分类（节点故障、驱逐、OOM、镜像拉取、配置、退出码），并在策略允许时自动重试。',
       },
       {
-        icon: 'SBX',
+        icon: 'box',
         title: '智能体沙箱',
         body: '交互式负载以 agent-sandbox Sandbox 的形式运行，可选 gVisor 或 Kata 隔离。空闲的沙箱会自动挂起，并可通过 TTL 按时停止。',
       },
       {
-        icon: 'VOL',
+        icon: 'database',
         title: '存储卷与文件',
         body: '共享的 ReadWriteMany 存储卷可以扩容、移入回收站并设置过期时间，也可以恢复。按需启动的文件服务器用于浏览这些卷，空闲时缩容至零。',
       },
       {
-        icon: 'GPU',
+        icon: 'gauge',
         title: '实例类型',
         body: '根据集群节点自动生成 GPU 类型与规格，并实时显示每个节点的可用容量。成员选择实例类型，但无法修改目录本身。',
       },
     ],
   },
 
+  console: {
+    eyebrow: '桌面控制台',
+    title: '任务、沙箱和 GPU，一个窗口看全',
+    lead: '控制台是适用于 macOS、Windows 和 Linux 的桌面应用。它通过你的 kubeconfig 直接访问 Kubernetes，中间没有任何代理，所见即集群的真实状态。',
+    tabsLabel: '控制台视图',
+    frameTitle: 'forgeai 控制台',
+    items: [
+      {
+        key: 'jobs',
+        tab: '任务',
+        title: '自动排队、自动重试的训练任务',
+        body: '用表单提交任务，查看工作实例及其日志。超出配额的任务在 Kueue 队列中等待，失败的任务会作为新的尝试自动重试，并折叠在第一个任务之下。',
+        bullets: ['停止、启动、重新运行与删除', '一眼看清失败原因和重试策略', '常用任务可保存为模板'],
+        alt: '任务视图：列出运行中、排队中、失败和已完成的训练任务，以及实例类型、就绪工作实例和重试策略',
+      },
+      {
+        key: 'sandboxes',
+        tab: '沙箱',
+        title: '为智能体和 Notebook 准备的沙箱',
+        body: '选择镜像、命令、存储卷，按需加上 GPU，即可启动 gVisor 或 Kata 隔离的沙箱。空闲的沙箱会自动挂起，也可以直接在运行中的沙箱里打开终端。',
+        bullets: ['每个沙箱独立的隔离运行时与资源', '对外提供服务的沙箱拥有稳定的访问地址', '空闲挂起与 TTL 让 GPU 不被闲置占用'],
+        alt: '沙箱视图：列出运行中、空闲和已挂起的沙箱，以及隔离运行时、资源和访问地址',
+      },
+      {
+        key: 'volumes',
+        tab: '存储卷',
+        title: '有后悔药的共享存储卷',
+        body: '从平台存储类型创建 ReadWriteMany 存储卷，就地扩容，并查看哪些任务和沙箱在使用它。删除的存储卷先进入回收站，到期后才会清除。',
+        bullets: ['扩容、恢复和设置过期时间', '无需挂载，通过 HTTPS 浏览文件', '项目的镜像仓库也在同一处管理'],
+        alt: '存储卷视图：项目的存储卷、使用它们的任务和沙箱，以及回收站',
+      },
+      {
+        key: 'resources',
+        tab: '资源',
+        title: '清楚集群能放下什么',
+        body: '实例类型由 GPU 节点自动生成，并显示实时空闲容量。项目配额展示各 GPU 类别、存储、存储卷和 Pod 的用量与上限。',
+        bullets: ['每个工作实例的 GPU 类别、CPU 和内存', '每种实例类型的空闲容量', '项目配额与集群容量并排展示'],
+        alt: '资源视图：实例类型、GPU 空闲容量和项目配额',
+      },
+    ],
+    perks: [
+      { icon: 'key', title: '使用你的 kubeconfig', body: '直接使用现有的上下文，权限由 Kubernetes RBAC 决定。' },
+      { icon: 'moon', title: '浅色与深色', body: '跟随系统主题，也可以手动选择。' },
+      { icon: 'globe', title: 'English 与中文', body: '跟随系统语言，也可以手动选择。' },
+      { icon: 'laptop', title: 'macOS、Windows、Linux', body: '每个平台都有安装包和便携版。' },
+    ],
+  },
   how: {
     eyebrow: '工作原理',
     title: '没有自己的 API 服务器',
     lead: 'Operator 负责协调 Kubernetes 对象。桌面控制台和 kubectl 使用每位成员自己的凭据创建这些对象，因此由 Kubernetes RBAC 决定每个人能做什么。',
+    arch: {
+      caption: '一个请求如何变成一个租户',
+      clients: '客户端',
+      clientItems: ['桌面控制台', 'kubectl', '你自己的工具'],
+      api: 'Kubernetes API Server',
+      apiBody: '使用成员自己的凭据，由 RBAC 决定权限。',
+      operator: 'forgeai operator',
+      operatorBody: '协调项目、重试失败任务、挂起空闲沙箱、清理回收站。',
+      tiles: ['命名空间与网络策略', 'Kueue 队列与配额', 'Kubeflow Trainer 任务', 'agent-sandbox 沙箱', 'Harbor 镜像仓库项目', 'dufs 文件服务'],
+      credentials: '自己的凭据',
+      watches: '监听并协调',
+      provisions: '创建并维护',
+    },
     steps: [
       {
         title: '管理员创建项目',
@@ -367,13 +497,13 @@ const zh: Messages = {
     lead: '控制台通过 kubeconfig 上下文管理项目、任务、沙箱和存储卷。安装包由本站提供，无需直接访问 GitHub 即可下载。',
     platforms: [
       {
-        icon: 'MAC',
+        icon: 'laptop',
         title: 'macOS',
         body: '同时适用于 Apple 芯片和 Intel 芯片的通用版本。应用采用 ad hoc 签名，首次启动时 macOS 会要求你确认。',
         links: [{ label: '下载 .dmg', key: 'macos' }],
       },
       {
-        icon: 'WIN',
+        icon: 'monitor',
         title: 'Windows',
         body: '64 位。可以运行安装程序，也可以直接使用免安装的便携版。',
         links: [
@@ -382,7 +512,7 @@ const zh: Messages = {
         ],
       },
       {
-        icon: 'LNX',
+        icon: 'terminal',
         title: 'Linux',
         body: '64 位。运行时需要 GTK 3 和 WebKitGTK 4.1。Debian 软件包会添加应用菜单项。',
         links: [
@@ -425,6 +555,12 @@ const zh: Messages = {
     },
   },
 
+  cta: {
+    title: '让每个团队都拥有自己的 GPU 切片',
+    body: '安装 operator，创建项目，把 kubeconfig 交给成员。控制台一键下载即可使用。',
+    primary: '下载控制台',
+    secondary: '阅读文档',
+  },
   notFound: {
     eyebrow: '404',
     title: '页面不存在',

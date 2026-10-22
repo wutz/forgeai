@@ -1,0 +1,33 @@
+---
+import type { Locale } from '../i18n/messages';
+import { messages } from '../i18n/messages';
+
+interface Props {
+  lang: Locale;
+  // File stem under public/screenshots, e.g. "overview" for overview-en-light.webp.
+  name: string;
+  alt: string;
+  // Load now instead of when scrolled near. Use it for the image at the top of the page.
+  eager?: boolean;
+}
+
+const { lang, name, alt, eager = false } = Astro.props;
+const title = messages[lang].console.frameTitle;
+const loading = eager ? 'eager' : 'lazy';
+const src = (theme: 'light' | 'dark') => `/screenshots/${name}-${lang}-${theme}.webp`;
+---
+
+<!--
+  Both themes are in the markup; CSS shows the one that matches the effective theme (see .shot-* in global.css),
+  and the browser only fetches the visible one. Screenshots are made by hack/gui-screenshots.
+-->
+<figure class="window">
+  <div class="window-bar" aria-hidden="true">
+    <span class="window-dots"><i></i><i></i><i></i></span>
+    <span class="window-title">{title}</span>
+  </div>
+  <div class="window-body">
+    <img class="shot-light" src={src('light')} alt={alt} width="2160" height="1500" loading={loading} decoding="async" />
+    <img class="shot-dark" src={src('dark')} alt={alt} width="2160" height="1500" loading={loading} decoding="async" />
+  </div>
+</figure>

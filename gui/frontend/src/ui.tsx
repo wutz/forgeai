@@ -277,9 +277,10 @@ function ConfirmDialog({request, onClose}: {request: ConfirmRequest, onClose: ()
     onClose()
   }
   return (
-    <Dialog title={request.title} onClose={onClose} width={420} footer={<>
-      <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
-      <button className={`btn ${request.danger ? 'btn-danger-tint' : 'btn-primary'}`} onClick={go} autoFocus>
+    <Dialog title={request.title} onClose={onClose} width={440} footer={<>
+      {/* A destructive confirm opens on Cancel, so a stray Enter does not run it. */}
+      <button className="btn" onClick={onClose} autoFocus={!!request.danger}>{t('common.cancel')}</button>
+      <button className={`btn ${request.danger ? 'btn-danger-tint' : 'btn-primary'}`} onClick={go} autoFocus={!request.danger}>
         {request.action}
       </button>
     </>}>
@@ -289,19 +290,27 @@ function ConfirmDialog({request, onClose}: {request: ConfirmRequest, onClose: ()
 }
 
 // Dialog is the modal frame: title bar, scrolling body, footer.
-export function Dialog({title, subtitle, onClose, children, footer, width}: {
+// Dialog closes on Escape, the X and a click outside it. While busy (a save in
+// flight) every close is ignored, so a typed form is not lost mid-request.
+export function Dialog({title, subtitle, onClose, children, footer, width, busy}: {
   title: string, subtitle?: ReactNode, onClose: () => void, children: ReactNode,
-  footer?: ReactNode, width?: number
+  footer?: ReactNode, width?: number, busy?: boolean
 }) {
+  const close = () => { if (!busy) onClose() }
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
   return (
-    <div className="overlay" onMouseDown={e => e.target === e.currentTarget && onClose()}>
+    <div className="overlay" onMouseDown={e => e.target === e.currentTarget && close()}>
       <div className="dialog" style={width ? {width} : undefined} role="dialog" aria-modal>
         <div className="dialog-head">
           <div>
             <h2>{title}</h2>
             {subtitle && <div className="dialog-sub">{subtitle}</div>}
           </div>
-          <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}><Icon name="close"/></button>
+          <button className="icon-btn" onClick={close} disabled={busy} aria-label={t('common.close')}><Icon name="close"/></button>
         </div>
         <div className="dialog-body">{children}</div>
         {footer && <div className="dialog-foot">{footer}</div>}

@@ -1,11 +1,14 @@
-import {FormEvent, useEffect, useState} from 'react'
-import {CreateJob, ListInstanceTypes, TemplateNames, ListVolumes} from '../wailsjs/go/app/App'
+import {FormEvent, useEffect, useRef, useState} from 'react'
+import {CreateJob, ListInstanceTypes, ListTemplates, TemplateNames, ListVolumes} from '../wailsjs/go/app/App'
 import {app, training, volumes} from '../wailsjs/go/models'
-import {envToLines, linesToEnv, errText, generateName} from './util'
+import {envErrors, envMap, envToLines, linesToEnv, errText, generateName} from './util'
 import {t} from './i18n'
 import {Dialog} from './ui'
 import {ImageField} from './ImageField'
 import {Mount, VolumeMountsField, mountProblems} from './VolumeMounts'
+
+const NAME_PATTERN = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/
+const NAME_MAX = 50
 
 // JobCreateDialog is the "New job" form: template prefill, instance type,
 // workers, volumes, env and retry defaults.
@@ -38,29 +41,41 @@ export function JobCreateDialog({onClose, onCreated}: {
   const set = <K extends keyof training.Form>(k: K, v: training.Form[K]) =>
     setF(prev => training.Form.createFrom({...prev, [k]: v}))
 
+  // pickSeq numbers the template choices: a reply for an earlier choice is
+  // dropped, so a slow load cannot overwrite the template chosen after it.
+  const pickSeq = useRef(0)
   const useTemplate = (name: string) => {
+    const seq = ++pickSeq.current
     set('template', name)
     if (!name) return
-    import('../wailsjs/go/app/App').then(({ListTemplates}) =>
-      ListTemplates().then(ts => {
-        const found = ts.find(x => x.name === name)
-        if (found?.form) {
-          const nf = training.Form.createFrom({...found.form, name: f.name, template: name})
-          setF(nf)
-          setEnvText(envToLines(Object.fromEntries((nf.env || []).map(e => [e.name, e.value]))))
-          setMounts(nf.volumes || [])
-        }
-      }).catch(e => setError(errText(e))))
+    ListTemplates().then(ts => {
+      if (seq !== pickSeq.current) return
+      const form = ts.find(x => x.name === name)?.form
+      if (!form) return
+      // The template's instance type is kept only when it names one; an empty
+      // one would leave the required select blank.
+      setF(prev => training.Form.createFrom({
+        ...form, name: prev.name, template: name,
+        instanceType: form.instanceType || prev.instanceType,
+      }))
+      setEnvText(envToLines(envMap(form.env || [])))
+      setMounts(form.volumes || [])
+    }).catch(e => {
+      if (seq === pickSeq.current) setError(errText(e))
+    })
   }
 
   // Mounts need the project's volumes to check against; without any mounts the
   // form does not wait for them.
   const mountsOK = mounts.length === 0 ||
     (vols !== null && mountProblems(mounts, vols, f.workers).every(p => !p))
+  const envBad = envErrors(envText)
+  // The name is a DNS label of at most 50 characters, the TrainJob name limit.
+  const nameOK = NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= NAME_MAX
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (!mountsOK) return
+    if (!mountsOK || !nameOK || envBad.length) return
     setBusy(true)
     const form = training.Form.createFrom({
       ...f,
@@ -78,9 +93,9 @@ export function JobCreateDialog({onClose, onCreated}: {
 
   return (
     <Dialog title={t('jobCreate.title')} subtitle={t('jobCreate.subtitle')}
-            onClose={onClose} footer={<>
-              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
-              <button type="submit" form="job-form" className="btn btn-primary" disabled={busy || !f.name || !f.image || !mountsOK}>
+            onClose={onClose} busy={busy} footer={<>
+              <button className="btn" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
+              <button type="submit" form="job-form" className="btn btn-primary" disabled={busy || !f.image || !nameOK || !mountsOK || envBad.length > 0}>
                 {busy ? t('jobCreate.creating') : t('jobCreate.create')}
               </button>
             </>}>
@@ -90,8 +105,8 @@ export function JobCreateDialog({onClose, onCreated}: {
             <label htmlFor="j-name">{t('common.name')}</label>
             <input id="j-name" className="input mono" value={f.name}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                   onChange={e => set('name', e.target.value)}
-                   placeholder={t('jobCreate.namePlaceholder')} required/>
+                   onChange={e => set('name', e.target.value)} maxLength={NAME_MAX}
+                   aria-invalid={!nameOK} placeholder={t('jobCreate.namePlaceholder')} required/>
             <span className="hint">{t('jobCreate.nameHint')}</span>
           </div>
           <div className="row">
@@ -137,7 +152,11 @@ export function JobCreateDialog({onClose, onCreated}: {
             <label htmlFor="j-env">{t('jobCreate.environment')}</label>
             <textarea id="j-env" className="textarea" rows={3} value={envText}
                       autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                      onChange={e => setEnvText(e.target.value)} placeholder="KEY=value"/>
+                      onChange={e => setEnvText(e.target.value)} placeholder="KEY=value"
+                      aria-invalid={envBad.length > 0}/>
+            {envBad.length > 0 && <span className="hint hint-error">
+              {t('jobCreate.envInvalid', {lines: envBad.join(', ')})}
+            </span>}
           </div>
           <div className="field">
             <label>{t('jobCreate.volumeMounts')}</label>

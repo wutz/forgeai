@@ -175,7 +175,9 @@ func (a *App) CreateJob(f training.Form) (*Job, error) {
 	return toJob(ctx, c, tj)
 }
 
-// DeleteJob deletes a TrainJob (pods go with it, Kueue releases the quota).
+// DeleteJob deletes a TrainJob (pods go with it, Kueue releases the quota). A
+// group leader takes its retries with it: they are TrainJobs of their own, and
+// left behind they would show as top-level jobs still holding pods and quota.
 func (a *App) DeleteJob(name string) error {
 	c, err := a.current()
 	if err != nil {
@@ -183,7 +185,31 @@ func (a *App) DeleteJob(name string) error {
 	}
 	ctx, cancel := a.call()
 	defer cancel()
-	return c.k8s.Delete(ctx, trainJobStub(c, name))
+	items, err := listTrainJobs(ctx, c)
+	if err != nil {
+		return err
+	}
+	targets := []string{name}
+	for i := range items {
+		if items[i].Name != name {
+			continue
+		}
+		if groupOf(&items[i]) == name {
+			targets = nil
+			for j := range items {
+				if groupOf(&items[j]) == name {
+					targets = append(targets, items[j].Name)
+				}
+			}
+		}
+		break
+	}
+	for _, t := range targets {
+		if err := c.k8s.Delete(ctx, trainJobStub(c, t)); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
 }
 
 // StopJob stops a running or queued job: the operator deactivates its Kueue
@@ -209,17 +235,20 @@ func (a *App) StartJob(name string) (*Job, error) {
 	})
 }
 
-// RerunJob submits a fresh job from the form of an existing one.
+// RerunJob submits a fresh job from the form of an existing one. Without a name
+// the copy takes the first free "-rN" suffix, so a job can be rerun again.
 func (a *App) RerunJob(name, newName string) (*Job, error) {
 	c, err := a.current()
 	if err != nil {
 		return nil, err
 	}
-	if newName == "" {
-		newName = name + "-r2"
-	}
 	ctx, cancel := a.call()
 	defer cancel()
+	if newName == "" {
+		if newName, err = freeRerunName(ctx, c, name); err != nil {
+			return nil, err
+		}
+	}
 	src, err := getTrainJob(ctx, c, name)
 	if err != nil {
 		return nil, err
@@ -236,6 +265,29 @@ func (a *App) RerunJob(name, newName string) (*Job, error) {
 		return nil, err
 	}
 	return toJob(ctx, c, tj)
+}
+
+// freeRerunName returns name with the lowest "-rN" suffix (N from 2) that no
+// TrainJob in the namespace holds, keeping the result within the name limit.
+func freeRerunName(ctx context.Context, c *Connection, name string) (string, error) {
+	items, err := listTrainJobs(ctx, c)
+	if err != nil {
+		return "", err
+	}
+	taken := make(map[string]bool, len(items))
+	for i := range items {
+		taken[items[i].Name] = true
+	}
+	for n := 2; ; n++ {
+		suffix := "-r" + strconv.Itoa(n)
+		base := name
+		if room := training.MaxNameLength - len(suffix); len(base) > room {
+			base = base[:room]
+		}
+		if cand := base + suffix; !taken[cand] {
+			return cand, nil
+		}
+	}
 }
 
 // rerunForm is the form of a new job copied from src. It keeps src's job

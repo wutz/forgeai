@@ -18,6 +18,8 @@ export const en = {
   'sandboxes.stopping': 'Stopping…',
   'sandboxes.saveAsTemplate': 'Save as template',
   'sandboxes.deleteTitle': 'Delete sandbox {name}?',
+  'sandboxes.stopTitle': 'Stop sandbox {name}?',
+  'sandboxes.stopMessage': 'Its pod stops and anything the agent keeps only inside the container is lost. Volumes stay, and the sandbox can be started again.',
   'sandboxes.deleteMessage': 'Its pod and service stop, and the volumes it created from its claim templates are deleted. Shared volumes stay. This cannot be undone.',
   'sandboxes.deleteAction': 'Delete sandbox',
   'sandboxes.tabOverview': 'Overview',
@@ -66,6 +68,7 @@ export const en = {
   'sandboxCreate.serviceNo': 'No (pod IP only)',
 
   'terminal.sessionEnded': 'session ended',
+  'terminal.reconnect': 'Reconnect',
   'terminal.sessionEndedWith': 'session ended: {message}',
   'terminal.restoreLabel': 'Restore terminal',
   'terminal.maximizeLabel': 'Maximize terminal',
@@ -91,6 +94,8 @@ export const zh: Record<keyof typeof en, string> = {
   'sandboxes.stopping': '停止中…',
   'sandboxes.saveAsTemplate': '保存为模板',
   'sandboxes.deleteTitle': '删除沙箱 {name}？',
+  'sandboxes.stopTitle': '停止沙箱 {name}？',
+  'sandboxes.stopMessage': '其 Pod 将停止，仅保存在容器内的智能体数据会丢失。存储卷保留，之后可以重新启动该沙箱。',
   'sandboxes.deleteMessage': '该沙箱的 Pod 和服务将停止，由其卷声明模板创建的存储卷会被删除，共享存储卷保留。此操作无法撤销。',
   'sandboxes.deleteAction': '删除沙箱',
   'sandboxes.tabOverview': '概览',
@@ -139,6 +144,7 @@ export const zh: Record<keyof typeof en, string> = {
   'sandboxCreate.serviceNo': '否（仅 Pod IP）',
 
   'terminal.sessionEnded': '会话已结束',
+  'terminal.reconnect': '重新连接',
   'terminal.sessionEndedWith': '会话已结束：{message}',
   'terminal.restoreLabel': '还原终端',
   'terminal.maximizeLabel': '最大化终端',

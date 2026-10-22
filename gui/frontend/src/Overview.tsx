@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {ListInstanceTypes, ListJobs, ListVolumes, ListImages, Quota} from '../wailsjs/go/app/App'
 import {app, volumes} from '../wailsjs/go/models'
 import {Card, Icon, MetricTile, Meter, PageHeader, RefreshButton, Spinner, useActive} from './ui'
-import {Status, errText, fmtDate, pct, phaseLabel, toGiB} from './util'
+import {Status, errText, fmtDate, pct, phaseLabel, tagCount, toGiB} from './util'
 import {t} from './i18n'
 
 // Overview is the landing view of a project: what is running now, the GPU
@@ -32,7 +32,14 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
   })
   useEffect(() => {
     if (!onScreen) return
-    const poll = () => refresh().catch(() => {})
+    // A slow reply must not overlap the next poll: the older answer could land
+    // last and show stale numbers.
+    let inFlight = false
+    const poll = () => {
+      if (inFlight) return
+      inFlight = true
+      refresh().catch(() => {}).finally(() => { inFlight = false })
+    }
     poll()
     const timer = setInterval(poll, 8000)
     return () => clearInterval(timer)
@@ -61,7 +68,7 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
   const gpuUsed = Math.max(0, gpuTotal - gpuFree)
 
   const storageGiB = vols.reduce((n, v) => n + (v.capacityGiB || v.requestedGiB || 0), 0)
-  const totalTags = images.reduce((n, r) => n + r.count, 0)
+  const totalTags = images.reduce((n, r) => n + tagCount(r), 0)
 
   if (!loaded) return <div className="page"><Spinner label={t('overview.loading')}/></div>
 
@@ -129,10 +136,10 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
           {!quota ? <div className="empty"><div className="empty-title">{t('overview.quotaUnavailable')}</div></div> : (
             <div className="quota-list">
               {(quota.gpuClasses || []).map(g => (
-                <Meter key={g.class} value={g.used} max={Math.max(g.quota, 1)}
-                       tone={g.used >= g.quota ? 'warning' : 'accent'}
+                <Meter key={g.class} value={g.used} max={Math.max(quota.gpuQuota, g.used, 1)}
+                       tone={quota.gpuQuota && g.used >= quota.gpuQuota ? 'warning' : 'accent'}
                        label={<span className="mono">{t('overview.gpusOfClass', {cls: g.class})}</span>}
-                       right={<span>{g.used} / {g.quota}</span>}/>
+                       right={<span>{quota.gpuQuota ? `${g.used} / ${quota.gpuQuota}` : g.used}</span>}/>
               ))}
               <Meter value={toGiB(quota.storageUsed)} max={Math.max(toGiB(quota.storage), 1)} tone="muted"
                      label={<span className="mono">{t('overview.volumeStorage')}</span>}

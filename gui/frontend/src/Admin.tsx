@@ -4,7 +4,7 @@ import {
 } from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {errText, fmtDate, generateName, phaseLabel} from './util'
-import {Badge, Card, Dialog, Empty, Icon, PageHeader, useActive, useConfirm} from './ui'
+import {Badge, Card, Dialog, Empty, Icon, PageHeader, RefreshButton, useActive, useConfirm} from './ui'
 import {t} from './i18n'
 
 // Admin manages Projects: quota (GPU classes, storage), network isolation,
@@ -16,10 +16,15 @@ export function Admin() {
   const confirm = useConfirm()
   const active = useActive()
 
+  // refresh rejects when the list fails; the banner shows why and the refresh
+  // button reports it.
   const refresh = () => ListProjects().then(ps => {
     setProjects(ps); setError('')
-  }).catch(e => setError(errText(e)))
-  useEffect(() => { if (active) refresh() }, [active])
+  }).catch(e => {
+    setError(errText(e))
+    throw e
+  })
+  useEffect(() => { if (active) refresh().catch(() => undefined) }, [active])
 
   const newProject = () => app.Project.createFrom({
     name: '', displayName: '', namespace: '',
@@ -48,13 +53,16 @@ export function Admin() {
                   meta={<span className="muted" style={{fontSize: 12.5}}>
                     {t('admin.meta', {total: projects.length, ready})}
                   </span>}
-                  actions={<button className="btn btn-primary" onClick={() => edit('')}>
-                    <Icon name="plus" size={14}/>{t('admin.newProject')}
-                  </button>}/>
+                  actions={<>
+                    <RefreshButton onRefresh={refresh}/>
+                    <button className="btn btn-primary" onClick={() => edit('')}>
+                      <Icon name="plus" size={14}/>{t('admin.newProject')}
+                    </button>
+                  </>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {confirm.dialog}
       {editing && <ProjectDialog form={editing} onClose={() => setEditing(null)}
-                                 onSaved={() => { setEditing(null); refresh() }}/>}
+                                 onSaved={() => { setEditing(null); refresh().catch(() => undefined) }}/>}
 
       <Card>
         {projects.length === 0 ? (
@@ -174,8 +182,8 @@ function ProjectDialog({form, onClose, onSaved}: {
   return (
     <Dialog title={create ? t('admin.newProject') : t('admin.editProject')}
             subtitle={t('admin.dialogSubtitle')}
-            onClose={onClose} footer={<>
-              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
+            onClose={onClose} busy={busy} footer={<>
+              <button className="btn" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
               <button type="submit" form="project-form" className="btn btn-primary" disabled={busy || !p.name}>
                 {busy ? t('admin.saving') : create ? t('admin.createProject') : t('common.save')}
               </button>
@@ -265,6 +273,7 @@ function ProjectDialog({form, onClose, onSaved}: {
               <option value="Isolated">{t('admin.isolationIsolated')}</option>
               <option value="None">{t('admin.isolationNone')}</option>
             </select>
+            <span className="hint">{t('admin.isolationHint')}</span>
           </div>
           <div className="field">
             <label>{t('admin.internetEgress')}</label>
@@ -291,7 +300,8 @@ function ProjectDialog({form, onClose, onSaved}: {
               </select>
               {!create && <button type="button" className="btn btn-sm"
                                   onClick={() => exportKube(m.name)} disabled={!m.name}>Kubeconfig</button>}
-              <button type="button" className="btn btn-sm btn-danger"
+              <button type="button" className="btn btn-sm btn-danger" aria-label={t('admin.removeMember')}
+                      title={t('admin.removeMember')}
                       onClick={() => set('members', (p.members || []).filter((_, j) => j !== i))}>
                 <Icon name="trash" size={13}/>
               </button>

@@ -23,13 +23,17 @@ export function Dependencies() {
   const confirm = useConfirm()
   const active = useActive()
 
-  const refresh = () => ListDependencies().then(d => {
-    setData(d); setError('')
-  }).catch(e => {
+  // refresh does not clear error: the install outcome is refreshed right after
+  // it is set, and the banner must still show it.
+  const refresh = () => ListDependencies().then(setData).catch(e => {
     setError(errText(e))
     throw e
   })
-  useEffect(() => { if (active) refresh().catch(() => undefined) }, [active])
+  useEffect(() => {
+    if (!active) return
+    setError('')
+    refresh().catch(() => undefined)
+  }, [active])
 
   // Installs run in the background; their steps arrive as events, and the
   // final one refreshes the list with the outcome.
@@ -123,7 +127,7 @@ export function Dependencies() {
                   <td>
                     <div className="actions">
                       {d.installable && d.status !== 'ready' && d.status !== 'installing' && d.status !== 'mismatch' && (
-                        <button className="btn btn-sm btn-primary" onClick={() => install(d)}>
+                        <button className="btn btn-sm btn-accent" onClick={() => install(d)}>
                           <Icon name="download" size={13}/>{verb(d)}
                         </button>
                       )}

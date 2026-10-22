@@ -13,6 +13,7 @@ const phaseKeys = new Map<string, MessageKey>([
   ['stopped', 'phase.stopped'], ['suspended', 'phase.suspended'], ['succeeded', 'phase.succeeded'],
   ['failed', 'phase.failed'], ['idle', 'phase.idle'], ['ready', 'phase.ready'],
   ['resizing', 'phase.resizing'],
+  ['expired', 'phase.expired'],
 ])
 
 // phaseLabel is the text shown for a backend phase. Code compares phases by
@@ -46,6 +47,19 @@ export function linesToEnv(s: string): EnvMap {
     env[name] = i < 0 ? '' : line.slice(i + 1)
   }
   return env
+}
+
+// envErrors returns the 1-based numbers of the lines that are not NAME=value.
+// Blank and comment lines are fine; linesToEnv would otherwise take a bare
+// "KEY" as an empty value, or drop a "=value" line without a name.
+export function envErrors(s: string): number[] {
+  const bad: number[] = []
+  s.split('\n').forEach((line, i) => {
+    const text = line.trim()
+    if (!text || text.startsWith('#')) return
+    if (text.indexOf('=') <= 0) bad.push(i + 1)
+  })
+  return bad
 }
 
 // envMap turns the name/value list of a form into an EnvMap.
@@ -91,4 +105,10 @@ export function toGiB(q?: string): number {
 export function pct(value: number, max: number): number {
   if (!(max > 0)) return 0
   return Math.min(100, Math.max(0, Math.round((value / max) * 100)))
+}
+
+// tagCount is the number of tags across a repository's images. The registry's
+// artifact count is digests, and an untagged digest has no tag to count.
+export function tagCount(repo: {images?: {tags?: string[]}[]}): number {
+  return (repo.images ?? []).reduce((n, img) => n + (img.tags?.filter(Boolean).length ?? 0), 0)
 }

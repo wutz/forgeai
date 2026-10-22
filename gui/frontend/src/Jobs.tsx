@@ -103,7 +103,7 @@ export function Jobs() {
       </div>
 
       <div className="split">
-        <JobTable jobs={shown} selected={selected} onSelect={n =>
+        <JobTable jobs={shown} filtered={filter !== 'all'} selected={selected} onSelect={n =>
           setSelected(prev => prev === n ? null : n)}/>
         {selected && <JobDetail name={selected} onDone={refresh} onOpen={n => { setSelected(n); refresh() }}
                                 onDeleted={() => { setSelected(null); refresh() }}/>}
@@ -112,11 +112,13 @@ export function Jobs() {
   )
 }
 
-function JobTable({jobs, selected, onSelect}: {
-  jobs: app.Job[], selected: string | null, onSelect: (name: string) => void
+function JobTable({jobs, filtered, selected, onSelect}: {
+  jobs: app.Job[], filtered: boolean, selected: string | null, onSelect: (name: string) => void
 }) {
   if (!jobs.length) {
-    return <Card><Empty icon="play" title={t('jobs.emptyTitle')}>{t('jobs.emptyHint')}</Empty></Card>
+    return <Card>{filtered
+      ? <Empty icon="play" title={t('jobs.emptyFiltered')}/>
+      : <Empty icon="play" title={t('jobs.emptyTitle')}>{t('jobs.emptyHint')}</Empty>}</Card>
   }
   return (
     <Card>
@@ -162,7 +164,8 @@ function JobTable({jobs, selected, onSelect}: {
 type DetailTab = 'overview' | 'workers' | 'log' | 'env'
 
 // jobTemplateForm is the job template a job's settings are saved as. Volumes
-// are left out: job templates do not carry them.
+// are left out: the job view keeps only claim names, and a template needs the
+// mount paths too.
 function jobTemplateForm(job: app.Job) {
   return training.Form.createFrom({
     name: '', description: '', image: job.image, command: job.command,
@@ -209,11 +212,15 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
   useEffect(() => {
     if (!active) return
     GetJob(name).then(setJob).catch(e => setError(errText(e)))
-    const timer = setInterval(() => GetJob(name).then(setJob).catch(() => {}), 5000)
+    // A failed poll is shown: the job may have been deleted elsewhere, and its actions then fail.
+    const timer = setInterval(() => GetJob(name).then(setJob).catch(e => setError(errText(e))), 5000)
     return () => clearInterval(timer)
   }, [name, active])
 
-  if (!job) return <Card><Spinner label={error || t('jobs.loadingJob')}/></Card>
+  if (!job) return <Card>{error
+    ? <div className="banner banner-error" role="alert">{error}</div>
+    : <Spinner label={t('jobs.loadingJob')}/>}</Card>
+
   const live = job.phase !== 'Failed' && job.phase !== 'Succeeded'
   const retriable = job.phase === 'Failed' || job.phase === 'Succeeded'
 
@@ -259,7 +266,12 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
           <Icon name="scroll" size={13}/>{t('common.logs')}
         </button>
         {live && job.phase !== 'Stopped' &&
-          <button className="btn btn-sm" disabled={!!pending} onClick={() => act('stop', StopJob(job.name))}>
+          <button className="btn btn-sm" disabled={!!pending} onClick={() => confirm.ask({
+            title: t('jobs.stopTitle', {name: job.name}),
+            message: t('jobs.stopMessage'),
+            action: t('jobs.stopAction'),
+            run: () => act('stop', StopJob(job.name)),
+          })}>
             <Icon name="square" size={12}/>{pending === 'stop' ? t('jobs.stopping') : t('common.stop')}
           </button>}
         {job.phase === 'Stopped' &&
@@ -276,7 +288,8 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
         <span className="spacer"/>
         <button className="btn btn-sm btn-danger" onClick={() => confirm.ask({
           title: t('jobs.deleteTitle', {name: job.name}),
-          message: t('jobs.deleteMessage'),
+          message: t('jobs.deleteMessage') + (job.retries?.length
+            ? ' ' + t('jobs.deleteRetries', {count: job.retries.length}) : ''),
           action: t('jobs.deleteAction'), danger: true,
           run: () => DeleteJob(job.name).then(onDeleted).catch(e => setError(errText(e))),
         })}>
@@ -302,7 +315,9 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
               <dt>{t('jobs.volumes')}</dt><dd className="mono">{job.volumes?.join(', ') || '—'}</dd>
               <dt>{t('jobs.command')}</dt><dd><pre className="code">{job.command || '—'}</pre></dd>
               {job.failureReason && <><dt>{t('jobs.failure')}</dt><dd>{t('jobs.failureDetail', {reason: job.failureReason, message: job.message || ''})}</dd></>}
-              {job.retriedAs && <><dt>{t('jobs.retriedAs')}</dt><dd className="mono">{job.retriedAs}</dd></>}
+              {job.retriedAs && <><dt>{t('jobs.retriedAs')}</dt><dd>
+                <button className="btn btn-sm mono" onClick={() => onOpen(job.retriedAs ?? '')}>{job.retriedAs}</button>
+              </dd></>}
               <dt>{t('common.created')}</dt><dd>{fmtDate(job.created)}</dd>
             </dl>
 
@@ -311,7 +326,7 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
                 <h4 className="sub-head">{t('jobs.retries')}</h4>
                 <div className="mini-table">
                   {job.retries.map(r => (
-                    <button key={r.name} className="mini-row" onClick={() => detailOf(r.name)}>
+                    <button key={r.name} className="mini-row" onClick={() => onOpen(r.name)}>
                       <span className="mono">{r.name}</span>
                       <Status phase={r.phase}/>
                       <span className="muted">{r.failureReason || ''}</span>

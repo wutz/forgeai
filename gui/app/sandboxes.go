@@ -140,9 +140,13 @@ func (a *App) CreateSandbox(f sandbox.Form) (*Sandbox, error) {
 	if err := volumesClient(c).Mountable(ctx, names, 1); err != nil {
 		return nil, err
 	}
+	regSecret, err := registrySecretName(ctx, c)
+	if err != nil {
+		return nil, err
+	}
 	u, err := sandbox.Render(&f, sandbox.Context{
 		Namespace: c.namespace(), Project: c.Info.Project, InstanceType: it, Platform: cfg,
-		RegistrySecret: registrySecretName(ctx, c),
+		RegistrySecret: regSecret,
 	})
 	if err != nil {
 		return nil, err
@@ -501,11 +505,16 @@ func ptr[T any](p *T) T {
 
 // registrySecretName is the pull secret of the project, or "" when the
 // registry is not set up.
-func registrySecretName(ctx context.Context, c *Connection) string {
+func registrySecretName(ctx context.Context, c *Connection) (string, error) {
 	sec := &corev1.Secret{}
 	key := client.ObjectKey{Namespace: c.namespace(), Name: naming.RegistrySecretName}
 	if err := c.k8s.Get(ctx, key, sec); err != nil {
-		return ""
+		// A missing secret means no pull secret; any other failure must not
+		// quietly create a sandbox that cannot pull its private images.
+		if apierrors.IsNotFound(err) {
+			return "", nil
+		}
+		return "", err
 	}
-	return naming.RegistrySecretName
+	return naming.RegistrySecretName, nil
 }

@@ -178,7 +178,8 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
     const payload = training.Form.createFrom({
       ...f,
       env: Object.entries(linesToEnv(envText)).map(([name, value]) => ({name, value})),
-      volumes: [],
+      // The dialog does not edit mounts; an edited template keeps its own.
+      volumes: f.volumes ?? [],
     })
     const req = existing ? UpdateTemplate(existing, payload) : CreateTemplate(payload)
     req.then(() => onSaved(payload.name ?? '')).catch(e => {
@@ -191,8 +192,8 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
             subtitle={existing
               ? t('templates.jobEditSubtitle')
               : t('templates.jobNewSubtitle')}
-            onClose={onClose} footer={<>
-              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
+            onClose={onClose} busy={busy} footer={<>
+              <button className="btn" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
               <button type="submit" form="template-form" className="btn btn-primary" disabled={busy || !f.name || !f.image}>
                 {busy ? t('templates.saving') : t('templates.saveTemplate')}
               </button>

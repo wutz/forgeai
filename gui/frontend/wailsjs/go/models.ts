@@ -139,7 +139,6 @@ export namespace app {
 	}
 	export class GPUUsage {
 	    class: string;
-	    quota: number;
 	    used: number;
 	    pods: number;
 	
@@ -150,7 +149,6 @@ export namespace app {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.class = source["class"];
-	        this.quota = source["quota"];
 	        this.used = source["used"];
 	        this.pods = source["pods"];
 	    }
@@ -585,6 +583,7 @@ export namespace app {
 	
 	
 	export class QuotaUsage {
+	    gpuQuota: number;
 	    gpuClasses: GPUUsage[];
 	    storage: string;
 	    storageUsed: string;
@@ -599,7 +598,8 @@ export namespace app {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.gpuClasses = this.convertValues(source["gpuClasses"], GPUUsage);
+	        this.gpuQuota = source["gpuQuota"];
+        this.gpuClasses = this.convertValues(source["gpuClasses"], GPUUsage);
 	        this.storage = source["storage"];
 	        this.storageUsed = source["storageUsed"];
 	        this.volumes = source["volumes"];

@@ -32,7 +32,7 @@ export function Resources() {
   const total = types.reduce((n, ty) => n + ty.total, 0)
   const free = types.reduce((n, ty) => n + ty.free, 0)
   const used = Math.max(0, total - free)
-  const gpuQuota = (quota?.gpuClasses || []).reduce((n, g) => n + g.quota, 0)
+  const gpuQuota = quota?.gpuQuota ?? 0
   const gpuUsed = (quota?.gpuClasses || []).reduce((n, g) => n + g.used, 0)
 
   return (
@@ -67,7 +67,7 @@ export function Resources() {
             <tbody>
             {types.map(ty => (
               <tr key={ty.name} className={ty.free >= 1 ? '' : 'row-full'}>
-                <td className="mono">
+                <td className="mono nowrap">
                   <span className="cell-main">{ty.name}</span>
                   <span className="cell-sub">{ty.class}</span>
                 </td>
@@ -98,12 +98,12 @@ export function Resources() {
               <tr key={g.class}>
                 <td className="mono">{t('resources.gpusOfClass', {cls: g.class})}</td>
                 <td>
-                  <Meter value={g.used} max={Math.max(g.quota, 1)}
-                         tone={g.used >= g.quota ? 'warning' : 'accent'}
-                         right={<span>{pct(g.used, g.quota)}%</span>}/>
+                  <Meter value={g.used} max={Math.max(quota.gpuQuota, g.used, 1)}
+                         tone={quota.gpuQuota && g.used >= quota.gpuQuota ? 'warning' : 'accent'}
+                         right={<span>{pct(g.used, quota.gpuQuota)}%</span>}/>
                 </td>
                 <td>{g.used}</td>
-                <td>{g.quota}</td>
+                <td>{quota.gpuQuota || '—'}</td>
               </tr>
             ))}
             <tr>

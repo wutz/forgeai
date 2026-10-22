@@ -6,6 +6,7 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -100,6 +101,11 @@ func (a *App) SaveProject(f Project) error {
 	p := &v1.Project{}
 	create := false
 	if err := c.k8s.Get(ctx, client.ObjectKey{Name: f.Name}, p); err != nil {
+		// Only a missing project is created: a forbidden or failed read must
+		// not turn into a create that then fails, or worse, succeeds.
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
 		p = &v1.Project{ObjectMeta: metav1.ObjectMeta{Name: f.Name}}
 		create = true
 	}

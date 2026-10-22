@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {DeleteImage, DeleteImageRepo, ListImages, Registry} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
-import {errText, fmtDate} from './util'
+import {errText, fmtDate, tagCount} from './util'
 import {t} from './i18n'
 import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, useActive, useConfirm} from './ui'
 
@@ -38,12 +38,12 @@ export function Images() {
   const host = reg?.url.split('/')[0] ?? ''
   const login = reg?.username ? `docker login ${host} -u '${reg.username}'` : ''
   const address = (repo: string, tag: string) => reg ? `${reg.url}/${repo}:${tag}` : ''
-  const totalTags = repos.reduce((n, r) => n + r.count, 0)
+  const totalTags = repos.reduce((n, r) => n + tagCount(r), 0)
   const totalPulls = repos.reduce((n, r) => n + r.pulls, 0)
 
   const deleteRepo = (r: app.ImageRepo) => confirm.ask({
     title: t('images.deleteRepoTitle', {name: r.name}),
-    message: t('images.deleteRepoMessage', {count: r.count}),
+    message: t('images.deleteRepoMessage', {count: tagCount(r)}),
     action: t('images.deleteRepo'), danger: true,
     run: () => DeleteImageRepo(r.name).then(refresh).catch(e => setError(errText(e))),
   })
@@ -114,7 +114,7 @@ export function Images() {
           <details key={r.name} className="repo">
             <summary>
               <span className="mono">{reg?.url}/{r.name}</span>
-              <Badge>{t('images.tagsCount', {count: r.count})}</Badge>
+              <Badge>{t('images.tagsCount', {count: tagCount(r)})}</Badge>
               <span className="muted" style={{fontSize: 12}}>{t('images.pullsCount', {count: r.pulls})}</span>
               <button className="btn btn-sm btn-danger" onClick={e => {
                 e.preventDefault()

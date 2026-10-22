@@ -343,7 +343,7 @@ func (a *App) ListDependencies() (*Dependencies, error) {
 		if r, ok := records[info.name]; ok {
 			dep.AppliedBy, dep.AppliedAt = r.AppliedBy, r.AppliedAt
 		}
-		if a.installs.active(info.name) {
+		if a.installs.active(installKey(c, info.name)) {
 			dep.Status, dep.Message = "installing", "Installing"
 		}
 		out.Items = append(out.Items, dep)
@@ -545,7 +545,8 @@ func (a *App) InstallDependency(name string) error {
 	} else if err := checkChartTarget(ctx, c.k8s); err != nil {
 		return err
 	}
-	if !a.installs.start(name) {
+	key := installKey(c, name)
+	if !a.installs.start(key) {
 		return fmt.Errorf("%s is already being installed", name)
 	}
 	go func() {
@@ -567,7 +568,7 @@ func (a *App) InstallDependency(name string) error {
 		}
 		// Release the component before the outcome is emitted: the view
 		// refreshes on it and must not still see the install in progress.
-		a.installs.finish(name)
+		a.installs.finish(key)
 		done := DependencyProgress{Name: name, Message: "Installed " + rec.Version, Done: true}
 		if err != nil {
 			done = DependencyProgress{Name: name, Message: "Install failed", Done: true, Error: err.Error()}
@@ -746,6 +747,10 @@ func restartOperator(ctx context.Context, k8s client.Client) error {
 	d.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().UTC().Format(time.RFC3339)
 	return k8s.Patch(ctx, d, client.MergeFrom(orig))
 }
+
+// installKey names an install by its cluster context as well as its component:
+// the same component installing on another cluster is not this one.
+func installKey(c *Connection, name string) string { return c.Info.Context + "/" + name }
 
 // depInstalls tracks the installs in progress, by component.
 type depInstalls struct {

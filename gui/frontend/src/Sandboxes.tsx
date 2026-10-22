@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react'
+import {useEffect, useRef, useState} from 'react'
 import {
   DeleteSandbox, GetSandbox, KeepSandboxAwake, ListSandboxes, SandboxLogs, StartSandbox, StopSandbox,
 } from '../wailsjs/go/app/App'
@@ -23,9 +23,17 @@ export function Sandboxes() {
   const [creating, setCreating] = useState(false)
   const active = useActive()
 
+  // listed holds the names of the last completed list. A selected sandbox that
+  // was listed and is now gone was deleted elsewhere, so its detail is closed.
+  // A sandbox just created is not listed yet and keeps its detail.
+  const listed = useRef(new Set<string>())
   const refresh = () => {
     ListSandboxes().then(bs => {
+      const names = new Set(bs.map(b => b.name))
+      const before = listed.current
+      listed.current = names
       setBoxes(bs)
+      setSelected(cur => cur && before.has(cur) && !names.has(cur) ? null : cur)
       setError('')
     }).catch(e => setError(errText(e)))
   }
@@ -144,8 +152,12 @@ function SandboxDetail({name, onDone, onDeleted}: {
 
   useEffect(() => {
     if (!phase || !pending) return
-    const up = phase === 'Running' || phase === 'Pending'
-    if (pending === 'start' ? up : !up) setPending(null)
+    // A start is done once the sandbox leaves Stopped, even into Failed or
+    // Expired; a stop is done once it reaches a settled phase.
+    const settled = pending === 'start'
+      ? phase !== 'Stopped'
+      : phase === 'Stopped' || phase === 'Failed' || phase === 'Expired' || phase === 'Succeeded'
+    if (settled) setPending(null)
   }, [phase, pending])
 
   useEffect(() => {
@@ -201,8 +213,12 @@ function SandboxDetail({name, onDone, onDeleted}: {
         <button className="btn btn-sm" onClick={() => showLog().catch(() => {})}>
           <Icon name="scroll" size={13}/>{t('common.logs')}
         </button>
-        {running && <button className="btn btn-sm" disabled={pending !== null}
-                           onClick={() => transition('stop', StopSandbox(box.name))}>
+        {running && <button className="btn btn-sm" disabled={pending !== null} onClick={() => confirm.ask({
+          title: t('sandboxes.stopTitle', {name: box.name}),
+          message: t('sandboxes.stopMessage'),
+          action: t('common.stop'),
+          run: () => transition('stop', StopSandbox(box.name)),
+        })}>
           {pending === 'stop' ? <span className="spinner" aria-hidden/> : <Icon name="square" size={12}/>}
           {pending === 'stop' ? t('sandboxes.stopping') : t('common.stop')}
         </button>}

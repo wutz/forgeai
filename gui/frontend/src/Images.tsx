@@ -53,7 +53,7 @@ export function Images() {
     const tags = img.tags?.filter(Boolean) ?? []
     confirm.ask({
       title: t('images.deleteImageTitle', {digest: img.digest.slice(7, 19), name: r.name}),
-      message: tags.length > 1
+      message: tags.length
         ? t('images.deleteImageTags', {tags: tags.join(', ')})
         : t('images.deleteImageMessage'),
       action: t('images.deleteImage'), danger: true,

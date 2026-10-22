@@ -1,7 +1,7 @@
 import {FormEvent, useEffect, useState} from 'react'
 import {CreateSandbox, ListInstanceTypes, ListVolumes, SandboxOptions, SandboxTemplates} from '../wailsjs/go/app/App'
 import {app, sandbox, volumes, v1} from '../wailsjs/go/models'
-import {envErrors, envToLines, linesToEnv, errText, generateName} from './util'
+import {envErrors, envToLines, linesToEnv, errText, generateName, NAME_PATTERN, SANDBOX_NAME_MAX} from './util'
 import {CancelButton, Dialog} from './ui'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
@@ -67,10 +67,13 @@ export function SandboxCreateDialog({onClose, onCreated}: {
     (vols !== null && mountProblems(mounts, vols, 1).every(p => !p))
 
   const envBad = envErrors(envText)
+  // The backend rejects a name that does not start with a letter, or is longer
+  // than the sandbox limit; the field says so before Create is pressed.
+  const nameOK = NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= SANDBOX_NAME_MAX
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (!mountsOK || envBad.length) return
+    if (!nameOK || !mountsOK || envBad.length) return
     setBusy(true)
     const form = sandbox.Form.createFrom({
       ...f,
@@ -95,7 +98,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
     <Dialog title={t('sandboxCreate.title')} subtitle={t('sandboxCreate.subtitle')}
             onClose={onClose} busy={busy} footer={<>
               <CancelButton disabled={busy}/>
-              <button type="submit" form="sandbox-form" className="btn btn-primary" disabled={busy || !f.name || !f.image || !mountsOK || envBad.length > 0}>
+              <button type="submit" form="sandbox-form" className="btn btn-primary" disabled={busy || !nameOK || !f.image || !mountsOK || envBad.length > 0}>
                 {busy ? t('sandboxCreate.creating') : t('sandboxCreate.create')}
               </button>
             </>}>
@@ -117,9 +120,13 @@ export function SandboxCreateDialog({onClose, onCreated}: {
             <label htmlFor="s-name">{t('common.name')}</label>
             <input id="s-name" className="input mono" value={f.name}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                   onChange={e => set('name', e.target.value)}
+                   onChange={e => set('name', e.target.value)} maxLength={SANDBOX_NAME_MAX}
+                   aria-invalid={!nameOK}
                    placeholder="agent" required/>
             <span className="hint">{t('sandboxCreate.nameHint')}</span>
+            {!nameOK && (f.name ?? '') !== '' && <span className="hint hint-error">
+              {t('common.nameInvalid', {max: SANDBOX_NAME_MAX})}
+            </span>}
           </div>
           <div className="field">
             <label htmlFor="s-image">{t('common.image')}</label>

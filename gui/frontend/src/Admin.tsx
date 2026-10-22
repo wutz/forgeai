@@ -138,6 +138,10 @@ function parseGPUs(text: string): Record<string, number> {
 // is named under its field, not returned by the server after Save.
 const quantityRE = /^[+-]?(\d+(\.\d*)?|\.\d+)(Ki|Mi|Gi|Ti|Pi|Ei|[numkMGTPE]|[eE][+-]?\d+)?$/
 const durationRE = /^(\d+(\.\d+)?(ns|us|µs|ms|s|m|h))+$|^0$/
+// Project names and member usernames are DNS labels of at most 40 characters
+// (the CRD rule), so a bad one is named here rather than rejected after Save.
+const dnsLabelRE = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/
+const dnsLabelOK = (s: string) => dnsLabelRE.test(s) && s.length <= 40
 
 function ProjectDialog({form, onClose, onSaved}: {
   form: app.Project, onClose: () => void, onSaved: () => void
@@ -148,14 +152,29 @@ function ProjectDialog({form, onClose, onSaved}: {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [kube, setKube] = useState('')
+  const [kubeError, setKubeError] = useState('')
   const create = !form.name
   const gpuBad = gpuText.split(/\s+/).filter(Boolean).find(pair => !/^([^:]+):(\d+)$/.test(pair))
+  const nameOK = !p.name || dnsLabelOK(p.name)
   const storageOK = !p.quota?.storage || quantityRE.test(p.quota.storage)
   const registryOK = !p.quota?.registryStorage || quantityRE.test(p.quota.registryStorage)
   const trashOK = !p.trashRetention || durationRE.test(p.trashRetention)
   const volumesOK = (p.quota?.volumes ?? 0) >= 0
   const podsOK = (p.quota?.pods ?? 0) >= 0
-  const formOK = !gpuBad && storageOK && registryOK && trashOK && volumesOK && podsOK
+  // Empty rows are reported on Save; here a name that is not a DNS label, or
+  // a username listed twice, is named under the Members field.
+  const memberErr = (() => {
+    const seen = new Set<string>()
+    for (const m of p.members || []) {
+      const name = m.name.trim()
+      if (!name) continue
+      if (!dnsLabelOK(name)) return t('admin.memberNameInvalid')
+      if (seen.has(name)) return t('admin.memberDuplicate', {name})
+      seen.add(name)
+    }
+    return ''
+  })()
+  const formOK = !gpuBad && nameOK && storageOK && registryOK && trashOK && volumesOK && podsOK && !memberErr
 
   const set = <K extends keyof app.Project>(k: K, v: app.Project[K]) =>
     setP(prev => app.Project.createFrom({...prev, [k]: v}))
@@ -186,8 +205,13 @@ function ProjectDialog({form, onClose, onSaved}: {
     setBusy(true)
     SaveProject(project).then(onSaved).catch(err => { setError(errText(err)); setBusy(false) })
   }
+  // The export error stays by the member list, where the button was clicked,
+  // and the previous member's YAML is dropped so it cannot be mistaken for this one.
   const exportKube = (member: string) => {
-    MemberKubeconfig(p.name, member).then(y => setKube(`${member}:\n${y}`)).catch(e => setError(errText(e)))
+    setKubeError('')
+    MemberKubeconfig(p.name, member)
+      .then(y => setKube(`${member}:\n${y}`))
+      .catch(e => { setKube(''); setKubeError(errText(e)) })
   }
   const downloadKube = () => {
     const blob = new Blob([kube.split('\n').slice(1).join('\n')], {type: 'text/yaml'})
@@ -214,7 +238,9 @@ function ProjectDialog({form, onClose, onSaved}: {
             <label htmlFor="p-name">{t('common.name')}</label>
             <input id="p-name" className="input mono" disabled={!create} value={p.name}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                   onChange={e => set('name', e.target.value)} required/>
+                   onChange={e => set('name', e.target.value)} aria-invalid={!nameOK} required/>
+            <span className="hint">{t('admin.nameHint')}</span>
+            {!nameOK && <span className="hint hint-error">{t('admin.nameInvalid')}</span>}
           </div>
           <div className="field">
             <label htmlFor="p-display">{t('admin.displayName')}</label>
@@ -327,7 +353,7 @@ function ProjectDialog({form, onClose, onSaved}: {
                 <option value="view">{t('admin.roleView')}</option>
               </select>
               {!create && <button type="button" className="btn btn-sm"
-                                  onClick={() => exportKube(m.name)} disabled={!m.name}>{t('admin.kubeconfig')}</button>}
+                                  onClick={() => exportKube(m.name.trim())} disabled={!m.name.trim()}>{t('admin.kubeconfig')}</button>}
               <button type="button" className="btn btn-sm btn-danger" aria-label={t('admin.removeMember')}
                       title={t('admin.removeMember')}
                       onClick={() => set('members', (p.members || []).filter((_, j) => j !== i))}>
@@ -335,6 +361,8 @@ function ProjectDialog({form, onClose, onSaved}: {
               </button>
             </div>
           ))}
+          {memberErr && <span className="hint hint-error">{memberErr}</span>}
+          {kubeError && <div className="banner banner-error" role="alert">{kubeError}</div>}
           <button type="button" className="btn btn-sm" style={{alignSelf: 'flex-start'}}
                   onClick={() => set('members', [...(p.members || []),
                     app.ProjectMember.createFrom({name: '', role: 'edit'})])}>

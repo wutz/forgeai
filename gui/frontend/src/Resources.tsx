@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {ListInstanceTypes, Quota} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {errText, pct, toGiB} from './util'
-import {Badge, Card, Empty, Icon, Meter, MetricTile, PageHeader, RefreshButton} from './ui'
+import {Badge, Card, Empty, Icon, Meter, MetricTile, PageHeader, RefreshButton, useActive} from './ui'
 import {t} from './i18n'
 
 // Resources shows the cluster GPU catalogue (instance types with free
@@ -11,6 +11,7 @@ export function Resources() {
   const [types, setTypes] = useState<app.InstanceType[]>([])
   const [quota, setQuota] = useState<app.QuotaUsage | null>(null)
   const [error, setError] = useState('')
+  const active = useActive()
 
   // load rejects when either list failed; the banner already shows why.
   const load = () => Promise.all([
@@ -21,11 +22,12 @@ export function Resources() {
     throw e
   })
   useEffect(() => {
+    if (!active) return
     const poll = () => load().catch(() => {})
     poll()
     const timer = setInterval(poll, 10000)
     return () => clearInterval(timer)
-  }, [])
+  }, [active])
 
   const total = types.reduce((n, ty) => n + ty.total, 0)
   const free = types.reduce((n, ty) => n + ty.free, 0)

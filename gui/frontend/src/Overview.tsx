@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {ListInstanceTypes, ListJobs, ListVolumes, ListImages, Quota} from '../wailsjs/go/app/App'
 import {app, volumes} from '../wailsjs/go/models'
-import {Card, Icon, MetricTile, Meter, PageHeader, RefreshButton, Spinner} from './ui'
+import {Card, Icon, MetricTile, Meter, PageHeader, RefreshButton, Spinner, useActive} from './ui'
 import {Status, errText, fmtDate, pct, phaseLabel, toGiB} from './util'
 import {t} from './i18n'
 
@@ -16,6 +16,7 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
   const [quota, setQuota] = useState<app.QuotaUsage | null>(null)
   const [error, setError] = useState('')
   const [loaded, setLoaded] = useState(false)
+  const onScreen = useActive()
 
   // refresh rejects when any list failed; the banner already shows why.
   const refresh = () => Promise.allSettled([
@@ -30,19 +31,21 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
     if (failed) throw failed.reason
   })
   useEffect(() => {
+    if (!onScreen) return
     const poll = () => refresh().catch(() => {})
     poll()
     const timer = setInterval(poll, 8000)
     return () => clearInterval(timer)
-  }, [])
+  }, [onScreen])
 
   // Images cost a Harbor call per repository, so they refresh on a slower beat.
   useEffect(() => {
+    if (!onScreen) return
     const load = () => ListImages().then(setImages).catch(() => {})
     load()
     const timer = setInterval(load, 60000)
     return () => clearInterval(timer)
-  }, [])
+  }, [onScreen])
 
   const running = jobs.filter(j => j.phase === 'Running')
   const queued = jobs.filter(j => j.phase === 'Queued' || j.phase === 'Pending')

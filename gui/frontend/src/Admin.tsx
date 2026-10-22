@@ -4,7 +4,7 @@ import {
 } from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {errText, fmtDate, generateName, phaseLabel} from './util'
-import {Badge, Card, Dialog, Empty, Icon, PageHeader, useConfirm} from './ui'
+import {Badge, Card, Dialog, Empty, Icon, PageHeader, useActive, useConfirm} from './ui'
 import {t} from './i18n'
 
 // Admin manages Projects: quota (GPU classes, storage), network isolation,
@@ -14,11 +14,12 @@ export function Admin() {
   const [error, setError] = useState('')
   const [editing, setEditing] = useState<app.Project | null>(null)
   const confirm = useConfirm()
+  const active = useActive()
 
   const refresh = () => ListProjects().then(ps => {
     setProjects(ps); setError('')
   }).catch(e => setError(errText(e)))
-  useEffect(() => { refresh() }, [])
+  useEffect(() => { if (active) refresh() }, [active])
 
   const newProject = () => app.Project.createFrom({
     name: '', displayName: '', namespace: '',

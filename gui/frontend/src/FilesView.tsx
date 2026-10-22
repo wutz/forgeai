@@ -3,7 +3,7 @@ import {Files} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {errText, phaseLabel} from './util'
 import {t} from './i18n'
-import {Card, Empty, PageHeader, Spinner} from './ui'
+import {Card, Empty, PageHeader, Spinner, useActive} from './ui'
 
 // Files shows the project's on-demand file server (dufs). It wakes the server
 // and keeps it up while the view is open. The browser is embedded through a
@@ -13,8 +13,12 @@ export function FilesView() {
   const [state, setState] = useState<app.Files | null>(null)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
+  const active = useActive()
 
+  // Polling wakes the server and keeps it up, so it stops while the view is
+  // hidden and the server can go idle.
   useEffect(() => {
+    if (!active) return
     let stopped = false
     let timer = 0
     // Poll quickly until the server is Ready, then at a slower pace; the
@@ -36,7 +40,7 @@ export function FilesView() {
       stopped = true
       window.clearTimeout(timer)
     }
-  }, [attempt])
+  }, [attempt, active])
 
   const ready = state?.phase === 'Ready'
   // Only a ready server has an address: an idle one has no pod behind it.

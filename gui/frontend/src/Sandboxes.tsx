@@ -105,7 +105,7 @@ function SandboxTable({boxes, selected, onSelect}: {
           <tr key={b.name} className={selected === b.name ? 'selected' : ''}
               onClick={() => onSelect(b.name)}>
             <td className="mono">
-              <span className="cell-main">{b.name}</span>
+              <button type="button" className="row-name cell-main">{b.name}</button>
               <span className="cell-sub">{b.image.split('/').pop()}</span>
             </td>
             <td><Status phase={b.phase}/>{b.message && b.phase !== 'Running' &&

@@ -153,7 +153,7 @@ function JobTable({jobs, filtered, selected, onSelect}: {
           <tr key={j.name} className={selected === j.name ? 'selected' : ''}
               onClick={() => onSelect(j.name)}>
             <td className="mono">
-              <span className="cell-main">{j.name}</span>
+              <button type="button" className="row-name cell-main">{j.name}</button>
               <span className="cell-sub">
                 {workerCount(j.workers)}
                 {j.retries?.length ? ` · ${retryCount(j.retries.length)}` : ''}

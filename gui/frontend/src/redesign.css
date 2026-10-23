@@ -384,6 +384,14 @@ a { color: inherit; text-decoration: none; }
 .table tbody tr.selected .status-failed { color: var(--error-deep); }
 .mono { font-size: 12.5px; }
 .cell-main { display: block; color: var(--ink); }
+/* The name of a clickable row is a real button, so the row opens from the keyboard.
+   Its click bubbles to the row's onClick, so the button needs no handler of its own. */
+.row-name {
+  display: block; max-width: 100%; padding: 0; border: 0; background: none;
+  font: inherit; color: var(--ink); text-align: left; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.row-name:hover { text-decoration: underline; }
 .table td.nowrap { white-space: nowrap; }
 .cell-sub { display: block; margin-top: 2px; font-size: 11.5px; line-height: 16px; color: var(--mute); }
 .table td .cell-sub { font-family: var(--font); }

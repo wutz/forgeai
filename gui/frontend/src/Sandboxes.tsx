@@ -299,13 +299,20 @@ function SandboxDetail({name, onDone, onDeleted}: {
               <dt>{t('common.created')}</dt><dd>{fmtDate(box.created)}</dd>
             </dl>
           )}
-          {tab === 'terminal' && (box.podPhase === 'Running'
+          {tab === 'terminal' && (box.podPhase === 'Running' && box.phase !== 'Stopping'
             ? <SandboxTerminal name={box.name}/>
             // The idle box is the terminal's size, so opening it does not shift the layout.
-            : <div className="term term-idle" role="status">
-                {box.phase === 'Pending' || box.podPhase === 'Pending'
-                  ? t('sandboxes.terminalStarting')
-                  : t('sandboxes.startToOpenTerminal')}
+            : <div className="term term-idle">
+                <span role="status">
+                  {box.phase === 'Pending' || box.phase === 'Starting' || box.podPhase === 'Pending'
+                    ? t('sandboxes.terminalStarting')
+                    : t('sandboxes.startToOpenTerminal')}
+                </span>
+                {!running && <button className="btn btn-sm btn-accent" disabled={busy}
+                                     onClick={() => transition('start', StartSandbox(box.name))}>
+                  {pending === 'start' ? <span className="spinner" aria-hidden/> : <Icon name="play" size={12}/>}
+                  {pending === 'start' ? t('sandboxes.starting') : t('common.start')}
+                </button>}
               </div>)}
           {tab === 'log' && <LogView text={log} onRefresh={showLog}/>}
           {tab === 'env' && <pre className="code">{box.command ? `$ ${box.command}\n\n` : ''}

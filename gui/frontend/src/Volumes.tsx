@@ -75,7 +75,7 @@ export function Volumes() {
                       <Icon name="trash" size={14}/>{t('volumes.recycleBin')}
                       {(trash?.length ?? 0) > 0 && <Badge>{trash?.length}</Badge>}
                     </button>
-                    <button className="btn" onClick={() => setCreating(true)}>
+                    <button className="btn" disabled={!config} onClick={() => setCreating(true)}>
                       <Icon name="plus" size={14}/>{t('volumes.new')}
                     </button>
                   </>}/>
@@ -272,6 +272,8 @@ function ResizeVolumeDialog({volume, onClose, onDone}: {
 }) {
   const current = volume.capacityGiB || volume.requestedGiB
   const [size, setSize] = useState(current * 2)
+  // A resize only grows: the size is a whole number above the current one.
+  const growOK = Number.isInteger(size) && size > current
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -291,7 +293,7 @@ function ResizeVolumeDialog({volume, onClose, onDone}: {
             width={440} onClose={onClose} busy={busy} footer={<>
               <CancelButton/>
               <button type="submit" form="resize-volume" className="btn btn-primary"
-                      disabled={busy || !(size > current)}>
+                      disabled={busy || !growOK}>
                 {busy ? t('volumes.growing') : t('volumes.growVolume')}
               </button>
             </>}>
@@ -300,9 +302,9 @@ function ResizeVolumeDialog({volume, onClose, onDone}: {
         <div className="field">
           <label htmlFor="v-grow">{t('volumes.newSize')}</label>
           <input id="v-grow" className="input" type="number" min={current + 1} step={1} value={size}
-                 aria-invalid={!(size > current)}
+                 aria-invalid={!growOK}
                  onChange={e => setSize(+e.target.value)} required/>
-          {!(size > current) && <span className="hint hint-error">
+          {!growOK && <span className="hint hint-error">
             {t('volumes.growTooSmall', {size: current})}
           </span>}
         </div>

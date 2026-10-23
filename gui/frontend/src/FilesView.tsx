@@ -79,7 +79,10 @@ export function FilesView() {
         </Card>
       ) : frame ? (
         <div className="files-frame card">
-          <iframe src={frame} title={t('files.title')} allow="clipboard-write"/>
+          {/* The file pages need scripts and their own origin (the proxy), but may not
+              navigate the app or open windows. */}
+          <iframe src={frame} title={t('files.title')} allow="clipboard-write"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-downloads"/>
         </div>
       ) : ready ? (
         <Card>

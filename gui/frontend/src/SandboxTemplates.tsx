@@ -36,7 +36,7 @@ export function SandboxTemplateTable({items, failed, onEdit, onDelete}: {
             {tpl.error && <span className="cell-sub hint-error">{t('sandboxTemplates.unreadable', {error: tpl.error})}</span>}
           </td>
           <td className="mono trunc" title={tpl.form?.image}>{tpl.form?.image || '—'}</td>
-          <td className="mono">{tpl.form?.runtimeClass || 'runc'}</td>
+          <td className="mono">{tpl.form?.runtimeClass || t('sandboxes.runcNode')}</td>
           <td className="muted">{fmtDate(tpl.created)}</td>
           <td>
             <div className="actions">

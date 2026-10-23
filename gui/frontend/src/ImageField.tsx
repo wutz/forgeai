@@ -225,6 +225,7 @@ export function ImageField({id, value, onChange, offered, placeholder, required}
              onClick={() => { if (!open) openMenu() }}
              placeholder={placeholder} required={required}/>
       <button type="button" className="icon-btn combo-toggle" tabIndex={-1} aria-label={t('imagePicker.show')}
+              aria-expanded={open}
               onClick={() => {
                 if (open) setOpen(false)
                 else {

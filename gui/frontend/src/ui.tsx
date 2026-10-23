@@ -405,13 +405,24 @@ export function CancelButton({disabled}: {disabled?: boolean}) {
   return <button className="btn" onClick={() => close?.()} disabled={disabled}>{t('common.cancel')}</button>
 }
 
+// dialogStack lists the open dialogs, outermost first. Escape and Tab belong to
+// the innermost one only, so a dialog opened from another does not close it too.
+const dialogStack: object[] = []
+
 export function Dialog({title, subtitle, onClose, children, footer, width, busy}: {
   title: string, subtitle?: ReactNode, onClose: () => void, children: ReactNode,
   footer?: ReactNode, width?: number, busy?: boolean
 }) {
   const [edited, setEdited] = useState(false)
   const [asking, setAsking] = useState(false)
+  const [token] = useState(() => ({}))
   const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    dialogStack.push(token)
+    return () => {
+      dialogStack.splice(dialogStack.indexOf(token), 1)
+    }
+  }, [token])
   // resume is the element that had focus when the discard prompt opened. The
   // prompt takes focus, so leaving it puts focus back there.
   const resume = useRef<HTMLElement | null>(null)
@@ -425,7 +436,7 @@ export function Dialog({title, subtitle, onClose, children, footer, width, busy}
   }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
+      if (e.key !== 'Escape' || dialogStack.at(-1) !== token) return
       if (asking) setAsking(false)
       else close()
     }
@@ -473,7 +484,7 @@ export function Dialog({title, subtitle, onClose, children, footer, width, busy}
   useEffect(() => {
     const onTab = (e: KeyboardEvent) => {
       const el = box.current
-      if (e.key !== 'Tab' || !el) return
+      if (e.key !== 'Tab' || !el || dialogStack.at(-1) !== token) return
       const items = el.querySelectorAll<HTMLElement>(focusableSelector)
       if (items.length === 0) return
       const first = items[0], last = items[items.length - 1]

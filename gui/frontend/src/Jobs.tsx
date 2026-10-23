@@ -4,11 +4,11 @@ import {app, training} from '../wailsjs/go/models'
 import {failureLabel} from './util'
 import {JobCreateDialog} from './JobCreateDialog'
 import {TemplateDialog} from './Templates'
-import {Status, envToLines, everyWhileVisible, fmtDate, errText, latestAttempt} from './util'
+import {JobBucket, Status, envToLines, everyWhileVisible, fmtDate, errText, jobBucket, latestAttempt} from './util'
 import {t} from './i18n'
 import {Badge, Card, Empty, Icon, LogView, PageHeader, Segmented, Spinner, Tabs, tabPanelProps, useActive, useConfirm} from './ui'
 
-type Filter = 'all' | 'running' | 'queued' | 'stopped' | 'failed' | 'done'
+type Filter = 'all' | JobBucket
 
 // filterOptions is built per render so the labels follow the language.
 const filterOptions = (): {value: Filter, label: string}[] => [
@@ -24,25 +24,6 @@ const filterOptions = (): {value: Filter, label: string}[] => [
 // settling reports a phase that changes within seconds, so the lists poll faster
 // until it passes. Queued can last hours and keeps the normal interval.
 const settling = (phase: string) => phase === 'Stopping' || phase === 'Restarting'
-
-function bucket(phase: string): Filter {
-  switch (phase) {
-    // Stopping pods are still running, so the job counts as running until it stops.
-    case 'Running':
-    case 'Stopping':
-      return 'running'
-    case 'Queued':
-    case 'Pending':
-    case 'Restarting':
-      return 'queued'
-    case 'Stopped':
-      return 'stopped'
-    case 'Failed':
-      return 'failed'
-    default:
-      return 'done'
-  }
-}
 
 // workerCount is the "N workers" text of a job row.
 function workerCount(n: number): string {
@@ -99,11 +80,11 @@ export function Jobs({focus}: {focus?: {name: string} | null}) {
 
   const counts = useMemo(() => {
     const c: Record<Filter, number> = {all: list.length, running: 0, queued: 0, stopped: 0, failed: 0, done: 0}
-    for (const j of list) c[bucket(latestAttempt(j).phase)]++
+    for (const j of list) c[jobBucket(latestAttempt(j).phase)]++
     return c
   }, [list])
 
-  const shown = jobs && (filter === 'all' ? jobs : jobs.filter(j => bucket(latestAttempt(j).phase) === filter))
+  const shown = jobs && (filter === 'all' ? jobs : jobs.filter(j => jobBucket(latestAttempt(j).phase) === filter))
 
   return (
     <div className="page">
@@ -355,10 +336,10 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
                 <dt>{t('common.image')}</dt><dd className="mono">{job.image}</dd>
                 <dt>{t('jobs.instance')}</dt><dd className="mono">{job.instanceType}
                   {job.gpuCount ? ` (${job.gpuCount}× ${job.gpuClass})` : ''}</dd>
-                <dt>{t('jobs.workers')}</dt><dd>{t('jobs.workersReady', {ready: job.ready, total: job.workers})}</dd>
+                <dt>{t('jobs.workers')}</dt><dd>{t('jobs.workersReady', {ready: attempt.ready, total: attempt.workers})}</dd>
                 <dt>{t('jobs.volumes')}</dt><dd className="mono">{job.volumes?.join(', ') || '—'}</dd>
                 <dt>{t('jobs.command')}</dt><dd><pre className="code">{job.command || '—'}</pre></dd>
-                {job.failureReason && <><dt>{t('jobs.failure')}</dt><dd>{t('jobs.failureDetail', {reason: failureLabel(job.failureReason), message: job.message || ''})}</dd></>}
+                {attempt.failureReason && <><dt>{t('jobs.failure')}</dt><dd>{t('jobs.failureDetail', {reason: failureLabel(attempt.failureReason), message: attempt.message || ''})}</dd></>}
                 {job.retryOf && <><dt>{t('jobs.retryOf')}</dt><dd>
                   <button className="btn btn-sm mono" onClick={() => onOpen(job.retryOf ?? '')}>{job.retryOf}</button>
                 </dd></>}

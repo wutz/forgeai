@@ -59,8 +59,13 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
                     : setJobDialog({form: blankJobForm()})}>
                     <Icon name="plus" size={14}/>{isSandbox ? t('templates.newSandbox') : t('templates.newJob')}
                   </button>}/>
-      {error && <div className="banner banner-error" role="alert">{error}</div>}
-      {sandboxDialog && <SandboxTemplateDialog initial={sandboxDialog.initial} existing={sandboxDialog.existing} version={sandboxDialog.version}
+      {error && <div className="banner banner-error" role="alert">
+        <span>{error}</span>
+        {/* A conflict says to reload; the refresh is here so the user does not have to find it. */}
+        <span className="spacer"/>
+        <button className="btn btn-sm" onClick={() => refresh()}>{t('common.refresh')}</button>
+      </div>}
+      {sandboxDialog &&<SandboxTemplateDialog initial={sandboxDialog.initial} existing={sandboxDialog.existing} version={sandboxDialog.version}
                                                onClose={() => setSandboxDialog(null)} onSaved={() => {
         setSandboxDialog(null); refresh()
       }}/>}

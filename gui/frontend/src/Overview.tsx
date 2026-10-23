@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {ListInstanceTypes, ListJobs, ListVolumes, ListImages, Quota} from '../wailsjs/go/app/App'
 import {app, volumes} from '../wailsjs/go/models'
 import {Card, Icon, MetricTile, Meter, PageHeader, RefreshButton, Spinner, useActive} from './ui'
-import {Status, errText, everyWhileVisible, fmtDate, latestAttempt, pct, phaseLabel, tagCount, toGiB} from './util'
+import {Status, errText, everyWhileVisible, fmtDate, jobBucket, latestAttempt, pct, phaseLabel, tagCount, toGiB} from './util'
 import {t} from './i18n'
 
 // Overview is the landing view of a project: what is running now, the GPU
@@ -63,9 +63,9 @@ export function Overview({onOpen, onOpenJob}: {
   // Each job family counts by its live attempt, so a retry that runs is counted
   // and the leader it replaced is not.
   const attempts = jobList.map(latestAttempt)
-  const running = attempts.filter(j => j.phase === 'Running')
-  const queued = attempts.filter(j => j.phase === 'Queued' || j.phase === 'Pending')
-  const failed = attempts.filter(j => j.phase === 'Failed')
+  const running = attempts.filter(j => jobBucket(j.phase) === 'running')
+  const queued = attempts.filter(j => jobBucket(j.phase) === 'queued')
+  const failed = attempts.filter(j => jobBucket(j.phase) === 'failed')
   // Workers count only jobs that still hold or wait for pods: a finished,
   // failed or stopped job no longer expects its workers to be ready.
   const active = attempts.filter(j => j.phase !== 'Succeeded' && j.phase !== 'Failed' && j.phase !== 'Stopped')

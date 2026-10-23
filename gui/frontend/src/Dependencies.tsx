@@ -48,7 +48,9 @@ export function Dependencies() {
   })
   useEffect(() => {
     if (!active) return
-    fail('')
+    // A failed install keeps its banner and retry offer until the next install,
+    // so leaving the page and coming back does not lose them.
+    if (!failed) fail('')
     setDone('')
     refresh().catch(() => undefined)
   }, [active])
@@ -73,7 +75,7 @@ export function Dependencies() {
     title: t('deps.confirmTitle', {action: verb(d), name: title(d.name, d.title)}),
     message: <>
       {t(d.name === 'forgeai' ? 'deps.chartConfirmMessage' : 'deps.confirmMessage', {version: d.pinned})}
-      {d.name === 'agent-sandbox' && ` ${t('deps.restartNote')}`}
+      {d.name === 'agent-sandbox' && <><br/>{t('deps.restartNote')}</>}
     </>,
     action: verb(d), primary: true,
     run: () => {

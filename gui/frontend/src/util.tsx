@@ -36,6 +36,29 @@ export function latestAttempt(j: app.Job): app.Job {
   return (j.retries ?? []).reduce((newest, r) => (r.created > newest.created ? r : newest), j)
 }
 
+// JobBucket is the group a job phase counts under: the list filters and the
+// Overview counts use the same grouping, so the two always agree.
+export type JobBucket = 'running' | 'queued' | 'stopped' | 'failed' | 'done'
+
+export function jobBucket(phase: string): JobBucket {
+  switch (phase) {
+    // Stopping pods are still running, so the job counts as running until it stops.
+    case 'Running':
+    case 'Stopping':
+      return 'running'
+    case 'Queued':
+    case 'Pending':
+    case 'Restarting':
+      return 'queued'
+    case 'Stopped':
+      return 'stopped'
+    case 'Failed':
+      return 'failed'
+    default:
+      return 'done'
+  }
+}
+
 const phaseKeys = new Map<string, MessageKey>([
   ['running', 'phase.running'], ['queued', 'phase.queued'], ['pending', 'phase.pending'],
   ['starting', 'phase.starting'], ['restarting', 'phase.restarting'], ['stopping', 'phase.stopping'],

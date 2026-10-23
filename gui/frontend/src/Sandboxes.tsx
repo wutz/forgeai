@@ -113,7 +113,7 @@ function SandboxTable({boxes, failed, selected, onSelect}: {
             {/* A stopped sandbox's controller message is English and repeats the status label. */}
             <td><Status phase={b.phase}/>{b.phase !== 'Running' && !b.stopped && statusText(b).label &&
               <div className="cell-sub" title={b.message}>{short(statusText(b).label)}</div>}</td>
-            <td>{b.runtimeClass ? <Badge>{b.runtimeClass}</Badge> : <span className="muted">runc</span>}</td>
+            <td>{b.runtimeClass ? <Badge>{b.runtimeClass}</Badge> : <span className="muted">{t('sandboxes.runcNode')}</span>}</td>
             <td className="mono">{b.cpu || '—'}/{b.memory || '—'}{b.gpu ? ` · ${b.gpu} GPU` : ''}</td>
             <td className="mono trunc" title={b.serviceFQDN || b.podIPs?.[0]}>{b.serviceFQDN || b.podIPs?.[0] || '—'}</td>
             <td className="muted">{b.age}</td>
@@ -159,10 +159,19 @@ function SandboxDetail({name, onDone, onDeleted}: {
   const confirm = useConfirm()
   const phase = box?.phase
   // reload reads the sandbox now, so an action's result shows without waiting for the poll.
-  const reload = () => GetSandbox(name).then(b => {
-    setBox(b)
-    setLoadError('')
-  }).catch(e => setLoadError(errText(e)))
+  // Reads are latest-wins: a slow poll that started before an action cannot
+  // overwrite the state read after it.
+  const reloadSeq = useRef(0)
+  const reload = () => {
+    const seq = ++reloadSeq.current
+    return GetSandbox(name).then(b => {
+      if (seq !== reloadSeq.current) return
+      setBox(b)
+      setLoadError('')
+    }).catch(e => {
+      if (seq === reloadSeq.current) setLoadError(errText(e))
+    })
+  }
   const transition = (kind: 'start' | 'stop', p: Promise<unknown>) => {
     setPending(kind)
     setError('')
@@ -305,7 +314,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
               <dt>{t('common.created')}</dt><dd>{fmtDate(box.created)}</dd>
             </dl>
           )}
-          {tab === 'terminal' && (box.containerRunning && box.phase !== 'Stopping'
+          {tab === 'terminal' && ((box.containerRunning || box.podUnknown) && box.phase !== 'Stopping'
             ? <SandboxTerminal name={box.name}/>
             // The idle box is the terminal's size, so opening it does not shift the layout.
             : <div className="term term-idle">

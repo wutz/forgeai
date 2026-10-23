@@ -6,7 +6,7 @@ import {JobCreateDialog} from './JobCreateDialog'
 import {TemplateDialog} from './Templates'
 import {JobBucket, Status, envToLines, everyWhileVisible, fmtDate, errText, jobBucket, latestAttempt} from './util'
 import {t} from './i18n'
-import {Badge, Card, Empty, Icon, LogView, PageHeader, Segmented, Spinner, Tabs, tabPanelProps, useActive, useConfirm} from './ui'
+import {Badge, Card, Empty, Icon, LogView, PageHeader, Segmented, Spinner, Tabs, tabPanelProps, useActive, useConfirm, useDetailClose} from './ui'
 
 type Filter = 'all' | JobBucket
 
@@ -50,6 +50,7 @@ export function Jobs({focus}: {focus?: {name: string} | null}) {
   const [selected, setSelected] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
+  const {split, close: closeDetail} = useDetailClose(selected, setSelected)
   useEffect(() => {
     if (!focus) return
     setFilter('all')
@@ -86,6 +87,13 @@ export function Jobs({focus}: {focus?: {name: string} | null}) {
 
   const shown = jobs && (filter === 'all' ? jobs : jobs.filter(j => jobBucket(latestAttempt(j).phase) === filter))
 
+  // A filter that hides the open job closes its detail with it: the detail is never for a row the list does not show.
+  const chooseFilter = (next: Filter) => {
+    setFilter(next)
+    const open = list.find(j => j.name === selected)
+    if (open && next !== 'all' && jobBucket(latestAttempt(open).phase) !== next) setSelected(null)
+  }
+
   return (
     <div className="page">
       <PageHeader eyebrow={t('jobs.eyebrow')} title={t('jobs.title')}
@@ -101,15 +109,16 @@ export function Jobs({focus}: {focus?: {name: string} | null}) {
       }}/>}
 
       <div className="list-toolbar">
-        <Segmented options={filterOptions()} value={filter} onChange={setFilter} counts={counts}/>
+        <Segmented options={filterOptions()} value={filter} onChange={chooseFilter} counts={counts}/>
       </div>
 
-      <div className="split">
+      <div className="split" ref={split}>
         <JobTable jobs={shown} failed={!!error} filtered={filter !== 'all'} selected={selected} onSelect={n =>
           setSelected(prev => prev === n ? null : n)}/>
         {/* Keyed by name: a read still in flight for the previous job lands on an unmounted detail. */}
         {selected && <JobDetail key={selected} name={selected} onDone={refresh} onOpen={n => { setSelected(n); refresh() }}
-                                onDeleted={() => { setSelected(null); refresh() }}/>}
+                                onDeleted={() => { setSelected(null); refresh() }}
+                                onClose={closeDetail}/>}
       </div>
     </div>
   )
@@ -181,8 +190,8 @@ function jobTemplateForm(job: app.Job) {
   })
 }
 
-function JobDetail({name, onDone, onOpen, onDeleted}: {
-  name: string, onDone: () => void, onOpen: (name: string) => void, onDeleted: () => void
+function JobDetail({name, onDone, onOpen, onDeleted, onClose}: {
+  name: string, onDone: () => void, onOpen: (name: string) => void, onDeleted: () => void, onClose: () => void
 }) {
   const [job, setJob] = useState<app.Job | null>(null)
   // error is an action's failure; loadError is a failed read. A read clears only
@@ -277,7 +286,12 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
             template: job.template || t('jobs.defaultRuntime'), created: fmtDate(job.created),
           })}</div>
         </div>
-        <div className="card-head-actions"><Status phase={attempt.phase}/></div>
+        <div className="card-head-actions">
+          <Status phase={attempt.phase}/>
+          <button type="button" className="icon-btn" aria-label={t('common.close')} title={t('common.close')} onClick={onClose}>
+            <Icon name="close" size={14}/>
+          </button>
+        </div>
       </div>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {loadError && <div className="banner banner-error" role="alert">{loadError}</div>}

@@ -64,6 +64,26 @@ export function Icon({name, size = 16}: {name: IconName; size?: number}) {
   )
 }
 
+// useDetailClose is the close of a list's open detail. The detail's close button
+// goes with the detail, so focus returns to the row it was opened from, and the
+// returned split ref is put on the element that holds the list.
+export function useDetailClose(selected: string | null, select: (name: string | null) => void) {
+  const split = useRef<HTMLDivElement>(null)
+  const returnTo = useRef<string | null>(null)
+  useEffect(() => {
+    if (selected || !returnTo.current) return
+    const name = returnTo.current
+    returnTo.current = null
+    const rows = split.current?.querySelectorAll<HTMLButtonElement>('button.row-name') ?? []
+    Array.from(rows).find(b => b.textContent === name)?.focus()
+  }, [selected])
+  const close = () => {
+    returnTo.current = selected
+    select(null)
+  }
+  return {split, close}
+}
+
 // phoneQuery matches windows too narrow for a page's actions to share the top bar.
 const phoneQuery = typeof window === 'undefined' ? null : window.matchMedia('(max-width: 560px)')
 const subscribePhone = (fn: () => void) => {

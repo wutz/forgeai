@@ -7,7 +7,7 @@ import {SandboxCreateDialog} from './SandboxCreateDialog'
 import {SandboxTemplateDialog} from './SandboxTemplates'
 import {SandboxTerminal} from './SandboxTerminal'
 import {Status, envToLines, everyWhileVisible, fmtDate, errText} from './util'
-import {Badge, Card, Empty, Icon, LogView, PageHeader, Spinner, Tabs, tabPanelProps, useActive, useConfirm} from './ui'
+import {Badge, Card, Empty, Icon, LogView, PageHeader, Spinner, Tabs, tabPanelProps, useActive, useConfirm, useDetailClose} from './ui'
 import {MessageKey, t} from './i18n'
 
 // HEARTBEAT is how often an open sandbox detail resets the sandbox's idle
@@ -25,6 +25,7 @@ export function Sandboxes() {
   const [boxes, setBoxes] = useState<app.Sandbox[] | null>(null)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
+  const {split, close: closeDetail} = useDetailClose(selected, setSelected)
   const [creating, setCreating] = useState(false)
   const active = useActive()
 
@@ -74,12 +75,12 @@ export function Sandboxes() {
         setSelected(name)
         refresh()
       }}/>}
-      <div className="split">
+      <div className="split" ref={split}>
         <SandboxTable boxes={boxes} failed={!!error} selected={selected} onSelect={n =>
           setSelected(prev => prev === n ? null : n)}/>
         {/* Keyed by name: a read still in flight for the previous sandbox must not land on this detail, where Stop and Delete would act on it. */}
         {selected && <SandboxDetail key={selected} name={selected} onDone={refresh}
-                                    onDeleted={() => { setSelected(null); refresh() }}/>}
+                                    onDeleted={() => { setSelected(null); refresh() }} onClose={closeDetail}/>}
       </div>
     </div>
   )
@@ -144,8 +145,8 @@ function sandboxTemplateForm(box: app.Sandbox) {
   })
 }
 
-function SandboxDetail({name, onDone, onDeleted}: {
-  name: string, onDone: () => void, onDeleted: () => void
+function SandboxDetail({name, onDone, onDeleted, onClose}: {
+  name: string, onDone: () => void, onDeleted: () => void, onClose: () => void
 }) {
   const [box, setBox] = useState<app.Sandbox | null>(null)
   // error is an action's failure; loadError is a failed read. A read clears only
@@ -270,7 +271,12 @@ function SandboxDetail({name, onDone, onDeleted}: {
           <h2 className="mono">{box.name}</h2>
           <div className="card-sub">{box.runtimeClass || 'runc'} · {t('sandboxes.createdAt', {date: fmtDate(box.created)})}</div>
         </div>
-        <div className="card-head-actions"><Status phase={box.phase}/></div>
+        <div className="card-head-actions">
+          <Status phase={box.phase}/>
+          <button type="button" className="icon-btn" aria-label={t('common.close')} title={t('common.close')} onClick={onClose}>
+            <Icon name="close" size={14}/>
+          </button>
+        </div>
       </div>
       {failure && <div className="banner banner-error" role="alert">{failure}</div>}
       {running && heartbeatError && <div className="banner banner-warn" role="status">{t('sandboxes.heartbeatFailed', {error: heartbeatError})}</div>}

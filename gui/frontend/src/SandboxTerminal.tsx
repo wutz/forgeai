@@ -18,6 +18,8 @@ export function SandboxTerminal({name}: {name: string}) {
   const [error, setError] = useState('')
   const [maximized, setMaximized] = useState(false)
   const [ended, setEnded] = useState(false)
+  // connecting is true from the start of a shell until it opens or fails.
+  const [connecting, setConnecting] = useState(false)
   // attempt changes to start a new shell.
   const [attempt, setAttempt] = useState(0)
 
@@ -26,6 +28,7 @@ export function SandboxTerminal({name}: {name: string}) {
     if (!el) return
     setError('')
     setEnded(false)
+    setConnecting(true)
     // The id is chosen here so the output listeners exist before the shell
     // prints its first prompt.
     const id = crypto.randomUUID()
@@ -69,9 +72,15 @@ export function SandboxTerminal({name}: {name: string}) {
       ro.observe(el)
       OpenSandboxTerminal(name, id, term.cols, term.rows).then(() => {
         if (closed) CloseSandboxTerminal(id).catch(() => {})
-        else term.focus()
+        else {
+          setConnecting(false)
+          term.focus()
+        }
       }, e => {
-        if (!closed) setError(errText(e))
+        if (!closed) {
+          setConnecting(false)
+          setError(errText(e))
+        }
       })
     }, 0)
 
@@ -95,6 +104,9 @@ export function SandboxTerminal({name}: {name: string}) {
         {(ended || error) && <button className="btn btn-sm btn-accent" onClick={() => setAttempt(a => a + 1)}>
           <Icon name="refresh" size={13}/>{t('terminal.reconnect')}
         </button>}
+        {connecting
+          ? <span className="term-status muted" role="status">{t('terminal.connecting')}</span>
+          : ended && <span className="term-status muted" role="status">{t('terminal.endedStatus')}</span>}
         <span className="spacer"/>
         <button className="btn btn-sm" onClick={() => setMaximized(m => !m)}
                 aria-label={maximized ? t('terminal.restoreLabel') : t('terminal.maximizeLabel')}>

@@ -435,7 +435,13 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
 .term-wrap { display: flex; flex-direction: column; gap: 8px; }
 .term { height: 340px; padding: 8px 10px; border-radius: 8px; background: #0f1117; overflow: hidden; }
 .term .xterm { height: 100%; }
-.term-bar { display: flex; align-items: center; }
+.term-bar { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.term-status { font-size: 12px; }
+/* Before the shell opens: the terminal's own box, with a line of text where the shell will be. */
+.term.term-idle {
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  color: #a1a1aa; font-size: 12.5px; text-align: center;
+}
 /* Covers the main content area only: below the 56px app header and right of
    the sidebar (--sidebar-w is 0 when the sidebar is hidden). Padding matches .main. */
 .term-wrap.term-max {

@@ -40,6 +40,7 @@ export const en = {
   'sandboxes.idleSince': 'Idle since',
   'sandboxes.autoStop': 'Auto-stop',
   'sandboxes.startToOpenTerminal': 'Start the sandbox to open a terminal.',
+  'sandboxes.terminalStarting': 'The terminal opens once the sandbox is running.',
 
   'sandboxCreate.title': 'New sandbox',
   'sandboxCreate.subtitle': 'An isolated, resumable agent environment',
@@ -69,6 +70,8 @@ export const en = {
   'sandboxCreate.serviceNo': 'No (pod IP only)',
 
   'terminal.sessionEnded': 'session ended',
+  'terminal.connecting': 'Connecting…',
+  'terminal.endedStatus': 'Shell ended',
   'terminal.reconnect': 'Reconnect',
   'terminal.sessionEndedWith': 'session ended: {message}',
   'terminal.restoreLabel': 'Restore terminal',
@@ -117,6 +120,7 @@ export const zh: Record<keyof typeof en, string> = {
   'sandboxes.idleSince': '空闲始于',
   'sandboxes.autoStop': '自动停止',
   'sandboxes.startToOpenTerminal': '启动沙箱后即可打开终端。',
+  'sandboxes.terminalStarting': '沙箱进入运行状态后即可打开终端。',
 
   'sandboxCreate.title': '新建沙箱',
   'sandboxCreate.subtitle': '隔离且可恢复的智能体运行环境',
@@ -146,6 +150,8 @@ export const zh: Record<keyof typeof en, string> = {
   'sandboxCreate.serviceNo': '否（仅 Pod IP）',
 
   'terminal.sessionEnded': '会话已结束',
+  'terminal.connecting': '连接中…',
+  'terminal.endedStatus': '终端已结束',
   'terminal.reconnect': '重新连接',
   'terminal.sessionEndedWith': '会话已结束：{message}',
   'terminal.restoreLabel': '还原终端',

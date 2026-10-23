@@ -301,7 +301,12 @@ function SandboxDetail({name, onDone, onDeleted}: {
           )}
           {tab === 'terminal' && (box.podPhase === 'Running'
             ? <SandboxTerminal name={box.name}/>
-            : <p className="muted">{t('sandboxes.startToOpenTerminal')}</p>)}
+            // The idle box is the terminal's size, so opening it does not shift the layout.
+            : <div className="term term-idle" role="status">
+                {box.phase === 'Pending' || box.podPhase === 'Pending'
+                  ? t('sandboxes.terminalStarting')
+                  : t('sandboxes.startToOpenTerminal')}
+              </div>)}
           {tab === 'log' && <LogView text={log} onRefresh={showLog}/>}
           {tab === 'env' && <pre className="code">{box.command ? `$ ${box.command}\n\n` : ''}
             {envToLines(box.env) || '—'}</pre>}

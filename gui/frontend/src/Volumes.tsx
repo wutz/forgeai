@@ -82,8 +82,8 @@ export function Volumes() {
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {configError && <div className="banner banner-error" role="alert">{configError}</div>}
       {creating && config && <CreateVolumeDialog config={config} onClose={() => setCreating(false)}
-                                                 onCreated={refresh}/>}
-      {growing && <ResizeVolumeDialog volume={growing} onClose={() => setGrowing(null)} onDone={refresh}/>}
+                                                 onCreated={reload}/>}
+      {growing && <ResizeVolumeDialog volume={growing} onClose={() => setGrowing(null)} onDone={reload}/>}
       {recycling && <RecycleBinDialog volumes={trash ?? []} onChanged={refresh} onClose={() => setRecycling(false)}/>}
       {confirm.dialog}
 

@@ -122,7 +122,7 @@ export function Dependencies() {
         {!data ? (
           error ? null : <Spinner label={t('deps.checking')}/>
         ) : (
-          <table className="table">
+          <table className="table table-wrap">
             <thead>
             <tr><th>{t('deps.component')}</th><th>{t('deps.installed')}</th><th>{t('deps.pinned')}</th>
               <th>{t('deps.status')}</th><th/></tr>

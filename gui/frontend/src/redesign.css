@@ -599,6 +599,9 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
    squeezing the text into narrow, wrapped cells. Code blocks and collapsible
    sections in a card scroll on their own, so the card never clips them. */
 .card:has(> .table) { overflow-x: auto; }
+/* A table whose cells hold text beside actions wraps the text instead of scrolling
+   sideways, so the row actions stay in view at the narrowest window width. */
+.table.table-wrap td { white-space: normal; }
 .card pre { max-width: 100%; overflow-x: auto; }
 /* Row buttons stay on one line; a narrow table scrolls rather than stacking them. */
 .table .actions { flex-wrap: nowrap; }

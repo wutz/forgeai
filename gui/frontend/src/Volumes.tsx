@@ -90,6 +90,7 @@ export function Volumes() {
                     <button className="btn" disabled={!config} onClick={() => setCreating(true)}>
                       <Icon name="plus" size={14}/>{t('volumes.new')}
                     </button>
+                    <RefreshButton onRefresh={refresh}/>
                   </>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {configError && <div className="banner banner-error" role="alert">{configError}</div>}
@@ -244,7 +245,7 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
   return (
     <Dialog title={t('volumes.new')} subtitle={t('volumes.createSubtitle')} width={440}
             onClose={onClose} busy={busy} footer={<>
-              <CancelButton/>
+              <CancelButton disabled={busy}/>
               <button type="submit" form="create-volume" className="btn"
                       disabled={busy || !nameOK || !sizeOK || !typeOK}>
                 {busy ? t('volumes.creating') : t('volumes.createVolume')}
@@ -292,7 +293,9 @@ function ResizeVolumeDialog({volume, onClose, onDone}: {
   // The floor is the larger of the size in use and the size asked for: a resize that is
   // still settling has requested more than its capacity shows, and a smaller one is refused.
   const current = Math.max(volume.capacityGiB || 0, volume.requestedGiB || 0)
-  const [size, setSize] = useState(current * 2)
+  // The default is the largest size the platform takes, so a very large volume doubled
+  // past 1 PiB opens already invalid; the field is clamped and still must grow.
+  const [size, setSize] = useState(Math.min(current * 2, MAX_VOLUME_GIB))
   // A resize only grows: the size is a whole number above the current one.
   const growOK = Number.isInteger(size) && size > current && size <= MAX_VOLUME_GIB
   const [error, setError] = useState('')
@@ -312,7 +315,7 @@ function ResizeVolumeDialog({volume, onClose, onDone}: {
     <Dialog title={t('volumes.growTitle', {name: volume.name})}
             subtitle={t('volumes.growSubtitle', {size: current})}
             width={440} onClose={onClose} busy={busy} footer={<>
-              <CancelButton/>
+              <CancelButton disabled={busy}/>
               <button type="submit" form="resize-volume" className="btn btn-primary"
                       disabled={busy || !growOK}>
                 {busy ? t('volumes.growing') : t('volumes.growVolume')}
@@ -376,7 +379,7 @@ function ExpiryDialog({volume, onClose, onDone}: {
   return (
     <Dialog title={t('volumes.expiryTitle', {name: volume.name})} subtitle={t('volumes.expirySubtitle')}
             width={440} onClose={onClose} busy={busy} footer={<>
-              <CancelButton/>
+              <CancelButton disabled={busy}/>
               <button type="button" className="btn" disabled={busy} onClick={useDefault}>
                 {t('volumes.useDefault')}
               </button>

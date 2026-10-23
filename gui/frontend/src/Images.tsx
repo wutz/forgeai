@@ -150,7 +150,8 @@ export function Images() {
         )}
         {list.map(r => (
           <div key={r.name} className="repo-row">
-            <details className="repo">
+            {/* A repository that could not be listed opens on its error, which is otherwise behind the summary. */}
+            <details className="repo" open={!!r.error}>
               <summary>
                 <span className="mono">{reg?.url}/{r.name}</span>
                 {r.error

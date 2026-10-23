@@ -112,7 +112,9 @@ export function Resources() {
                   {quota.gpuQuota ? (
                     <Meter value={g.used} max={Math.max(quota.gpuQuota, g.used, 1)}
                            tone={g.used >= quota.gpuQuota ? 'warning' : 'accent'}
-                           right={<span>{t('resources.percentInUse', {percent: pct(g.used, quota.gpuQuota)})}</span>}/>
+                           right={<span>{g.used > quota.gpuQuota
+                             ? t('resources.gpuOver', {over: g.used - quota.gpuQuota})
+                             : t('resources.percentInUse', {percent: pct(g.used, quota.gpuQuota)})}</span>}/>
                   ) : <span className="muted">{t('resources.noQuotaSet')}</span>}
                 </td>
                 <td>{g.used}</td>

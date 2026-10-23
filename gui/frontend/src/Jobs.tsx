@@ -396,7 +396,15 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
             )
           )}
 
-          {tab === 'log' && (
+          {/* With no log read yet and a read that failed, the log view would wait on that read; retry offers it again. */}
+          {tab === 'log' && log === null && error && (
+            <div className="actions">
+              <button className="btn btn-sm" onClick={() => viewLog(logWorker, logTitle || t('jobs.workerLabel', {index: 0})).catch(() => {})}>
+                {t('common.retry')}
+              </button>
+            </div>
+          )}
+          {tab === 'log' && (log !== null || !error) && (
             // Keyed by the worker's log so switching workers starts at the end of the new log.
             <LogView key={logTitle} title={logTitle || t('jobs.workerLabel', {index: 0})} text={log}
                      onRefresh={() => viewLog(logWorker, logTitle || t('jobs.workerLabel', {index: 0}))}/>

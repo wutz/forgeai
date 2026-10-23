@@ -79,7 +79,9 @@ export function Dependencies() {
     </>,
     action: verb(d), primary: true,
     run: () => {
-      fail('')
+      // Only this component's own failure is cleared: another component's error,
+      // and the retry it offers, stay until that component is installed again.
+      if (failed === d.name) fail('')
       setDone('')
       setSteps(s => ({...s, [d.name]: 'starting'}))
       InstallDependency(d.name).catch(e => {
@@ -279,7 +281,7 @@ function verb(d: app.Dependency): string {
 }
 
 function label(status: string): string {
-  return t(`deps.status.${status}` as MessageKey)
+  return copy(`deps.status.${status}`, status)
 }
 
 function tone(status: string): 'success' | 'warning' | 'error' | 'accent' | 'neutral' {

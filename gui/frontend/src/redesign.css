@@ -257,6 +257,8 @@ a { color: inherit; text-decoration: none; }
 .field { min-width: 0; }
 .field label { font-size: 12.5px; }
 .row > * { flex: 1; min-width: 0; }
+/* A member row keeps its buttons and role select at their own width; only the name takes the rest. */
+.member-row > .btn, .member-row > .select { flex: 0 0 auto; }
 .checkbox { height: 34px; }
 .checkbox input { accent-color: var(--accent); }
 
@@ -274,6 +276,8 @@ a { color: inherit; text-decoration: none; }
 .mount-hint { font-size: 12px; line-height: 16px; color: var(--mute); }
 .mount-hint-error { color: var(--error); }
 .hint-error { color: var(--error); }
+/* .field .hint sets the grey hint colour with a higher specificity, so the error colour is restated for fields. */
+.field .hint.hint-error { color: var(--error); }
 .mounts-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 
 /* Cards */

@@ -126,12 +126,14 @@ function gpuLines(gpus: Record<string, number> = {}): string {
 }
 
 // parseGPUs reads the GPU field. Partial pairs are rejected here rather than
-// typed into the quota, so a half-typed class never reaches the Project.
+// typed into the quota, so a half-typed class never reaches the Project. A class
+// listed twice is rejected too: the second count would silently replace the first.
 function parseGPUs(text: string): Record<string, number> {
   const gpus: Record<string, number> = {}
   for (const pair of text.split(/\s+/).filter(Boolean)) {
     const m = /^([^:]+):(\d+)$/.exec(pair)
     if (!m) throw new Error(t('admin.gpuFormatError', {pair}))
+    if (m[1] in gpus) throw new Error(t('admin.gpuDuplicate', {cls: m[1]}))
     if (+m[2] > 0) gpus[m[1]] = +m[2]
   }
   return gpus
@@ -168,14 +170,18 @@ function ProjectDialog({form, onClose, onSaved}: {
     return () => { live = false }
   }, [])
   const create = !form.name
-  const gpuBad = gpuText.split(/\s+/).filter(Boolean).find(pair => !/^([^:]+):(\d+)$/.test(pair))
+  // gpuErr is the message for the first bad GPU pair, or '' when the field parses.
+  const gpuErr = (() => {
+    try { parseGPUs(gpuText); return '' } catch (err) { return errText(err) }
+  })()
   const nameOK = !p.name || dnsLabelOK(p.name)
   const nsPreview = prefix && p.name && nameOK ? prefix + p.name : ''
   const storageOK = !p.quota?.storage || quantityRE.test(p.quota.storage)
   const registryOK = !p.quota?.registryStorage || quantityRE.test(p.quota.registryStorage)
   const trashOK = !p.trashRetention || durationRE.test(p.trashRetention)
-  const volumesOK = (p.quota?.volumes ?? 0) >= 0
-  const podsOK = (p.quota?.pods ?? 0) >= 0
+  // Counts are whole numbers: a fraction such as 1.5 is refused rather than saved.
+  const volumesOK = Number.isInteger(p.quota?.volumes ?? 0) && (p.quota?.volumes ?? 0) >= 0
+  const podsOK = Number.isInteger(p.quota?.pods ?? 0) && (p.quota?.pods ?? 0) >= 0
   // Empty rows are reported on Save; here a name that is not a DNS label, or
   // a username listed twice, is named under the Members field.
   const memberErr = (() => {
@@ -189,7 +195,7 @@ function ProjectDialog({form, onClose, onSaved}: {
     }
     return ''
   })()
-  const formOK = !gpuBad && nameOK && storageOK && registryOK && trashOK && volumesOK && podsOK && !memberErr
+  const formOK = !gpuErr && nameOK && storageOK && registryOK && trashOK && volumesOK && podsOK && !memberErr
 
   const set = <K extends keyof app.Project>(k: K, v: app.Project[K]) =>
     setP(prev => app.Project.createFrom({...prev, [k]: v}))
@@ -209,8 +215,11 @@ function ProjectDialog({form, onClose, onSaved}: {
     }
     let project: app.Project
     try {
+      // Names are saved as typed-trimmed, the same value the validation above checks.
       project = app.Project.createFrom({
-        ...p, quota: app.ProjectQuota.createFrom({...p.quota, gpus: parseGPUs(gpuText)}),
+        ...p,
+        quota: app.ProjectQuota.createFrom({...p.quota, gpus: parseGPUs(gpuText)}),
+        members: (p.members || []).map(m => app.ProjectMember.createFrom({name: m.name.trim(), role: m.role})),
       })
     } catch (err) {
       setError(errText(err))
@@ -285,10 +294,10 @@ function ProjectDialog({form, onClose, onSaved}: {
           <label htmlFor="p-gpus">{t('admin.gpuQuotaLabel')}</label>
           <input id="p-gpus" className="input mono" value={gpuText}
                  autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                 onChange={e => setGpuText(e.target.value)} aria-invalid={!!gpuBad}
+                 onChange={e => setGpuText(e.target.value)} aria-invalid={!!gpuErr}
                  placeholder="rtx-5090:8 a100:2"/>
           <span className="hint">{t('admin.jobsOverQuota')}</span>
-          {gpuBad && <span className="hint hint-error">{t('admin.gpuFormatError', {pair: gpuBad})}</span>}
+          {gpuErr && <span className="hint hint-error">{gpuErr}</span>}
         </div>
         <div className="row">
           <div className="field">
@@ -313,21 +322,21 @@ function ProjectDialog({form, onClose, onSaved}: {
         <div className="row">
           <div className="field">
             <label htmlFor="p-volumes">{t('admin.volumes')}</label>
-            <input id="p-volumes" className="input" type="number" min={0}
+            <input id="p-volumes" className="input" type="number" min={0} step={1}
                    value={p.quota?.volumes || 0}
                    aria-invalid={!volumesOK}
                    onChange={e => set('quota', app.ProjectQuota.createFrom({...p.quota, volumes: +e.target.value}))}/>
             <span className="hint">{t('admin.zeroNoLimit')}</span>
-            {!volumesOK && <span className="hint hint-error">{t('admin.countNegative')}</span>}
+            {!volumesOK && <span className="hint hint-error">{t('admin.countInvalid')}</span>}
           </div>
           <div className="field">
             <label htmlFor="p-pods">{t('admin.pods')}</label>
-            <input id="p-pods" className="input" type="number" min={0}
+            <input id="p-pods" className="input" type="number" min={0} step={1}
                    value={p.quota?.pods || 0}
                    aria-invalid={!podsOK}
                    onChange={e => set('quota', app.ProjectQuota.createFrom({...p.quota, pods: +e.target.value}))}/>
             <span className="hint">{t('admin.zeroNoLimit')}</span>
-            {!podsOK && <span className="hint hint-error">{t('admin.countNegative')}</span>}
+            {!podsOK && <span className="hint hint-error">{t('admin.countInvalid')}</span>}
           </div>
         </div>
         <div className="row">
@@ -347,6 +356,7 @@ function ProjectDialog({form, onClose, onSaved}: {
               <option value="Retain">{t('admin.policyRetain')}</option>
               <option value="Delete">{t('admin.policyDelete')}</option>
             </select>
+            <span className="hint">{t(p.deletionPolicy === 'Delete' ? 'admin.policyDeleteHint' : 'admin.policyRetainHint')}</span>
           </div>
         </div>
         <div className="row">
@@ -375,7 +385,7 @@ function ProjectDialog({form, onClose, onSaved}: {
         <div className="field">
           <label>{t('admin.members')}</label>
           {(p.members || []).map((m, i) => (
-            <div className="row" key={i}>
+            <div className="row member-row" key={i}>
               <input className="input mono" value={m.name} placeholder={t('admin.usernamePlaceholder')}
                      aria-label={t('admin.memberName')}
                      autoCapitalize="none" autoCorrect="off" spellCheck={false}

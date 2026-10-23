@@ -156,7 +156,7 @@ export function Overview({onOpen, onOpenJob}: {
               {(quota.gpuClasses || []).map(g => (
                 <Meter key={g.class} value={g.used} max={Math.max(quota.gpuQuota, g.used, 1)}
                        tone={quota.gpuQuota && g.used >= quota.gpuQuota ? 'warning' : 'accent'}
-                       label={<span className="mono">{g.class === '*' ? t('overview.gpusUnknownClass') : t('overview.gpusOfClass', {cls: g.class})}</span>}
+                       label={<span>{g.class === '*' ? t('overview.gpusUnknownClass') : t('overview.gpusOfClass', {cls: g.class})}</span>}
                        right={<span>{g.used}</span>}/>
               ))}
               {quota.gpuQuota > 0 && (quota.gpuClasses || []).length > 0 && (
@@ -164,13 +164,13 @@ export function Overview({onOpen, onOpenJob}: {
               )}
               {/* A zero or empty limit means unlimited: the bar stays empty rather than full. */}
               <Meter value={toGiB(quota.storageUsed)} max={toGiB(quota.storage)} tone="muted"
-                     label={<span className="mono">{t('overview.volumeStorage')}</span>}
+                     label={<span>{t('overview.volumeStorage')}</span>}
                      right={<span>{quota.storageUsed || '0'} / {quota.storage || t('overview.unlimited')}</span>}/>
               <Meter value={quota.volumes} max={quota.volumeMax} tone="muted"
-                     label={<span className="mono">{t('overview.volumes')}</span>}
+                     label={<span>{t('overview.volumes')}</span>}
                      right={<span>{quota.volumes} / {quota.volumeMax || t('overview.unlimited')}</span>}/>
               <Meter value={quota.pods} max={quota.podMax} tone="muted"
-                     label={<span className="mono">{t('overview.pods')}</span>}
+                     label={<span>{t('overview.pods')}</span>}
                      right={<span>{quota.pods} / {quota.podMax || t('overview.unlimited')}</span>}/>
             </div>
           )}

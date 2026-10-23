@@ -362,8 +362,15 @@ function SandboxDetail({name, onDone, onDeleted}: {
                 </button>}
               </div>)}
           {tab === 'log' && <>
-            {logError && <div className="banner banner-error" role="alert">{logError}</div>}
-            <LogView text={log} onRefresh={showLog}/>
+            {logError && <div className="banner banner-error" role="alert">
+              <span>{logError}</span>
+              {/* With no log read yet, the log view would wait on a read that failed; retry offers the read again. */}
+              {log === null && <>
+                <span className="spacer"/>
+                <button className="btn btn-sm" onClick={() => showLog().catch(() => {})}>{t('common.retry')}</button>
+              </>}
+            </div>}
+            {log === null && logError ? null : <LogView text={log} onRefresh={showLog}/>}
           </>}
           {tab === 'env' && <pre className="code">{box.command ? `$ ${box.command}\n\n` : ''}
             {envToLines(box.env) || '—'}</pre>}

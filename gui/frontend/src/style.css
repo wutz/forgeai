@@ -157,6 +157,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .status-suspended .dot { background: var(--mute); }
 .status-failed { color: var(--error); }
 .status-failed .dot { background: var(--error); }
+/* A lost volume has no usable storage behind it, so it reads as a failure, not as idle. */
+.status-lost { color: var(--error); }
+.status-lost .dot { background: var(--error); }
+.status-deleting .dot { background: var(--warning); }
 .status-retried .dot { background: var(--faint); }
 
 /* Detail */
@@ -173,7 +177,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* Banner / empty */
 .banner { padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 16px; }
-.banner-error { background: var(--error-soft); color: var(--error); }
+/* The label is --error-deep on the tint: --error on --error-soft is under 4.5:1 for body text. */
+.banner-error { background: var(--error-soft); color: var(--error-deep); }
 .banner-warn { background: var(--warning-soft); color: var(--warning-deep); }
 .banner-success { background: var(--success-soft); color: var(--success-deep); }
 .empty { padding: 48px 16px; text-align: center; color: var(--mute); }

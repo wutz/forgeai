@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 	"unicode/utf8"
 
 	corev1 "k8s.io/api/core/v1"
@@ -59,25 +60,54 @@ func (q *sizeQueue) set(s remotecommand.TerminalSize) {
 	}
 }
 
+// sandboxOutput is one chunk of shell output. Seq numbers the chunks of a
+// session in the order the shell wrote them.
+type sandboxOutput struct {
+	Seq  uint64 `json:"seq"`
+	Data string `json:"data"`
+}
+
+// sandboxExit ends a session. Its Seq follows the last output chunk, so the
+// GUI shows it after all of the output.
+type sandboxExit struct {
+	Seq     uint64 `json:"seq"`
+	Message string `json:"message"`
+}
+
 // eventWriter emits what the shell writes as a Wails event. A multi-byte
 // UTF-8 character split across two reads is held back until it is complete.
+// The event bridge does not keep events in the order they are emitted under
+// a burst of output, so each chunk carries its sequence number and the GUI
+// writes them in that order.
 type eventWriter struct {
 	app     *App
 	ctx     context.Context
 	event   string
+	mu      sync.Mutex
 	pending []byte
+	seq     uint64
 }
 
 // Write implements io.Writer.
 func (w *eventWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	buf := append(w.pending, p...)
 	cut := completeLen(buf)
 	chunk := string(buf[:cut])
 	w.pending = append(w.pending[:0], buf[cut:]...)
 	if chunk != "" {
-		w.app.emitEvent(w.ctx, w.event, chunk)
+		w.seq++
+		w.app.emitEvent(w.ctx, w.event, sandboxOutput{Seq: w.seq, Data: chunk})
 	}
 	return len(p), nil
+}
+
+// nextSeq returns the sequence number for the next event after the output.
+func (w *eventWriter) nextSeq() uint64 {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.seq + 1
 }
 
 // completeLen returns the length of the prefix of b that ends on a rune
@@ -177,7 +207,7 @@ func (a *App) OpenSandboxTerminal(name, id string, cols, rows int) error {
 		if err != nil {
 			msg = err.Error()
 		}
-		a.emitEvent(a.ctx, "sandbox-terminal:"+id+":exit", msg)
+		a.emitEvent(a.ctx, "sandbox-terminal:"+id+":exit", sandboxExit{Seq: out.nextSeq(), Message: msg})
 	}()
 	return nil
 }

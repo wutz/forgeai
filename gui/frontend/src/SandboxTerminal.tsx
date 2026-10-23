@@ -10,6 +10,53 @@ import {errText} from './util'
 import {Icon} from './ui'
 import {t} from './i18n'
 
+// orderChunks calls deliver with each sequenced item in sequence order, from 1.
+// An item that arrives ahead of the ones before it waits for them. An item
+// still missing after waitMs is treated as lost: the items held are delivered
+// in order, and a late arrival is delivered as it comes, so no output is dropped.
+// stop cancels the pending wait; call it when the consumer goes away.
+function orderChunks<T>(deliver: (item: T) => void, waitMs = 250) {
+  let next = 1
+  const held = new Map<number, T>()
+  let timer = 0
+  const drain = () => {
+    while (held.has(next)) {
+      deliver(held.get(next) as T)
+      held.delete(next)
+      next++
+    }
+  }
+  const skip = () => {
+    timer = 0
+    for (const seq of [...held.keys()].sort((a, b) => a - b)) {
+      deliver(held.get(seq) as T)
+      held.delete(seq)
+      next = seq + 1
+    }
+    drain()
+  }
+  return {
+    add(seq: number, item: T) {
+      if (seq < next) {
+        deliver(item)
+        return
+      }
+      held.set(seq, item)
+      drain()
+      if (held.size === 0) {
+        window.clearTimeout(timer)
+        timer = 0
+      } else if (!timer) {
+        timer = window.setTimeout(skip, waitMs)
+      }
+    },
+    stop() {
+      window.clearTimeout(timer)
+      timer = 0
+    },
+  }
+}
+
 // SandboxTerminal is an interactive shell in a running sandbox. The session
 // lives as long as the component: leaving the tab closes the shell. When the
 // shell ends or fails to open, Reconnect starts a new one.
@@ -43,15 +90,24 @@ export function SandboxTerminal({name}: {name: string}) {
     const fit = new FitAddon()
     term.loadAddon(fit)
 
-    const offData = EventsOn(`sandbox-terminal:${id}`, (data: string) => term.write(data))
-    const offExit = EventsOn(`sandbox-terminal:${id}:exit`, (msg: string) => {
-      const text = msg ? t('terminal.sessionEndedWith', {message: msg}) : t('terminal.sessionEnded')
+    // Output and the end of the session are written in the order the backend
+    // numbered them, so the screen shows what the shell printed, in that order.
+    const order = orderChunks((c: {data: string} | {exit: string}) => {
+      if ('data' in c) {
+        term.write(c.data)
+        return
+      }
+      const text = c.exit ? t('terminal.sessionEndedWith', {message: c.exit}) : t('terminal.sessionEnded')
       term.write(`\r\n\x1b[90m[${text}]\x1b[0m\r\n`)
       // An ended shell takes no input; keys would otherwise vanish silently.
       term.options.disableStdin = true
       term.options.cursorBlink = false
       setEnded(true)
     })
+    const offData = EventsOn(`sandbox-terminal:${id}`, (out: {seq: number; data: string}) =>
+      order.add(out.seq, {data: out.data}))
+    const offExit = EventsOn(`sandbox-terminal:${id}:exit`, (ex: {seq: number; message: string}) =>
+      order.add(ex.seq, {exit: ex.message}))
     // A write that fails means the shell is gone or unreachable: the error is shown
     // rather than the keys vanishing. Each call runs on its own goroutine in the
     // backend, so the next chunk waits for this one: typed keys reach the shell in order.
@@ -108,6 +164,7 @@ export function SandboxTerminal({name}: {name: string}) {
       window.clearTimeout(open)
       ro?.disconnect()
       onData.dispose()
+      order.stop()
       offData()
       offExit()
       CloseSandboxTerminal(id).catch(() => {})

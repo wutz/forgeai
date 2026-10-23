@@ -2,7 +2,7 @@ import {Fragment, useEffect, useRef, useState} from 'react'
 import {InstallDependency, ListDependencies} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {EventsOn} from '../wailsjs/runtime/runtime'
-import {errText} from './util'
+import {errText, isAlreadyInstalling} from './util'
 import {Badge, Card, Empty, Icon, Meter, PageHeader, RefreshButton, Spinner, useActive, useConfirm} from './ui'
 import {MessageKey, getLocale, t} from './i18n'
 
@@ -85,6 +85,9 @@ export function Dependencies() {
       setDone('')
       setSteps(s => ({...s, [d.name]: 'starting'}))
       InstallDependency(d.name).catch(e => {
+        // A refusal because the component is already installing is not this install's failure:
+        // its steps and outcome still arrive, and a Retry would only repeat the refusal.
+        if (isAlreadyInstalling(e)) return fail(errText(e))
         setSteps(({[d.name]: _, ...rest}) => rest)
         fail(errText(e), d.name)
       }).then(() => refresh().catch(() => undefined))

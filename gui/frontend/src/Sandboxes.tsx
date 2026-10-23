@@ -95,15 +95,16 @@ function SandboxTable({boxes, failed, selected, onSelect}: {
   }
   return (
     <Card>
+      {/* Beside an open sandbox the table drops isolation and age: the detail shows both. */}
       <table className="table sandbox-table">
         <thead>
         <tr>
           <th>{t('common.name')}</th>
           <th>{t('common.status')}</th>
-          <th>{t('sandboxes.isolation')}</th>
+          {!selected && <th>{t('sandboxes.isolation')}</th>}
           <th>{t('sandboxes.resources')}</th>
           <th>{t('sandboxes.endpoint')}</th>
-          <th>{t('sandboxes.age')}</th>
+          {!selected && <th>{t('sandboxes.age')}</th>}
         </tr>
         </thead>
         <tbody>
@@ -119,10 +120,10 @@ function SandboxTable({boxes, failed, selected, onSelect}: {
               <div className="cell-sub" title={b.message}>{short(statusText(b).label)}</div>}
               {b.phase === 'Running' && containerNote(b) &&
               <div className="cell-sub" title={containerNote(b)}>{short(containerNote(b))}</div>}</td>
-            <td>{b.runtimeClass ? <Badge>{b.runtimeClass}</Badge> : <span className="muted">{t('sandboxes.runcNode')}</span>}</td>
+            {!selected && <td>{b.runtimeClass ? <Badge>{b.runtimeClass}</Badge> : <span className="muted">{t('sandboxes.runcNode')}</span>}</td>}
             <td className="mono">{b.cpu || '—'}/{b.memory || '—'}{b.gpu ? ` · ${b.gpu} GPU` : ''}</td>
             <td className="mono trunc" title={b.serviceFQDN || b.podIPs?.[0]}>{b.serviceFQDN || b.podIPs?.[0] || '—'}</td>
-            <td className="muted">{b.age}</td>
+            {!selected && <td className="muted">{b.age}</td>}
           </tr>
         ))}
         </tbody>

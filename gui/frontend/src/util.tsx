@@ -33,7 +33,14 @@ function rawMessage(e: unknown): string {
 export function errText(e: unknown): string {
   const raw = rawMessage(e)
   for (const [re, key] of knownErrors) if (re.test(raw)) return t(key)
-  return raw
+  // Backend text is English. In the Chinese UI it is framed as a failure, so the message is not a bare English line.
+  return getLocale() === 'zh' ? t('error.unknown', {message: raw}) : raw
+}
+
+// isAlreadyInstalling reports whether an install was refused because the same
+// component is installing now; that install's progress still arrives.
+export function isAlreadyInstalling(e: unknown): boolean {
+  return /is already being installed/.test(rawMessage(e))
 }
 
 // isConflict reports whether a save failed because the object changed since it was loaded.

@@ -4,7 +4,7 @@ import {app, training} from '../wailsjs/go/models'
 import {failureLabel} from './util'
 import {JobCreateDialog} from './JobCreateDialog'
 import {TemplateDialog} from './Templates'
-import {Status, envToLines, fmtDate, errText} from './util'
+import {Status, envToLines, fmtDate, errText, latestAttempt} from './util'
 import {t} from './i18n'
 import {Badge, Card, Empty, Icon, LogView, PageHeader, Segmented, Spinner, Tabs, tabPanelProps, useActive, useConfirm} from './ui'
 
@@ -84,7 +84,7 @@ export function Jobs() {
     })
   }
   const list = jobs ?? []
-  const busy = list.some(j => settling(j.phase))
+  const busy = list.some(j => settling(latestAttempt(j).phase))
   useEffect(() => {
     if (!active) return
     refresh()
@@ -94,11 +94,11 @@ export function Jobs() {
 
   const counts = useMemo(() => {
     const c: Record<Filter, number> = {all: list.length, running: 0, queued: 0, stopped: 0, failed: 0, done: 0}
-    for (const j of list) c[bucket(j.phase)]++
+    for (const j of list) c[bucket(latestAttempt(j).phase)]++
     return c
   }, [list])
 
-  const shown = jobs && (filter === 'all' ? jobs : jobs.filter(j => bucket(j.phase) === filter))
+  const shown = jobs && (filter === 'all' ? jobs : jobs.filter(j => bucket(latestAttempt(j).phase) === filter))
 
   return (
     <div className="page">
@@ -152,27 +152,28 @@ function JobTable({jobs, failed, filtered, selected, onSelect}: {
         </tr>
         </thead>
         <tbody>
-        {jobs.map(j => (
-          <tr key={j.name} className={selected === j.name ? 'clickable selected' : 'clickable'}
+        {jobs.map(j => {
+          const live = latestAttempt(j)
+          return <tr key={j.name} className={selected === j.name ? 'clickable selected' : 'clickable'}
               onClick={() => onSelect(j.name)}>
             <td className="mono">
               <button type="button" className="row-name cell-main">{j.name}</button>
               <span className="cell-sub">
-                {workerCount(j.workers)}
+                {workerCount(live.workers)}
                 {j.retries?.length ? ` · ${retryCount(j.retries.length)}` : ''}
                 {j.template ? ` · ${j.template}` : ''}
               </span>
             </td>
-            <td><Status phase={j.phase}/>{j.failureReason && j.phase === 'Failed' &&
-              <div className="cell-sub" title={j.message}>{failureLabel(j.failureReason)}</div>}</td>
+            <td><Status phase={live.phase}/>{live.failureReason && live.phase === 'Failed' &&
+              <div className="cell-sub" title={live.message}>{failureLabel(live.failureReason)}</div>}</td>
             <td className="mono">{j.instanceType}</td>
-            <td className="mono">{j.ready}/{j.workers}</td>
+            <td className="mono">{live.ready}/{live.workers}</td>
             <td>{j.maxRetries
               ? <Badge>{retryOnLabel(j.retryOn || 'Infra')} × {j.maxRetries}</Badge>
               : <span className="muted">—</span>}</td>
             <td className="muted">{j.age}</td>
           </tr>
-        ))}
+        })}
         </tbody>
       </table>
     </Card>
@@ -235,7 +236,7 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
   }, [name])
 
   // The poll pauses while the view is hidden and restarts with a fresh read.
-  const busy = !!job && settling(job.phase)
+  const busy = !!job && settling(latestAttempt(job).phase)
   useEffect(() => {
     if (!active) return
     detailOf(name)
@@ -249,19 +250,21 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
     ? <div className="banner banner-error" role="alert">{failure}</div>
     : <Spinner label={t('jobs.loadingJob')}/>}</Card>
 
-  const live = job.phase !== 'Failed' && job.phase !== 'Succeeded'
-  const retriable = job.phase === 'Failed' || job.phase === 'Succeeded'
+  // A retried job's live attempt is the one to act on; the leader keeps the title.
+  const attempt = latestAttempt(job)
+  const live = attempt.phase !== 'Failed' && attempt.phase !== 'Succeeded'
+  const retriable = attempt.phase === 'Failed' || attempt.phase === 'Succeeded'
 
   // Rerun submits a fresh job from this one's form and opens it.
   const rerun = () => {
     setPending('rerun')
     setError('')
-    RerunJob(job.name, '').then(j => onOpen(j.name)).catch(e => setError(errText(e))).finally(() => setPending(''))
+    RerunJob(attempt.name, '').then(j => onOpen(j.name)).catch(e => setError(errText(e))).finally(() => setPending(''))
   }
 
   // viewLog rejects when the log cannot be read; the banner shows why.
   const viewLog = (worker: number, label: string) =>
-    Logs(job.name, worker, 500).then(v => {
+    Logs(attempt.name, worker, 500).then(v => {
       setLog(v)
       setLogTitle(label)
       setLogWorker(worker)
@@ -280,7 +283,7 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
             template: job.template || t('jobs.defaultRuntime'), created: fmtDate(job.created),
           })}</div>
         </div>
-        <div className="card-head-actions"><Status phase={job.phase}/></div>
+        <div className="card-head-actions"><Status phase={attempt.phase}/></div>
       </div>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {loadError && <div className="banner banner-error" role="alert">{loadError}</div>}
@@ -294,17 +297,17 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
         <button className="btn btn-sm" onClick={() => viewLog(0, t('jobs.workerLabel', {index: 0})).catch(() => {})}>
           <Icon name="scroll" size={13}/>{t('common.logs')}
         </button>
-        {live && job.phase !== 'Stopped' &&
+        {live && attempt.phase !== 'Stopped' &&
           <button className="btn btn-sm" disabled={!!pending} onClick={() => confirm.ask({
-            title: t('jobs.stopTitle', {name: job.name}),
+            title: t('jobs.stopTitle', {name: attempt.name}),
             message: t('jobs.stopMessage'),
             action: t('jobs.stopAction'),
-            run: () => act('stop', StopJob(job.name)),
+            run: () => act('stop', StopJob(attempt.name)),
           })}>
             <Icon name="square" size={12}/>{pending === 'stop' ? t('jobs.stopping') : t('common.stop')}
           </button>}
-        {job.phase === 'Stopped' &&
-          <button className="btn btn-sm btn-accent" disabled={!!pending} onClick={() => act('start', StartJob(job.name))}>
+        {attempt.phase === 'Stopped' &&
+          <button className="btn btn-sm btn-accent" disabled={!!pending} onClick={() => act('start', StartJob(attempt.name))}>
             <Icon name="play" size={12}/>{pending === 'start' ? t('jobs.resuming') : t('common.resume')}
           </button>}
         {retriable &&
@@ -382,9 +385,9 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
           )}
 
           {tab === 'workers' && (
-            job.workerPods?.length ? (
+            attempt.workerPods?.length ? (
               <div className="mini-table">
-                {job.workerPods.map(w => (
+                {attempt.workerPods.map(w => (
                   <div key={w.podName} className="mini-row">
                     <span className="mono">{w.podName}</span>
                     <Status phase={w.phase || 'Pending'}/>
@@ -396,7 +399,7 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
               </div>
             ) : (
               <div className="empty">
-                <div className="empty-title">{job.phase === 'Queued' ? t('jobs.noPodsQueued') : t('jobs.noPodsYet')}</div>
+                <div className="empty-title">{attempt.phase === 'Queued' ? t('jobs.noPodsQueued') : t('jobs.noPodsYet')}</div>
               </div>
             )
           )}

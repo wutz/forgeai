@@ -157,6 +157,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .status-suspended .dot { background: var(--mute); }
 .status-failed { color: var(--error); }
 .status-failed .dot { background: var(--error); }
+.status-retried .dot { background: var(--faint); }
 
 /* Detail */
 .kv { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px 12px; font-size: 13px; }

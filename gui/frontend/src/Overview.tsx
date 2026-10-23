@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {ListInstanceTypes, ListJobs, ListVolumes, ListImages, Quota} from '../wailsjs/go/app/App'
 import {app, volumes} from '../wailsjs/go/models'
 import {Card, Icon, MetricTile, Meter, PageHeader, RefreshButton, Spinner, useActive} from './ui'
-import {Status, errText, fmtDate, pct, phaseLabel, tagCount, toGiB} from './util'
+import {Status, errText, fmtDate, latestAttempt, pct, phaseLabel, tagCount, toGiB} from './util'
 import {t} from './i18n'
 
 // Overview is the landing view of a project: what is running now, the GPU
@@ -59,12 +59,15 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
 
   const jobList = jobs ?? []
   const typeList = types ?? []
-  const running = jobList.filter(j => j.phase === 'Running')
-  const queued = jobList.filter(j => j.phase === 'Queued' || j.phase === 'Pending')
-  const failed = jobList.filter(j => j.phase === 'Failed')
+  // Each job family counts by its live attempt, so a retry that runs is counted
+  // and the leader it replaced is not.
+  const attempts = jobList.map(latestAttempt)
+  const running = attempts.filter(j => j.phase === 'Running')
+  const queued = attempts.filter(j => j.phase === 'Queued' || j.phase === 'Pending')
+  const failed = attempts.filter(j => j.phase === 'Failed')
   // Workers count only jobs that still hold or wait for pods: a finished,
   // failed or stopped job no longer expects its workers to be ready.
-  const active = jobList.filter(j => j.phase !== 'Succeeded' && j.phase !== 'Failed' && j.phase !== 'Stopped')
+  const active = attempts.filter(j => j.phase !== 'Succeeded' && j.phase !== 'Failed' && j.phase !== 'Stopped')
   const readyWorkers = active.reduce((n, j) => n + (j.ready || 0), 0)
   const wantedWorkers = active.reduce((n, j) => n + (j.workers || 0), 0)
 
@@ -89,23 +92,23 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
 
       <div className="metrics">
         <MetricTile icon="play" label={t('overview.runningJobs')} tone="success"
-                    value={running.length} unit={`/ ${jobList.length}`}
-                    detail={t('overview.workersReady', {ready: readyWorkers, wanted: wantedWorkers})}>
+                    value={jobs === null ? '—' : running.length} unit={jobs === null ? undefined : `/ ${jobList.length}`}
+                    detail={jobs === null ? '—' : t('overview.workersReady', {ready: readyWorkers, wanted: wantedWorkers})}>
           <Meter value={running.length} max={Math.max(jobList.length, 1)} tone="success"/>
         </MetricTile>
         <MetricTile icon="clock" label={phaseLabel('Queued')} tone="warning"
-                    value={queued.length}
-                    detail={queued.length ? t('overview.waitingForQuota') : t('overview.nothingWaiting')}>
+                    value={jobs === null ? '—' : queued.length}
+                    detail={jobs === null ? '—' : queued.length ? t('overview.waitingForQuota') : t('overview.nothingWaiting')}>
           <Meter value={queued.length} max={Math.max(jobList.length, 1)} tone="warning"/>
         </MetricTile>
         <MetricTile icon="warning" label={phaseLabel('Failed')} tone={failed.length ? 'error' : undefined}
-                    value={failed.length}
-                    detail={failed.length ? t('overview.openJobs') : t('overview.noFailures')}>
+                    value={jobs === null ? '—' : failed.length}
+                    detail={jobs === null ? '—' : failed.length ? t('overview.openJobs') : t('overview.noFailures')}>
           <Meter value={failed.length} max={Math.max(jobList.length, 1)} tone={failed.length ? 'error' : 'muted'}/>
         </MetricTile>
         <MetricTile icon="cpu" label={t('overview.gpusInUse')} tone="accent"
-                    value={gpuUsed} unit={gpuTotal ? `/ ${gpuTotal}` : undefined}
-                    detail={gpuTotal ? t('overview.freeInCluster', {free: gpuFree}) : t('overview.noGpuNodes')}>
+                    value={types === null ? '—' : gpuUsed} unit={types && gpuTotal ? `/ ${gpuTotal}` : undefined}
+                    detail={types === null ? '—' : gpuTotal ? t('overview.freeInCluster', {free: gpuFree}) : t('overview.noGpuNodes')}>
           <Meter value={gpuUsed} max={Math.max(gpuTotal, 1)} tone="accent"/>
         </MetricTile>
       </div>
@@ -180,14 +183,15 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
             <table className="table">
               <thead><tr><th>{t('overview.colJob')}</th><th>{t('common.status')}</th><th>{t('overview.colReady')}</th><th>{t('common.created')}</th></tr></thead>
               <tbody>
-              {jobs.slice(0, 6).map(j => (
-                <tr key={j.name} className="clickable" onClick={() => onOpen('jobs')}>
+              {jobs.slice(0, 6).map(j => {
+                const live = latestAttempt(j)
+                return <tr key={j.name} className="clickable" onClick={() => onOpen('jobs')}>
                   <td className="mono trunc" title={j.name}><button type="button" className="row-name">{j.name}</button></td>
-                  <td><Status phase={j.phase}/></td>
-                  <td className="muted">{j.ready}/{j.workers}</td>
+                  <td><Status phase={live.phase}/></td>
+                  <td className="muted">{live.ready}/{live.workers}</td>
                   <td className="muted">{fmtDate(j.created)}</td>
                 </tr>
-              ))}
+              })}
               </tbody>
             </table>
           )}

@@ -32,7 +32,8 @@ export function JobCreateDialog({onClose, onCreated}: {
   useEffect(() => {
     ListInstanceTypes().then(ts => {
       setTypes(ts)
-      if (ts.length) setF(prev => training.Form.createFrom({...prev, instanceType: ts[0].name}))
+      // The first type is the default only while none is set, so a template's type is kept.
+      if (ts.length) setF(prev => prev.instanceType ? prev : training.Form.createFrom({...prev, instanceType: ts[0].name}))
     }).catch(e => setError(errText(e)))
     TemplateNames().then(setTemplates).catch(() => {})
     ListVolumes(false).then(setVols).catch(e => setError(errText(e)))
@@ -73,6 +74,8 @@ export function JobCreateDialog({onClose, onCreated}: {
   // The name is a DNS label of at most 50 characters, the TrainJob name limit.
   const nameOK = NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= NAME_MAX
   const workersOK = f.workers >= 1
+  // A template can name a type the project no longer offers; the backend rejects it, so Create waits.
+  const typeOK = !!f.instanceType && types.some(it => it.name === f.instanceType)
   // The platform accepts 0 to 20 retries; the backend rejects anything else.
   const retries = f.maxRetries ?? 0
   const retriesOK = Number.isInteger(retries) && retries >= 0 && retries <= MAX_RETRIES
@@ -82,6 +85,7 @@ export function JobCreateDialog({onClose, onCreated}: {
     : !nameOK ? t('common.nameInvalid', {max: NAME_MAX})
     : !f.image ? t('common.imageRequired')
     : !workersOK ? t('jobCreate.workersInvalid')
+    : !typeOK ? t('jobCreate.typeRequired')
     : !retriesOK ? t('jobCreate.retriesInvalid')
     : !mountsOK ? (vols === null ? t('mounts.loading') : t('mounts.fixFirst'))
     : envBad.length ? t('common.envInvalid', {lines: envBad.join(', ')}) : ''
@@ -138,6 +142,8 @@ export function JobCreateDialog({onClose, onCreated}: {
               <label htmlFor="j-instance">{t('jobCreate.instanceType')}</label>
               <select id="j-instance" className="select mono" value={f.instanceType}
                       onChange={e => set('instanceType', e.target.value)} required>
+                {f.instanceType && !types.some(it => it.name === f.instanceType) &&
+                  <option value={f.instanceType}>{t('templates.typeUnavailable', {name: f.instanceType})}</option>}
                 {types.map(it => <option key={it.name} value={it.name}>
                   {it.gpuCount
                     ? t('jobCreate.instanceOption', {

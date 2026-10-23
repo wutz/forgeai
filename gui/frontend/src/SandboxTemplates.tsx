@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {CreateSandboxTemplate, UpdateSandboxTemplate, SandboxOptions} from '../wailsjs/go/app/App'
 import {app, sandbox} from '../wailsjs/go/models'
-import {envErrors, envMap, envToLines, linesToEnv, fmtDate, errText, generateName, NAME_MAX, NAME_PATTERN} from './util'
+import {envErrors, envMap, envToLines, linesToEnv, fmtDate, errText, generateName, NAME_PATTERN, SANDBOX_NAME_MAX} from './util'
 import {CancelButton, Dialog, Empty, Spinner, useConfirm} from './ui'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
@@ -82,7 +82,7 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
       setOpts(o)
       if (initial) return
       setF(prev => sandbox.TemplateForm.createFrom({
-        ...prev, image: o.defaultImage, runtimeClass: o.defaultRuntimeClass,
+        ...prev, image: prev.image || o.defaultImage, runtimeClass: prev.runtimeClass || o.defaultRuntimeClass,
       }))
     }).catch(e => setError(errText(e)))
   }, [])
@@ -92,11 +92,11 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
 
   const envBad = envErrors(envText)
   // An edit keeps its name (the field is disabled), so only a new name is checked.
-  const nameOK = !!existing || (NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= NAME_MAX)
+  const nameOK = !!existing || (NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= SANDBOX_NAME_MAX)
   // blocker says why Save is off. A bad name or env line already has a hint
   // under its field, so the footer only names the blockers that have none.
   const blocker = !f.name ? t('common.nameRequired')
-    : !nameOK ? t('common.nameInvalid', {max: NAME_MAX})
+    : !nameOK ? t('common.nameInvalid', {max: SANDBOX_NAME_MAX})
     : !f.image ? t('common.imageRequired')
     : envBad.length ? t('common.envInvalid', {lines: envBad.join(', ')}) : ''
   const hasFieldHint = (!nameOK && (f.name ?? '') !== '') || envBad.length > 0
@@ -134,8 +134,8 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
             <input id="st-name" className="input mono" value={f.name} disabled={!!existing}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
                    onChange={e => set('name', e.target.value)} placeholder="agent" required
-                   maxLength={existing ? undefined : NAME_MAX} aria-invalid={!nameOK}/>
-            {!nameOK && (f.name ?? '') !== '' && <span className="hint hint-error">{t('common.nameInvalid', {max: NAME_MAX})}</span>}
+                   maxLength={existing ? undefined : SANDBOX_NAME_MAX} aria-invalid={!nameOK}/>
+            {!nameOK && (f.name ?? '') !== '' && <span className="hint hint-error">{t('common.nameInvalid', {max: SANDBOX_NAME_MAX})}</span>}
           </div>
           <div className="field">
             <label htmlFor="st-desc">{t('templates.description')}</label>

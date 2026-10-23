@@ -52,7 +52,9 @@ export function SandboxTerminal({name}: {name: string}) {
       term.options.cursorBlink = false
       setEnded(true)
     })
-    const onData = term.onData(data => SandboxTerminalInput(id, data).catch(() => {}))
+    // A write that fails means the shell is gone or unreachable: the error is shown
+    // rather than the keys vanishing.
+    const onData = term.onData(data => SandboxTerminalInput(id, data).catch(e => setError(errText(e))))
 
     // The terminal opens in a later task, not here. StrictMode runs this effect
     // twice, and a terminal disposed right after open leaves its viewport with a
@@ -76,6 +78,9 @@ export function SandboxTerminal({name}: {name: string}) {
         }
       }, e => {
         if (!closed) {
+          // A shell that did not open takes no input; the user reconnects from the message.
+          term.options.disableStdin = true
+          term.options.cursorBlink = false
           setConnecting(false)
           setError(errText(e))
         }

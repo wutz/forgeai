@@ -31,7 +31,9 @@ export function Scope({contexts, cluster, projects, namespace, connected, busy, 
             {projects.map(p => <option key={p.namespace} value={p.namespace}>{p.namespace}</option>)}
           </select>
         ) : (
-          <NamespaceInput value={namespace} disabled={busy || !connected} onCommit={onProject}/>
+          // Typing is allowed while not connected: the namespace is how a user whose
+          // first connect failed picks another one.
+          <NamespaceInput value={namespace} disabled={busy} onCommit={onProject}/>
         )}
       </div>
     </div>

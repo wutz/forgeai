@@ -410,7 +410,7 @@ code {
 /* Status */
 .status { font-size: 12.5px; }
 .dot { width: 7px; height: 7px; }
-.status-succeeded .dot, .status-stopped .dot, .status-idle .dot { background: var(--faint); }
+.status-succeeded .dot, .status-stopped .dot, .status-idle .dot, .status-retried .dot { background: var(--faint); }
 .status-starting .dot, .status-resizing .dot { background: var(--warning); }
 
 /* Detail pane */

@@ -1,9 +1,9 @@
-import {useEffect, useState} from 'react'
+import {useEffect, useRef, useState} from 'react'
 import {DeleteImage, DeleteImageRepo, DeleteImageTag, ListImages, Registry} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {errText, fmtDate, tagCount} from './util'
 import {t} from './i18n'
-import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, useActive, useConfirm} from './ui'
+import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Spinner, useActive, useConfirm} from './ui'
 
 // countImages and countTags name a count in a sentence, with the singular
 // form of one ("1 image") as the messages do for jobs.
@@ -13,11 +13,14 @@ const countTags = (n: number) => n === 1 ? t('images.tagsOne') : t('images.tagsM
 // Images shows the project registry: the push command with the robot
 // credentials and the pushed tags with delete buttons.
 export function Images() {
-  const [repos, setRepos] = useState<app.ImageRepo[]>([])
+  // repos is null until the first list answers, so the empty state does not show while it loads.
+  const [repos, setRepos] = useState<app.ImageRepo[] | null>(null)
+  const list = repos ?? []
   // reg stays null until Registry answers, so the empty states do not flash.
   const [reg, setReg] = useState<app.Registry | null>(null)
   const [error, setError] = useState('')
   const [copied, setCopied] = useState('')
+  const copyTimer = useRef<number>()
   const [showPassword, setShowPassword] = useState(false)
   const confirm = useConfirm()
   const active = useActive()
@@ -34,8 +37,10 @@ export function Images() {
   const copy = (text: string, key: string) =>
     navigator.clipboard.writeText(text).then(() => {
       setCopied(key)
-      setTimeout(() => setCopied(''), 1500)
-    }, () => {})
+      // A second copy restarts the notice, so the earlier timer must not clear it early.
+      window.clearTimeout(copyTimer.current)
+      copyTimer.current = window.setTimeout(() => setCopied(''), 1500)
+    }, () => setError(t('images.copyFailed')))
 
   // The password is not part of the command: docker asks for it, so it stays
   // out of shell history and the process list. The robot name contains "$",
@@ -43,8 +48,8 @@ export function Images() {
   const host = reg?.url.split('/')[0] ?? ''
   const login = reg?.username ? `docker login ${host} -u '${reg.username}'` : ''
   const address = (repo: string, tag: string) => reg ? `${reg.url}/${repo}:${tag}` : ''
-  const totalTags = repos.reduce((n, r) => n + tagCount(r), 0)
-  const totalPulls = repos.reduce((n, r) => n + r.pulls, 0)
+  const totalTags = list.reduce((n, r) => n + tagCount(r), 0)
+  const totalPulls = list.reduce((n, r) => n + r.pulls, 0)
 
   const deleteRepo = (r: app.ImageRepo) => confirm.ask({
     title: t('images.deleteRepoTitle', {name: r.name}),
@@ -81,8 +86,8 @@ export function Images() {
   return (
     <div className="page">
       <PageHeader eyebrow={t('storage.eyebrow')} title={t('images.title')}
-                  meta={repos.length > 0 && <span className="muted" style={{fontSize: 12}}>
-                    {t('images.summary', {repos: repos.length, tags: totalTags, pulls: totalPulls})}
+                  meta={list.length > 0 && <span className="muted" style={{fontSize: 12}}>
+                    {t('images.summary', {repos: list.length, tags: totalTags, pulls: totalPulls})}
                   </span>}
                   actions={<RefreshButton onRefresh={refresh}/>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
@@ -129,17 +134,18 @@ export function Images() {
             {t('images.viewOnlyHint')}
           </Empty>
         )}
-        {repos.length === 0 && !error && reg?.enabled && reg.credentials && (
+        {repos === null && !error && <Spinner label={t('common.loading')}/>}
+        {repos !== null && list.length === 0 && !error && reg?.enabled && reg.credentials && (
           <Empty icon="image" title={t('images.noneTitle')}>
             {t('images.noneHintBefore')} <code className="mono">{reg?.url}</code>{t('images.noneHintAfter')}
           </Empty>
         )}
-        {repos.length === 0 && reg && !reg.enabled && (
+        {repos !== null && list.length === 0 && reg && !reg.enabled && (
           <Empty icon="image" title={t('images.notConfigured')}>
             {t('images.notConfiguredHint')}
           </Empty>
         )}
-        {repos.map(r => (
+        {list.map(r => (
           <details key={r.name} className="repo">
             <summary>
               <span className="mono">{reg?.url}/{r.name}</span>

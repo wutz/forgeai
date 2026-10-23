@@ -1,3 +1,4 @@
+import {app} from '../wailsjs/go/models'
 import {MessageKey, getLocale, t} from './i18n'
 
 // knownErrors maps the backend messages users hit most to catalogue keys, so
@@ -14,6 +15,8 @@ const knownErrors: [RegExp, MessageKey][] = [
   [/registry is not configured for this project/, 'error.registryNotConfigured'],
   [/was superseded by a newer connect/, 'error.connectionSuperseded'],
   [/has no pod: it is stopped or still starting/, 'error.sandboxNoPod'],
+  [/start it before opening a terminal/, 'error.sandboxNotRunning'],
+  [/instance type "[^"]*" not found/, 'error.instanceTypeNotFound'],
 ]
 
 export function errText(e: unknown): string {
@@ -24,11 +27,19 @@ export function errText(e: unknown): string {
   return raw
 }
 
+// latestAttempt is the attempt that decides a job family's state: the newest of
+// the leader and its retries. The list keeps the leader's name, because that is
+// what the list links to, but a leader whose retry ran is "Retried", and its
+// live attempt is the one to count, filter, stop and rerun.
+export function latestAttempt(j: app.Job): app.Job {
+  return (j.retries ?? []).reduce((newest, r) => (r.created > newest.created ? r : newest), j)
+}
+
 const phaseKeys = new Map<string, MessageKey>([
   ['running', 'phase.running'], ['queued', 'phase.queued'], ['pending', 'phase.pending'],
   ['starting', 'phase.starting'], ['restarting', 'phase.restarting'], ['stopping', 'phase.stopping'],
   ['stopped', 'phase.stopped'], ['suspended', 'phase.suspended'], ['succeeded', 'phase.succeeded'],
-  ['failed', 'phase.failed'], ['idle', 'phase.idle'], ['ready', 'phase.ready'],
+  ['failed', 'phase.failed'], ['retried', 'phase.retried'], ['idle', 'phase.idle'], ['ready', 'phase.ready'],
   ['resizing', 'phase.resizing'],
   ['expired', 'phase.expired'],
 ])
@@ -77,12 +88,16 @@ export function linesToEnv(s: string): EnvMap {
 // envErrors returns the 1-based numbers of the lines that are not NAME=value.
 // Blank and comment lines are fine; linesToEnv would otherwise take a bare
 // "KEY" as an empty value, or drop a "=value" line without a name.
+// envNameRE is the name rule Kubernetes applies to container environment variables.
+const envNameRE = /^[-._a-zA-Z][-._a-zA-Z0-9]*$/
+
 export function envErrors(s: string): number[] {
   const bad: number[] = []
   s.split('\n').forEach((line, i) => {
     const text = line.trim()
     if (!text || text.startsWith('#')) return
-    if (text.indexOf('=') <= 0) bad.push(i + 1)
+    const eq = text.indexOf('=')
+    if (eq <= 0 || !envNameRE.test(text.slice(0, eq).trim())) bad.push(i + 1)
   })
   return bad
 }

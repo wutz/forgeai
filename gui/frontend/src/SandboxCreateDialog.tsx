@@ -24,6 +24,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   }))
   const [envText, setEnvText] = useState('')
   const [mounts, setMounts] = useState<Mount[]>([])
+  // NaN is an empty field, which is not a valid TTL (an empty field would read as 0 hours).
   const [ttlHours, setTtlHours] = useState(0)
   // idleMinutes stays null until typed: null uses the platform's idle timeout,
   // 0 turns the idle policy off for this sandbox.
@@ -33,8 +34,9 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   useEffect(() => {
     SandboxOptions().then(o => {
       setOpts(o)
+      // A template or image the user already picked is kept; the defaults fill only blanks.
       setF(prev => sandbox.Form.createFrom({
-        ...prev, image: o.defaultImage, runtimeClass: o.defaultRuntimeClass,
+        ...prev, image: prev.image || o.defaultImage, runtimeClass: prev.runtimeClass || o.defaultRuntimeClass,
       }))
     }).catch(e => setError(errText(e)))
     ListInstanceTypes().then(setTypes).catch(e => setError(errText(e)))
@@ -80,6 +82,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
     setBusy(true)
     const form = sandbox.Form.createFrom({
       ...f,
+      image: f.image.trim(),
       env: Object.entries(linesToEnv(envText)).map(([name, value]) => ({name, value})),
       volumes: mounts.map(m => ({
         volume: m.volume.trim(), mountPath: m.mountPath.trim(), subPath: (m.subPath || '').trim(),
@@ -101,7 +104,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
     <Dialog title={t('sandboxCreate.title')} subtitle={t('sandboxCreate.subtitle')}
             onClose={onClose} busy={busy} footer={<>
               <CancelButton disabled={busy}/>
-              <button type="submit" form="sandbox-form" className="btn" disabled={busy || !nameOK || !f.image || !mountsOK || envBad.length > 0 || !ttlOK || !idleOK}>
+              <button type="submit" form="sandbox-form" className="btn" disabled={busy || !nameOK || !f.image.trim() || !mountsOK || envBad.length > 0 || !ttlOK || !idleOK}>
                 {busy ? t('sandboxCreate.creating') : t('sandboxCreate.create')}
               </button>
             </>}>
@@ -182,8 +185,8 @@ export function SandboxCreateDialog({onClose, onCreated}: {
           <div className="row">
             <div className="field">
               <label htmlFor="s-ttl">{t('sandboxCreate.ttl')}</label>
-              <input id="s-ttl" className="input" type="number" step="any" value={ttlHours} aria-invalid={!ttlOK}
-                     onChange={e => setTtlHours(+e.target.value)}/>
+              <input id="s-ttl" className="input" type="number" step="any" value={Number.isNaN(ttlHours) ? '' : ttlHours}
+                     aria-invalid={!ttlOK} onChange={e => setTtlHours(e.target.value === '' ? NaN : +e.target.value)}/>
               <span className="hint">{t('sandboxCreate.ttlHint')}</span>
               {!ttlOK && <span className="hint hint-error">{t('sandboxCreate.nonNegative')}</span>}
             </div>

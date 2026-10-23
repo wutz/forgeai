@@ -112,6 +112,31 @@ func projectOf(ctx context.Context, k8s client.Client, namespace string) (string
 	return ns.Labels[naming.LabelProject], nil
 }
 
+// resolveProject returns the project namespace and project a connection opens.
+// An explicit namespace must be a project the user can read. Otherwise the
+// context default is used when it is a project, else the first project the
+// user can see. When the user can see no project, the namespace is "": the
+// connection opens nothing, which an admin reads as the admin area and anyone
+// else as a connection the App explains.
+func resolveProject(ctx context.Context, k8s client.Client, namespace string, explicit bool) (string, string, error) {
+	project, err := projectOf(ctx, k8s, namespace)
+	if err == nil && project == "" {
+		err = fmt.Errorf("namespace %q is not a forgeai project", namespace)
+	}
+	if err == nil || explicit {
+		return namespace, project, err
+	}
+	projects, lerr := listProjects(ctx, k8s)
+	switch {
+	case lerr == nil && len(projects) > 0:
+		return projects[0].Namespace, projects[0].Project, nil
+	case lerr == nil || apierrors.IsForbidden(lerr):
+		// Listing namespaces is itself forbidden to a user with no project role.
+		return "", "", nil
+	}
+	return "", "", lerr
+}
+
 // Connect switches to a kubeconfig context and a forgeai project namespace.
 // The namespace is only accepted when it carries the forgeai project label,
 // so the GUI cannot be pointed at unrelated parts of the cluster. When no
@@ -149,29 +174,18 @@ func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
 
 	admin := mustBeAdmin(ctx, k8s)
 	clusterAdmin := mustBeClusterAdmin(ctx, k8s)
-	project, err := projectOf(ctx, k8s, namespace)
-	if err == nil && project == "" {
-		err = fmt.Errorf("namespace %q is not a forgeai project", namespace)
-	}
-	if err != nil && !explicit {
-		if projects, lerr := listProjects(ctx, k8s); lerr == nil {
-			switch {
-			case len(projects) > 0:
-				namespace, project, err = projects[0].Namespace, projects[0].Project, nil
-			case admin:
-				// No projects yet: only the admin area is usable.
-				namespace, err = "", nil
-			}
-		}
-	}
+	namespace, project, err := resolveProject(ctx, k8s, namespace, explicit)
 	if err != nil {
 		return ConnInfo{}, err
 	}
 
-	// Cluster-wide reads need the forgeai catalogues; probe they work.
-	forgeai, err := isolate(ctx, k8s, clusterAdmin)
-	if err != nil {
-		return ConnInfo{}, err
+	// Cluster-wide reads need the forgeai catalogues; probe they work. Someone
+	// with nothing open does not read them, and may not be allowed to.
+	forgeai := false
+	if namespace != "" || admin {
+		if forgeai, err = isolate(ctx, k8s, clusterAdmin); err != nil {
+			return ConnInfo{}, err
+		}
 	}
 	info := ConnInfo{
 		Context: contextName, Server: rest.Host, Namespace: namespace, Project: project,

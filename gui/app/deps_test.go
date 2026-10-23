@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io/fs"
 	"reflect"
 	"slices"
@@ -401,5 +402,28 @@ func TestDepInstallsRejectsSecondStart(t *testing.T) {
 	d.finish("kueue")
 	if d.active("kueue") || !d.start("kueue") {
 		t.Fatal("component not reusable after finish")
+	}
+}
+
+func TestForEachConcurrentlyRunsEachIndexAndReturnsFirstError(t *testing.T) {
+	const n = 8
+	ran := make([]bool, n)
+	err := forEachConcurrently(n, func(i int) error {
+		ran[i] = true
+		if i == 5 || i == 2 {
+			return fmt.Errorf("probe %d failed", i)
+		}
+		return nil
+	})
+	for i, ok := range ran {
+		if !ok {
+			t.Errorf("index %d did not run", i)
+		}
+	}
+	if err == nil || err.Error() != "probe 2 failed" {
+		t.Errorf("err = %v, want the first failure by index (probe 2)", err)
+	}
+	if err := forEachConcurrently(n, func(int) error { return nil }); err != nil {
+		t.Errorf("no failures: err = %v", err)
 	}
 }

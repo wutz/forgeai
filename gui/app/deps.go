@@ -406,14 +406,18 @@ func (a *App) ListDependencies() (*Dependencies, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, info := range depCatalog {
+	// The components are probed at once: each probe is a few independent reads, so
+	// the page waits for the slowest component, not the sum of all of them.
+	items := make([]Dependency, len(depCatalog))
+	err = forEachConcurrently(len(depCatalog), func(i int) error {
+		info := depCatalog[i]
 		b, err := bundleByName(info.name)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		dep, err := probeDependency(ctx, c.k8s, info, b, expectedNamespace(cfg, info.name))
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if r, ok := records[info.name]; ok {
 			dep.AppliedBy, dep.AppliedAt = r.AppliedBy, r.AppliedAt
@@ -422,9 +426,31 @@ func (a *App) ListDependencies() (*Dependencies, error) {
 			dep.Status = "installing"
 			diagnose(&dep, "installing", nil, "Installing")
 		}
-		out.Items = append(out.Items, dep)
+		items[i] = dep
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
+	out.Items = append(out.Items, items...)
 	return out, nil
+}
+
+// forEachConcurrently runs fn for each index in [0, n) at once and returns the
+// first error by index. Each fn writes only its own slot, so callers need no lock.
+func forEachConcurrently(n int, fn func(i int) error) error {
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Go(func() { errs[i] = fn(i) })
+	}
+	wg.Wait()
+	for _, err := range errs {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // probeDependency reads the CRDs and Deployments of a component. Bundled
@@ -443,15 +469,25 @@ func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *de
 		dep.Pinned = forgeaiChartVersion
 	}
 	h.crdsWanted = len(crds)
-	for _, name := range crds {
+	// Each CRD is read at once; a slot per CRD keeps the count free of a lock.
+	found := make([]bool, len(crds))
+	if err := forEachConcurrently(len(crds), func(i int) error {
 		u := &unstructured.Unstructured{}
 		u.SetGroupVersionKind(crdGVK)
-		err := k8s.Get(ctx, client.ObjectKey{Name: name}, u)
+		err := k8s.Get(ctx, client.ObjectKey{Name: crds[i]}, u)
 		switch {
 		case err == nil:
-			h.crdsFound++
+			found[i] = true
 		case !apierrors.IsNotFound(err):
-			return dep, err
+			return err
+		}
+		return nil
+	}); err != nil {
+		return dep, err
+	}
+	for _, ok := range found {
+		if ok {
+			h.crdsFound++
 		}
 	}
 	if b != nil {

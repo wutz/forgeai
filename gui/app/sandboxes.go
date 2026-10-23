@@ -596,7 +596,12 @@ func toSandbox(u *unstructured.Unstructured, pods podLookup) *Sandbox {
 		out.CPU, out.Memory = cpu.String(), mem.String()
 	}
 	out.GPU = sandbox.GPU(sb)
-	pod, unknown := pods(sandbox.PodName(sb))
+	// A suspended or expired sandbox has no pod, so its read skips the pod lookup.
+	var pod *corev1.Pod
+	var unknown bool
+	if phase != sandbox.PhaseStopped && phase != sandbox.PhaseExpired {
+		pod, unknown = pods(sandbox.PodName(sb))
+	}
 	out.PodUnknown = unknown
 	if pod != nil {
 		out.PodName, out.PodPhase = pod.Name, string(pod.Status.Phase)

@@ -368,7 +368,7 @@ The console follows the system appearance by default. `gui/frontend/src/theme.ts
 | `--ink` | #18181b | #fafafa | headings, values (16.9:1 on surface) |
 | `--body` | #52525b | #d4d4d8 | body text (12.0:1) |
 | `--mute` | #71717a | #a1a1aa | secondary text (6.9:1) |
-| `--faint` | #a1a1aa | #71717a | nav labels (4.0:1 on chrome; decorative caps) |
+| `--faint` | #6b6b75 | #8b8b94 | nav and eyebrow labels (4.6:1 on chrome, 5.8:1 in dark); disabled and decorative marks |
 | `--accent` | #4f46e5 | #818cf8 | focus, icons, meters (6.3:1 on canvas) |
 | `--accent-deep` | #4338ca | #a5b4fc | accent text (8.9:1 on surface) |
 | `--accent-tint` | #e0e7ff | indigo-500 @ 22% | primary button, selected row |

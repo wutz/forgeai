@@ -3,7 +3,7 @@
    with meters, segmented filters, underline tabs. */
 
 :root {
-  --faint: #a1a1aa;
+  --faint: #6b6b75;
   --canvas: #f6f7f9;
   /* Window chrome sits one step below the canvas so the sidebar reads as a
      separate surface without needing a heavy divider. */
@@ -32,7 +32,7 @@
    light. Shadows are black here, since slate would vanish on dark. */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --faint: #71717a;
+  --faint: #8b8b94;
   --canvas: #111113;
   --chrome: #0c0c0e;
   --chrome-line: #1f1f23;

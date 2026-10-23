@@ -84,6 +84,7 @@ export const en = {
   'resources.gpusOfClass': 'GPUs ({cls})',
   'resources.volumeStorage': 'Volume storage',
   'resources.volumes': 'Volumes',
+  'resources.pods': 'Pods',
   'resources.unlimited': 'unlimited',
 
   'admin.eyebrow': 'Admin',
@@ -284,6 +285,7 @@ export const zh: Record<keyof typeof en, string> = {
   'resources.gpusOfClass': 'GPU（{cls}）',
   'resources.volumeStorage': '存储卷容量',
   'resources.volumes': '存储卷',
+  'resources.pods': 'Pod 数量',
   'resources.unlimited': '不限',
 
   'admin.eyebrow': '管理',

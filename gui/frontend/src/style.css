@@ -16,6 +16,8 @@
   --warning-soft: #fef3c7;
   --success: #059669;
   --success-soft: #d1fae5;
+  /* Success as text on white and the accent wash: --success is 3.8:1 there. */
+  --success-deep: #047857;
   --accent: #4f46e5;
   --accent-deep: #4338ca;
   --accent-soft: #eef2ff;
@@ -62,6 +64,7 @@
   --warning-soft: rgba(251, 191, 36, 0.14);
   --success: #34d399;
   --success-soft: rgba(52, 211, 153, 0.14);
+  --success-deep: #34d399;
   --accent: #818cf8;
   --accent-deep: #a5b4fc;
   --accent-soft: rgba(129, 140, 248, 0.12);
@@ -220,4 +223,4 @@ button, input, select, textarea { font: inherit; color: inherit; }
   border-bottom: 1px solid var(--hairline-soft); list-style: none; }
 .repo[open] summary { border-bottom-color: transparent; }
 .row-full { opacity: 0.55; }
-.free { color: var(--success); }
+.free { color: var(--success-deep); }

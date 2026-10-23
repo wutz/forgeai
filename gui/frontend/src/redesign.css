@@ -345,7 +345,7 @@ a { color: inherit; text-decoration: none; }
    spilling past the row's padding, where the scroll container would clip it. */
 .segment:focus-visible { outline-offset: -2px; }
 .segment.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-seg); }
-.segment-count { font-size: 11px; color: var(--mute); font-variant-numeric: tabular-nums; }
+.segment-count { font-size: 11px; color: var(--body); font-variant-numeric: tabular-nums; }
 .segment.active .segment-count { color: var(--accent-deep); }
 
 .tabs { display: flex; align-items: center; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--hairline); }
@@ -378,6 +378,10 @@ a { color: inherit; text-decoration: none; }
 .table tbody tr:hover { background: var(--wash); }
 .table tbody tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
 .table tbody tr.selected:hover { background: var(--accent-tint); }
+/* The selected row sits on the accent wash, where the muted and error labels fall
+   below 4.5:1; the deeper labels keep them readable. */
+.table tbody tr.selected .cell-sub { color: var(--body); }
+.table tbody tr.selected .status-failed { color: var(--error-deep); }
 .mono { font-size: 12.5px; }
 .cell-main { display: block; color: var(--ink); }
 .table td.nowrap { white-space: nowrap; }

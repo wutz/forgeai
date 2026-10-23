@@ -53,7 +53,7 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
                       ? t('templates.countSandbox', {count: sandboxItems.length})
                       : t('templates.countJob', {count: jobItems.length})}
                   </span>}
-                  actions={<button className="btn btn-primary" onClick={() => isSandbox
+                  actions={<button className="btn" onClick={() => isSandbox
                     ? setSandboxDialog({})
                     : setJobDialog({form: blankJobForm()})}>
                     <Icon name="plus" size={14}/>{isSandbox ? t('templates.newSandbox') : t('templates.newJob')}
@@ -210,7 +210,7 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
             onClose={onClose} busy={busy} footer={<>
               {blocker && !busy && !hasFieldHint && <span className="hint hint-error" role="status">{blocker}</span>}
               <CancelButton disabled={busy}/>
-              <button type="submit" form="template-form" className="btn btn-primary" disabled={busy || !!blocker}>
+              <button type="submit" form="template-form" className={existing ? 'btn btn-primary' : 'btn'} disabled={busy || !!blocker}>
                 {busy ? t('templates.saving') : t('templates.saveTemplate')}
               </button>
             </>}>

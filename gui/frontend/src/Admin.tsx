@@ -55,7 +55,7 @@ export function Admin() {
                   </span>}
                   actions={<>
                     <RefreshButton onRefresh={refresh}/>
-                    <button className="btn btn-primary" onClick={() => edit('')}>
+                    <button className="btn" onClick={() => edit('')}>
                       <Icon name="plus" size={14}/>{t('admin.newProject')}
                     </button>
                   </>}/>
@@ -236,7 +236,7 @@ function ProjectDialog({form, onClose, onSaved}: {
             subtitle={t('admin.dialogSubtitle')}
             onClose={onClose} busy={busy} footer={<>
               <CancelButton disabled={busy}/>
-              <button type="submit" form="project-form" className="btn btn-primary" disabled={busy || !p.name || !formOK}>
+              <button type="submit" form="project-form" className={create ? 'btn' : 'btn btn-primary'} disabled={busy || !p.name || !formOK}>
                 {busy ? t('admin.saving') : create ? t('admin.createProject') : t('common.save')}
               </button>
             </>}>

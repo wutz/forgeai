@@ -78,7 +78,7 @@ export function Volumes() {
                   </span>}
                   actions={<>
                     <RefreshButton onRefresh={refresh}/>
-                    <button className="btn btn-primary" onClick={() => setCreating(true)}>
+                    <button className="btn" onClick={() => setCreating(true)}>
                       <Icon name="plus" size={14}/>{t('volumes.new')}
                     </button>
                   </>}/>
@@ -199,7 +199,7 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
     <Dialog title={t('volumes.new')} subtitle={t('volumes.createSubtitle')} width={440}
             onClose={onClose} busy={busy} footer={<>
               <CancelButton/>
-              <button type="submit" form="create-volume" className="btn btn-primary"
+              <button type="submit" form="create-volume" className="btn"
                       disabled={busy || !nameOK || !sizeOK || !typeOK}>
                 {busy ? t('volumes.creating') : t('volumes.createVolume')}
               </button>

@@ -121,7 +121,7 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
             onClose={onClose} busy={busy} footer={<>
               {blocker && !busy && !hasFieldHint && <span className="hint hint-error" role="status">{blocker}</span>}
               <CancelButton disabled={busy}/>
-              <button type="submit" form="sandbox-template-form" className="btn btn-primary" disabled={busy || !!blocker}>
+              <button type="submit" form="sandbox-template-form" className={existing ? 'btn btn-primary' : 'btn'} disabled={busy || !!blocker}>
                 {busy ? t('templates.saving') : t('templates.saveTemplate')}
               </button>
             </>}>

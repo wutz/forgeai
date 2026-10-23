@@ -196,16 +196,16 @@ components:
     padding: "0px 6px"
   button-default-sm-hover:
     backgroundColor: "{colors.hairline-soft}"
-  button-create-sm:
+  button-primary-sm:
     backgroundColor: "{colors.accent-tint}"
     textColor: "{colors.accent-deep}"
     borderColor: "{colors.accent-line}"
     typography: "{typography.button-md}"
     rounded: "{rounded.sm}"
     padding: "0px 6px"
-  button-create-sm-hover:
+  button-primary-sm-hover:
     backgroundColor: "{colors.accent-tint-hover}"
-  button-create-sm-press:
+  button-primary-sm-press:
     backgroundColor: "{colors.accent-tint-press}"
   button-accent-sm:
     backgroundColor: "{colors.canvas-elevated}"
@@ -330,10 +330,10 @@ components:
 
 forgeai is a desktop console for AI training, RL and inference jobs on Kubernetes. It follows the Geist system below as an **app surface** (not marketing): 6px square buttons (`{components.button-accent-sm}` / `{components.button-ghost-sm}`), hairline cards and tables, no hero mesh gradient.
 
-- **Theme color — Forge Indigo** (`{colors.accent}` #4f46e5): a cool, electric indigo in the register of current AI and developer tools, chosen over the earlier Forge Ember orange so the console reads calm and technical next to dense cluster data. It is used for the primary create and submit action, the active nav icon, tab underlines, meters, focus rings and input focus (`{components.input-focus}`, with a translucent `{colors.accent-ring}` 3px ring) and the logo tile. `{colors.link}` is the accent too. Accent text uses `{colors.accent-deep}` (#4338ca). The `{colors.accent-soft}` (#eef2ff) wash also marks selected rows, which carry a 2px accent bar on their left edge (`{components.table-row-selected}`). The indigo→violet gradient (`{colors.accent-gradient-start}` → `{colors.accent-gradient-end}`) is kept for the logo tile only.
-- **Buttons** — one system with four roles, all 6px square (`{components.button-default-sm}`, `{components.button-create-sm}`, `{components.button-accent-sm}`, `{components.button-danger-sm}`, `{components.button-danger-tint-sm}`). Fills stay light; ink and hairline carry the page.
-  - *Default*: white, hairline edge, ink label. Every neutral action (Logs, Edit, Cancel, Save as template). Hover `{colors.hairline-soft}`.
-  - *Primary*: the view's create or submit action (Create sandbox, Create job, Save, dialog submit). Indigo tint `{colors.accent-tint}`, `{colors.accent-deep}` label (6.4:1 at rest, 5.8:1 on hover, 5.3:1 pressed), `{colors.accent-line}` edge. Hover `{colors.accent-tint-hover}`, press `{colors.accent-tint-press}`. A solid indigo fill was tried and read as too heavy on every page.
+- **Theme color — Forge Indigo** (`{colors.accent}` #4f46e5): a cool, electric indigo in the register of current AI and developer tools, chosen over the earlier Forge Ember orange so the console reads calm and technical next to dense cluster data. It is used for the primary save action on an existing resource, the active nav icon, tab underlines, meters, focus rings and input focus (`{components.input-focus}`, with a translucent `{colors.accent-ring}` 3px ring) and the logo tile. `{colors.link}` is the accent too. Accent text uses `{colors.accent-deep}` (#4338ca). The `{colors.accent-soft}` (#eef2ff) wash also marks selected rows, which carry a 2px accent bar on their left edge (`{components.table-row-selected}`). The indigo→violet gradient (`{colors.accent-gradient-start}` → `{colors.accent-gradient-end}`) is kept for the logo tile only.
+- **Buttons** — one system with four roles, all 6px square (`{components.button-default-sm}`, `{components.button-primary-sm}`, `{components.button-accent-sm}`, `{components.button-danger-sm}`, `{components.button-danger-tint-sm}`). Fills stay light; ink and hairline carry the page.
+  - *Default*: white, hairline edge, ink label. Every neutral action: create-resource buttons (New sandbox, New job, New volume, New template, New project, and their dialog submits), Logs, Edit, Cancel, Save as template. Hover `{colors.hairline-soft}`.
+  - *Primary*: saving an existing resource (the Save or Update submit of an edit dialog) and install actions. Indigo tint `{colors.accent-tint}`, `{colors.accent-deep}` label (6.4:1 at rest, 5.8:1 on hover, 5.3:1 pressed), `{colors.accent-line}` edge. Hover `{colors.accent-tint-hover}`, press `{colors.accent-tint-press}`. A solid indigo fill was tried and read as too heavy on every page.
   - *Accent*: Start and Resume, the state-changing action on a detail view. White with an indigo edge and `{colors.accent-deep}` label (7.9:1). Hover `{colors.accent-soft}`, press `{colors.accent-tint}`. It is one step quieter than Primary, so each view has one strong action.
   - *Danger*: destructive actions inside a row or view (Delete, Purge now). White with a `{colors.app-danger}` label (4.8:1), hover `{colors.app-danger-wash}` with a `{colors.app-danger-deep}` label (7.6:1) and a `{colors.app-danger-line}` edge.
   - *Danger tint*: the confirm button of a destructive dialog only. `{colors.app-danger-wash}` at rest, `{colors.app-danger-soft}` on hover, `{colors.app-danger-press}` pressed, `{colors.app-danger-deep}` label (7.6:1 at rest, 6.8:1 on hover, 5.7:1 pressed).
@@ -363,6 +363,7 @@ The console follows the system appearance by default. `gui/frontend/src/theme.ts
 | `--chrome-line` | #e2e5eb | #1f1f23 | sidebar divider |
 | `--surface` | #ffffff | #18181b | cards, inputs, dialogs, header row |
 | `--wash` | #fafafa | #1f1f23 | row hover, dialog footer |
+| `--nav-active` | slate @ 8% | white @ 9% | selected sidebar row |
 | `--hairline` | #e4e4e7 | #27272a | borders |
 | `--hairline-soft` | #f4f4f5 | #222226 | hover fills, meter track |
 | `--ink` | #18181b | #fafafa | headings, values (16.9:1 on surface) |
@@ -385,18 +386,30 @@ The app surface follows the Geist ladder but reads as a dense console: a grouped
 
 - **App canvas** — `--canvas` #f6f7f9 (a step darker than the marketing #fafafa) so white cards read as sheets on the desktop window. Cards stay `{colors.canvas-elevated}` at `--radius-lg` (14px) with a 1px `{colors.hairline}` and a whisper shadow.
 - **Window chrome** — `--chrome` #eef0f4 paints the sidebar, one step below the canvas, so navigation reads as its own surface next to the content area. The header spans the full window and is split to match: a gradient fills `0 → sidebar width` with chrome, the next 1px with `--chrome-line` (continuing the sidebar divider) and the rest with the canvas, so the top bar reads as chrome above the sidebar and as content above the page. With the sidebar hidden the header is all canvas and the toggle moves to the left edge. On this darker ground hover states step down (`rgba(15,23,42,0.05)`) rather than lifting in white.
-- **Sidebar** — 224px, chrome-colored, a hairline on its right. Items are grouped under uppercase Geist Mono labels (`Workspace`, `Storage`, `Cluster`, `Admin`) at 10.5px / `{colors.faint}`. An item is a 34px row: 16px stroke icon in `{colors.mute}` + 13.5px label; the active row is a white chip with a whisper shadow, an ink label and an `{colors.accent}` icon. The cluster and project pickers sit at the top of the sidebar, above the groups: one compact row each, a 58px uppercase mono `nav-label` beside a 28px select, and picking one connects straight away.
+- **Sidebar** — 224px, chrome-colored, a hairline on its right. Items are grouped under sentence-case labels (`Workspace`, `Storage`, `Cluster`, `Admin`) at 12px / `{colors.mute}`, as in the Claude desktop sidebar. An item is a 32px row: 16px stroke icon in `{colors.mute}` + 14px label; the active row is a neutral wash (`--nav-active`: slate at 8%, white at 9% in dark) with a medium ink label and an `{colors.accent}` icon. The cluster and project pickers sit at the top of the sidebar, above the groups: one compact row each, a 58px `nav-label` beside a 28px select, and picking one connects straight away.
 - **Sidebar toggle** — a panel icon at the right end of the sidebar column (clear of the macOS traffic lights, which own the top-left 84px) hides the sidebar completely: the grid's first track collapses to 0, the sidebar is `display: none`, the header becomes one flat canvas surface and the toggle moves to the left edge after the traffic lights to bring it back. The state persists in `localStorage` (`forgeai.sidebar`). At ≤820px the window starts with the sidebar hidden and the toggle is the only way to open it.
 - **Preferences** — at the foot of the sidebar, under the nav, two compact menu buttons: Theme (a monitor / sun / moon icon, a menu of follow system, light, dark; saved under `forgeai.theme`) and Language (a button showing Auto / English / 中文, a menu of the same; saved under `forgeai.locale`). Each menu opens upward over the nav and closes on a pick, on Escape or on a click elsewhere. A fixed language re-renders the open views at once; Auto follows the system.
-- **Page frame** — `.main` pads 20/28/40px and centers a 1180px column. The view title lives in the top bar, not in the content: `PageHeader` portals into the header slot, so the bar reads `[nav toggle] [eyebrow · title · live meta] … [view actions]`. In the bar the eyebrow is 10.5px mono, the title 15px/600 and actions are 28px `btn-sm`. There is no connect screen: the app opens on the last cluster and project, and a view with no connection shows an empty state. The project and namespace are shown only in the sidebar. Below 1100px the eyebrow and connection label drop out to keep the title and actions legible; a view rendered outside the shell falls back to a title band above the content.
-- **Metric tiles** — a responsive grid (`repeat(auto-fit, minmax(190px, 1fr))`). Each tile carries a 22px toned icon chip, a 12px mute label, a 26px/600 tabular value with a mute unit, a 12px detail line and an optional `Meter`. Tones: accent (in use), success (running), warning (queued), error (failed), violet (#7c3aed, a secondary tone that pairs with the indigo gradient), neutral.
+- **Page frame** — `.main` pads 20/28/40px and centers a 1180px column. The view title lives in the top bar, not in the content: `PageHeader` portals into the header slot, so the bar reads `[nav toggle] [eyebrow · title · live meta] … [view actions]`. In the bar the eyebrow is 12px muted, the title 15px/600 and actions are 28px `btn-sm`. There is no connect screen: the app opens on the last cluster and project, and a view with no connection shows an empty state. The project and namespace are shown only in the sidebar. Below 1100px the eyebrow and connection label drop out to keep the title and actions legible; a view rendered outside the shell falls back to a title band above the content.
+- **Metric tiles** — a responsive grid (`repeat(auto-fit, minmax(190px, 1fr))`). Each tile carries a 22px neutral icon chip whose glyph takes the tone, a 12px mute label, a 26px/600 tabular value with a mute unit, a 12px detail line and an optional `Meter`. Tones: accent (in use), success (running), warning (queued), error (failed), violet (#7c3aed, a secondary tone that pairs with the indigo gradient), neutral.
 - **Meters** — 6px full-radius tracks on `{colors.hairline-soft}` with a label row above (11.5px mute, tabular figures). Fill tones mirror the tiles; `muted` marks informational usage. Meters are always derived from real list data — there is no fabricated trend chart.
 - **Segmented filter** — an inset `{colors.hairline-soft}` pill container holding 26px segments; the active segment is a white chip with a 1px shadow and an accent-tinted count. Used for job state filters.
 - **Tabs** — underline tabs inside detail cards (34px, 2px accent underline on the active tab), for `Overview` / `Workers` / `Log` / `Env`.
 - **Badges** — 20px full-radius pills at 11px/500: neutral by default, toned for status, instance type, isolation class and quota facts.
-- **Tables** — hairline header row in mono uppercase 11px; 11px/16px cell padding; the first cell is a `.cell-main` / `.cell-sub` pair (name + image or template) so the list reads without extra columns. Selected rows take the accent wash and a 2px accent bar on the left.
+- **Tables** — hairline header row in muted 12px sentence case; 12px/16px cell padding; the first cell is a `.cell-main` / `.cell-sub` pair (name + image or template) so the list reads without extra columns. Selected rows take the accent wash and a 2px accent bar on the left.
 - **Detail split** — list + 420px detail card (`minmax(0, 1fr) 420px`), collapsing to one column at ≤1100px. The detail card has a title head, an action bar (`detail-actions`) and the tab body.
 - **Dialogs** — 620px (440px for small forms), `{rounded.lg}`, Level-2 floating shadow, a dimmed blurred backdrop, a title/subtitle head, a scrolling body and a footer with the cancel and primary actions.
+
+## Claude desktop pass
+
+A later pass used the Claude desktop Code tab as the reference for how the console's quieter parts read. Theme colour, tokens and the button roles above are unchanged; this pass changes how labels, selections, icons and empty states look.
+
+- **Labels are sentence case.** Sidebar groups, table heads, section heads and page eyebrows are 12–13px sentence case, in `{colors.mute}` or ink, not uppercase mono. Geist Mono is for code, terminal and log text, and for technical values such as names and IDs.
+- **Selection is a wash, not a card.** The active sidebar row takes a neutral wash with an ink label; the accent stays on its icon. Selected table rows keep the accent wash and bar.
+- **Icon chips are neutral.** A metric's icon chip is a `{colors.hairline-soft}` square and the glyph carries the tone, so a row of tiles reads as one calm strip. Meters keep their colour.
+- **Empty states lead with the title.** The title is 15px/600 ink, with a 13px muted hint beneath.
+- **Inline code is a chip.** `code` sits on `{colors.hairline-soft}` at 0.92em in `{colors.body}` with a 5px radius.
+
+Not borrowed: Claude's warm palette and its Cowork / Code mode switch, since the console has one mode and keeps Forge Indigo as its theme colour; and the chat composer, since the console's forms are dialogs with explicit fields.
 
 ## Overview
 

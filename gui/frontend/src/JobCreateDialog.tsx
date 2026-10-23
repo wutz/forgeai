@@ -103,7 +103,7 @@ export function JobCreateDialog({onClose, onCreated}: {
             onClose={onClose} busy={busy} footer={<>
               {blocker && !busy && !hasFieldHint && <span className="hint hint-error" role="status">{blocker}</span>}
               <CancelButton disabled={busy}/>
-              <button type="submit" form="job-form" className="btn btn-primary" disabled={busy || !!blocker}>
+              <button type="submit" form="job-form" className="btn" disabled={busy || !!blocker}>
                 {busy ? t('jobCreate.creating') : t('jobCreate.create')}
               </button>
             </>}>

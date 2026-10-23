@@ -652,6 +652,11 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
   .split .table th, .split .table td { overflow: visible; }
   .split .table .cell-main, .split .table .cell-sub { overflow: visible; text-overflow: clip; }
 }
+/* Phone-width windows: a page's header sits in the page, and its actions wrap below the title. */
+@media (max-width: 560px) {
+  .page-head { flex-wrap: wrap; }
+  .page-head-actions { margin-left: 0; flex-wrap: wrap; }
+}
 @media (max-width: 820px) {
   /* Narrow windows: the sidebar is a drawer over the content, not a column
      beside it, so the content keeps the full width. It starts hidden (see App)

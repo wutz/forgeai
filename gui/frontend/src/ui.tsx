@@ -2,7 +2,7 @@
 // segmented filters, tabs, badges, empty state and dialogs. Everything here
 // renders from tokens in style.css (gui/DESIGN.md).
 
-import {KeyboardEvent as ReactKeyboardEvent, ReactNode, createContext, useContext, useEffect, useLayoutEffect, useRef, useState} from 'react'
+import {KeyboardEvent as ReactKeyboardEvent, ReactNode, createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore} from 'react'
 import {createPortal} from 'react-dom'
 import {t} from './i18n'
 
@@ -64,13 +64,23 @@ export function Icon({name, size = 16}: {name: IconName; size?: number}) {
   )
 }
 
+// phoneQuery matches windows too narrow for a page's actions to share the top bar.
+const phoneQuery = typeof window === 'undefined' ? null : window.matchMedia('(max-width: 560px)')
+const subscribePhone = (fn: () => void) => {
+  phoneQuery?.addEventListener('change', fn)
+  return () => phoneQuery?.removeEventListener('change', fn)
+}
+
 // PageHeader is the title band of every view. It renders into the app header
 // (HeaderSlot) so the top bar carries the title, optional inline meta and the
-// actions; views outside a header fall back to a band above the content.
+// actions; views outside a header fall back to a band above the content. On a
+// phone-width window the band stays in the page, since the top bar has no room
+// for the actions beside the title.
 export function PageHeader({eyebrow, title, meta, actions}: {
   eyebrow?: string, title: string, meta?: ReactNode, actions?: ReactNode
 }) {
   const slot = useContext(HeaderSlot)
+  const phone = useSyncExternalStore(subscribePhone, () => !!phoneQuery?.matches, () => false)
   const content = (
     <>
       <div className="page-head-text">
@@ -83,7 +93,7 @@ export function PageHeader({eyebrow, title, meta, actions}: {
       {actions && <div className="page-head-actions">{actions}</div>}
     </>
   )
-  return slot
+  return slot && !phone
     ? createPortal(<div className="page-head in-header">{content}</div>, slot)
     : <div className="page-head">{content}</div>
 }

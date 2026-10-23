@@ -259,6 +259,7 @@ func (a *App) SandboxTemplates() ([]SandboxTemplate, error) {
 	for i := range list.Items {
 		t := &sandbox.SandboxTemplate{}
 		if err := sandbox.FromUnstructured(list.Items[i].Object, t); err != nil {
+			out = append(out, SandboxTemplate{Name: list.Items[i].GetName(), Error: err.Error()})
 			continue
 		}
 		out = append(out, toSandboxTemplate(t))
@@ -296,7 +297,7 @@ func (a *App) CreateSandboxTemplate(f sandbox.TemplateForm) (*SandboxTemplate, e
 // UpdateSandboxTemplate replaces the form of an existing SandboxTemplate. The
 // name is the template's identity and does not change. Sandboxes already
 // created from it are not affected.
-func (a *App) UpdateSandboxTemplate(name string, f sandbox.TemplateForm) (*SandboxTemplate, error) {
+func (a *App) UpdateSandboxTemplate(name, resourceVersion string, f sandbox.TemplateForm) (*SandboxTemplate, error) {
 	c, err := a.current()
 	if err != nil {
 		return nil, err
@@ -324,9 +325,13 @@ func (a *App) UpdateSandboxTemplate(name string, f sandbox.TemplateForm) (*Sandb
 	}
 	// The stored object keeps its metadata (annotations, owner references and
 	// labels set by others); the form replaces the spec and the labels it
-	// renders. The resource version makes the update fail if someone changed
-	// the template since it was loaded into the form.
+	// renders. Updating against the version the form was loaded at makes a
+	// concurrent change fail with a conflict, instead of being overwritten.
+	if resourceVersion == "" {
+		return nil, fmt.Errorf("sandbox template %s has no loaded version to update from; reload it and try again", name)
+	}
 	upd := cur.DeepCopy()
+	upd.SetResourceVersion(resourceVersion)
 	upd.Object["spec"] = u.Object["spec"]
 	labels := upd.GetLabels()
 	if labels == nil {
@@ -378,10 +383,11 @@ func (a *App) DeleteSandboxTemplate(name string) error {
 
 func toSandboxTemplate(t *sandbox.SandboxTemplate) SandboxTemplate {
 	st := SandboxTemplate{
-		Name:        t.Name,
-		Description: t.Annotations[naming.AnnotationDescription],
-		Created:     t.CreationTimestamp.UTC().Format(time.RFC3339),
-		Form:        sandbox.TemplateFormOf(t),
+		Name:            t.Name,
+		Description:     t.Annotations[naming.AnnotationDescription],
+		Created:         t.CreationTimestamp.UTC().Format(time.RFC3339),
+		Form:            sandbox.TemplateFormOf(t),
+		ResourceVersion: t.ResourceVersion,
 	}
 	for _, ctr := range t.Spec.PodTemplate.Spec.Containers {
 		st.Images = append(st.Images, ctr.Image)
@@ -391,11 +397,15 @@ func toSandboxTemplate(t *sandbox.SandboxTemplate) SandboxTemplate {
 
 // SandboxTemplate is a SandboxTemplate as listed in the GUI.
 type SandboxTemplate struct {
-	Name        string                `json:"name"`
-	Description string                `json:"description,omitempty"`
-	Images      []string              `json:"images,omitempty"`
-	Created     string                `json:"created"`
-	Form        *sandbox.TemplateForm `json:"form"`
+	Name            string                `json:"name"`
+	Description     string                `json:"description,omitempty"`
+	Images          []string              `json:"images,omitempty"`
+	Created         string                `json:"created"`
+	Form            *sandbox.TemplateForm `json:"form"`
+	ResourceVersion string                `json:"resourceVersion,omitempty"`
+	// Error is set for a template the app cannot read; it is listed so it can
+	// still be deleted.
+	Error string `json:"error,omitempty"`
 }
 
 // mutateSandbox reads, changes and updates a sandbox.

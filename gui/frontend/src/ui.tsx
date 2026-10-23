@@ -186,7 +186,7 @@ export function Meter({value, max, tone = 'accent', label, right}: {
     <div className="meter">
       {(label || right) && <div className="meter-row"><span>{label}</span><span>{right}</span></div>}
       <div className="meter-track" role="progressbar" aria-valuenow={Math.round(pct)}
-           aria-valuemin={0} aria-valuemax={100}>
+           aria-valuemin={0} aria-valuemax={100} aria-label={typeof label === 'string' ? label : undefined}>
         <div className={`meter-fill meter-${tone}`} style={{width: `${pct}%`}}/>
       </div>
     </div>
@@ -260,10 +260,14 @@ export function tabPanelProps(idPrefix: string, value: string) {
 }
 
 // Badge is a small pill: neutral by default, toned for status.
-export function Badge({children, tone}: {
-  children: ReactNode, tone?: 'accent' | 'success' | 'warning' | 'error' | 'neutral'
+// Badge is a short fact. A badge that states a status sets dot, so the status
+// is not carried by colour alone (DESIGN.md).
+export function Badge({children, tone, dot}: {
+  children: ReactNode, tone?: 'accent' | 'success' | 'warning' | 'error' | 'neutral', dot?: boolean
 }) {
-  return <span className={`badge ${tone ? `badge-${tone}` : ''}`}>{children}</span>
+  return <span className={`badge ${tone ? `badge-${tone}` : ''}`}>
+    {dot && <span className="badge-dot" aria-hidden/>}{children}
+  </span>
 }
 
 export function Empty({icon, title, children}: {icon?: IconName, title: string, children?: ReactNode}) {

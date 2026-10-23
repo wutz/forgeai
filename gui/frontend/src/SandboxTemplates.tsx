@@ -33,13 +33,14 @@ export function SandboxTemplateTable({items, failed, onEdit, onDelete}: {
           <td className="mono">
             <span className="cell-main">{tpl.name}</span>
             {tpl.description && <span className="cell-sub">{tpl.description}</span>}
+            {tpl.error && <span className="cell-sub hint-error">{t('sandboxTemplates.unreadable', {error: tpl.error})}</span>}
           </td>
           <td className="mono trunc" title={tpl.form?.image}>{tpl.form?.image || '—'}</td>
           <td className="mono">{tpl.form?.runtimeClass || 'runc'}</td>
           <td className="muted">{fmtDate(tpl.created)}</td>
           <td>
             <div className="actions">
-              <button className="btn btn-sm" onClick={() => onEdit(tpl)}>{t('common.edit')}</button>
+              <button className="btn btn-sm" disabled={!!tpl.error} onClick={() => onEdit(tpl)}>{t('common.edit')}</button>
               <button className="btn btn-sm btn-danger" onClick={() => confirm.ask({
                 title: t('sandboxTemplates.deleteTitle', {name: tpl.name}),
                 message: t('sandboxTemplates.deleteMessage'),
@@ -61,8 +62,8 @@ export function SandboxTemplateTable({items, failed, onEdit, onDelete}: {
 // SandboxTemplateDialog creates a sandbox template, or edits the existing one
 // of that name when existing is set. initial prefills the form (edit, or
 // save-as-template from a sandbox); without it the platform defaults apply.
-export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
-  initial?: sandbox.TemplateForm, existing?: string, onClose: () => void, onSaved: (name: string) => void
+export function SandboxTemplateDialog({initial, existing, version, onClose, onSaved}: {
+  initial?: sandbox.TemplateForm, existing?: string, version?: string, onClose: () => void, onSaved: (name: string) => void
 }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -108,7 +109,7 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
       ...f,
       env: Object.entries(linesToEnv(envText)).map(([name, value]) => ({name, value})),
     })
-    const req = existing ? UpdateSandboxTemplate(existing, payload) : CreateSandboxTemplate(payload)
+    const req = existing ? UpdateSandboxTemplate(existing, version ?? '', payload) : CreateSandboxTemplate(payload)
     req.then(() => onSaved(payload.name)).catch(e => {
       setError(errText(e)); setBusy(false)
     })

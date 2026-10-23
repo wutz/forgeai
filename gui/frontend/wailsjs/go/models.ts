@@ -295,6 +295,7 @@ export namespace app {
 	    duration?: string;
 	    workerPods: Worker[];
 	    volumes?: string[];
+	    mounts?: training.VolumeMount[];
 	    maxRetries?: number;
 	    retryOn?: string;
 	    retriedAs?: string;
@@ -329,6 +330,7 @@ export namespace app {
 	        this.duration = source["duration"];
 	        this.workerPods = this.convertValues(source["workerPods"], Worker);
 	        this.volumes = source["volumes"];
+	        this.mounts = this.convertValues(source["mounts"], training.VolumeMount);
 	        this.maxRetries = source["maxRetries"];
 	        this.retryOn = source["retryOn"];
 	        this.retriedAs = source["retriedAs"];
@@ -749,6 +751,8 @@ export namespace app {
 	    images?: string[];
 	    created: string;
 	    form?: sandbox.TemplateForm;
+	    resourceVersion?: string;
+	    error?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SandboxTemplate(source);
@@ -761,6 +765,8 @@ export namespace app {
 	        this.images = source["images"];
 	        this.created = source["created"];
 	        this.form = this.convertValues(source["form"], sandbox.TemplateForm);
+	        this.resourceVersion = source["resourceVersion"];
+	        this.error = source["error"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -787,6 +793,7 @@ export namespace app {
 	    description?: string;
 	    form?: training.Form;
 	    created: string;
+	    resourceVersion?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Template(source);
@@ -798,6 +805,7 @@ export namespace app {
 	        this.description = source["description"];
 	        this.form = this.convertValues(source["form"], training.Form);
 	        this.created = source["created"];
+	        this.resourceVersion = source["resourceVersion"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

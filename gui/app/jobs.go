@@ -26,33 +26,34 @@ import (
 // Job is the view model of a TrainJob. Retries stay under their original job
 // group (Group); RetryOf is empty on the first attempt.
 type Job struct {
-	Name       string            `json:"name"`
-	Group      string            `json:"group"`
-	RetryOf    string            `json:"retryOf,omitempty"`
-	Template   string            `json:"template,omitempty"`
-	Image      string            `json:"image"`
-	Command    string            `json:"command"`
-	Env        map[string]string `json:"env"`
-	Instance   string            `json:"instanceType"`
-	Workers    int32             `json:"workers"`
-	Phase      string            `json:"phase"`
-	Message    string            `json:"message,omitempty"`
-	Reason     string            `json:"failureReason,omitempty"`
-	Stopped    bool              `json:"stopped"`
-	Superseded bool              `json:"superseded"`
-	Ready      int32             `json:"ready"`
-	CPU        string            `json:"cpu,omitempty"`
-	GPUClass   string            `json:"gpuClass,omitempty"`
-	GPUCount   int32             `json:"gpuCount,omitempty"`
-	Created    string            `json:"created"`
-	Age        string            `json:"age"`
-	Duration   string            `json:"duration,omitempty"`
-	WorkerPods []Worker          `json:"workerPods"`
-	Volumes    []string          `json:"volumes,omitempty"`
-	MaxRetries int32             `json:"maxRetries,omitempty"`
-	RetryOn    string            `json:"retryOn,omitempty"`
-	RetriedAs  string            `json:"retriedAs,omitempty"`
-	Retries    []*Job            `json:"retries"`
+	Name       string                 `json:"name"`
+	Group      string                 `json:"group"`
+	RetryOf    string                 `json:"retryOf,omitempty"`
+	Template   string                 `json:"template,omitempty"`
+	Image      string                 `json:"image"`
+	Command    string                 `json:"command"`
+	Env        map[string]string      `json:"env"`
+	Instance   string                 `json:"instanceType"`
+	Workers    int32                  `json:"workers"`
+	Phase      string                 `json:"phase"`
+	Message    string                 `json:"message,omitempty"`
+	Reason     string                 `json:"failureReason,omitempty"`
+	Stopped    bool                   `json:"stopped"`
+	Superseded bool                   `json:"superseded"`
+	Ready      int32                  `json:"ready"`
+	CPU        string                 `json:"cpu,omitempty"`
+	GPUClass   string                 `json:"gpuClass,omitempty"`
+	GPUCount   int32                  `json:"gpuCount,omitempty"`
+	Created    string                 `json:"created"`
+	Age        string                 `json:"age"`
+	Duration   string                 `json:"duration,omitempty"`
+	WorkerPods []Worker               `json:"workerPods"`
+	Volumes    []string               `json:"volumes,omitempty"`
+	Mounts     []training.VolumeMount `json:"mounts,omitempty"`
+	MaxRetries int32                  `json:"maxRetries,omitempty"`
+	RetryOn    string                 `json:"retryOn,omitempty"`
+	RetriedAs  string                 `json:"retriedAs,omitempty"`
+	Retries    []*Job                 `json:"retries"`
 }
 
 // Worker is one worker pod of a job.
@@ -530,6 +531,10 @@ func (ix *jobIndex) job(tj *kf.TrainJob) *Job {
 			}
 		}
 		out.Volumes = slices.Sorted(maps.Keys(claims))
+	}
+	// The same parse a rerun uses, so a template saved from the job keeps the mount paths.
+	if f, err := training.TrainJobForm(tj); err == nil {
+		out.Mounts = f.Volumes
 	}
 	slices.SortStableFunc(pods, func(a, b corev1.Pod) int {
 		return training.WorkerIndex(&a) - training.WorkerIndex(&b)

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,7 +47,7 @@ func TestUpdateTemplateReplacesForm(t *testing.T) {
 
 	edited := testTemplateForm("ignored", "img:2")
 	edited.Command = "python train.py"
-	got, err := a.UpdateTemplate("torch", edited)
+	got, err := a.UpdateTemplate("torch", templateVersion(t, a, "torch"), edited)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +82,7 @@ func TestUpdateTemplateRefusesForeignRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 	a := testApp(t, u)
-	_, err = a.UpdateTemplate("kubectl-made", testTemplateForm("kubectl-made", "img:2"))
+	_, err = a.UpdateTemplate("kubectl-made", "1", testTemplateForm("kubectl-made", "img:2"))
 	if err == nil || !strings.Contains(err.Error(), "not created by forgeai") {
 		t.Fatalf("UpdateTemplate of a foreign runtime: err = %v", err)
 	}
@@ -96,11 +97,106 @@ func TestUpdateSandboxTemplateReplacesForm(t *testing.T) {
 	}
 	a := testApp(t, cfg, u)
 
-	got, err := a.UpdateSandboxTemplate("agent", sandbox.TemplateForm{Image: "agent:2", Command: "python agent.py --once"})
+	got, err := a.UpdateSandboxTemplate("agent", sandboxTemplateVersion(t, a, "agent"), sandbox.TemplateForm{Image: "agent:2", Command: "python agent.py --once"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got.Name != "agent" || got.Form.Image != "agent:2" || got.Form.Command != "python agent.py --once" {
 		t.Fatalf("UpdateSandboxTemplate returned %+v", got)
+	}
+}
+
+// templateVersion is the version a job template was listed at, which the GUI
+// sends back with its update.
+func templateVersion(t *testing.T, a *App, name string) string {
+	t.Helper()
+	list, err := a.ListTemplates()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tpl := range list {
+		if tpl.Name == name {
+			return tpl.ResourceVersion
+		}
+	}
+	t.Fatalf("template %s is not listed", name)
+	return ""
+}
+
+func sandboxTemplateVersion(t *testing.T, a *App, name string) string {
+	t.Helper()
+	list, err := a.SandboxTemplates()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tpl := range list {
+		if tpl.Name == name {
+			return tpl.ResourceVersion
+		}
+	}
+	t.Fatalf("sandbox template %s is not listed", name)
+	return ""
+}
+
+// An update made from a version that a later change has already replaced
+// conflicts instead of overwriting that change.
+func TestUpdateTemplateRejectsStaleVersion(t *testing.T) {
+	f := testTemplateForm("torch", "img:1")
+	rt, err := training.Template(&f, testNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	obj, err := runtimeObject(rt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := testApp(t, obj)
+	loaded := templateVersion(t, a, "torch")
+
+	if _, err := a.UpdateTemplate("torch", loaded, testTemplateForm("torch", "img:2")); err != nil {
+		t.Fatalf("first update: %v", err)
+	}
+	if _, err := a.UpdateTemplate("torch", loaded, testTemplateForm("torch", "img:3")); !apierrors.IsConflict(err) {
+		t.Fatalf("stale update: err = %v, want a conflict", err)
+	}
+	if _, err := a.UpdateTemplate("torch", "", testTemplateForm("torch", "img:3")); err == nil {
+		t.Fatal("update without a loaded version succeeded")
+	}
+}
+
+func TestUpdateSandboxTemplateRejectsStaleVersion(t *testing.T) {
+	cfg := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: platform.ConfigMapName}}
+	in := sandbox.TemplateForm{Name: "agent", Image: "agent:1", Command: "python agent.py"}
+	u, err := sandbox.RenderTemplate(&in, sandbox.Context{Namespace: testNamespace})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := testApp(t, cfg, u)
+	loaded := sandboxTemplateVersion(t, a, "agent")
+
+	if _, err := a.UpdateSandboxTemplate("agent", loaded, sandbox.TemplateForm{Image: "agent:2"}); err != nil {
+		t.Fatalf("first update: %v", err)
+	}
+	if _, err := a.UpdateSandboxTemplate("agent", loaded, sandbox.TemplateForm{Image: "agent:3"}); !apierrors.IsConflict(err) {
+		t.Fatalf("stale update: err = %v, want a conflict", err)
+	}
+}
+
+// A sandbox template the app cannot read is listed with its error, so it can
+// still be deleted, instead of vanishing from the list.
+func TestListSandboxTemplatesShowsUnreadable(t *testing.T) {
+	broken := &unstructured.Unstructured{Object: map[string]any{
+		"metadata": map[string]any{"name": "broken", "namespace": testNamespace},
+		"spec":     map[string]any{"podTemplate": "not-an-object"},
+	}}
+	broken.SetGroupVersionKind(sandbox.SandboxTemplateGVK)
+	a := testApp(t, broken)
+
+	list, err := a.SandboxTemplates()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(list) != 1 || list[0].Name != "broken" || list[0].Error == "" {
+		t.Fatalf("SandboxTemplates = %+v, want the unreadable template with its error", list)
 	}
 }

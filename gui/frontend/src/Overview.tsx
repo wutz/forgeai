@@ -2,13 +2,15 @@ import {useEffect, useState} from 'react'
 import {ListInstanceTypes, ListJobs, ListVolumes, ListImages, Quota} from '../wailsjs/go/app/App'
 import {app, volumes} from '../wailsjs/go/models'
 import {Card, Icon, MetricTile, Meter, PageHeader, RefreshButton, Spinner, useActive} from './ui'
-import {Status, errText, fmtDate, latestAttempt, pct, phaseLabel, tagCount, toGiB} from './util'
+import {Status, errText, everyWhileVisible, fmtDate, latestAttempt, pct, phaseLabel, tagCount, toGiB} from './util'
 import {t} from './i18n'
 
 // Overview is the landing view of a project: what is running now, the GPU
 // catalogue and the quota it may still use. Every figure is derived from the
 // same list calls the other views use — there is no separate metrics API.
-export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resources' | 'images') => void}) {
+export function Overview({onOpen, onOpenJob}: {
+  onOpen: (area: 'jobs' | 'volumes' | 'resources' | 'images') => void, onOpenJob: (name: string) => void
+}) {
   // jobs and types are null until their first read, so a failed read is not shown as an empty list.
   const [jobs, setJobs] = useState<app.Job[] | null>(null)
   const [types, setTypes] = useState<app.InstanceType[] | null>(null)
@@ -44,8 +46,7 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
       refresh().catch(() => {}).finally(() => { inFlight = false })
     }
     poll()
-    const timer = setInterval(poll, 8000)
-    return () => clearInterval(timer)
+    return everyWhileVisible(poll, 8000)
   }, [onScreen])
 
   // Images cost a Harbor call per repository, so they refresh on a slower beat.
@@ -151,7 +152,7 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
               {(quota.gpuClasses || []).map(g => (
                 <Meter key={g.class} value={g.used} max={Math.max(quota.gpuQuota, g.used, 1)}
                        tone={quota.gpuQuota && g.used >= quota.gpuQuota ? 'warning' : 'accent'}
-                       label={<span className="mono">{t('overview.gpusOfClass', {cls: g.class})}</span>}
+                       label={<span className="mono">{g.class === '*' ? t('overview.gpusUnknownClass') : t('overview.gpusOfClass', {cls: g.class})}</span>}
                        right={<span>{quota.gpuQuota ? `${g.used} / ${quota.gpuQuota}` : g.used}</span>}/>
               ))}
               {/* A zero or empty limit means unlimited: the bar stays empty rather than full. */}
@@ -185,7 +186,7 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
               <tbody>
               {jobs.slice(0, 6).map(j => {
                 const live = latestAttempt(j)
-                return <tr key={j.name} className="clickable" onClick={() => onOpen('jobs')}>
+                return <tr key={j.name} className="clickable" onClick={() => onOpenJob(j.name)}>
                   <td className="mono trunc" title={j.name}><button type="button" className="row-name">{j.name}</button></td>
                   <td><Status phase={live.phase}/></td>
                   <td className="muted">{live.ready}/{live.workers}</td>

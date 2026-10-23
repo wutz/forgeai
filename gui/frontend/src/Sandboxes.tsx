@@ -6,7 +6,7 @@ import {app, sandbox} from '../wailsjs/go/models'
 import {SandboxCreateDialog} from './SandboxCreateDialog'
 import {SandboxTemplateDialog} from './SandboxTemplates'
 import {SandboxTerminal} from './SandboxTerminal'
-import {Status, envToLines, fmtDate, errText} from './util'
+import {Status, envToLines, everyWhileVisible, fmtDate, errText} from './util'
 import {Badge, Card, Empty, Icon, LogView, PageHeader, Spinner, Tabs, tabPanelProps, useActive, useConfirm} from './ui'
 import {MessageKey, t} from './i18n'
 
@@ -48,8 +48,7 @@ export function Sandboxes() {
   useEffect(() => {
     if (!active) return
     refresh()
-    const timer = setInterval(refresh, 5000)
-    return () => clearInterval(timer)
+    return everyWhileVisible(refresh, 5000)
   }, [active])
 
   // Same definition as the detail view: a Pending sandbox is on its way up.
@@ -60,7 +59,7 @@ export function Sandboxes() {
     <div className="page">
       <PageHeader eyebrow={t('sandboxes.eyebrow')} title={t('sandboxes.title')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>
-                    {t('sandboxes.runningCount', {running, total: list.length})}
+                    {boxes !== null && t('sandboxes.runningCount', {running, total: list.length})}
                   </span>}
                   actions={<button className="btn" onClick={() => setCreating(true)}>
                     <Icon name="plus" size={14}/>{t('sandboxes.new')}
@@ -199,12 +198,12 @@ function SandboxDetail({name, onDone, onDeleted}: {
   useEffect(() => {
     if (!active) return
     reload()
-    const timer = setInterval(reload, 5000)
+    const stopPoll = everyWhileVisible(reload, 5000)
     // Keep the sandbox awake while its detail is open and running.
     const beat = setInterval(() => KeepSandboxAwake(name).catch(() => {}), HEARTBEAT)
     KeepSandboxAwake(name).catch(() => {})
     return () => {
-      clearInterval(timer)
+      stopPoll()
       clearInterval(beat)
     }
   }, [name, active])

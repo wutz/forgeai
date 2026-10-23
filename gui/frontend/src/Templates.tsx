@@ -51,8 +51,8 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
       <PageHeader eyebrow={t('templates.eyebrow')} title={t('templates.title')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>
                     {isSandbox
-                      ? t('templates.countSandbox', {count: sandboxItems?.length ?? 0})
-                      : t('templates.countJob', {count: jobItems?.length ?? 0})}
+                      ? sandboxItems !== null && t('templates.countSandbox', {count: sandboxItems.length})
+                      : jobItems !== null && t('templates.countJob', {count: jobItems.length})}
                   </span>}
                   actions={<button className="btn" onClick={() => isSandbox
                     ? setSandboxDialog({})
@@ -60,11 +60,11 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
                     <Icon name="plus" size={14}/>{isSandbox ? t('templates.newSandbox') : t('templates.newJob')}
                   </button>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
-      {sandboxDialog && <SandboxTemplateDialog initial={sandboxDialog.initial} existing={sandboxDialog.existing}
+      {sandboxDialog && <SandboxTemplateDialog initial={sandboxDialog.initial} existing={sandboxDialog.existing} version={sandboxDialog.version}
                                                onClose={() => setSandboxDialog(null)} onSaved={() => {
         setSandboxDialog(null); refresh()
       }}/>}
-      {jobDialog && <TemplateDialog form={jobDialog.form} existing={jobDialog.existing}
+      {jobDialog && <TemplateDialog form={jobDialog.form} existing={jobDialog.existing} version={jobDialog.version}
                                     onClose={() => setJobDialog(null)} onSaved={() => {
         setJobDialog(null); refresh()
       }}/>}
@@ -72,17 +72,17 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
       {sandboxes && (
         <div className="list-toolbar">
           <Segmented options={kindOptions()} value={kind} onChange={setKind}
-                     counts={{sandbox: sandboxItems?.length ?? 0, job: jobItems?.length ?? 0}}/>
+                     counts={{sandbox: sandboxItems?.length, job: jobItems?.length}}/>
         </div>
       )}
 
       <Card>
         {isSandbox
           ? <SandboxTemplateTable items={sandboxItems} failed={!!error} onEdit={tpl => setSandboxDialog({
-              initial: sandbox.TemplateForm.createFrom({...tpl.form, name: tpl.name}), existing: tpl.name,
+              initial: sandbox.TemplateForm.createFrom({...tpl.form, name: tpl.name}), existing: tpl.name, version: tpl.resourceVersion,
             })} onDelete={onDeleteSandbox}/>
           : <JobTemplateTable items={jobItems} failed={!!error} onEdit={tpl => setJobDialog({
-              form: training.Form.createFrom({...tpl.form, name: tpl.name}), existing: tpl.name,
+              form: training.Form.createFrom({...tpl.form, name: tpl.name}), existing: tpl.name, version: tpl.resourceVersion,
             })} onDelete={onDeleteJob}/>}
       </Card>
     </div>
@@ -90,8 +90,8 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
 }
 
 // existing names the template being edited; without it the dialog creates one.
-type JobDialogState = {form: training.Form, existing?: string}
-type SandboxDialogState = {initial?: sandbox.TemplateForm, existing?: string}
+type JobDialogState = {form: training.Form, existing?: string, version?: string}
+type SandboxDialogState = {initial?: sandbox.TemplateForm, existing?: string, version?: string}
 
 function blankJobForm() {
   return training.Form.createFrom({
@@ -154,8 +154,8 @@ function JobTemplateTable({items, failed, onEdit, onDelete}: {
 
 // TemplateDialog creates a job template from form, or edits the existing
 // template of that name when existing is set.
-export function TemplateDialog({form, existing, onClose, onSaved}: {
-  form: training.Form, existing?: string, onClose: () => void, onSaved: (name: string) => void
+export function TemplateDialog({form, existing, version, onClose, onSaved}: {
+  form: training.Form, existing?: string, version?: string, onClose: () => void, onSaved: (name: string) => void
 }) {
   // A new template (also a save-as-template from a job) gets a generated name.
   const [f, setF] = useState(() => existing || form.name
@@ -178,7 +178,7 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
   const envBad = envErrors(envText)
   const nameOK = NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= NAME_MAX
   // A template prefills the New job form, which needs at least one worker.
-  const workersOK = f.workers >= 1
+  const workersOK = Number.isInteger(f.workers) && f.workers >= 1
   // blocker says why Save is off. A bad name, worker count or env line already
   // has a hint under its field, so the footer only names the blockers that have none.
   const blocker = !f.name ? t('common.nameRequired')
@@ -198,7 +198,7 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
       // The dialog does not edit mounts; an edited template keeps its own.
       volumes: f.volumes ?? [],
     })
-    const req = existing ? UpdateTemplate(existing, payload) : CreateTemplate(payload)
+    const req = existing ? UpdateTemplate(existing, version ?? '', payload) : CreateTemplate(payload)
     req.then(() => onSaved(payload.name ?? '')).catch(e => {
       setError(errText(e)); setBusy(false)
     })
@@ -244,6 +244,17 @@ export function TemplateDialog({form, existing, onClose, onSaved}: {
                     autoCapitalize="none" autoCorrect="off" spellCheck={false}
                     onChange={e => set('command', e.target.value)}/>
         </div>
+        {!!f.volumes?.length && (
+          <div className="field">
+            <label>{t('jobCreate.volumeMounts')}</label>
+            {f.volumes.map((m, i) => (
+              <div key={i} className="mono" style={{fontSize: 13}}>
+                {m.volume} → {m.mountPath}{m.subPath ? ` (${m.subPath})` : ''}{m.readOnly ? ` · ${t('mounts.readOnly')}` : ''}
+              </div>
+            ))}
+            <span className="hint">{t('templates.mountsKept')}</span>
+          </div>
+        )}
         <div className="row">
           <div className="field">
             <label htmlFor="t-instance">{t('templates.defaultInstanceType')}</label>

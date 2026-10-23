@@ -14,10 +14,11 @@ import (
 
 // Template is the view model of a job template (a TrainingRuntime).
 type Template struct {
-	Name        string         `json:"name"`
-	Description string         `json:"description,omitempty"`
-	Form        *training.Form `json:"form,omitempty"`
-	Created     string         `json:"created"`
+	Name            string         `json:"name"`
+	Description     string         `json:"description,omitempty"`
+	Form            *training.Form `json:"form,omitempty"`
+	Created         string         `json:"created"`
+	ResourceVersion string         `json:"resourceVersion,omitempty"`
 }
 
 // ListTemplates lists the job templates of the project. Cluster runtimes
@@ -42,10 +43,11 @@ func (a *App) ListTemplates() ([]Template, error) {
 			return nil, err
 		}
 		t := Template{
-			Name:        rt.Name,
-			Description: rt.Annotations[naming.AnnotationDescription],
-			Created:     rt.CreationTimestamp.UTC().Format(time.RFC3339),
-			Form:        f,
+			Name:            rt.Name,
+			Description:     rt.Annotations[naming.AnnotationDescription],
+			Created:         rt.CreationTimestamp.UTC().Format(time.RFC3339),
+			Form:            f,
+			ResourceVersion: rt.ResourceVersion,
 		}
 		out = append(out, t)
 	}
@@ -80,8 +82,9 @@ func (a *App) CreateTemplate(f training.Form) (*Template, error) {
 
 // UpdateTemplate replaces the form of an existing job template. The name is
 // the template's identity and does not change. Jobs created from the template
-// keep their settings.
-func (a *App) UpdateTemplate(name string, f training.Form) (*Template, error) {
+// keep their settings. resourceVersion is the version the form was loaded at;
+// the update fails if the template changed since.
+func (a *App) UpdateTemplate(name, resourceVersion string, f training.Form) (*Template, error) {
 	c, err := a.current()
 	if err != nil {
 		return nil, err
@@ -104,9 +107,12 @@ func (a *App) UpdateTemplate(name string, f training.Form) (*Template, error) {
 	if err != nil {
 		return nil, err
 	}
-	// The resource version makes the update fail if someone changed the
-	// template since it was loaded into the form.
-	u.SetResourceVersion(cur.GetResourceVersion())
+	// Updating against the version the form was loaded at makes a concurrent
+	// change fail with a conflict, instead of being overwritten.
+	if resourceVersion == "" {
+		return nil, fmt.Errorf("template %s has no loaded version to update from; reload it and try again", name)
+	}
+	u.SetResourceVersion(resourceVersion)
 	if err := c.k8s.Update(ctx, u); err != nil {
 		return nil, err
 	}
@@ -114,7 +120,7 @@ func (a *App) UpdateTemplate(name string, f training.Form) (*Template, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Template{Name: rt.Name, Description: f.Description, Form: form}, nil
+	return &Template{Name: rt.Name, Description: f.Description, Form: form, ResourceVersion: u.GetResourceVersion()}, nil
 }
 
 // DeleteTemplate deletes a job template. Like UpdateTemplate, it only deletes

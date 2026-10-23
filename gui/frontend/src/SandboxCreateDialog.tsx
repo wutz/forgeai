@@ -1,7 +1,7 @@
 import {FormEvent, useEffect, useState} from 'react'
 import {CreateSandbox, ListInstanceTypes, ListVolumes, SandboxOptions, SandboxTemplates} from '../wailsjs/go/app/App'
 import {app, sandbox, volumes, v1} from '../wailsjs/go/models'
-import {envErrors, envToLines, linesToEnv, errText, generateName, NAME_PATTERN, SANDBOX_NAME_MAX} from './util'
+import {envErrors, envToLines, formatGoDuration, linesToEnv, errText, generateName, NAME_PATTERN, SANDBOX_NAME_MAX} from './util'
 import {CancelButton, Dialog} from './ui'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
@@ -18,6 +18,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   const [types, setTypes] = useState<app.InstanceType[]>([])
   // vols is null until the project's volumes load.
   const [vols, setVols] = useState<volumes.Volume[] | null>(null)
+  const [volsError, setVolsError] = useState('')
   const [f, setF] = useState<sandbox.Form>(sandbox.Form.createFrom({
     name: generateName('sandbox'), image: '', command: '', env: [], instanceType: '', runtimeClass: '', service: true,
     volumes: [], ttl: v1.Duration.createFrom({Duration: 0}),
@@ -40,7 +41,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
       }))
     }).catch(e => setError(errText(e)))
     ListInstanceTypes().then(setTypes).catch(e => setError(errText(e)))
-    ListVolumes(false).then(setVols).catch(e => setError(errText(e)))
+    ListVolumes(false).then(setVols).catch(e => setVolsError(errText(e)))
     SandboxTemplates().then(setTemplates).catch(() => {})
   }, [])
 
@@ -75,6 +76,11 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   // Negative durations are refused by the backend; the fields say so before Create.
   const ttlOK = Number.isFinite(ttlHours) && ttlHours >= 0
   const idleOK = idleMinutes === null || (Number.isFinite(idleMinutes) && idleMinutes >= 0)
+  // The footer names the blocker that has no field hint of its own, so a disabled
+  // Create is never unexplained.
+  const blocker = !f.image.trim() ? t('common.imageRequired')
+    : !mountsOK ? (vols === null ? (volsError ? t('mounts.loadFailed') : t('mounts.loading')) : t('mounts.fixFirst'))
+    : ''
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -103,6 +109,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   return (
     <Dialog title={t('sandboxCreate.title')} subtitle={t('sandboxCreate.subtitle')}
             onClose={onClose} busy={busy} footer={<>
+              {blocker && !busy && <span className="hint hint-error" role="status">{blocker}</span>}
               <CancelButton disabled={busy}/>
               <button type="submit" form="sandbox-form" className="btn" disabled={busy || !nameOK || !f.image.trim() || !mountsOK || envBad.length > 0 || !ttlOK || !idleOK}>
                 {busy ? t('sandboxCreate.creating') : t('sandboxCreate.create')}
@@ -179,7 +186,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
           </div>
           <div className="field">
             <label>{t('sandboxCreate.volumeMounts')}</label>
-            <VolumeMountsField mounts={mounts} onChange={setMounts} vols={vols}/>
+            <VolumeMountsField mounts={mounts} onChange={setMounts} vols={vols} loadError={volsError}/>
             <span className="hint">{t('mounts.sandboxHint')}</span>
           </div>
           <div className="row">
@@ -195,9 +202,9 @@ export function SandboxCreateDialog({onClose, onCreated}: {
               <input id="s-idle" className="input" type="number" step="any" value={idleMinutes ?? ''} aria-invalid={!idleOK}
                      onChange={e => setIdleMinutes(e.target.value === '' ? null : +e.target.value)}
                      placeholder={opts?.idleTimeout
-                       ? t('sandboxCreate.idleDefault', {value: opts.idleTimeout})
+                       ? t('sandboxCreate.idleDefault', {value: formatGoDuration(opts.idleTimeout)})
                        : t('sandboxCreate.off')}/>
-              <span className="hint">{t('sandboxCreate.idleHint', {timeout: opts?.idleTimeout || t('sandboxCreate.off')})}</span>
+              <span className="hint">{t('sandboxCreate.idleHint', {timeout: opts?.idleTimeout ? formatGoDuration(opts.idleTimeout) : t('sandboxCreate.off')})}</span>
               {!idleOK && <span className="hint hint-error">{t('sandboxCreate.nonNegative')}</span>}
             </div>
           </div>

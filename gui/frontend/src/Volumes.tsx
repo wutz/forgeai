@@ -4,7 +4,7 @@ import {
   TrashVolume, PurgeVolume, Config, FileServerPhase,
 } from '../wailsjs/go/app/App'
 import {app, volumes as vol} from '../wailsjs/go/models'
-import {fmtDate, errText, generateName, phaseLabel} from './util'
+import {fmtDate, errText, everyWhileVisible, generateName, phaseLabel} from './util'
 import {t} from './i18n'
 import {Badge, Card, CancelButton, Dialog, Empty, Icon, PageHeader, RefreshButton, useActive, useConfirm, Spinner} from './ui'
 
@@ -38,8 +38,7 @@ export function Volumes() {
     if (!active) return
     reload()
     Config().then(setConfig).catch(e => setConfigError(errText(e)))
-    const timer = setInterval(reload, 10000)
-    return () => clearInterval(timer)
+    return everyWhileVisible(reload, 10000)
   }, [active])
 
   const totalGiB = (items ?? []).reduce((n, v) => n + (v.capacityGiB || v.requestedGiB || 0), 0)
@@ -69,7 +68,7 @@ export function Volumes() {
     <div className="page">
       <PageHeader eyebrow={t('storage.eyebrow')} title={t('volumes.title')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>
-                    {t('volumes.summary', {count: items?.length ?? 0, size: totalGiB})}
+                    {items !== null && t('volumes.summary', {count: items.length, size: totalGiB})}
                   </span>}
                   actions={<>
                     <button className="btn" onClick={() => setRecycling(true)}>

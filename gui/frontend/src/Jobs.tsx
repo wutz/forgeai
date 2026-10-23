@@ -4,7 +4,7 @@ import {app, training} from '../wailsjs/go/models'
 import {failureLabel} from './util'
 import {JobCreateDialog} from './JobCreateDialog'
 import {TemplateDialog} from './Templates'
-import {Status, envToLines, fmtDate, errText, latestAttempt} from './util'
+import {Status, envToLines, everyWhileVisible, fmtDate, errText, latestAttempt} from './util'
 import {t} from './i18n'
 import {Badge, Card, Empty, Icon, LogView, PageHeader, Segmented, Spinner, Tabs, tabPanelProps, useActive, useConfirm} from './ui'
 
@@ -61,13 +61,19 @@ function retryOnLabel(retryOn: string): string {
   return retryOn
 }
 
-export function Jobs() {
+// focus asks the page to select a job and show all jobs, so the job is in the list.
+export function Jobs({focus}: {focus?: {name: string} | null}) {
   // jobs is null until the first read, so a failed first read is not shown as an empty list.
   const [jobs, setJobs] = useState<app.Job[] | null>(null)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [filter, setFilter] = useState<Filter>('all')
+  useEffect(() => {
+    if (!focus) return
+    setFilter('all')
+    setSelected(focus.name)
+  }, [focus])
   const active = useActive()
   // Each refresh takes a number; a response that is not from the latest refresh
   // is dropped, so a slow older poll cannot overwrite a newer list.
@@ -88,8 +94,7 @@ export function Jobs() {
   useEffect(() => {
     if (!active) return
     refresh()
-    const timer = setInterval(refresh, busy ? 1500 : 5000)
-    return () => clearInterval(timer)
+    return everyWhileVisible(refresh, busy ? 1500 : 5000)
   }, [active, busy])
 
   const counts = useMemo(() => {
@@ -103,7 +108,7 @@ export function Jobs() {
   return (
     <div className="page">
       <PageHeader eyebrow={t('jobs.eyebrow')} title={t('jobs.title')}
-                  meta={<span className="muted" style={{fontSize: 12.5}}>{t('jobs.total', {count: list.length})}</span>}
+                  meta={<span className="muted" style={{fontSize: 12.5}}>{jobs !== null && t('jobs.total', {count: list.length})}</span>}
                   actions={<button className="btn" onClick={() => setCreating(true)}>
                     <Icon name="plus" size={14}/>{t('jobs.newJob')}
                   </button>}/>
@@ -182,14 +187,13 @@ function JobTable({jobs, failed, filtered, selected, onSelect}: {
 
 type DetailTab = 'overview' | 'workers' | 'log' | 'env'
 
-// jobTemplateForm is the job template a job's settings are saved as. Volumes
-// are left out: the job view keeps only claim names, and a template needs the
-// mount paths too.
+// jobTemplateForm is the job template a job's settings are saved as, mounts
+// included: the job carries their paths, as a rerun does.
 function jobTemplateForm(job: app.Job) {
   return training.Form.createFrom({
     name: '', description: '', image: job.image, command: job.command,
     env: Object.entries(job.env || {}).map(([name, value]) => ({name, value})),
-    instanceType: job.instanceType, workers: job.workers || 1, volumes: [],
+    instanceType: job.instanceType, workers: job.workers || 1, volumes: job.mounts ?? [],
     maxRetries: job.maxRetries || 0, retryOn: job.retryOn || 'Infra',
   })
 }
@@ -241,8 +245,7 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
     if (!active) return
     detailOf(name)
     // A failed poll is shown: the job may have been deleted elsewhere, and its actions then fail.
-    const timer = setInterval(() => detailOf(name), busy ? 1500 : 5000)
-    return () => clearInterval(timer)
+    return everyWhileVisible(() => detailOf(name), busy ? 1500 : 5000)
   }, [name, active, busy])
 
   const failure = error || loadError

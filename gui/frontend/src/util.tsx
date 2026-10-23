@@ -16,6 +16,7 @@ const knownErrors: [RegExp, MessageKey][] = [
   [/was superseded by a newer connect/, 'error.connectionSuperseded'],
   [/has no pod: it is stopped or still starting/, 'error.sandboxNoPod'],
   [/start it before opening a terminal/, 'error.sandboxNotRunning'],
+  [/worker \d+ has no pod/, 'error.workerNoPod'],
   [/instance type "[^"]*" not found/, 'error.instanceTypeNotFound'],
 ]
 
@@ -85,19 +86,23 @@ export function linesToEnv(s: string): EnvMap {
   return env
 }
 
-// envErrors returns the 1-based numbers of the lines that are not NAME=value.
-// Blank and comment lines are fine; linesToEnv would otherwise take a bare
-// "KEY" as an empty value, or drop a "=value" line without a name.
+// envErrors returns the 1-based numbers of the lines that are not NAME=value,
+// and of the lines that repeat a name already set above. Blank and comment lines
+// are fine; linesToEnv would otherwise take a bare "KEY" as an empty value, drop
+// a "=value" line without a name, or keep only the last of two same names.
 // envNameRE is the name rule Kubernetes applies to container environment variables.
 const envNameRE = /^[-._a-zA-Z][-._a-zA-Z0-9]*$/
 
 export function envErrors(s: string): number[] {
   const bad: number[] = []
+  const seen = new Set<string>()
   s.split('\n').forEach((line, i) => {
     const text = line.trim()
     if (!text || text.startsWith('#')) return
     const eq = text.indexOf('=')
-    if (eq <= 0 || !envNameRE.test(text.slice(0, eq).trim())) bad.push(i + 1)
+    const name = eq <= 0 ? '' : text.slice(0, eq).trim()
+    if (!envNameRE.test(name) || seen.has(name)) bad.push(i + 1)
+    seen.add(name)
   })
   return bad
 }
@@ -148,6 +153,32 @@ export function toGiB(q?: string): number {
     k: 1e3, M: 1e6, G: 1e9, T: 1e12, P: 1e15, E: 1e18,
   }
   return parseFloat(m[1]) * bytes[m[2] ?? ''] / 1024 ** 3
+}
+
+// everyWhileVisible runs fn every ms while the window is visible, and once when
+// it becomes visible again, so a hidden window makes no reads. It returns the
+// function that stops both.
+export function everyWhileVisible(fn: () => void, ms: number): () => void {
+  const tick = () => { if (!document.hidden) fn() }
+  const timer = setInterval(tick, ms)
+  document.addEventListener('visibilitychange', tick)
+  return () => {
+    clearInterval(timer)
+    document.removeEventListener('visibilitychange', tick)
+  }
+}
+
+// formatGoDuration reads a Go duration ("1h30m0s") as "1 h 30 min", dropping the
+// zero parts. A value it does not parse is shown as it arrives.
+export function formatGoDuration(d: string): string {
+  const m = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+(?:\.\d+)?)s)?$/.exec(d)
+  if (!m || d === '') return d
+  const parts = [
+    +(m[1] ?? 0) > 0 && t('duration.hours', {count: +m[1]}),
+    +(m[2] ?? 0) > 0 && t('duration.minutes', {count: +m[2]}),
+    +(m[3] ?? 0) > 0 && t('duration.seconds', {count: +m[3]}),
+  ].filter(Boolean)
+  return parts.length ? parts.join(' ') : d
 }
 
 // pct returns value/max as a whole percentage, clamped to 0..100.

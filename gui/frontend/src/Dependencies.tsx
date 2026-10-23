@@ -150,7 +150,7 @@ export function Dependencies() {
                   </td>
                   <td className="mono">{d.pinned || <span className="muted">—</span>}</td>
                   <td>
-                    <Badge tone={tone(d.status)}>{label(d.status)}</Badge>
+                    <Badge tone={tone(d.status)} dot>{label(d.status)}</Badge>
                     {installing && !step && <div className="muted" style={{fontSize: 12, marginTop: 4}}>
                       {t('deps.step.starting')}
                     </div>}
@@ -200,7 +200,9 @@ function InstallSteps({name, step}: {name: string, step: string}) {
         {steps.map((s, i) => (
           <li key={s} className={i < current ? 'done' : i === current ? 'current' : undefined}
               aria-current={i === current ? 'step' : undefined}>
+            {i < current ? <Icon name="check" size={12}/> : <span className="step-mark" aria-hidden/>}
             {t(`deps.step.${s}` as MessageKey)}
+            {i < current && <span className="visually-hidden">{t('deps.stepDone')}</span>}
           </li>
         ))}
       </ol>

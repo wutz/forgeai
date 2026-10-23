@@ -72,3 +72,29 @@ func TestCreateJobChecksMountedVolumes(t *testing.T) {
 		t.Fatalf("ReadWriteOnce volume on two workers: got %v, want ErrNotShared", err)
 	}
 }
+
+// A job keeps its mount paths, so saving it as a template does not drop them.
+func TestJobMountsKeepPathsForTemplates(t *testing.T) {
+	a := testApp(t, mountFixtures()...)
+	want := []training.VolumeMount{
+		{Volume: "shared", MountPath: "/data", SubPath: "run1", ReadOnly: true},
+		{Volume: "shared", MountPath: "/cache"},
+	}
+	if _, err := a.CreateJob(training.Form{
+		Name: "train", Image: "img", InstanceType: "cpu.small", Workers: 2, Volumes: want,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	j, err := a.GetJob("train")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(j.Mounts) != len(want) {
+		t.Fatalf("mounts = %+v, want %+v", j.Mounts, want)
+	}
+	for i := range want {
+		if j.Mounts[i] != want[i] {
+			t.Errorf("mount %d = %+v, want %+v", i, j.Mounts[i], want[i])
+		}
+	}
+}

@@ -95,6 +95,8 @@ export default function App() {
   const [projects, setProjects] = useState<app.ProjectNamespace[]>([])
   const [conn, setConn] = useState<app.ConnInfo | null>(null)
   const [area, setArea] = useState<Area>('overview')
+  // jobFocus asks the Jobs page to select a job; a new object each time, so the same job can be picked again.
+  const [jobFocus, setJobFocus] = useState<{name: string} | null>(null)
   // visited lists the areas opened on this connection. A view mounts on its
   // first visit and stays mounted after that.
   const [visited, setVisited] = useState<Area[]>([])
@@ -247,8 +249,8 @@ export default function App() {
             {conn ? (
               // Keyed by the connection so every view refetches after a switch.
               <Fragment key={`${conn.context}/${conn.namespace}`}>
-                {shown('overview', <Overview onOpen={setArea}/>)}
-                {shown('jobs', <Jobs/>)}
+                {shown('overview', <Overview onOpen={setArea} onOpenJob={name => { setJobFocus({name}); setArea('jobs') }}/>)}
+                {shown('jobs', <Jobs focus={jobFocus}/>)}
                 {shown('sandboxes', <Sandboxes/>)}
                 {shown('templates', <Templates sandboxes={conn.sandboxes}/>)}
                 {shown('volumes', <Volumes/>)}

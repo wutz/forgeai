@@ -21,6 +21,7 @@ export function JobCreateDialog({onClose, onCreated}: {
   const [templates, setTemplates] = useState<string[]>([])
   // vols is null until the project's volumes load.
   const [vols, setVols] = useState<volumes.Volume[] | null>(null)
+  const [volsError, setVolsError] = useState('')
   const [f, setF] = useState(training.Form.createFrom({
     name: generateName('job'), image: '', command: '', workers: 1,
     instanceType: '', env: [], volumes: [],
@@ -36,7 +37,7 @@ export function JobCreateDialog({onClose, onCreated}: {
       if (ts.length) setF(prev => prev.instanceType ? prev : training.Form.createFrom({...prev, instanceType: ts[0].name}))
     }).catch(e => setError(errText(e)))
     TemplateNames().then(setTemplates).catch(() => {})
-    ListVolumes(false).then(setVols).catch(e => setError(errText(e)))
+    ListVolumes(false).then(setVols).catch(e => setVolsError(errText(e)))
   }, [])
 
   const set = <K extends keyof training.Form>(k: K, v: training.Form[K]) =>
@@ -73,7 +74,7 @@ export function JobCreateDialog({onClose, onCreated}: {
   const envBad = envErrors(envText)
   // The name is a DNS label of at most 50 characters, the TrainJob name limit.
   const nameOK = NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= NAME_MAX
-  const workersOK = f.workers >= 1
+  const workersOK = Number.isInteger(f.workers) && f.workers >= 1
   // A template can name a type the project no longer offers; the backend rejects it, so Create waits.
   const typeOK = !!f.instanceType && types.some(it => it.name === f.instanceType)
   // The platform accepts 0 to 20 retries; the backend rejects anything else.
@@ -87,7 +88,7 @@ export function JobCreateDialog({onClose, onCreated}: {
     : !workersOK ? t('jobCreate.workersInvalid')
     : !typeOK ? t('jobCreate.typeRequired')
     : !retriesOK ? t('jobCreate.retriesInvalid')
-    : !mountsOK ? (vols === null ? t('mounts.loading') : t('mounts.fixFirst'))
+    : !mountsOK ? (vols === null ? (volsError ? t('mounts.loadFailed') : t('mounts.loading')) : t('mounts.fixFirst'))
     : envBad.length ? t('common.envInvalid', {lines: envBad.join(', ')}) : ''
   const hasFieldHint = (!nameOK && (f.name ?? '') !== '') || !workersOK || !retriesOK || envBad.length > 0
 
@@ -185,7 +186,7 @@ export function JobCreateDialog({onClose, onCreated}: {
           </div>
           <div className="field">
             <label>{t('jobCreate.volumeMounts')}</label>
-            <VolumeMountsField mounts={mounts} onChange={setMounts} vols={vols} workers={f.workers}/>
+            <VolumeMountsField mounts={mounts} onChange={setMounts} vols={vols} loadError={volsError} workers={f.workers}/>
             <span className="hint">{t('mounts.jobHint')}</span>
           </div>
           <div className="row">

@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {ListInstanceTypes, Quota} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
-import {errText, pct, toGiB} from './util'
+import {errText, everyWhileVisible, pct, toGiB} from './util'
 import {Badge, Card, Empty, Icon, Meter, MetricTile, PageHeader, RefreshButton, Spinner, useActive} from './ui'
 import {t} from './i18n'
 
@@ -26,8 +26,7 @@ export function Resources() {
     if (!active) return
     const poll = () => load().catch(() => {})
     poll()
-    const timer = setInterval(poll, 10000)
-    return () => clearInterval(timer)
+    return everyWhileVisible(poll, 10000)
   }, [active])
 
   // total and free count instances; the GPU tiles count GPUs, so each GPU type
@@ -49,13 +48,15 @@ export function Resources() {
 
       <div className="metrics">
         <MetricTile icon="cpu" label={t('resources.gpusInCluster')} tone="accent"
-                    value={total} detail={list.length === 1 ? t('resources.instanceTypeOne') : t('resources.instanceTypeCount', {count: list.length})}/>
+                    value={types === null ? '—' : total} detail={list.length === 1 ? t('resources.instanceTypeOne') : t('resources.instanceTypeCount', {count: list.length})}/>
         <MetricTile icon="check" label={t('resources.freeNow')} tone="success"
-                    value={free} detail={!types ? '' : total ? t('resources.percentInUse', {percent: pct(used, total)}) : t('resources.noGpuNodes')}/>
+                    value={types === null ? '—' : free} detail={!types ? '' : total ? t('resources.percentInUse', {percent: pct(used, total)}) : t('resources.noGpuNodes')}/>
         <MetricTile icon="shield" label={t('resources.projectGpuQuota')} tone="violet"
-                    value={gpuQuota || '—'} detail={gpuQuota ? t('resources.usedByProject', {used: gpuUsed}) : t('resources.noQuotaSet')}/>
+                    value={quota === null ? '—' : gpuQuota || '—'}
+                    detail={quota === null ? '' : gpuQuota ? t('resources.usedByProject', {used: gpuUsed}) : t('resources.noQuotaSet')}/>
         <MetricTile icon="database" label={t('resources.storageQuota')} tone="warning"
-                    value={quota?.storage || '∞'} detail={quota?.storageUsed && quota.storageUsed !== '0' ? t('resources.storageUsed', {used: quota.storageUsed}) : t('resources.nothingUsed')}/>
+                    value={quota === null ? '—' : quota.storage || '∞'}
+                    detail={quota === null ? '' : quota.storageUsed && quota.storageUsed !== '0' ? t('resources.storageUsed', {used: quota.storageUsed}) : t('resources.nothingUsed')}/>
       </div>
 
       <Card title={t('resources.instanceTypes')} subtitle={t('resources.instanceTypesSubtitle')}>
@@ -106,7 +107,7 @@ export function Resources() {
             {/* A zero limit means the quota sets none, so there is no bar to fill. */}
             {quota.gpuClasses?.map(g => (
               <tr key={g.class}>
-                <td className="mono">{t('resources.gpusOfClass', {cls: g.class})}</td>
+                <td className="mono">{g.class === '*' ? t('resources.gpusUnknownClass') : t('resources.gpusOfClass', {cls: g.class})}</td>
                 <td>
                   {quota.gpuQuota ? (
                     <Meter value={g.used} max={Math.max(quota.gpuQuota, g.used, 1)}

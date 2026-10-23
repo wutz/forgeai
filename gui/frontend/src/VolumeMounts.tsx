@@ -54,8 +54,10 @@ export function mountProblems(mounts: Mount[], vols: volumes.Volume[], workers: 
 // picks one of the project's volumes, so a mount can only name a volume that
 // exists and is ready; the volume's size and access mode are shown beside it.
 // vols is null while the volumes load.
-export function VolumeMountsField({mounts, onChange, vols, workers = 1}: {
-  mounts: Mount[], onChange: (next: Mount[]) => void, vols: volumes.Volume[] | null, workers?: number,
+// loadError is set when the project's volumes could not be read: the field says
+// so instead of waiting for them.
+export function VolumeMountsField({mounts, onChange, vols, loadError, workers = 1}: {
+  mounts: Mount[], onChange: (next: Mount[]) => void, vols: volumes.Volume[] | null, loadError?: string, workers?: number,
 }) {
   const problems = vols ? mountProblems(mounts, vols, workers) : []
   const choices = (vols ?? []).filter(mountable)
@@ -121,7 +123,9 @@ export function VolumeMountsField({mounts, onChange, vols, workers = 1}: {
         </button>
         {vols?.length === 0 && <span className="mount-hint">{t('mounts.noVolumes')}</span>}
         {vols && vols.length > 0 && choices.length === 0 && <span className="mount-hint">{t('mounts.noneReady')}</span>}
-        {!vols && <span className="mount-hint">{t('mounts.loading')}</span>}
+        {!vols && <span className="mount-hint" role={loadError ? 'alert' : undefined}>
+          {loadError ? t('mounts.loadFailed') : t('mounts.loading')}
+        </span>}
       </div>
     </div>
   )

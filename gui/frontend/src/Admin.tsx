@@ -9,7 +9,9 @@ import {t} from './i18n'
 
 // Admin manages Projects: quota (GPU classes, storage), network isolation,
 // members and their kubeconfigs. Shown only to platform admins.
-export function Admin() {
+// Admin lists and edits the projects of the connected cluster. onProjectsChanged
+// runs after a save or delete, so the shell's project list stays in step.
+export function Admin({onProjectsChanged}: {onProjectsChanged: () => void}) {
   // projects is null until the first read, so a failed first read is not shown as an empty list.
   const [projects, setProjects] = useState<app.Project[] | null>(null)
   const [error, setError] = useState('')
@@ -46,7 +48,7 @@ export function Admin() {
       ? t('admin.deleteDataMessage')
       : t('admin.deleteRetainMessage'),
     action: t('admin.deleteAction'), danger: true,
-    run: () => DeleteProject(p.name).then(refresh).catch(e => setError(errText(e))),
+    run: () => DeleteProject(p.name).then(() => { onProjectsChanged(); return refresh() }).catch(e => setError(errText(e))),
   })
 
   return (
@@ -64,7 +66,7 @@ export function Admin() {
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {confirm.dialog}
       {editing && <ProjectDialog form={editing} onClose={() => setEditing(null)}
-                                 onSaved={() => { setEditing(null); refresh().catch(() => undefined) }}/>}
+                                 onSaved={() => { setEditing(null); onProjectsChanged(); refresh().catch(() => undefined) }}/>}
 
       <Card>
         {!projects ? (

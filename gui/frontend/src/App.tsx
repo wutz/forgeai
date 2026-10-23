@@ -181,6 +181,18 @@ export default function App() {
     if (conn && namespace !== conn.namespace) connectTo(conn.context, namespace)
   }
 
+  // refreshProjects re-reads the connected cluster's projects after an admin
+  // created, saved or deleted one. If the connected project is gone, it connects
+  // to a project that is left.
+  const refreshProjects = () => {
+    if (!conn) return
+    const context = conn.context
+    Projects(context).then(list => {
+      setProjects(list)
+      if (!list.some(p => p.namespace === conn.namespace)) connectTo(context)
+    }).catch(() => undefined)
+  }
+
   // The sidebar groups areas like the reference consoles: workspace, storage,
   // cluster catalogue, then admin. Sandboxes appear only when the connected
   // cluster runs agents.x-k8s.io.
@@ -267,7 +279,7 @@ export default function App() {
                 {shown('files', <FilesView/>)}
                 {shown('images', <Images/>)}
                 {shown('resources', <Resources/>)}
-                {shown('admin', <Admin/>)}
+                {shown('admin', <Admin onProjectsChanged={refreshProjects}/>)}
                 {shown('dependencies', <Dependencies/>)}
               </Fragment>
             ) : loading ? (

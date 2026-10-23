@@ -77,7 +77,7 @@ export function PageHeader({eyebrow, title, meta, actions}: {
         {eyebrow && <div className="eyebrow">{eyebrow}</div>}
         <div className="page-head-row">
           <h1 className="page-title">{title}</h1>
-          {meta}
+          {meta ? <span className="page-meta">{meta}</span> : null}
         </div>
       </div>
       {actions && <div className="page-head-actions">{actions}</div>}

@@ -23,6 +23,8 @@ import {getLocale, subscribeLocale, t} from './i18n'
 const PREFS = 'forgeai.connection'
 const NAMESPACES = 'forgeai.namespaces'
 const SIDEBAR = 'forgeai.sidebar'
+// Matches the redesign.css breakpoint where the rail becomes an overlay.
+const isNarrow = () => window.matchMedia('(max-width: 820px)').matches
 
 type Area = 'overview' | 'jobs' | 'sandboxes' | 'templates' | 'volumes' | 'files' | 'images' | 'resources'
   | 'admin' | 'dependencies'
@@ -99,7 +101,8 @@ export default function App() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   // The rail remembers its state across launches, like the connection does.
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR) === 'collapsed')
+  // A narrow window overlays the page with the rail, so it always starts closed.
+  const [collapsed, setCollapsed] = useState(() => isNarrow() || localStorage.getItem(SIDEBAR) === 'collapsed')
   // Views portal their PageHeader into this node in the top bar.
   const [headerSlot, setHeaderSlot] = useState<HTMLDivElement | null>(null)
   // Each connect takes a number; a slower, superseded switch must not win.
@@ -225,7 +228,11 @@ export default function App() {
                 <div className="nav-label">{g.label}</div>
                 {g.items.map(item => (
                   <button key={item.area} className={`nav-item ${area === item.area ? 'active' : ''}`}
-                          onClick={() => setArea(item.area)}
+                          onClick={() => {
+                            setArea(item.area)
+                            // On a narrow window the rail is an overlay; picking a page dismisses it.
+                            if (isNarrow()) setCollapsed(true)
+                          }}
                           title={collapsed ? item.label : undefined}
                           aria-label={item.label} aria-current={area === item.area ? 'page' : undefined}>
                     <Icon name={item.icon}/><span>{item.label}</span>

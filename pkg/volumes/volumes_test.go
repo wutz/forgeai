@@ -129,6 +129,7 @@ func TestRetentionUsesProjectOverride(t *testing.T) {
 	k8s := fake.NewClientBuilder().WithScheme(s).WithObjects(
 		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "forge-a", Labels: map[string]string{naming.LabelProject: "alpha"}}},
 		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "forge-b", Labels: map[string]string{naming.LabelProject: "beta"}}},
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "forge-c"}},
 		&v1.Project{ObjectMeta: metav1.ObjectMeta{Name: "alpha"}, Spec: v1.ProjectSpec{
 			TrashRetention: &metav1.Duration{Duration: time.Hour}}},
 		&v1.Project{ObjectMeta: metav1.ObjectMeta{Name: "beta"}},
@@ -142,6 +143,7 @@ func TestRetentionUsesProjectOverride(t *testing.T) {
 		{"project override", "forge-a", time.Hour},
 		{"project without override", "forge-b", platformDefault},
 		{"unknown namespace", "missing", platformDefault},
+		{"namespace without project label", "forge-c", platformDefault},
 	} {
 		got, err := Retention(ctx, k8s, tc.ns, platformDefault)
 		if err != nil || got != tc.want {

@@ -95,8 +95,14 @@ func Retention(ctx context.Context, c client.Reader, ns string, platformDefault 
 	if err := c.Get(ctx, types.NamespacedName{Name: ns}, nsObj); err != nil {
 		return platformDefault, client.IgnoreNotFound(err)
 	}
+	// A namespace without a project label has no project to ask: that is the
+	// platform default, not a lookup of a project with an empty name.
+	name := nsObj.Labels[naming.LabelProject]
+	if name == "" {
+		return platformDefault, nil
+	}
 	p := &v1.Project{}
-	if err := c.Get(ctx, types.NamespacedName{Name: nsObj.Labels[naming.LabelProject]}, p); err != nil {
+	if err := c.Get(ctx, types.NamespacedName{Name: name}, p); err != nil {
 		return platformDefault, client.IgnoreNotFound(err)
 	}
 	if p.Spec.TrashRetention != nil {

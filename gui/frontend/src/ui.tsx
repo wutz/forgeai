@@ -436,14 +436,21 @@ export function Dialog({title, subtitle, onClose, children, footer, width, busy}
     if (active && active !== document.body) return active
     return lastClicked?.isConnected ? lastClicked : null
   })
+  const restoreTimer = useRef(0)
   useEffect(() => {
+    // StrictMode unmounts and mounts again in development. The return of focus
+    // waits a tick, so that first unmount does not hand focus back to the opener
+    // and make the remount move it again.
+    window.clearTimeout(restoreTimer.current)
     const el = box.current
     if (el && !el.contains(document.activeElement)) {
       const first = el.querySelector('.dialog-body')?.querySelector<HTMLElement>(focusableSelector)
         ?? el.querySelector<HTMLElement>(focusableSelector)
       first?.focus()
     }
-    return () => opener?.focus?.()
+    return () => {
+      restoreTimer.current = window.setTimeout(() => opener?.focus?.())
+    }
   }, [])
   // Leaving the discard prompt, by Keep editing or Escape, returns focus to the
   // field the user was in. The prompt's button is removed by then, so without

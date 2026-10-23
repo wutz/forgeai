@@ -93,7 +93,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
     <Dialog title={t('sandboxCreate.title')} subtitle={t('sandboxCreate.subtitle')}
             onClose={onClose} footer={<>
               <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
-              <button type="submit" form="sandbox-form" className="btn btn-primary" disabled={busy || !f.name || !f.image || !mountsOK}>
+              <button type="submit" form="sandbox-form" className="btn" disabled={busy || !f.name || !f.image || !mountsOK}>
                 {busy ? t('sandboxCreate.creating') : t('sandboxCreate.create')}
               </button>
             </>}>

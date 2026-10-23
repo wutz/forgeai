@@ -60,11 +60,17 @@ function adminAreas(info: app.ConnInfo): Area[] {
   ]
 }
 
+// nothingOpen reports a connection with neither a project nor an admin area:
+// there is no view to show, so the page says why instead.
+function nothingOpen(info: app.ConnInfo): boolean {
+  return !info.project && adminAreas(info).length === 0
+}
+
 // areaFor keeps the open view when the new connection offers it. A connection
 // without a project only has the admin areas, and opens on the first of them.
 function areaFor(current: Area, info: app.ConnInfo): Area {
   const offered = adminAreas(info)
-  if (!info.project) return offered.includes(current) ? current : offered[0] ?? 'dependencies'
+  if (!info.project) return offered.includes(current) ? current : offered[0] ?? 'overview'
   if (offered.includes(current)) return current
   if (current === 'admin' || current === 'dependencies') return 'overview'
   if (current === 'sandboxes' && !info.sandboxes) return 'overview'
@@ -246,7 +252,11 @@ export default function App() {
           </nav>
           <main className="main">
             {error && <div className="banner banner-error" role="alert">{error}</div>}
-            {conn ? (
+            {conn && nothingOpen(conn) ? (
+              <Empty icon="shield" title={t('app.noAccess')}>
+                {t('app.noAccessHint')}
+              </Empty>
+            ) : conn ? (
               // Keyed by the connection so every view refetches after a switch.
               <Fragment key={`${conn.context}/${conn.namespace}`}>
                 {shown('overview', <Overview onOpen={setArea} onOpenJob={name => { setJobFocus({name}); setArea('jobs') }}/>)}

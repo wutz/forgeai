@@ -142,7 +142,13 @@ export function Dependencies() {
                   <td className="mono">
                     {d.installed || (d.running
                       ? <>
-                          {d.running}
+                          {/* Each tag stays on one line; the list wraps only between tags. */}
+                          {d.running.split(', ').map((tag, i) => (
+                            <Fragment key={i}>
+                              {i > 0 && ', '}
+                              <span style={{whiteSpace: 'nowrap'}}>{tag}</span>
+                            </Fragment>
+                          ))}
                           <div className="muted" style={{fontSize: 12, marginTop: 4}}>{t('deps.runningHint')}</div>
                         </>
                       : <span className="muted">—</span>)}

@@ -88,7 +88,7 @@ export function Jobs() {
     <div className="page">
       <PageHeader eyebrow={t('jobs.eyebrow')} title={t('jobs.title')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>{t('jobs.total', {count: jobs.length})}</span>}
-                  actions={<button className="btn btn-primary" onClick={() => setCreating(true)}>
+                  actions={<button className="btn" onClick={() => setCreating(true)}>
                     <Icon name="plus" size={14}/>{t('jobs.newJob')}
                   </button>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}

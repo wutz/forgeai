@@ -21,6 +21,8 @@
   --wash: #fafafa;
   --scrim: rgba(15, 23, 42, 0.32);
   --hover-wash: rgba(15, 23, 42, 0.05);
+  /* Selected sidebar row: a neutral wash on the chrome, as in Claude desktop. */
+  --nav-active: rgba(15, 23, 42, 0.08);
   --scroll-thumb: #d4d4d8;
   --scroll-thumb-hover: #a1a1aa;
   --shadow-active: 0 1px 2px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(15, 23, 42, 0.04);
@@ -43,6 +45,7 @@
   --wash: #1f1f23;
   --scrim: rgba(0, 0, 0, 0.6);
   --hover-wash: rgba(255, 255, 255, 0.06);
+  --nav-active: rgba(255, 255, 255, 0.09);
   --scroll-thumb: #3f3f46;
   --scroll-thumb-hover: #52525b;
   --shadow-active: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06);
@@ -132,24 +135,24 @@ a { color: inherit; text-decoration: none; }
 .sidebar { padding: 8px 12px 12px; gap: 2px; background: var(--chrome); border-right-color: var(--chrome-line); }
 .shell.collapsed { grid-template-columns: 0 minmax(0, 1fr); }
 .shell.collapsed .sidebar { display: none; }
-.nav-group { display: flex; flex-direction: column; gap: 1px; margin-top: 14px; }
-.nav-group:first-child { margin-top: 2px; }
+.nav-group { display: flex; flex-direction: column; gap: 2px; margin-top: 20px; }
+.nav-group:first-child { margin-top: 4px; }
+/* Section labels are sentence case and muted, as the Claude desktop sidebar
+   sets its Pinned / Today groups: quiet enough to scan past, readable in both
+   languages. */
 .nav-label {
-  padding: 0 10px 6px; font-family: var(--mono); font-size: 10.5px; font-weight: 500;
-  letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint);
+  padding: 0 10px 4px; font-size: 12px; font-weight: 500; letter-spacing: -0.05px; color: var(--mute);
 }
 .nav-item {
-  display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px;
-  border-radius: 8px; font-size: 13.5px; letter-spacing: -0.1px;
+  display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 10px;
+  border-radius: 8px; font-size: 14px; letter-spacing: -0.15px;
 }
 .nav-item .icon { color: var(--mute); }
 .nav-item:hover .icon { color: var(--body); }
 .nav-item.active .icon { color: var(--accent); }
-/* The active row is a white chip lifted off the chrome; ink label, accent icon. */
-.sidebar .nav-item.active {
-  background: var(--surface); color: var(--ink);
-  box-shadow: var(--shadow-active);
-}
+/* The active row is a neutral wash with an ink label and an accent icon: it
+   reads as a selection, not as a card floating above the sidebar. */
+.sidebar .nav-item.active { background: var(--nav-active); color: var(--ink); font-weight: 500; }
 /* On the darker chrome the default light hover wash would read as a lift;
    hover steps down instead, so only the active row is lighter. */
 .sidebar .nav-item:not(.active):hover { background: var(--hover-wash); }
@@ -161,7 +164,7 @@ a { color: inherit; text-decoration: none; }
   padding: 2px 0 10px; border-bottom: 1px solid var(--chrome-line);
 }
 .scope-field { display: grid; grid-template-columns: 58px minmax(0, 1fr); align-items: center; gap: 6px; }
-.scope .nav-label { padding: 0 2px; font-size: 10px; letter-spacing: 0.04em; white-space: nowrap; }
+.scope .nav-label { padding: 0 2px; font-size: 12px; white-space: nowrap; }
 .scope .select, .scope .input { width: 100%; height: 28px; font-size: 12.5px; border-radius: 7px; }
 .scope .input { padding: 0 8px; }
 .scope .select { padding-left: 8px; padding-right: 24px; background-position: right 6px center; }
@@ -178,10 +181,7 @@ a { color: inherit; text-decoration: none; }
    renders outside the shell. */
 .page-head { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 20px; }
 .page-head-text { min-width: 0; }
-.eyebrow {
-  font-family: var(--mono); font-size: 10.5px; font-weight: 500; letter-spacing: 0.06em;
-  text-transform: uppercase; color: var(--faint); margin-bottom: 6px;
-}
+.eyebrow { font-size: 12px; font-weight: 500; color: var(--mute); margin-bottom: 6px; }
 .page-head-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .page-title { margin: 0; font-size: 23px; line-height: 30px; font-weight: 600; letter-spacing: -0.7px; }
 .page-head-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
@@ -293,11 +293,13 @@ a { color: inherit; text-decoration: none; }
   display: inline-flex; align-items: center; justify-content: center;
   width: 22px; height: 22px; border-radius: 6px; background: var(--hairline-soft); color: var(--body);
 }
-.metric-accent .metric-icon { background: var(--accent-soft); color: var(--accent-deep); }
-.metric-success .metric-icon { background: var(--success-soft); color: var(--success); }
-.metric-warning .metric-icon { background: var(--warning-soft); color: var(--warning-deep); }
-.metric-violet .metric-icon { background: var(--violet-soft); color: var(--violet); }
-.metric-error .metric-icon { background: var(--error-soft); color: var(--error); }
+/* The icon chip stays neutral; only the glyph takes the tone, so a row of tiles
+   reads as one calm strip rather than four coloured blocks. */
+.metric-accent .metric-icon { color: var(--accent); }
+.metric-success .metric-icon { color: var(--success); }
+.metric-warning .metric-icon { color: var(--warning-deep); }
+.metric-violet .metric-icon { color: var(--violet); }
+.metric-error .metric-icon { color: var(--error); }
 .metric-value {
   margin-top: 12px; font-size: 28px; line-height: 32px; font-weight: 600; letter-spacing: -1.1px;
   font-variant-numeric: tabular-nums;
@@ -357,15 +359,18 @@ a { color: inherit; text-decoration: none; }
 .badge-neutral { background: var(--hairline-soft); color: var(--body); }
 
 /* Table */
-.table th {
-  font-size: 11px; padding: 9px 16px; font-family: var(--mono);
-  letter-spacing: 0.03em; text-transform: uppercase;
-}
-.table td { padding: 11px 16px; font-size: 13px; }
+/* Column heads are muted sentence case, as in Claude desktop's lists. */
+.table th { font-size: 12px; font-weight: 500; color: var(--mute); padding: 9px 16px; }
+.table td { padding: 12px 16px; font-size: 13px; }
 .table tbody tr:hover { background: var(--wash); }
 .table tbody tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
 .table tbody tr.selected:hover { background: var(--accent-tint); }
 .mono { font-size: 12.5px; }
+/* Inline code is a quiet hairline chip, as in Claude desktop's messages. */
+code {
+  font-family: var(--mono); font-size: 0.92em; padding: 1px 5px; border-radius: 5px;
+  background: var(--hairline-soft); color: var(--body);
+}
 .cell-main { display: block; color: var(--ink); }
 .cell-sub { display: block; margin-top: 2px; font-size: 11.5px; line-height: 16px; color: var(--mute); }
 .table td .cell-sub { font-family: var(--font); }
@@ -404,14 +409,9 @@ a { color: inherit; text-decoration: none; }
 }
 .section { padding: 16px 18px; }
 .detail .section { border-top: none; }
-.section h4 {
-  font-size: 11px; font-family: var(--mono); letter-spacing: 0.05em; text-transform: uppercase;
-}
+.section h4 { font-size: 13px; font-weight: 600; letter-spacing: -0.2px; }
 .kv { grid-template-columns: 96px minmax(0, 1fr); gap: 9px 14px; font-size: 12.5px; margin: 0; }
-.sub-head {
-  margin: 20px 0 8px; font-size: 11px; font-weight: 500; font-family: var(--mono);
-  letter-spacing: 0.05em; text-transform: uppercase; color: var(--mute);
-}
+.sub-head { margin: 20px 0 8px; font-size: 12px; font-weight: 500; color: var(--mute); }
 pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 18px; }
 .logs {
   height: 300px; padding: 12px 14px; border-radius: 8px; background: #0f1117; color: #e4e4e7;
@@ -452,8 +452,9 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
   width: 38px; height: 38px; margin-bottom: 10px; border-radius: 10px;
   background: var(--hairline-soft); color: var(--mute);
 }
-.empty-title { font-size: 13px; font-weight: 500; color: var(--body); }
-.empty-text { margin: 4px auto 0; max-width: 360px; font-size: 12.5px; line-height: 18px; }
+/* The title carries the empty state: ink and a size up, the hint muted beneath. */
+.empty-title { font-size: 15px; font-weight: 600; letter-spacing: -0.2px; color: var(--ink); }
+.empty-text { margin: 6px auto 0; max-width: 380px; font-size: 13px; line-height: 20px; color: var(--mute); }
 .loading { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 40px; color: var(--mute); font-size: 13px; }
 .spinner {
   width: 14px; height: 14px; border-radius: 50%;

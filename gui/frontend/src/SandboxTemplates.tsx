@@ -108,7 +108,7 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
               : t('sandboxTemplates.newSubtitle')}
             onClose={onClose} footer={<>
               <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
-              <button type="submit" form="sandbox-template-form" className="btn btn-primary" disabled={busy || !f.name || !f.image}>
+              <button type="submit" form="sandbox-template-form" className={existing ? 'btn btn-primary' : 'btn'} disabled={busy || !f.name || !f.image}>
                 {busy ? t('templates.saving') : t('templates.saveTemplate')}
               </button>
             </>}>

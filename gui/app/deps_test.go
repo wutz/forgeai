@@ -248,6 +248,47 @@ func TestImageTag(t *testing.T) {
 	}
 }
 
+func TestBundleRunningTags(t *testing.T) {
+	s := runtime.NewScheme()
+	if err := clientgoscheme.AddToScheme(s); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	// Each bundle Deployment runs an image tagged with its own name, so the
+	// expected string lists every one of them in bundle order.
+	for _, name := range []string{"agent-sandbox", "trainer"} {
+		t.Run(name, func(t *testing.T) {
+			b, err := bundleByName(name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var objs []client.Object
+			var want []string
+			for _, o := range b.objects {
+				if o.GetKind() != "Deployment" || o.GroupVersionKind().Group != appsv1.GroupName {
+					continue
+				}
+				tag := "v" + o.GetName()
+				d := testDeployment("", true)
+				d.Namespace, d.Name = o.GetNamespace(), o.GetName()
+				d.Spec.Template.Spec.Containers = []corev1.Container{{Image: "registry.example/" + o.GetName() + ":" + tag}}
+				objs = append(objs, &d)
+				want = append(want, tag)
+			}
+			if len(objs) == 0 {
+				t.Fatal("bundle declares no Deployment")
+			}
+			if got, err := bundleRunningTags(ctx, fake.NewClientBuilder().WithScheme(s).Build(), b); err != nil || got != "" {
+				t.Fatalf("bundleRunningTags without the Deployments = %q, %v; want empty", got, err)
+			}
+			k8s := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
+			if got, err := bundleRunningTags(ctx, k8s, b); err != nil || got != strings.Join(want, ", ") {
+				t.Fatalf("bundleRunningTags = %q, %v; want %q", got, err, strings.Join(want, ", "))
+			}
+		})
+	}
+}
+
 func TestRecordRoundTrip(t *testing.T) {
 	s := runtime.NewScheme()
 	if err := clientgoscheme.AddToScheme(s); err != nil {

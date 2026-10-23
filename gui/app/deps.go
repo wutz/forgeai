@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -477,7 +478,39 @@ func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *de
 	}
 	dep.Namespace = h.namespace
 	assess(&dep, h)
+	// An install outside forgeai carries no labels, so its Deployments are not
+	// found above. Its running version comes from the Deployments the bundle declares.
+	if b != nil && len(h.deployments) == 0 && dep.Status != "missing" {
+		running, err := bundleRunningTags(ctx, k8s, b)
+		if err != nil {
+			return dep, err
+		}
+		dep.Running = running
+	}
 	return dep, nil
+}
+
+// bundleRunningTags returns the distinct image tags of the Deployments the
+// bundle declares that exist in the cluster, joined in bundle order. A
+// component with several Deployments, such as Trainer with JobSet, lists each.
+func bundleRunningTags(ctx context.Context, k8s client.Reader, b *depBundle) (string, error) {
+	var tags []string
+	for _, o := range b.objects {
+		if o.GetKind() != "Deployment" || o.GroupVersionKind().Group != appsv1.GroupName {
+			continue
+		}
+		d := &appsv1.Deployment{}
+		err := k8s.Get(ctx, client.ObjectKey{Namespace: o.GetNamespace(), Name: o.GetName()}, d)
+		switch {
+		case err == nil:
+			if tag := imageTag(d); tag != "" && !slices.Contains(tags, tag) {
+				tags = append(tags, tag)
+			}
+		case !apierrors.IsNotFound(err):
+			return "", err
+		}
+	}
+	return strings.Join(tags, ", "), nil
 }
 
 // loadPlatform reads the platform config. Without the ConfigMap the defaults apply.

@@ -111,7 +111,8 @@ function SandboxTable({boxes, failed, selected, onSelect}: {
               <button type="button" className="row-name cell-main">{b.name}</button>
               <span className="cell-sub">{b.image.split('/').pop()}</span>
             </td>
-            <td><Status phase={b.phase}/>{b.message && b.phase !== 'Running' &&
+            {/* A stopped sandbox's controller message is English and repeats the status label. */}
+            <td><Status phase={b.phase}/>{b.message && b.phase !== 'Running' && !b.stopped &&
               <div className="cell-sub" title={b.message}>{short(b.message)}</div>}</td>
             <td>{b.runtimeClass ? <Badge>{b.runtimeClass}</Badge> : <span className="muted">runc</span>}</td>
             <td className="mono">{b.cpu || '—'}/{b.memory || '—'}{b.gpu ? ` · ${b.gpu} GPU` : ''}</td>
@@ -298,7 +299,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
               {box.stopped && <><dt>{t('sandboxes.stoppedLabel')}</dt><dd>{t('sandboxes.suspendedNote')}</dd></>}
               {box.idleSince && <><dt>{t('sandboxes.idleSince')}</dt><dd>{fmtDate(box.idleSince)}</dd></>}
               {box.shutdownTime && <><dt>{t('sandboxes.autoStop')}</dt><dd>{fmtDate(box.shutdownTime)}</dd></>}
-              {box.message && <><dt>{t('common.status')}</dt><dd>{box.message}</dd></>}
+              {box.message && !box.stopped && <><dt>{t('common.status')}</dt><dd>{box.message}</dd></>}
               <dt>{t('common.created')}</dt><dd>{fmtDate(box.created)}</dd>
             </dl>
           )}

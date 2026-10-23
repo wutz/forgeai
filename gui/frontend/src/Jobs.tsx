@@ -198,10 +198,18 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
   // pending is the action in flight; its button stays disabled until it answers.
   const [pending, setPending] = useState('')
   const confirm = useConfirm()
-  const detailOf = (n: string) => GetJob(n).then(j => {
-    setJob(j)
-    setLoadError('')
-  }).catch(e => setLoadError(errText(e)))
+  // detailSeq numbers the reads, so a slow reply cannot overwrite a newer one.
+  const detailSeq = useRef(0)
+  const detailOf = (n: string) => {
+    const seq = ++detailSeq.current
+    return GetJob(n).then(j => {
+      if (seq !== detailSeq.current) return
+      setJob(j)
+      setLoadError('')
+    }).catch(e => {
+      if (seq === detailSeq.current) setLoadError(errText(e))
+    })
+  }
   const act = (kind: string, p: Promise<unknown>) => {
     setPending(kind)
     setError('')

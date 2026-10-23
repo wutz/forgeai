@@ -76,9 +76,10 @@ func (a *App) ListSandboxes() ([]*Sandbox, error) {
 	if err != nil {
 		return nil, err
 	}
+	pods := listSandboxPods(ctx, c)
 	out := make([]*Sandbox, 0, len(items))
 	for i := range items {
-		out = append(out, toSandbox(ctx, c, items[i]))
+		out = append(out, toSandbox(items[i], pods))
 	}
 	return out, nil
 }
@@ -95,7 +96,7 @@ func (a *App) GetSandbox(name string) (*Sandbox, error) {
 	if err != nil {
 		return nil, err
 	}
-	return toSandbox(ctx, c, u), nil
+	return toSandbox(u, sandboxPodOf(ctx, c)), nil
 }
 
 // SandboxOptions returns the platform settings the create dialog needs.
@@ -180,7 +181,7 @@ func (a *App) CreateSandbox(f sandbox.Form) (*Sandbox, error) {
 	if err := c.k8s.Create(ctx, u); err != nil {
 		return nil, err
 	}
-	return toSandbox(ctx, c, u), nil
+	return toSandbox(u, sandboxPodOf(ctx, c)), nil
 }
 
 // StopSandbox suspends a sandbox: its pod is deleted, the object and its
@@ -196,6 +197,9 @@ func (a *App) StopSandbox(name string) (*Sandbox, error) {
 func (a *App) StartSandbox(name string) (*Sandbox, error) {
 	return a.mutateSandbox(name, func(sb *sandbox.Sandbox) {
 		sb.Spec.OperatingMode = sandbox.OperatingRunning
+		// An expired sandbox would expire again at once; starting it is the user's
+		// choice to run on, so its shutdown time is cleared.
+		sandbox.ReopenElapsed(sb, time.Now())
 		delete(sb.Annotations, naming.AnnotationStopped)
 		delete(sb.Annotations, naming.AnnotationIdleSince)
 		setAnnotation(sb, naming.AnnotationLastActive, time.Now().UTC().Format(time.RFC3339))
@@ -485,7 +489,7 @@ func (a *App) mutateSandboxOnce(name string, fn func(*sandbox.Sandbox)) (*Sandbo
 	if err := c.k8s.Update(ctx, out); err != nil {
 		return nil, err
 	}
-	return toSandbox(ctx, c, out), nil
+	return toSandbox(out, sandboxPodOf(ctx, c)), nil
 }
 
 func listSandboxes(ctx context.Context, c *Connection) ([]*unstructured.Unstructured, error) {
@@ -517,8 +521,37 @@ func getSandbox(ctx context.Context, c *Connection, name string) (*unstructured.
 	return u, nil
 }
 
+// podLookup returns the pod named name: nil when there is none, and unknown when
+// the pod could not be read at all.
+type podLookup func(name string) (pod *corev1.Pod, unknown bool)
+
+// sandboxPodOf reads one pod with a GET; a single sandbox read needs no list.
+func sandboxPodOf(ctx context.Context, c *Connection) podLookup {
+	return func(name string) (*corev1.Pod, bool) {
+		pod := &corev1.Pod{}
+		if err := c.k8s.Get(ctx, types.NamespacedName{Namespace: c.namespace(), Name: name}, pod); err != nil {
+			return nil, !apierrors.IsNotFound(err)
+		}
+		return pod, false
+	}
+}
+
+// listSandboxPods lists the namespace's pods once, so a poll of the whole list
+// costs one read rather than one per sandbox.
+func listSandboxPods(ctx context.Context, c *Connection) podLookup {
+	list := &corev1.PodList{}
+	if err := c.k8s.List(ctx, list, client.InNamespace(c.namespace())); err != nil {
+		return func(string) (*corev1.Pod, bool) { return nil, true }
+	}
+	byName := make(map[string]*corev1.Pod, len(list.Items))
+	for i := range list.Items {
+		byName[list.Items[i].Name] = &list.Items[i]
+	}
+	return func(name string) (*corev1.Pod, bool) { return byName[name], false }
+}
+
 // toSandbox derives the view model from the sandbox and its pod.
-func toSandbox(ctx context.Context, c *Connection, u *unstructured.Unstructured) *Sandbox {
+func toSandbox(u *unstructured.Unstructured, pods podLookup) *Sandbox {
 	sb := &sandbox.Sandbox{}
 	if err := sandbox.FromUnstructured(u.Object, sb); err != nil {
 		return &Sandbox{Name: u.GetName(), Phase: string(sandbox.PhaseFailed), Message: err.Error()}
@@ -563,16 +596,14 @@ func toSandbox(ctx context.Context, c *Connection, u *unstructured.Unstructured)
 		out.CPU, out.Memory = cpu.String(), mem.String()
 	}
 	out.GPU = sandbox.GPU(sb)
-	pod := &corev1.Pod{}
-	name := sandbox.PodName(sb)
-	if err := c.k8s.Get(ctx, types.NamespacedName{Namespace: c.namespace(), Name: name}, pod); err == nil {
+	pod, unknown := pods(sandbox.PodName(sb))
+	out.PodUnknown = unknown
+	if pod != nil {
 		out.PodName, out.PodPhase = pod.Name, string(pod.Status.Phase)
 		out.ContainerRunning, out.ContainerReason = sandboxContainerState(pod)
 		if out.NodeName == "" {
 			out.NodeName = pod.Spec.NodeName
 		}
-	} else if !apierrors.IsNotFound(err) {
-		out.PodUnknown = true
 	}
 	return out
 }

@@ -14,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
@@ -82,6 +83,7 @@ func (a *App) ListJobs() ([]*Job, error) {
 	if err != nil {
 		return nil, err
 	}
+	ix.names = trainJobNames(items)
 	out := make([]*Job, 0, len(items))
 	for i := range items {
 		out = append(out, ix.job(&items[i]))
@@ -119,6 +121,7 @@ func (a *App) GetJob(name string) (*Job, error) {
 	if err != nil {
 		return nil, err
 	}
+	ix.names = trainJobNames(items)
 	j := ix.job(self)
 	if j.Group != j.Name {
 		return j, nil
@@ -408,6 +411,17 @@ func (a *App) renderTrainJob(ctx context.Context, c *Connection, f training.Form
 	if f.Workers < 1 {
 		f.Workers = 1
 	}
+	// A job started from a template the namespace no longer has would wait forever on its runtime.
+	if f.Template != "" {
+		rt := &unstructured.Unstructured{}
+		rt.SetGroupVersionKind(kf.TrainingRuntimeGVK)
+		if err := c.k8s.Get(ctx, client.ObjectKey{Namespace: c.namespace(), Name: f.Template}, rt); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, fmt.Errorf("template %q not found", f.Template)
+			}
+			return nil, err
+		}
+	}
 	it := &v1.InstanceType{}
 	if err := c.k8s.Get(ctx, client.ObjectKey{Name: f.InstanceType}, it); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -446,6 +460,17 @@ func (a *App) renderTrainJob(ctx context.Context, c *Connection, f training.Form
 type jobIndex struct {
 	pods          map[string][]corev1.Pod // by job set name
 	instanceTypes map[string]*v1.InstanceType
+	// names holds the TrainJobs of the listing; nil when the listing was not read.
+	names map[string]bool
+}
+
+// trainJobNames returns the names of the listed TrainJobs.
+func trainJobNames(items []kf.TrainJob) map[string]bool {
+	names := make(map[string]bool, len(items))
+	for i := range items {
+		names[items[i].Name] = true
+	}
+	return names
 }
 
 func loadJobIndex(ctx context.Context, c *Connection) (*jobIndex, error) {
@@ -481,6 +506,14 @@ func toJob(ctx context.Context, c *Connection, tj *kf.TrainJob) (*Job, error) {
 // job derives the view model: phase from conditions and pods, form fields
 // from the trainer overrides and the forgeai runtime patch.
 func (ix *jobIndex) job(tj *kf.TrainJob) *Job {
+	// A retry that was deleted no longer supersedes its job: the job's own
+	// failure is what the user acts on, not a link to a retry that is gone.
+	if ix.names != nil && tj.Annotations[naming.AnnotationRetriedAs] != "" && !ix.names[tj.Annotations[naming.AnnotationRetriedAs]] {
+		cp := *tj
+		cp.Annotations = maps.Clone(tj.Annotations)
+		delete(cp.Annotations, naming.AnnotationRetriedAs)
+		tj = &cp
+	}
 	pods := slices.Clone(ix.pods[tj.Name])
 	phase, msg := training.JobPhase(tj, pods)
 	out := &Job{

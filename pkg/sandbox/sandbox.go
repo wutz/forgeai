@@ -444,3 +444,14 @@ func GPU(sb *Sandbox) int64 {
 	}
 	return n
 }
+
+// ReopenElapsed clears a shutdown time that has already passed, so a sandbox that
+// expired can run again instead of expiring at once. A shutdown time still ahead
+// is kept. It reports whether it cleared one.
+func ReopenElapsed(sb *Sandbox, now time.Time) bool {
+	if sb.Spec.ShutdownTime == nil || sb.Spec.ShutdownTime.IsZero() || now.Before(sb.Spec.ShutdownTime.Time) {
+		return false
+	}
+	sb.Spec.ShutdownTime = nil
+	return true
+}

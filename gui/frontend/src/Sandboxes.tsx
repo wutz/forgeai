@@ -15,6 +15,10 @@ import {MessageKey, t} from './i18n'
 // timeout, so the beats stop when the detail closes.
 const HEARTBEAT = 60_000
 
+// TRANSITION_TIMEOUT_MS bounds a start or stop wait. Suspending or resuming takes
+// the controller a while, but a wait past this is a stuck transition, not a slow one.
+const TRANSITION_TIMEOUT_MS = 120_000
+
 // Sandboxes is the view of the project's agent sandboxes (agents.x-k8s.io).
 export function Sandboxes() {
   // boxes is null until the first read, so a failed first read is not shown as an empty list.
@@ -183,13 +187,25 @@ function SandboxDetail({name, onDone, onDeleted}: {
 
   useEffect(() => {
     if (!phase || !pending) return
-    // A start is done once the sandbox leaves Stopped, even into Failed or
-    // Expired; a stop is done once it reaches a settled phase.
+    // A start is done once the sandbox leaves Stopped and Expired (a start clears
+    // the shutdown time, so Expired is left behind too), even into Failed; a stop
+    // is done once it reaches a settled phase.
     const settled = pending === 'start'
-      ? phase !== 'Stopped'
+      ? phase !== 'Stopped' && phase !== 'Expired'
       : phase === 'Stopped' || phase === 'Failed' || phase === 'Expired' || phase === 'Succeeded'
     if (settled) setPending(null)
   }, [phase, pending])
+
+  // A transition the controller never finishes must not hold the buttons forever:
+  // after the timeout the view releases them and says so.
+  useEffect(() => {
+    if (!pending) return
+    const timer = window.setTimeout(() => {
+      setPending(null)
+      setError(t(pending === 'start' ? 'sandboxes.startTimeout' : 'sandboxes.stopTimeout'))
+    }, TRANSITION_TIMEOUT_MS)
+    return () => window.clearTimeout(timer)
+  }, [pending])
 
   useEffect(() => {
     setBox(null)

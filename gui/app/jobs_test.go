@@ -140,3 +140,39 @@ func TestDeleteJobRemovesWholeGroup(t *testing.T) {
 		t.Fatalf("remaining jobs = %v, want [other]", names)
 	}
 }
+
+func TestCreateJobRefusesMissingTemplate(t *testing.T) {
+	a := testApp(t)
+	f := testTemplateForm("train", "img:1")
+	f.Template = "gone"
+	_, err := a.renderTrainJob(context.Background(), a.conn, f)
+	if err == nil || !strings.Contains(err.Error(), `template "gone" not found`) {
+		t.Fatalf("renderTrainJob with a missing template: err = %v, want template not found", err)
+	}
+}
+
+func TestDeletedRetryDoesNotSupersedeJob(t *testing.T) {
+	a := testApp(t)
+	leader := testTrainJob("train", "")
+	leader.Annotations = map[string]string{naming.AnnotationRetriedAs: "train-r1"}
+	seedTrainJobs(t, a, leader)
+
+	// The retry the leader points at is gone, so the leader is not superseded.
+	j, err := a.GetJob("train")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if j.Superseded || j.RetriedAs != "" {
+		t.Errorf("job with a deleted retry: superseded = %v, retriedAs = %q; want neither", j.Superseded, j.RetriedAs)
+	}
+
+	// Once the retry exists, the link is shown again.
+	seedTrainJobs(t, a, testTrainJob("train-r1", "train"))
+	j, err = a.GetJob("train")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !j.Superseded || j.RetriedAs != "train-r1" {
+		t.Errorf("job with a live retry: superseded = %v, retriedAs = %q; want superseded by train-r1", j.Superseded, j.RetriedAs)
+	}
+}

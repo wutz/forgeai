@@ -581,7 +581,10 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
   transition: transform 120ms ease;
 }
 .repo[open] summary::before { transform: rotate(90deg); }
-.repo summary .btn { margin-left: auto; }
+/* The delete sits beside the repository's disclosure, aligned with its summary line. */
+.repo-row { display: flex; align-items: flex-start; gap: 8px; }
+.repo-row > .repo { flex: 1; min-width: 0; }
+.repo-row > .btn { margin-top: 12px; margin-right: 12px; flex: none; }
 
 /* Overview */
 .overview-grid {

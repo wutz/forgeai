@@ -146,33 +146,30 @@ export function Images() {
           </Empty>
         )}
         {list.map(r => (
-          <details key={r.name} className="repo">
-            <summary>
-              <span className="mono">{reg?.url}/{r.name}</span>
-              {r.error
-                ? <Badge tone="error">{t('images.notListed')}</Badge>
-                : <Badge>{t('images.tagsCount', {count: tagCount(r)})}</Badge>}
-              <span className="muted" style={{fontSize: 12}}>{t('images.pullsCount', {count: r.pulls})}</span>
-              <button className="btn btn-sm btn-danger" onClick={e => {
-                e.preventDefault()
-                deleteRepo(r)
-              }}>{t('images.deleteRepo')}</button>
-            </summary>
-            {r.error && <div className="banner banner-error" role="alert">
-              {t('images.repoError', {error: r.error})}
-            </div>}
-            <table className="table">
-              <thead><tr><th>{t('images.tag')}</th><th>{t('images.digest')}</th><th>{t('images.size')}</th><th>{t('images.pushed')}</th><th/></tr></thead>
-              <tbody>
-              {r.images?.map(img => {
-                const tags = img.tags?.filter(Boolean) ?? []
-                return (
-                <tr key={img.digest}>
-                  <td>
-                    {tags.length
-                      ? <div style={{display: 'flex', flexWrap: 'wrap', gap: 6}}>
-                        {tags.map(tag => {
-                          const key = `address-${img.digest}-${tag}`
+          <div key={r.name} className="repo-row">
+            <details className="repo">
+              <summary>
+                <span className="mono">{reg?.url}/{r.name}</span>
+                {r.error
+                  ? <Badge tone="error">{t('images.notListed')}</Badge>
+                  : <Badge>{t('images.tagsCount', {count: tagCount(r)})}</Badge>}
+                <span className="muted" style={{fontSize: 12}}>{t('images.pullsCount', {count: r.pulls})}</span>
+              </summary>
+              {r.error && <div className="banner banner-error" role="alert">
+                {t('images.repoError', {error: r.error})}
+              </div>}
+              <table className="table">
+                <thead><tr><th>{t('images.tag')}</th><th>{t('images.digest')}</th><th>{t('images.size')}</th><th>{t('images.pushed')}</th><th/></tr></thead>
+                <tbody>
+                {r.images?.map(img => {
+                  const tags = img.tags?.filter(Boolean) ?? []
+                  return (
+                  <tr key={img.digest}>
+                    <td>
+                      {tags.length
+                        ? <div style={{display: 'flex', flexWrap: 'wrap', gap: 6}}>
+                          {tags.map(tag => {
+                            const key = `address-${img.digest}-${tag}`
                           return (
                             <span key={tag} style={{display: 'inline-flex', gap: 2}}>
                               <button className="btn btn-sm mono" title={t('images.copyAddress')}
@@ -205,7 +202,11 @@ export function Images() {
               })}
               </tbody>
             </table>
-          </details>
+            </details>
+            {/* The delete is beside the disclosure, not in its summary: a button inside
+                summary is invalid interactive content and Enter on it toggles the list. */}
+            <button className="btn btn-sm btn-danger" onClick={() => deleteRepo(r)}>{t('images.deleteRepo')}</button>
+          </div>
         ))}
       </Card>
     </div>

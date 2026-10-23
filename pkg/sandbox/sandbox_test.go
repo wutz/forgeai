@@ -386,3 +386,30 @@ func TestIdle(t *testing.T) {
 		t.Error("a stopped sandbox is not idle, it is already stopped")
 	}
 }
+
+func TestReopenElapsed(t *testing.T) {
+	now := time.Now()
+	past := metav1.NewTime(now.Add(-time.Hour))
+	future := metav1.NewTime(now.Add(time.Hour))
+	cases := map[string]struct {
+		shutdown *metav1.Time
+		cleared  bool
+	}{
+		"no shutdown": {nil, false},
+		"elapsed":     {&past, true},
+		"still ahead": {&future, false},
+	}
+	for name, c := range cases {
+		sb := &Sandbox{}
+		sb.Spec.ShutdownTime = c.shutdown
+		if got := ReopenElapsed(sb, now); got != c.cleared {
+			t.Errorf("%s: ReopenElapsed = %v, want %v", name, got, c.cleared)
+		}
+		if c.cleared && sb.Spec.ShutdownTime != nil {
+			t.Errorf("%s: shutdown time kept after reopen", name)
+		}
+		if !c.cleared && c.shutdown != nil && sb.Spec.ShutdownTime == nil {
+			t.Errorf("%s: shutdown time dropped while still ahead", name)
+		}
+	}
+}

@@ -375,6 +375,10 @@ code {
 .cell-sub { display: block; margin-top: 2px; font-size: 11.5px; line-height: 16px; color: var(--mute); }
 .table td .cell-sub { font-family: var(--font); }
 .trashed td { color: var(--mute); }
+/* Recycle bin dialog: sizes, dates and the row actions stay on one line; only the name wraps. */
+.recycle td { white-space: nowrap; }
+.recycle td:first-child { white-space: normal; }
+.recycle .actions { flex-wrap: nowrap; }
 .list-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
 
 /* Status */

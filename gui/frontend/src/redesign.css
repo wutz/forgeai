@@ -403,8 +403,8 @@ code {
 .trashed td { color: var(--mute); }
 /* Recycle bin dialog: sizes, dates and the row actions stay on one line; only the name wraps. */
 .recycle td { white-space: nowrap; }
-.recycle td:first-child { white-space: normal; }
-.recycle .actions { flex-wrap: nowrap; }
+.recycle td:last-child { white-space: normal; }
+.table.recycle .actions { flex-wrap: wrap; }
 .list-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
 
 /* Status */

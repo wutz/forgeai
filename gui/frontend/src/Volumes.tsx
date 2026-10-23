@@ -144,18 +144,26 @@ function RecycleBinDialog({volumes, onChanged, onClose}: {
 }) {
   const [error, setError] = useState('')
   const [expiring, setExpiring] = useState<vol.Volume | null>(null)
+  // busy is the volume whose restore or purge is in flight; its row's buttons
+  // stay disabled until the call answers, so a double click sends one request.
+  const [busy, setBusy] = useState('')
   const confirm = useConfirm()
 
-  const restore = (v: vol.Volume) => RestoreVolume(v.name).then(onChanged).catch(e => setError(errText(e)))
+  const act = (name: string, call: () => Promise<unknown>) => {
+    setBusy(name)
+    setError('')
+    return call().then(onChanged).catch(e => setError(errText(e))).finally(() => setBusy(''))
+  }
+  const restore = (v: vol.Volume) => act(v.name, () => RestoreVolume(v.name))
   const purge = (v: vol.Volume) => confirm.ask({
     title: t('volumes.purgeTitle', {name: v.name}),
     message: t('volumes.purgeMessage'),
     action: t('volumes.purgeNow'), danger: true,
-    run: () => PurgeVolume(v.name).then(onChanged).catch(e => setError(errText(e))),
+    run: () => act(v.name, () => PurgeVolume(v.name)),
   })
 
   return <>
-    <Dialog title={t('volumes.recycleBin')} subtitle={t('volumes.trashEmptyHint')} width={720} onClose={onClose}>
+    <Dialog title={t('volumes.recycleBin')} subtitle={t('volumes.trashEmptyHint')} onClose={onClose}>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {volumes.length === 0 ? (
         <Empty icon="trash" title={t('volumes.trashEmpty')}/>
@@ -170,9 +178,9 @@ function RecycleBinDialog({volumes, onChanged, onClose}: {
               <td className="muted">{v.expireAt ? fmtDate(v.expireAt) : '—'}</td>
               <td>
                 <div className="actions">
-                  <button className="btn btn-sm" onClick={() => restore(v)}>{t('volumes.restore')}</button>
-                  <button className="btn btn-sm" onClick={() => setExpiring(v)}>{t('volumes.setExpiry')}</button>
-                  <button className="btn btn-sm btn-danger" onClick={() => purge(v)}>{t('volumes.purgeNow')}</button>
+                  <button className="btn btn-sm" disabled={!!busy} onClick={() => restore(v)}>{t('volumes.restore')}</button>
+                  <button className="btn btn-sm" disabled={!!busy} onClick={() => setExpiring(v)}>{t('volumes.setExpiry')}</button>
+                  <button className="btn btn-sm btn-danger" disabled={!!busy} onClick={() => purge(v)}>{t('volumes.purgeNow')}</button>
                 </div>
               </td>
             </tr>
@@ -281,7 +289,7 @@ function ResizeVolumeDialog({volume, onClose, onDone}: {
   return (
     <Dialog title={t('volumes.growTitle', {name: volume.name})}
             subtitle={t('volumes.growSubtitle', {size: current})}
-            width={400} onClose={onClose} busy={busy} footer={<>
+            width={440} onClose={onClose} busy={busy} footer={<>
               <CancelButton/>
               <button type="submit" form="resize-volume" className="btn btn-primary"
                       disabled={busy || !(size > current)}>
@@ -329,7 +337,7 @@ function ExpiryDialog({volume, onClose, onDone}: {
   }
   return (
     <Dialog title={t('volumes.expiryTitle', {name: volume.name})} subtitle={t('volumes.expirySubtitle')}
-            width={400} onClose={onClose} busy={busy} footer={<>
+            width={440} onClose={onClose} busy={busy} footer={<>
               <CancelButton/>
               <button type="submit" form="expiry-volume" className="btn btn-primary" disabled={busy || !dayOK}>
                 {busy ? t('volumes.saving') : t('common.save')}

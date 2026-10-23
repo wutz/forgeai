@@ -46,8 +46,10 @@ export function FilesView() {
   // Only a ready server has an address: an idle one has no pod behind it.
   const frame = ready && state?.address ? state.address : ''
   // The volumes read as a list in the language of the page: "a and b", "a、b".
+  // Chinese sets Latin names apart from the 和 with a thin space.
+  const cjk = getLocale() === 'zh'
   const volumes = new Intl.ListFormat(getLocale(), {style: 'long', type: 'conjunction'})
-    .format(state?.volumes ?? [])
+    .format((state?.volumes ?? []).map(v => cjk ? ` ${v} ` : v))
 
   return (
     <div className="page">

@@ -220,6 +220,11 @@ function SandboxDetail({name, onDone, onDeleted}: {
       setError(errText(e))
       throw e
     })
+  // Selecting the log tab loads the logs, since the tab is the only entry point.
+  const selectTab = (next: Tab) => {
+    if (next === 'log') showLog().catch(() => {})
+    else setTab(next)
+  }
 
   return (
     <Card className="detail">
@@ -237,9 +242,6 @@ function SandboxDetail({name, onDone, onDeleted}: {
                                         onSaved={n => { setSaving(false); setSavedTemplate(n) }}/>}
 
       <div className="detail-actions">
-        <button className="btn btn-sm" onClick={() => showLog().catch(() => {})}>
-          <Icon name="scroll" size={13}/>{t('common.logs')}
-        </button>
         {running && <button className="btn btn-sm" disabled={busy} onClick={() => confirm.ask({
           title: t('sandboxes.stopTitle', {name: box.name}),
           message: t('sandboxes.stopMessage'),
@@ -276,11 +278,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
           {value: 'terminal', label: t('sandboxes.tabTerminal'), icon: 'terminal'},
           {value: 'log', label: t('sandboxes.tabLog'), icon: 'scroll'},
           {value: 'env', label: t('sandboxes.tabEnv'), icon: 'layers'},
-        ]} value={tab} onChange={v => {
-          setTab(v)
-          // The log tab shows what was last read, so opening it reads the logs.
-          if (v === 'log') showLog().catch(() => {})
-        }}/>
+        ]} value={tab} onChange={selectTab}/>
 
         <div {...tabPanelProps('sandbox', tab)}>
           {tab === 'overview' && (

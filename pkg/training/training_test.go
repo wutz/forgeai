@@ -207,6 +207,24 @@ func TestJobPhase(t *testing.T) {
 	}
 }
 
+// A runtime error can be longer than a message keeps; the cause it names last
+// must survive the cut.
+func TestClassifyKeepsErrorEnd(t *testing.T) {
+	cause := `exec: "/bin/bash": stat /bin/bash: no such file or directory`
+	pod := corev1.Pod{Status: corev1.PodStatus{
+		Phase: corev1.PodFailed,
+		ContainerStatuses: []corev1.ContainerStatus{{
+			State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{
+				ExitCode: 128, Message: strings.Repeat("runc create failed: ", 20) + cause,
+			}},
+		}},
+	}}
+	f := Classify([]corev1.Pod{pod}, nil)
+	if f.Reason != ReasonExitCode || !strings.HasSuffix(f.Message, cause) {
+		t.Errorf("failure = %+v, want an exit code failure ending with the cause", f)
+	}
+}
+
 // A crash-looping worker keeps the Running pod phase between restarts; the job
 // must still read as not running and say why.
 func TestJobPhaseCrashLoop(t *testing.T) {

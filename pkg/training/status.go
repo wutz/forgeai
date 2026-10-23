@@ -242,7 +242,7 @@ func Classify(pods []corev1.Pod, notReady map[string]bool) Failure {
 			default:
 				msg := fmt.Sprintf("%s exited with code %d", name, t.ExitCode)
 				if t.Message != "" {
-					msg += ": " + lastLine(t.Message)
+					msg += ": " + errorTail(t.Message)
 				}
 				failures = append(failures, Failure{ReasonExitCode, msg})
 			}
@@ -256,17 +256,6 @@ func Classify(pods []corev1.Pod, notReady map[string]bool) Failure {
 		return Failure{ReasonUnknown, ""}
 	}
 	return byPriority(failures)
-}
-
-func lastLine(s string) string {
-	s = strings.TrimSpace(s)
-	if i := strings.LastIndexByte(s, '\n'); i >= 0 {
-		s = s[i+1:]
-	}
-	if len(s) > 200 {
-		s = s[:200]
-	}
-	return s
 }
 
 // errorTail is the last line of an error, keeping its end when it is long: a

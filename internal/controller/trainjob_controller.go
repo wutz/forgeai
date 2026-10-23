@@ -122,6 +122,9 @@ func (r *TrainJobReconciler) Reconcile(ctx context.Context, req ctrl.Request) (c
 	if err != nil {
 		return ctrl.Result{}, err
 	}
+	if err := r.observe(ctx, tj, pods); err != nil {
+		return ctrl.Result{}, err
+	}
 	f, next := training.Stuck(pods, r.now(), cfg.Training.StuckTimeout.Duration)
 	if f == nil {
 		if next > 0 {
@@ -205,14 +208,31 @@ func (r *TrainJobReconciler) syncActive(ctx context.Context, tj *kf.TrainJob) er
 	return nil
 }
 
-func (r *TrainJobReconciler) classify(ctx context.Context, tj *kf.TrainJob) error {
-	pods, err := r.pods(ctx, tj)
+// observe records the worker failure a running job shows. The Trainer removes
+// the pods when the job fails, so the failure seen now is the only record of
+// its cause; classify falls back to it.
+func (r *TrainJobReconciler) observe(ctx context.Context, tj *kf.TrainJob, pods []corev1.Pod) error {
+	notReady, err := r.notReadyNodes(ctx, pods)
 	if err != nil {
 		return err
 	}
+	f := training.Classify(pods, notReady)
+	recorded := tj.Annotations[naming.AnnotationObservedFailureReason] == f.Reason &&
+		tj.Annotations[naming.AnnotationObservedFailureMessage] == f.Message
+	if f.Reason == training.ReasonUnknown || recorded {
+		return nil
+	}
+	return r.annotate(ctx, tj, map[string]string{
+		naming.AnnotationObservedFailureReason: f.Reason, naming.AnnotationObservedFailureMessage: f.Message,
+	})
+}
+
+// notReadyNodes lists the nodes that are NotReady or gone, including those
+// that still hold pods of the job.
+func (r *TrainJobReconciler) notReadyNodes(ctx context.Context, pods []corev1.Pod) (map[string]bool, error) {
 	nodes := &corev1.NodeList{}
 	if err := r.List(ctx, nodes); err != nil {
-		return err
+		return nil, err
 	}
 	notReady := map[string]bool{}
 	exists := map[string]bool{}
@@ -227,7 +247,25 @@ func (r *TrainJobReconciler) classify(ctx context.Context, tj *kf.TrainJob) erro
 			notReady[p.Spec.NodeName] = true
 		}
 	}
+	return notReady, nil
+}
+
+func (r *TrainJobReconciler) classify(ctx context.Context, tj *kf.TrainJob) error {
+	pods, err := r.pods(ctx, tj)
+	if err != nil {
+		return err
+	}
+	notReady, err := r.notReadyNodes(ctx, pods)
+	if err != nil {
+		return err
+	}
 	f := training.Classify(pods, notReady)
+	if f.Reason == training.ReasonUnknown && tj.Annotations[naming.AnnotationObservedFailureReason] != "" {
+		f = training.Failure{
+			Reason:  tj.Annotations[naming.AnnotationObservedFailureReason],
+			Message: tj.Annotations[naming.AnnotationObservedFailureMessage],
+		}
+	}
 	if f.Message == "" {
 		if c := meta.FindStatusCondition(tj.Status.Conditions, kf.ConditionFailed); c != nil {
 			f.Message = c.Message

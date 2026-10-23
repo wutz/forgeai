@@ -196,16 +196,16 @@ components:
     padding: "0px 6px"
   button-default-sm-hover:
     backgroundColor: "{colors.hairline-soft}"
-  button-create-sm:
+  button-primary-sm:
     backgroundColor: "{colors.accent-tint}"
     textColor: "{colors.accent-deep}"
     borderColor: "{colors.accent-line}"
     typography: "{typography.button-md}"
     rounded: "{rounded.sm}"
     padding: "0px 6px"
-  button-create-sm-hover:
+  button-primary-sm-hover:
     backgroundColor: "{colors.accent-tint-hover}"
-  button-create-sm-press:
+  button-primary-sm-press:
     backgroundColor: "{colors.accent-tint-press}"
   button-accent-sm:
     backgroundColor: "{colors.canvas-elevated}"
@@ -330,10 +330,10 @@ components:
 
 forgeai is a desktop console for AI training, RL and inference jobs on Kubernetes. It follows the Geist system below as an **app surface** (not marketing): 6px square buttons (`{components.button-accent-sm}` / `{components.button-ghost-sm}`), hairline cards and tables, no hero mesh gradient.
 
-- **Theme color — Forge Indigo** (`{colors.accent}` #4f46e5): a cool, electric indigo in the register of current AI and developer tools, chosen over the earlier Forge Ember orange so the console reads calm and technical next to dense cluster data. It is used for the primary create and submit action, the active nav icon, tab underlines, meters, focus rings and input focus (`{components.input-focus}`, with a translucent `{colors.accent-ring}` 3px ring) and the logo tile. `{colors.link}` is the accent too. Accent text uses `{colors.accent-deep}` (#4338ca). The `{colors.accent-soft}` (#eef2ff) wash also marks selected rows, which carry a 2px accent bar on their left edge (`{components.table-row-selected}`). The indigo→violet gradient (`{colors.accent-gradient-start}` → `{colors.accent-gradient-end}`) is kept for the logo tile only.
-- **Buttons** — one system with four roles, all 6px square (`{components.button-default-sm}`, `{components.button-create-sm}`, `{components.button-accent-sm}`, `{components.button-danger-sm}`, `{components.button-danger-tint-sm}`). Fills stay light; ink and hairline carry the page.
-  - *Default*: white, hairline edge, ink label. Every neutral action (Logs, Edit, Cancel, Save as template). Hover `{colors.hairline-soft}`.
-  - *Primary*: the view's create or submit action (Create sandbox, Create job, Save, dialog submit). Indigo tint `{colors.accent-tint}`, `{colors.accent-deep}` label (6.4:1 at rest, 5.8:1 on hover, 5.3:1 pressed), `{colors.accent-line}` edge. Hover `{colors.accent-tint-hover}`, press `{colors.accent-tint-press}`. A solid indigo fill was tried and read as too heavy on every page.
+- **Theme color — Forge Indigo** (`{colors.accent}` #4f46e5): a cool, electric indigo in the register of current AI and developer tools, chosen over the earlier Forge Ember orange so the console reads calm and technical next to dense cluster data. It is used for the primary save action on an existing resource, the active nav icon, tab underlines, meters, focus rings and input focus (`{components.input-focus}`, with a translucent `{colors.accent-ring}` 3px ring) and the logo tile. `{colors.link}` is the accent too. Accent text uses `{colors.accent-deep}` (#4338ca). The `{colors.accent-soft}` (#eef2ff) wash also marks selected rows, which carry a 2px accent bar on their left edge (`{components.table-row-selected}`). The indigo→violet gradient (`{colors.accent-gradient-start}` → `{colors.accent-gradient-end}`) is kept for the logo tile only.
+- **Buttons** — one system with four roles, all 6px square (`{components.button-default-sm}`, `{components.button-primary-sm}`, `{components.button-accent-sm}`, `{components.button-danger-sm}`, `{components.button-danger-tint-sm}`). Fills stay light; ink and hairline carry the page.
+  - *Default*: white, hairline edge, ink label. Every neutral action: create-resource buttons (New sandbox, New job, New volume, New template, New project, and their dialog submits), Logs, Edit, Cancel, Save as template. Hover `{colors.hairline-soft}`.
+  - *Primary*: saving an existing resource (the Save or Update submit of an edit dialog) and install actions. Indigo tint `{colors.accent-tint}`, `{colors.accent-deep}` label (6.4:1 at rest, 5.8:1 on hover, 5.3:1 pressed), `{colors.accent-line}` edge. Hover `{colors.accent-tint-hover}`, press `{colors.accent-tint-press}`. A solid indigo fill was tried and read as too heavy on every page.
   - *Accent*: Start and Resume, the state-changing action on a detail view. White with an indigo edge and `{colors.accent-deep}` label (7.9:1). Hover `{colors.accent-soft}`, press `{colors.accent-tint}`. It is one step quieter than Primary, so each view has one strong action.
   - *Danger*: destructive actions inside a row or view (Delete, Purge now). White with a `{colors.app-danger}` label (4.8:1), hover `{colors.app-danger-wash}` with a `{colors.app-danger-deep}` label (7.6:1) and a `{colors.app-danger-line}` edge.
   - *Danger tint*: the confirm button of a destructive dialog only. `{colors.app-danger-wash}` at rest, `{colors.app-danger-soft}` on hover, `{colors.app-danger-press}` pressed, `{colors.app-danger-deep}` label (7.6:1 at rest, 6.8:1 on hover, 5.7:1 pressed).

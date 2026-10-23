@@ -69,7 +69,7 @@ export function Volumes() {
                   meta={<span className="muted" style={{fontSize: 12.5}}>
                     {t('volumes.summary', {count: items.length, size: totalGiB})}
                   </span>}
-                  actions={<button className="btn btn-primary" onClick={() => setCreating(true)}>
+                  actions={<button className="btn" onClick={() => setCreating(true)}>
                     <Icon name="plus" size={14}/>{t('volumes.new')}
                   </button>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
@@ -180,7 +180,7 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
     <Dialog title={t('volumes.new')} subtitle={t('volumes.createSubtitle')} width={440}
             onClose={onClose} footer={<>
               <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
-              <button type="submit" form="create-volume" className="btn btn-primary" disabled={busy}>
+              <button type="submit" form="create-volume" className="btn" disabled={busy}>
                 {busy ? t('volumes.creating') : t('volumes.createVolume')}
               </button>
             </>}>

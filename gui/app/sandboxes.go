@@ -286,6 +286,11 @@ func (a *App) CreateSandboxTemplate(f sandbox.TemplateForm) (*SandboxTemplate, e
 	if err := c.k8s.Create(ctx, u); err != nil {
 		return nil, err
 	}
+	// The controller updates a new SandboxTemplate right after it is created, so
+	// the version Create returned is already stale: read the stored object.
+	if err := c.k8s.Get(ctx, client.ObjectKeyFromObject(u), u); err != nil {
+		return nil, err
+	}
 	t := &sandbox.SandboxTemplate{}
 	if err := sandbox.FromUnstructured(u.Object, t); err != nil {
 		return nil, err

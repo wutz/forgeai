@@ -106,6 +106,41 @@ func TestUpdateSandboxTemplateReplacesForm(t *testing.T) {
 	}
 }
 
+// A created template reports the version the apiserver stored, so an update
+// made right after the create is accepted.
+func TestCreateTemplateReturnsStoredVersion(t *testing.T) {
+	a := testApp(t)
+	created, err := a.CreateTemplate(testTemplateForm("torch", "img:1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.ResourceVersion == "" {
+		t.Fatal("CreateTemplate returned no resource version")
+	}
+	if created.ResourceVersion != templateVersion(t, a, "torch") {
+		t.Fatalf("CreateTemplate version = %q, the listed version is %q", created.ResourceVersion, templateVersion(t, a, "torch"))
+	}
+	if _, err := a.UpdateTemplate("torch", created.ResourceVersion, testTemplateForm("torch", "img:2")); err != nil {
+		t.Fatalf("update with the created version: %v", err)
+	}
+}
+
+// A created sandbox template reports a version an update can use.
+func TestCreateSandboxTemplateReturnsStoredVersion(t *testing.T) {
+	cfg := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: platform.ConfigMapName}}
+	a := testApp(t, cfg)
+	created, err := a.CreateSandboxTemplate(sandbox.TemplateForm{Name: "agent", Image: "agent:1", Command: "python agent.py"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.ResourceVersion == "" || created.ResourceVersion != sandboxTemplateVersion(t, a, "agent") {
+		t.Fatalf("CreateSandboxTemplate version = %q, the listed version is %q", created.ResourceVersion, sandboxTemplateVersion(t, a, "agent"))
+	}
+	if _, err := a.UpdateSandboxTemplate("agent", created.ResourceVersion, sandbox.TemplateForm{Image: "agent:2"}); err != nil {
+		t.Fatalf("update with the created version: %v", err)
+	}
+}
+
 // templateVersion is the version a job template was listed at, which the GUI
 // sends back with its update.
 func templateVersion(t *testing.T, a *App, name string) string {

@@ -77,7 +77,7 @@ func (a *App) CreateTemplate(f training.Form) (*Template, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Template{Name: rt.Name, Description: f.Description, Form: form}, nil
+	return &Template{Name: rt.Name, Description: f.Description, Form: form, ResourceVersion: u.GetResourceVersion()}, nil
 }
 
 // UpdateTemplate replaces the form of an existing job template. The name is

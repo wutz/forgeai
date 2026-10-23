@@ -379,6 +379,15 @@ function ConfirmDialog({request, onClose}: {request: ConfirmRequest, onClose: ()
 const focusableSelector = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), ' +
   'textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
 
+// lastClicked is the control the latest click landed on. WKWebView does not
+// focus a button when it is clicked, so a dialog opened by a click finds
+// document.body as its active element and falls back to this as its opener.
+// It is kept past the click because some dialogs open after a request resolves.
+let lastClicked: HTMLElement | null = null
+document.addEventListener('click', e => {
+  lastClicked = (e.target as Element).closest<HTMLElement>(focusableSelector)
+}, true)
+
 // DialogCloseContext hands a dialog's guarded close to its footer, so a Cancel
 // button asks before it discards edits, as the header X does.
 const DialogCloseContext = createContext<(() => void) | null>(null)
@@ -397,11 +406,16 @@ export function Dialog({title, subtitle, onClose, children, footer, width, busy}
   const [edited, setEdited] = useState(false)
   const [asking, setAsking] = useState(false)
   const box = useRef<HTMLDivElement>(null)
+  // resume is the element that had focus when the discard prompt opened. The
+  // prompt takes focus, so leaving it puts focus back there.
+  const resume = useRef<HTMLElement | null>(null)
   const close = () => {
     // While the discard prompt is up, only its own buttons or Escape act.
     if (busy || asking) return
-    if (edited) setAsking(true)
-    else onClose()
+    if (edited) {
+      resume.current = document.activeElement as HTMLElement | null
+      setAsking(true)
+    } else onClose()
   }
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -417,7 +431,11 @@ export function Dialog({title, subtitle, onClose, children, footer, width, busy}
   // rendering: autoFocus runs at commit, before the effects, and would
   // otherwise be taken for the opener. The first field of the body gets focus,
   // not the close button in the title bar.
-  const [opener] = useState(() => document.activeElement as HTMLElement | null)
+  const [opener] = useState(() => {
+    const active = document.activeElement as HTMLElement | null
+    if (active && active !== document.body) return active
+    return lastClicked?.isConnected ? lastClicked : null
+  })
   useEffect(() => {
     const el = box.current
     if (el && !el.contains(document.activeElement)) {
@@ -427,6 +445,17 @@ export function Dialog({title, subtitle, onClose, children, footer, width, busy}
     }
     return () => opener?.focus?.()
   }, [])
+  // Leaving the discard prompt, by Keep editing or Escape, returns focus to the
+  // field the user was in. The prompt's button is removed by then, so without
+  // this focus would fall to the page body.
+  useEffect(() => {
+    const target = resume.current
+    if (asking || !target) return
+    resume.current = null
+    const el = box.current
+    if (el?.contains(target)) target.focus()
+    else el?.querySelector('.dialog-body')?.querySelector<HTMLElement>(focusableSelector)?.focus()
+  }, [asking])
   // Tab and Shift+Tab stay inside the dialog while it is open.
   useEffect(() => {
     const onTab = (e: KeyboardEvent) => {

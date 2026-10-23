@@ -24,6 +24,7 @@ type Sandbox struct {
 	Name         string            `json:"name"`
 	Phase        string            `json:"phase"`
 	Message      string            `json:"message,omitempty"`
+	Reason       string            `json:"reason,omitempty"`
 	Image        string            `json:"image"`
 	Command      string            `json:"command,omitempty"`
 	Env          map[string]string `json:"env"`
@@ -473,6 +474,7 @@ func toSandbox(ctx context.Context, c *Connection, u *unstructured.Unstructured)
 		Name:         sb.Name,
 		Phase:        string(phase),
 		Message:      sandbox.TrimMessages(msg),
+		Reason:       sandbox.PhaseReason(sb),
 		InstanceType: sb.Labels[naming.LabelInstanceType],
 		RuntimeClass: ptr(sb.Spec.PodTemplate.Spec.RuntimeClassName),
 		Service:      sb.Spec.Service != nil && *sb.Spec.Service,

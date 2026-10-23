@@ -669,6 +669,7 @@ export namespace app {
 	    name: string;
 	    phase: string;
 	    message?: string;
+	    reason?: string;
 	    image: string;
 	    command?: string;
 	    env: Record<string, string>;
@@ -699,6 +700,7 @@ export namespace app {
 	        this.name = source["name"];
 	        this.phase = source["phase"];
 	        this.message = source["message"];
+	        this.reason = source["reason"];
 	        this.image = source["image"];
 	        this.command = source["command"];
 	        this.env = source["env"];

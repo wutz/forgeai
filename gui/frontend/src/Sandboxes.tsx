@@ -8,7 +8,7 @@ import {SandboxTemplateDialog} from './SandboxTemplates'
 import {SandboxTerminal} from './SandboxTerminal'
 import {Status, envToLines, fmtDate, errText} from './util'
 import {Badge, Card, Empty, Icon, LogView, PageHeader, Spinner, Tabs, tabPanelProps, useActive, useConfirm} from './ui'
-import {t} from './i18n'
+import {MessageKey, t} from './i18n'
 
 // HEARTBEAT is how often an open sandbox detail resets the sandbox's idle
 // clock. The operator suspends a sandbox once it has been idle for its idle
@@ -112,8 +112,8 @@ function SandboxTable({boxes, failed, selected, onSelect}: {
               <span className="cell-sub">{b.image.split('/').pop()}</span>
             </td>
             {/* A stopped sandbox's controller message is English and repeats the status label. */}
-            <td><Status phase={b.phase}/>{b.message && b.phase !== 'Running' && !b.stopped &&
-              <div className="cell-sub" title={b.message}>{short(b.message)}</div>}</td>
+            <td><Status phase={b.phase}/>{b.phase !== 'Running' && !b.stopped && statusText(b).label &&
+              <div className="cell-sub" title={b.message}>{short(statusText(b).label)}</div>}</td>
             <td>{b.runtimeClass ? <Badge>{b.runtimeClass}</Badge> : <span className="muted">runc</span>}</td>
             <td className="mono">{b.cpu || '—'}/{b.memory || '—'}{b.gpu ? ` · ${b.gpu} GPU` : ''}</td>
             <td className="mono trunc" title={b.serviceFQDN || b.podIPs?.[0]}>{b.serviceFQDN || b.podIPs?.[0] || '—'}</td>
@@ -299,7 +299,12 @@ function SandboxDetail({name, onDone, onDeleted}: {
               {box.stopped && <><dt>{t('sandboxes.stoppedLabel')}</dt><dd>{t('sandboxes.suspendedNote')}</dd></>}
               {box.idleSince && <><dt>{t('sandboxes.idleSince')}</dt><dd>{fmtDate(box.idleSince)}</dd></>}
               {box.shutdownTime && <><dt>{t('sandboxes.autoStop')}</dt><dd>{fmtDate(box.shutdownTime)}</dd></>}
-              {box.message && !box.stopped && <><dt>{t('common.status')}</dt><dd>{box.message}</dd></>}
+              {!box.stopped && statusText(box).label && <>
+                <dt>{t('common.status')}</dt>
+                <dd>{statusText(box).label}
+                  {statusText(box).detail && <div className="cell-sub mono">{statusText(box).detail}</div>}
+                </dd>
+              </>}
               <dt>{t('common.created')}</dt><dd>{fmtDate(box.created)}</dd>
             </dl>
           )}
@@ -329,4 +334,26 @@ function SandboxDetail({name, onDone, onDeleted}: {
 
 function short(msg: string): string {
   return msg.length > 48 ? msg.slice(0, 48) + '…' : msg
+}
+
+// reasonKeys maps the reasons the backend sends (sandbox.PhaseReason) to their
+// copy. A reason without copy here shows the controller's message as written.
+const reasonKeys: Record<string, MessageKey> = {
+  AwaitingController: 'sandboxes.reason.awaitingController',
+  DependenciesNotReady: 'sandboxes.reason.dependenciesNotReady',
+  PodFailed: 'sandboxes.reason.podFailed',
+  PodSucceeded: 'sandboxes.reason.podSucceeded',
+  InvalidConfiguration: 'sandboxes.reason.invalidConfiguration',
+  ReconcilerError: 'sandboxes.reason.reconcilerError',
+  MultiplePods: 'sandboxes.reason.multiplePods',
+  SandboxExpired: 'sandboxes.reason.expired',
+}
+
+// statusText says why a sandbox is not running: label is the line to show and
+// detail the controller's message under it. A reason with copy is worded in the
+// UI language and its message is the detail; any other message is the label.
+function statusText(b: app.Sandbox): {label: string, detail: string} {
+  const key = b.reason ? reasonKeys[b.reason] : undefined
+  if (key) return {label: t(key), detail: b.message ?? ''}
+  return {label: b.message ?? '', detail: ''}
 }

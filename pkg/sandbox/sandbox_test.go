@@ -329,6 +329,39 @@ func TestPhaseOf(t *testing.T) {
 	}
 }
 
+func TestPhaseReason(t *testing.T) {
+	ready := func(status metav1.ConditionStatus, reason string) *Sandbox {
+		return &Sandbox{Status: SandboxStatus{Conditions: []metav1.Condition{
+			{Type: ConditionReady, Status: status, Reason: reason, Message: "controller text"},
+		}}}
+	}
+	cases := []struct {
+		name string
+		sb   *Sandbox
+		want string
+	}{
+		{"no status yet", &Sandbox{}, ReasonAwaitingController},
+		{"no Ready condition, has an address", &Sandbox{Status: SandboxStatus{PodIPs: []string{"10.0.0.1"}}}, ""},
+		{"running", ready(metav1.ConditionTrue, ReasonDependenciesReady), ""},
+		{"pod failed", ready(metav1.ConditionFalse, ReasonPodFailed), ReasonPodFailed},
+		{"expired", ready(metav1.ConditionFalse, ReasonExpired), ReasonExpired},
+		{"suspended", ready(metav1.ConditionFalse, ReasonSuspended), ReasonSuspended},
+		{"suspended while Ready", &Sandbox{Status: SandboxStatus{Conditions: []metav1.Condition{
+			{Type: ConditionReady, Status: metav1.ConditionTrue, Reason: ReasonDependenciesReady},
+			{Type: ConditionSuspended, Status: metav1.ConditionTrue},
+		}}}, ReasonSuspended},
+	}
+	for _, c := range cases {
+		if got := PhaseReason(c.sb); got != c.want {
+			t.Errorf("%s: PhaseReason = %q, want %q", c.name, got, c.want)
+		}
+	}
+	// The controller's free-text message is not a reason, and PhaseOf keeps it.
+	if _, msg := PhaseOf(ready(metav1.ConditionFalse, ReasonPodFailed)); msg != "controller text" {
+		t.Errorf("PhaseOf message = %q, want the controller's text", msg)
+	}
+}
+
 func TestIdle(t *testing.T) {
 	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 	sb := &Sandbox{Status: SandboxStatus{Conditions: []metav1.Condition{

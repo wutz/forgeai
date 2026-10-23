@@ -1,9 +1,9 @@
-import {useEffect, useRef, useState} from 'react'
+import {Fragment, useEffect, useRef, useState} from 'react'
 import {InstallDependency, ListDependencies} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {EventsOn} from '../wailsjs/runtime/runtime'
 import {errText} from './util'
-import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Spinner, useActive, useConfirm} from './ui'
+import {Badge, Card, Empty, Icon, Meter, PageHeader, RefreshButton, Spinner, useActive, useConfirm} from './ui'
 import {MessageKey, getLocale, t} from './i18n'
 
 // Progress is one deps:progress event: a step of an install, or its outcome
@@ -19,6 +19,8 @@ export function Dependencies() {
   const [data, setData] = useState<app.Dependencies | null>(null)
   const [error, setError] = useState('')
   const [failed, setFailed] = useState('')
+  // done is the component whose install finished without error; its banner says so until the next install.
+  const [done, setDone] = useState('')
   // steps is the latest install step of each component that is installing, as
   // the step key the backend sent.
   const [steps, setSteps] = useState<Record<string, string>>({})
@@ -47,6 +49,7 @@ export function Dependencies() {
   useEffect(() => {
     if (!active) return
     fail('')
+    setDone('')
     refresh().catch(() => undefined)
   }, [active])
 
@@ -62,6 +65,7 @@ export function Dependencies() {
     }
     setSteps(({[p.name]: _, ...rest}) => rest)
     if (p.error) fail(`${title(p.name)}: ${errText(p.error)}`, p.name)
+    else setDone(p.name)
     refresh().catch(() => undefined)
   }), [])
 
@@ -74,6 +78,7 @@ export function Dependencies() {
     action: verb(d), primary: true,
     run: () => {
       fail('')
+      setDone('')
       setSteps(s => ({...s, [d.name]: 'starting'}))
       InstallDependency(d.name).catch(e => {
         setSteps(({[d.name]: _, ...rest}) => rest)
@@ -103,6 +108,7 @@ export function Dependencies() {
                     {items.length === 1 ? t('deps.metaOne', {ready}) : t('deps.meta', {total: items.length, ready})}
                   </span>}
                   actions={<RefreshButton onRefresh={refresh}/>}/>
+      {done && !error && <div className="banner banner-success" role="status">{t('deps.doneOK', {name: title(done)})}</div>}
       {error && <div className="banner banner-error" role="alert">
         <span>{error}</span>
         {retry && offersInstall(retry) && !steps[retry.name] && <>
@@ -127,7 +133,8 @@ export function Dependencies() {
               const installing = d.status === 'installing'
               const note = installing ? '' : detail(d)
               return (
-                <tr key={d.name}>
+                <Fragment key={d.name}>
+                <tr>
                   <td>
                     <span className="cell-main">{title(d.name)}</span>
                     <span className="cell-sub">{desc(d.name)}</span>
@@ -144,8 +151,8 @@ export function Dependencies() {
                   <td className="mono">{d.pinned || <span className="muted">—</span>}</td>
                   <td>
                     <Badge tone={tone(d.status)}>{label(d.status)}</Badge>
-                    {(installing || step) && <div className="muted" style={{fontSize: 12, marginTop: 4}}>
-                      {t(`deps.step.${step ?? 'starting'}` as MessageKey)}
+                    {installing && !step && <div className="muted" style={{fontSize: 12, marginTop: 4}}>
+                      {t('deps.step.starting')}
                     </div>}
                     {note && <div className="muted" style={{fontSize: 12, marginTop: 4}}>
                       {note}
@@ -161,12 +168,42 @@ export function Dependencies() {
                     </div>
                   </td>
                 </tr>
+                {step && <tr className="install-row"><td colSpan={5}><InstallSteps name={d.name} step={step}/></td></tr>}
+                </Fragment>
               )
             })}
             </tbody>
           </table>
         )}
       </Card>
+    </div>
+  )
+}
+
+// installSteps is the order of the steps an install emits (app/deps.go).
+function installSteps(name: string): string[] {
+  if (name === 'forgeai') return ['chart-namespace', 'chart-pull', 'chart-install', 'record']
+  const steps = ['namespaces', 'crds', 'controllers', 'deployments', 'webhooks', 'record']
+  return name === 'agent-sandbox' ? [...steps, 'restart'] : steps
+}
+
+// InstallSteps lists an install's steps in order under its row: the done ones,
+// the one running and the ones to come. The bar counts the step running.
+function InstallSteps({name, step}: {name: string, step: string}) {
+  const steps = installSteps(name)
+  const current = Math.max(0, steps.indexOf(step))
+  return (
+    <div className="install-steps">
+      <Meter value={current + 1} max={steps.length}
+             label={t('deps.stepCount', {current: current + 1, total: steps.length})}/>
+      <ol>
+        {steps.map((s, i) => (
+          <li key={s} className={i < current ? 'done' : i === current ? 'current' : undefined}
+              aria-current={i === current ? 'step' : undefined}>
+            {t(`deps.step.${s}` as MessageKey)}
+          </li>
+        ))}
+      </ol>
     </div>
   )
 }

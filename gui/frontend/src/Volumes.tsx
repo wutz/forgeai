@@ -6,7 +6,7 @@ import {
 import {app, volumes as vol} from '../wailsjs/go/models'
 import {fmtDate, errText, everyWhileVisible, generateName, phaseLabel} from './util'
 import {t} from './i18n'
-import {Badge, Card, CancelButton, Dialog, Empty, Icon, PageHeader, RefreshButton, useActive, useConfirm, Spinner} from './ui'
+import {Badge, Card, CancelButton, Dialog, Empty, HintButton, Icon, PageHeader, RefreshButton, useActive, useConfirm, Spinner} from './ui'
 
 // Volumes manages shared filesystems: create, grow, trash (recycle bin),
 // restore and purge. Deleting is delayed — the operator purges expired
@@ -130,12 +130,12 @@ export function Volumes() {
                 <td className="muted">{fmtDate(v.created)}</td>
                 <td>
                   <div className="actions">
-                    <button className="btn btn-sm" disabled={v.phase !== 'Bound' && v.phase !== 'Resizing'}
-                            title={v.phase === 'Pending' ? t('volumes.pendingHint') : undefined}
-                            onClick={() => setGrowing(v)}>{t('volumes.grow')}</button>
-                    <button className="btn btn-sm btn-danger" disabled={!!v.users?.length}
-                            title={v.users?.length ? t('volumes.inUseHint') : undefined}
-                            onClick={() => trashVolume(v)}>{t('common.delete')}</button>
+                    <HintButton className="btn btn-sm" disabled={v.phase !== 'Bound' && v.phase !== 'Resizing'}
+                                reason={v.phase === 'Pending' ? t('volumes.pendingHint') : undefined}
+                                onClick={() => setGrowing(v)}>{t('volumes.grow')}</HintButton>
+                    <HintButton className="btn btn-sm btn-danger" disabled={!!v.users?.length}
+                                reason={v.users?.length ? t('volumes.inUseHint') : undefined}
+                                onClick={() => trashVolume(v)}>{t('common.delete')}</HintButton>
                   </div>
                 </td>
               </tr>

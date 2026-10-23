@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {ListTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, DeleteSandboxTemplate, SandboxTemplates as ListSandboxTemplates, ListInstanceTypes} from '../wailsjs/go/app/App'
 import {app, sandbox, training} from '../wailsjs/go/models'
 import {envErrors, envToLines, linesToEnv, fmtDate, errText, generateName, MAX_RETRIES, NAME_MAX, NAME_PATTERN} from './util'
-import {Card, CancelButton, Dialog, Empty, Icon, PageHeader, Segmented, Spinner, useActive, useConfirm} from './ui'
+import {Card, CancelButton, Dialog, Empty, HintButton, Icon, PageHeader, Segmented, Spinner, useActive, useConfirm} from './ui'
 import {SandboxTemplateDialog, SandboxTemplateTable} from './SandboxTemplates'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
@@ -155,8 +155,8 @@ function JobTemplateTable({items, failed, onEdit, onDelete}: {
           <td className="muted col-optional">{fmtDate(tpl.created)}</td>
           <td>
             <div className="actions">
-              <button className="btn btn-sm" disabled={!!tpl.error} title={tpl.error ? t('templates.unreadableHint') : undefined}
-                      onClick={() => onEdit(tpl)}>{t('common.edit')}</button>
+              <HintButton className="btn btn-sm" disabled={!!tpl.error} reason={t('templates.unreadableHint')}
+                          onClick={() => onEdit(tpl)}>{t('common.edit')}</HintButton>
               <button className="btn btn-sm btn-danger" onClick={() =>
                 confirm.ask({
                   title: t('templates.deleteTitle', {name: tpl.name}),

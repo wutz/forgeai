@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {CreateSandboxTemplate, UpdateSandboxTemplate, SandboxOptions} from '../wailsjs/go/app/App'
 import {app, sandbox} from '../wailsjs/go/models'
 import {envErrors, envMap, envToLines, linesToEnv, fmtDate, errText, generateName, NAME_PATTERN, SANDBOX_NAME_MAX} from './util'
-import {CancelButton, Dialog, Empty, Spinner, useConfirm} from './ui'
+import {CancelButton, Dialog, Empty, HintButton, Spinner, useConfirm} from './ui'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
 
@@ -40,7 +40,8 @@ export function SandboxTemplateTable({items, failed, onEdit, onDelete}: {
           <td className="muted">{fmtDate(tpl.created)}</td>
           <td>
             <div className="actions">
-              <button className="btn btn-sm" disabled={!!tpl.error} onClick={() => onEdit(tpl)}>{t('common.edit')}</button>
+              <HintButton className="btn btn-sm" disabled={!!tpl.error} reason={t('templates.unreadableHint')}
+                          onClick={() => onEdit(tpl)}>{t('common.edit')}</HintButton>
               <button className="btn btn-sm btn-danger" onClick={() => confirm.ask({
                 title: t('sandboxTemplates.deleteTitle', {name: tpl.name}),
                 message: t('sandboxTemplates.deleteMessage'),

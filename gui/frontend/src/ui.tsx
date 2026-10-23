@@ -2,7 +2,7 @@
 // segmented filters, tabs, badges, empty state and dialogs. Everything here
 // renders from tokens in style.css (gui/DESIGN.md).
 
-import {KeyboardEvent as ReactKeyboardEvent, ReactNode, createContext, useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore} from 'react'
+import {KeyboardEvent as ReactKeyboardEvent, ReactNode, createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore} from 'react'
 import {createPortal} from 'react-dom'
 import {t} from './i18n'
 
@@ -437,6 +437,23 @@ const DialogCloseContext = createContext<(() => void) | null>(null)
 
 // CancelButton is the Cancel of a Dialog footer. It closes through the same
 // guard as the header X and Escape.
+// HintButton is a row action that can be unavailable for a reason. Unlike a
+// disabled button it stays in the tab order, so keyboard and screen reader users
+// reach the reason, which is also the tooltip for pointer users.
+export function HintButton({disabled, reason, className, onClick, children}:
+  {disabled?: boolean, reason?: string, className?: string, onClick: () => void, children: ReactNode}) {
+  const id = useId()
+  const hint = disabled && reason ? reason : undefined
+  // The wrapper keeps the hidden hint inside the button's box; an absolutely
+  // positioned hint in the cell would widen the page when the cell is at the edge.
+  return <span className="hint-button">
+    <button type="button" className={className} aria-disabled={disabled || undefined}
+            aria-describedby={hint ? id : undefined} title={hint}
+            onClick={() => { if (!disabled) onClick() }}>{children}</button>
+    {hint && <span id={id} className="visually-hidden">{hint}</span>}
+  </span>
+}
+
 export function CancelButton({disabled}: {disabled?: boolean}) {
   const close = useContext(DialogCloseContext)
   return <button className="btn" onClick={() => close?.()} disabled={disabled}>{t('common.cancel')}</button>

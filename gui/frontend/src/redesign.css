@@ -239,6 +239,12 @@ a { color: inherit; text-decoration: none; }
   box-shadow: none; cursor: not-allowed;
 }
 .btn-ghost:disabled { background: none; border-color: transparent; }
+.hint-button { position: relative; display: inline-flex; }
+/* A HintButton that is unavailable looks disabled but keeps focus (aria-disabled, see ui.tsx). */
+.btn[aria-disabled='true'], .btn[aria-disabled='true']:hover, .btn[aria-disabled='true']:active {
+  background: var(--hairline-soft); border-color: var(--hairline-soft); color: var(--faint);
+  box-shadow: none; cursor: not-allowed;
+}
 .icon-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; border-radius: 7px; border: none; background: none;

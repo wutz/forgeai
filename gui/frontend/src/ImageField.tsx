@@ -47,6 +47,8 @@ export function ImageField({id, value, onChange, offered, placeholder, required}
   // registry calls it does not need.
   const [pushed, setPushed] = useState<Choice[] | null>(null)
   const [pushedFailed, setPushedFailed] = useState(false)
+  // registryOff is set when the cluster has no project registry, which is not a failure.
+  const [registryOff, setRegistryOff] = useState(false)
   const [pos, setPos] = useState<CSSProperties>({})
   const inputRef = useRef<HTMLInputElement>(null)
   const wrap = useRef<HTMLDivElement>(null)
@@ -60,6 +62,7 @@ export function ImageField({id, value, onChange, offered, placeholder, required}
     if (requested.current) return
     requested.current = true
     Promise.all([Registry(), ListImages()]).then(([reg, repos]) => {
+      setRegistryOff(!reg.enabled)
       if (!reg.enabled) return []
       const out: Choice[] = []
       for (const r of repos) for (const img of r.images ?? []) for (const tag of img.tags ?? []) {
@@ -192,6 +195,7 @@ export function ImageField({id, value, onChange, offered, placeholder, required}
   }
 
   const projectNote = pushed === null ? t('imagePicker.loading')
+    : registryOff ? t('images.notConfiguredHint')
     : pushedFailed ? t('imagePicker.unavailable')
     : t('imagePicker.none')
 

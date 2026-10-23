@@ -126,7 +126,9 @@ function JobTable({jobs, failed, filtered, selected, onSelect}: {
   }
   return (
     <Card>
-      <table className="table">
+      {/* Beside an open job the table keeps its status, instance and ready columns on one line and
+          drops the age: the detail shows when the job was created. */}
+      <table className={selected ? 'table jobs-table' : 'table'}>
         <thead>
         <tr>
           <th>{t('common.name')}</th>
@@ -134,7 +136,7 @@ function JobTable({jobs, failed, filtered, selected, onSelect}: {
           <th>{t('jobs.instance')}</th>
           <th>{t('jobs.colReady')}</th>
           <th>{t('jobs.colRetry')}</th>
-          <th>{t('jobs.colAge')}</th>
+          {!selected && <th>{t('jobs.colAge')}</th>}
         </tr>
         </thead>
         <tbody>
@@ -150,14 +152,14 @@ function JobTable({jobs, failed, filtered, selected, onSelect}: {
                 {j.template ? ` · ${j.template}` : ''}
               </span>
             </td>
-            <td><Status phase={live.phase}/>{live.failureReason && live.phase === 'Failed' &&
+            <td className="nowrap"><Status phase={live.phase}/>{live.failureReason && live.phase === 'Failed' &&
               <div className="cell-sub" title={live.message}>{failureLabel(live.failureReason)}</div>}</td>
-            <td className="mono">{j.instanceType}</td>
-            <td className="mono">{live.ready}/{live.workers}</td>
+            <td className="mono nowrap">{j.instanceType}</td>
+            <td className="mono nowrap">{live.ready}/{live.workers}</td>
             <td>{j.maxRetries
               ? <Badge>{retryOnLabel(j.retryOn || 'Infra')} × {j.maxRetries}</Badge>
               : <span className="muted">—</span>}</td>
-            <td className="muted">{j.age}</td>
+            {!selected && <td className="muted">{j.age}</td>}
           </tr>
         })}
         </tbody>
@@ -345,7 +347,11 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
                 <dt>{t('jobs.instance')}</dt><dd className="mono">{job.instanceType}
                   {job.gpuCount ? ` (${job.gpuCount}× ${job.gpuClass})` : ''}</dd>
                 <dt>{t('jobs.workers')}</dt><dd>{t('jobs.workersReady', {ready: attempt.ready, total: attempt.workers})}</dd>
-                <dt>{t('jobs.volumes')}</dt><dd className="mono">{job.volumes?.join(', ') || '—'}</dd>
+                <dt>{t('jobs.volumes')}</dt><dd className="mono">{job.mounts?.length
+                  ? job.mounts.map(m => <div key={`${m.volume}:${m.mountPath}`}>
+                      {m.volume} → {m.mountPath}{m.subPath ? ` (${m.subPath})` : ''}{m.readOnly ? ` · ${t('mounts.readOnly')}` : ''}
+                    </div>)
+                  : job.volumes?.join(', ') || '—'}</dd>
                 <dt>{t('jobs.command')}</dt><dd><pre className="code">{job.command || '—'}</pre></dd>
                 {attempt.failureReason && <><dt>{t('jobs.failure')}</dt><dd>{t('jobs.failureDetail', {reason: failureLabel(attempt.failureReason), message: attempt.message || ''})}</dd></>}
                 {job.retryOf && <><dt>{t('jobs.retryOf')}</dt><dd>

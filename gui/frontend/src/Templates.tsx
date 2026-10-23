@@ -135,7 +135,7 @@ function JobTemplateTable({items, failed, onEdit, onDelete}: {
     {confirm.dialog}
     <table className="table">
       <thead>
-      <tr><th>{t('common.name')}</th><th>{t('common.image')}</th><th>{t('templates.workers')}</th><th>{t('templates.colInstance')}</th><th>{t('common.created')}</th><th/></tr>
+      <tr><th>{t('common.name')}</th><th>{t('common.image')}</th><th>{t('templates.workers')}</th><th>{t('templates.colInstance')}</th><th className="col-optional">{t('common.created')}</th><th/></tr>
       </thead>
       <tbody>
       {items.map(tpl => (
@@ -152,7 +152,7 @@ function JobTemplateTable({items, failed, onEdit, onDelete}: {
               ? <span className="muted">{t('templates.typeUnavailable', {name: tpl.form.instanceType})}</span>
               : tpl.form.instanceType
             : '—'}</td>
-          <td className="muted">{fmtDate(tpl.created)}</td>
+          <td className="muted col-optional">{fmtDate(tpl.created)}</td>
           <td>
             <div className="actions">
               <button className="btn btn-sm" disabled={!!tpl.error} title={tpl.error ? t('templates.unreadableHint') : undefined}
@@ -214,6 +214,9 @@ export function TemplateDialog({form, existing, version, onClose, onSaved}: {
     : !f.instanceType ? t('templates.instanceRequired')
     : !workersOK ? t('jobCreate.workersInvalid')
     : !retriesOK ? t('jobCreate.retriesInvalid')
+    // A type the project no longer offers would save a template whose jobs are refused; the
+    // select already names it, so the footer asks for a type the project offers.
+    : types.length > 0 && !types.some(ty => ty.name === f.instanceType) ? t('templates.instanceRequired')
     : envBad.length ? t('common.envInvalid', {lines: envBad.join(', ')}) : ''
   const hasFieldHint = (!nameOK && (f.name ?? '') !== '') || !workersOK || !retriesOK || envBad.length > 0
 

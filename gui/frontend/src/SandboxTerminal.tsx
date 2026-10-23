@@ -47,6 +47,9 @@ export function SandboxTerminal({name}: {name: string}) {
     const offExit = EventsOn(`sandbox-terminal:${id}:exit`, (msg: string) => {
       const text = msg ? t('terminal.sessionEndedWith', {message: msg}) : t('terminal.sessionEnded')
       term.write(`\r\n\x1b[90m[${text}]\x1b[0m\r\n`)
+      // An ended shell takes no input; keys would otherwise vanish silently.
+      term.options.disableStdin = true
+      term.options.cursorBlink = false
       setEnded(true)
     })
     const onData = term.onData(data => SandboxTerminalInput(id, data).catch(() => {}))
@@ -58,19 +61,14 @@ export function SandboxTerminal({name}: {name: string}) {
     // closed is set when the view goes away. If the shell opens after that,
     // the cleanup's close found no session yet, so this one closes it.
     let closed = false
+    let opened = false
     let ro: ResizeObserver | undefined
-    const open = window.setTimeout(() => {
-      term.open(el)
-      fit.fit()
-      ro = new ResizeObserver(() => {
-        // A hidden view has no size; fitting it would resize the shell to a
-        // couple of columns until the view is shown again.
-        if (!el.offsetWidth || !el.offsetHeight) return
-        fit.fit()
-        ResizeSandboxTerminal(id, term.cols, term.rows).catch(() => {})
-      })
-      ro.observe(el)
-      OpenSandboxTerminal(name, id, term.cols, term.rows).then(() => {
+    // The shell opens at the first size the view has, not before. A shell opened
+    // while the view is narrow prints its first lines a few columns wide, and
+    // that output stays wrapped after the terminal widens.
+    const start = (cols: number, rows: number) => {
+      opened = true
+      OpenSandboxTerminal(name, id, cols, rows).then(() => {
         if (closed) CloseSandboxTerminal(id).catch(() => {})
         else {
           setConnecting(false)
@@ -82,6 +80,18 @@ export function SandboxTerminal({name}: {name: string}) {
           setError(errText(e))
         }
       })
+    }
+    const open = window.setTimeout(() => {
+      term.open(el)
+      ro = new ResizeObserver(() => {
+        // A hidden view has no size; fitting it would resize the shell to a
+        // couple of columns until the view is shown again.
+        if (!el.offsetWidth || !el.offsetHeight) return
+        fit.fit()
+        if (opened) ResizeSandboxTerminal(id, term.cols, term.rows).catch(() => {})
+        else start(term.cols, term.rows)
+      })
+      ro.observe(el)
     }, 0)
 
     return () => {

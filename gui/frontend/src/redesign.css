@@ -550,8 +550,7 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
   box-shadow: var(--shadow-pop);
 }
 .combo-group {
-  padding: 8px 8px 4px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.05em;
-  text-transform: uppercase; color: var(--faint);
+  padding: 8px 8px 4px; font-size: 12px; font-weight: 500; color: var(--mute);
 }
 .combo-option {
   display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 4px 8px;

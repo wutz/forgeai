@@ -235,3 +235,43 @@ func TestListSandboxTemplatesShowsUnreadable(t *testing.T) {
 		t.Fatalf("SandboxTemplates = %+v, want the unreadable template with its error", list)
 	}
 }
+
+// A template whose spec annotation does not parse is still listed by name, so
+// the user can delete or rewrite it; the other templates are listed too.
+func TestListTemplatesKeepsMalformedSpec(t *testing.T) {
+	broken := testTemplateForm("broken-spec", "img:1")
+	brt, err := training.Template(&broken, testNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	brt.Annotations[training.AnnotationTemplateSpec] = "{not json"
+	brokenObj, err := runtimeObject(brt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	good := testTemplateForm("good-spec", "img:2")
+	grt, err := training.Template(&good, testNamespace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	goodObj, err := runtimeObject(grt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := testApp(t, brokenObj, goodObj)
+
+	list, err := a.ListTemplates()
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := map[string]bool{}
+	for _, tpl := range list {
+		names[tpl.Name] = true
+		if tpl.Name == "broken-spec" && tpl.Form.Template != "broken-spec" {
+			t.Errorf("malformed template form = %+v, want it named", tpl.Form)
+		}
+	}
+	if len(list) != 2 || !names["broken-spec"] || !names["good-spec"] {
+		t.Fatalf("ListTemplates = %+v, want both templates listed", list)
+	}
+}

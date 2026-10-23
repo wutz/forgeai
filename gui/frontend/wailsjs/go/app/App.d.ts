@@ -72,8 +72,6 @@ export function ListTemplates():Promise<Array<app.Template>>;
 
 export function ListVolumes(arg1:boolean):Promise<Array<volumes.Volume>>;
 
-export function Logout():Promise<void>;
-
 export function Logs(arg1:string,arg2:number,arg3:number):Promise<string>;
 
 export function MemberKubeconfig(arg1:string,arg2:string):Promise<string>;

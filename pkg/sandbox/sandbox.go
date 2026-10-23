@@ -148,11 +148,20 @@ func (f *Form) Validate() error {
 	if f.TTL.Duration < 0 {
 		return fmt.Errorf("ttl must not be negative")
 	}
+	if f.TTL.Duration > maxDuration {
+		return fmt.Errorf("ttl must not exceed one year")
+	}
 	if f.IdleTimeout != nil && f.IdleTimeout.Duration < 0 {
 		return fmt.Errorf("idleTimeout must not be negative")
 	}
+	if f.IdleTimeout != nil && f.IdleTimeout.Duration > maxDuration {
+		return fmt.Errorf("idleTimeout must not exceed one year")
+	}
 	return nil
 }
+
+// maxDuration bounds the auto-stop and idle timeouts: the form offers no more than a year.
+const maxDuration = 365 * 24 * time.Hour
 
 // Context is what a sandbox needs beyond the form.
 type Context struct {

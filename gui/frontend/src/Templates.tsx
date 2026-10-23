@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {ListTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, DeleteSandboxTemplate, SandboxTemplates as ListSandboxTemplates, ListInstanceTypes} from '../wailsjs/go/app/App'
 import {app, sandbox, training} from '../wailsjs/go/models'
-import {envErrors, envToLines, linesToEnv, fmtDate, errText, generateName, NAME_MAX, NAME_PATTERN} from './util'
+import {envErrors, envToLines, linesToEnv, fmtDate, errText, generateName, MAX_RETRIES, NAME_MAX, NAME_PATTERN} from './util'
 import {Card, CancelButton, Dialog, Empty, Icon, PageHeader, Segmented, Spinner, useActive, useConfirm} from './ui'
 import {SandboxTemplateDialog, SandboxTemplateTable} from './SandboxTemplates'
 import {t} from './i18n'
@@ -184,6 +184,9 @@ export function TemplateDialog({form, existing, version, onClose, onSaved}: {
   const nameOK = NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= NAME_MAX
   // A template prefills the New job form, which needs at least one worker.
   const workersOK = Number.isInteger(f.workers) && f.workers >= 1
+  // The platform accepts 0 to MAX_RETRIES retries; the backend rejects anything else.
+  const retries = f.maxRetries ?? 0
+  const retriesOK = Number.isInteger(retries) && retries >= 0 && retries <= MAX_RETRIES
   // blocker says why Save is off. A bad name, worker count or env line already
   // has a hint under its field, so the footer only names the blockers that have none.
   const blocker = !f.name ? t('common.nameRequired')
@@ -191,8 +194,9 @@ export function TemplateDialog({form, existing, version, onClose, onSaved}: {
     : !f.image ? t('common.imageRequired')
     : !f.instanceType ? t('templates.instanceRequired')
     : !workersOK ? t('jobCreate.workersInvalid')
+    : !retriesOK ? t('jobCreate.retriesInvalid')
     : envBad.length ? t('common.envInvalid', {lines: envBad.join(', ')}) : ''
-  const hasFieldHint = (!nameOK && (f.name ?? '') !== '') || !workersOK || envBad.length > 0
+  const hasFieldHint = (!nameOK && (f.name ?? '') !== '') || !workersOK || !retriesOK || envBad.length > 0
 
   const save = () => {
     if (blocker) return
@@ -250,8 +254,8 @@ export function TemplateDialog({form, existing, version, onClose, onSaved}: {
                     onChange={e => set('command', e.target.value)}/>
         </div>
         {!!f.volumes?.length && (
-          <div className="field">
-            <label>{t('jobCreate.volumeMounts')}</label>
+          <div className="field" role="group" aria-labelledby="t-mounts-label">
+            <label id="t-mounts-label">{t('jobCreate.volumeMounts')}</label>
             {f.volumes.map((m, i) => (
               <div key={i} className="mono" style={{fontSize: 13}}>
                 {m.volume} → {m.mountPath}{m.subPath ? ` (${m.subPath})` : ''}{m.readOnly ? ` · ${t('mounts.readOnly')}` : ''}
@@ -277,6 +281,23 @@ export function TemplateDialog({form, existing, version, onClose, onSaved}: {
                    value={f.workers} onChange={e => set('workers', +e.target.value)}
                    aria-invalid={!workersOK}/>
             {!workersOK && <span className="hint hint-error">{t('jobCreate.workersInvalid')}</span>}
+          </div>
+        </div>
+        <div className="row">
+          <div className="field">
+            <label htmlFor="t-retries">{t('jobCreate.maxRetries')}</label>
+            <input id="t-retries" className="input" type="number" min={0} max={MAX_RETRIES}
+                   value={f.maxRetries || 0} aria-invalid={!retriesOK}
+                   onChange={e => set('maxRetries', +e.target.value)}/>
+            {!retriesOK && <span className="hint hint-error">{t('jobCreate.retriesInvalid')}</span>}
+          </div>
+          <div className="field">
+            <label htmlFor="t-retryon">{t('jobCreate.retryOn')}</label>
+            <select id="t-retryon" className="select" value={f.retryOn || 'Infra'}
+                    onChange={e => set('retryOn', e.target.value)}>
+              <option value="Infra">{t('jobCreate.retryInfraOnly')}</option>
+              <option value="Any">{t('jobCreate.retryAnyFailure')}</option>
+            </select>
           </div>
         </div>
         <div className="field">

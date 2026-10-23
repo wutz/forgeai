@@ -1,14 +1,11 @@
 import {FormEvent, useEffect, useRef, useState} from 'react'
 import {CreateJob, ListInstanceTypes, ListTemplates, TemplateNames, ListVolumes} from '../wailsjs/go/app/App'
 import {app, training, volumes} from '../wailsjs/go/models'
-import {envErrors, envMap, envToLines, linesToEnv, errText, generateName, NAME_MAX, NAME_PATTERN} from './util'
+import {envErrors, envMap, envToLines, linesToEnv, errText, generateName, MAX_RETRIES, NAME_MAX, NAME_PATTERN} from './util'
 import {t} from './i18n'
 import {CancelButton, Dialog} from './ui'
 import {ImageField} from './ImageField'
 import {Mount, VolumeMountsField, mountProblems} from './VolumeMounts'
-
-// MAX_RETRIES is the most retries a job may ask for; the backend enforces the same bound.
-const MAX_RETRIES = 20
 
 // JobCreateDialog is the "New job" form: template prefill, instance type,
 // workers, volumes, env and retry defaults.
@@ -184,8 +181,8 @@ export function JobCreateDialog({onClose, onCreated}: {
               {t('common.envInvalid', {lines: envBad.join(', ')})}
             </span>}
           </div>
-          <div className="field">
-            <label>{t('jobCreate.volumeMounts')}</label>
+          <div className="field" role="group" aria-labelledby="j-mounts-label">
+            <label id="j-mounts-label">{t('jobCreate.volumeMounts')}</label>
             <VolumeMountsField mounts={mounts} onChange={setMounts} vols={vols} loadError={volsError} workers={f.workers}/>
             <span className="hint">{t('mounts.jobHint')}</span>
           </div>

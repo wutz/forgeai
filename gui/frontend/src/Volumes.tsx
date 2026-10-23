@@ -321,7 +321,11 @@ function ExpiryDialog({volume, onClose, onDone}: {
   const [day, setDay] = useState(volume.expireAt ? localDay(new Date(volume.expireAt)) : '')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const tomorrow = localDay(new Date(Date.now() + 24 * 3600 * 1000))
+  // Tomorrow is the next calendar day, not 24 hours on: across a daylight-saving
+  // change, 24 hours from late evening can land on the day after tomorrow.
+  const next = new Date()
+  next.setDate(next.getDate() + 1)
+  const tomorrow = localDay(next)
   // Dates are YYYY-MM-DD, so a string compare orders them.
   const dayOK = !!day && day >= tomorrow
 

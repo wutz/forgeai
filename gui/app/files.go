@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"net/http"
 	"net/url"
 	"time"
@@ -25,6 +26,9 @@ type Files struct {
 	Volumes []string `json:"volumes"`
 }
 
+// errConnectionChanged is returned when the connection moved on while Files read the server.
+var errConnectionChanged = errors.New("the connection changed while the file server was read; try again")
+
 // Files reports the file server: it wakes or keeps it alive (heartbeat) and
 // points the loopback proxy at it. The basic-auth credentials from the file
 // server Secret stay in this process; the webview only gets the proxy
@@ -36,6 +40,9 @@ func (a *App) Files() (*Files, error) {
 	}
 	ctx, cancel := a.call()
 	defer cancel()
+
+	a.filesMu.Lock()
+	defer a.filesMu.Unlock()
 
 	// Wake the server (or keep it awake): the operator treats a fresh
 	// last-active annotation as activity and scales to one replica.
@@ -89,7 +96,17 @@ func (a *App) Files() (*Files, error) {
 			}
 		}
 	}
-	a.files.SetTarget(target)
+	// The target is published only while this connection is still the current one:
+	// a Connect or a disconnect during the reads has already reset the proxy.
+	a.mu.RLock()
+	current := a.conn == c
+	if current {
+		a.files.SetTarget(target)
+	}
+	a.mu.RUnlock()
+	if !current {
+		return nil, errConnectionChanged
+	}
 	if target != nil {
 		origin, err := a.files.Origin()
 		if err != nil {

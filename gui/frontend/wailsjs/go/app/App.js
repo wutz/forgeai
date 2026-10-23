@@ -134,10 +134,6 @@ export function ListVolumes(arg1) {
   return window['go']['app']['App']['ListVolumes'](arg1);
 }
 
-export function Logout() {
-  return window['go']['app']['App']['Logout']();
-}
-
 export function Logs(arg1, arg2, arg3) {
   return window['go']['app']['App']['Logs'](arg1, arg2, arg3);
 }

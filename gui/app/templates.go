@@ -38,9 +38,12 @@ func (a *App) ListTemplates() ([]Template, error) {
 	out := make([]Template, 0, len(items))
 	for i := range items {
 		rt := &items[i]
+		// A template whose spec annotation does not parse is still listed, with only its
+		// name, so the user can see it and delete or rewrite it; one bad annotation
+		// does not hide the other templates.
 		f, err := training.TemplateForm(rt)
 		if err != nil {
-			return nil, err
+			f = &training.Form{Template: rt.Name}
 		}
 		t := Template{
 			Name:            rt.Name,

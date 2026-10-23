@@ -7,6 +7,9 @@ import {t} from './i18n'
 import {ImageField} from './ImageField'
 import {Mount, VolumeMountsField, mountProblems} from './VolumeMounts'
 
+// MAX_TTL_HOURS caps the auto-stop and idle timeouts at one year; the backend refuses more.
+const MAX_TTL_HOURS = 24 * 365
+
 // SandboxCreateDialog is the "New sandbox" form: image, isolation runtime
 // class, optional instance type and volumes, and the auto-stop timer.
 export function SandboxCreateDialog({onClose, onCreated}: {
@@ -74,8 +77,8 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   // than the sandbox limit; the field says so before Create is pressed.
   const nameOK = NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= SANDBOX_NAME_MAX
   // Negative durations are refused by the backend; the fields say so before Create.
-  const ttlOK = Number.isFinite(ttlHours) && ttlHours >= 0
-  const idleOK = idleMinutes === null || (Number.isFinite(idleMinutes) && idleMinutes >= 0)
+  const ttlOK = Number.isFinite(ttlHours) && ttlHours >= 0 && ttlHours <= MAX_TTL_HOURS
+  const idleOK = idleMinutes === null || (Number.isFinite(idleMinutes) && idleMinutes >= 0 && idleMinutes <= MAX_TTL_HOURS * 60)
   // The footer names the blocker that has no field hint of its own, so a disabled
   // Create is never unexplained.
   const blocker = !f.image.trim() ? t('common.imageRequired')
@@ -195,7 +198,9 @@ export function SandboxCreateDialog({onClose, onCreated}: {
               <input id="s-ttl" className="input" type="number" step="any" value={Number.isNaN(ttlHours) ? '' : ttlHours}
                      aria-invalid={!ttlOK} onChange={e => setTtlHours(e.target.value === '' ? NaN : +e.target.value)}/>
               <span className="hint">{t('sandboxCreate.ttlHint')}</span>
-              {!ttlOK && <span className="hint hint-error">{t('sandboxCreate.nonNegative')}</span>}
+              {!ttlOK && <span className="hint hint-error">{ttlHours > MAX_TTL_HOURS
+                ? t('sandboxCreate.ttlMax', {hours: MAX_TTL_HOURS})
+                : t('sandboxCreate.nonNegative')}</span>}
             </div>
             <div className="field">
               <label htmlFor="s-idle">{t('sandboxCreate.idle')}</label>
@@ -205,7 +210,9 @@ export function SandboxCreateDialog({onClose, onCreated}: {
                        ? t('sandboxCreate.idleDefault', {value: formatGoDuration(opts.idleTimeout)})
                        : t('sandboxCreate.off')}/>
               <span className="hint">{t('sandboxCreate.idleHint', {timeout: opts?.idleTimeout ? formatGoDuration(opts.idleTimeout) : t('sandboxCreate.off')})}</span>
-              {!idleOK && <span className="hint hint-error">{t('sandboxCreate.nonNegative')}</span>}
+              {!idleOK && <span className="hint hint-error">{idleMinutes !== null && idleMinutes > MAX_TTL_HOURS * 60
+                ? t('sandboxCreate.idleMax', {minutes: MAX_TTL_HOURS * 60})
+                : t('sandboxCreate.nonNegative')}</span>}
             </div>
           </div>
           <div className="row">

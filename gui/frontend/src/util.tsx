@@ -148,6 +148,9 @@ export const NAME_PATTERN = /^[a-z]([-a-z0-9]*[a-z0-9])?$/
 export const NAME_MAX = 50
 export const SANDBOX_NAME_MAX = 63
 
+// MAX_RETRIES is the most retries a job may ask for; the backend enforces the same bound.
+export const MAX_RETRIES = 20
+
 // generateName returns a Kubernetes-style name, prefix plus five random
 // characters ("sandbox-7xk2m"), a lowercase DNS label as the API server expects.
 export function generateName(prefix: string): string {

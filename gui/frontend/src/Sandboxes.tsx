@@ -209,11 +209,11 @@ function SandboxDetail({name, onDone, onDeleted}: {
     reload()
     const stopPoll = everyWhileVisible(reload, 5000)
     // Keep the sandbox awake while its detail is open and running.
-    const beat = setInterval(() => KeepSandboxAwake(name).catch(() => {}), HEARTBEAT)
+    const stopBeat = everyWhileVisible(() => KeepSandboxAwake(name).catch(() => {}), HEARTBEAT)
     KeepSandboxAwake(name).catch(() => {})
     return () => {
       stopPoll()
-      clearInterval(beat)
+      stopBeat()
     }
   }, [name, active])
 

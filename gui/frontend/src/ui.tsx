@@ -344,7 +344,9 @@ export type ConfirmRequest = {
   danger?: boolean
   // primary marks an install action; other confirms use the default role.
   primary?: boolean
-  run: () => void
+  // run may return a promise. The dialog then stays open and busy until it
+  // settles, so the action cannot be started a second time while it is in flight.
+  run: () => void | Promise<unknown>
 }
 
 // useConfirm returns ask(request) to open the confirmation and dialog to
@@ -358,15 +360,20 @@ export function useConfirm(): {ask: (request: ConfirmRequest) => void, dialog: R
 }
 
 function ConfirmDialog({request, onClose}: {request: ConfirmRequest, onClose: () => void}) {
+  const [busy, setBusy] = useState(false)
   const go = () => {
-    request.run()
-    onClose()
+    const result = request.run()
+    if (!(result instanceof Promise)) { onClose(); return }
+    // The action reports its own failure in the page, so a rejection only ends the wait here.
+    setBusy(true)
+    result.then(onClose, onClose)
   }
   return (
-    <Dialog title={request.title} onClose={onClose} width={440} footer={<>
+    <Dialog title={request.title} onClose={onClose} width={440} busy={busy} footer={<>
       {/* A destructive confirm opens on Cancel, so a stray Enter does not run it. */}
-      <button className="btn" onClick={onClose} autoFocus={!!request.danger}>{t('common.cancel')}</button>
-      <button className={`btn ${request.danger ? 'btn-danger-tint' : request.primary ? 'btn-primary' : ''}`.trim()} onClick={go} autoFocus={!request.danger}>
+      <button className="btn" onClick={onClose} disabled={busy} autoFocus={!!request.danger}>{t('common.cancel')}</button>
+      <button className={`btn ${request.danger ? 'btn-danger-tint' : request.primary ? 'btn-primary' : ''}`.trim()}
+              onClick={go} disabled={busy} autoFocus={!request.danger}>
         {request.action}
       </button>
     </>}>

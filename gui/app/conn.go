@@ -261,15 +261,6 @@ func mustBeClusterAdmin(ctx context.Context, k8s client.Client) bool {
 	return sar.Status.Allowed
 }
 
-// Logout forgets the connection and ends what it had open.
-func (a *App) Logout() {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.connGen++
-	a.closeConnectionState()
-	a.conn = nil
-}
-
 // closeConnectionState ends the sandbox shells and the file server target of
 // the connection being replaced: they belong to its cluster, not the next one.
 // The caller holds a.mu.

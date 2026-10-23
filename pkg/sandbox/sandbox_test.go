@@ -173,6 +173,9 @@ func TestValidate(t *testing.T) {
 		"negative ttl": {Name: "agent", Image: "img", TTL: metav1.Duration{Duration: -time.Minute}},
 		"negative idle": {Name: "agent", Image: "img",
 			IdleTimeout: &metav1.Duration{Duration: -time.Minute}},
+		"ttl over a year": {Name: "agent", Image: "img", TTL: metav1.Duration{Duration: 366 * 24 * time.Hour}},
+		"idle over a year": {Name: "agent", Image: "img",
+			IdleTimeout: &metav1.Duration{Duration: 366 * 24 * time.Hour}},
 	}
 	for name, f := range cases {
 		if err := f.Validate(); err == nil {

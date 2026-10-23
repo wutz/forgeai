@@ -544,9 +544,9 @@ func (ix *jobIndex) job(tj *kf.TrainJob) *Job {
 		p := &pods[i]
 		out.WorkerPods = append(out.WorkerPods, Worker{
 			Index: int32(training.WorkerIndex(p)), PodName: p.Name, NodeName: p.Spec.NodeName,
-			Phase: string(p.Status.Phase), Message: podMessage(p),
+			Phase: string(p.Status.Phase), Message: training.PodMessage(p),
 		})
-		if p.Status.Phase == corev1.PodRunning && p.DeletionTimestamp.IsZero() {
+		if training.Running(p) {
 			out.Ready++
 		}
 	}
@@ -556,21 +556,6 @@ func (ix *jobIndex) job(tj *kf.TrainJob) *Job {
 		out.CPU = it.Spec.CPU.String()
 	}
 	return out
-}
-
-// podMessage explains a pod that is not running.
-func podMessage(p *corev1.Pod) string {
-	for _, c := range p.Status.Conditions {
-		if c.Type == corev1.PodScheduled && c.Status == corev1.ConditionFalse {
-			return strings.TrimSuffix(c.Reason+": "+c.Message, ": ")
-		}
-	}
-	for _, cs := range p.Status.ContainerStatuses {
-		if w := cs.State.Waiting; w != nil && w.Reason != "ContainerCreating" {
-			return strings.TrimSuffix(w.Reason+": "+w.Message, ": ")
-		}
-	}
-	return ""
 }
 
 func groupOf(tj *kf.TrainJob) string {

@@ -101,26 +101,56 @@ func JobPhase(tj *kf.TrainJob, pods []corev1.Pod) (Phase, string) {
 	msg := ""
 	for i := range pods {
 		p := &pods[i]
-		if p.Status.Phase == corev1.PodRunning && p.DeletionTimestamp.IsZero() {
+		if Running(p) {
 			return PhaseRunning, ""
 		}
-		if m := waitingMessage(p); m != "" && msg == "" {
+		if m := PodMessage(p); m != "" && msg == "" {
 			msg = m
 		}
 	}
 	return PhasePending, msg
 }
 
-func waitingMessage(p *corev1.Pod) string {
+// Running reports whether a worker pod is running its containers. A pod whose
+// container is stuck in a failing wait, such as a crash loop, keeps the Running
+// phase between restarts, so the container state decides.
+func Running(p *corev1.Pod) bool {
+	if p.Status.Phase != corev1.PodRunning || !p.DeletionTimestamp.IsZero() {
+		return false
+	}
+	for _, cs := range p.Status.ContainerStatuses {
+		if w := cs.State.Waiting; w != nil {
+			if _, stuck := stuckWaiting[w.Reason]; stuck {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// PodMessage explains a worker pod that is not running: why it is not
+// scheduled, or why its container is waiting. A crash loop names the error
+// that ended the last run.
+func PodMessage(p *corev1.Pod) string {
 	for _, c := range p.Status.Conditions {
 		if c.Type == corev1.PodScheduled && c.Status == corev1.ConditionFalse {
-			return c.Reason + ": " + c.Message
+			return strings.TrimSuffix(c.Reason+": "+c.Message, ": ")
 		}
 	}
 	for _, cs := range p.Status.ContainerStatuses {
-		if w := cs.State.Waiting; w != nil && w.Reason != "ContainerCreating" {
-			return strings.TrimSuffix(w.Reason+": "+w.Message, ": ")
+		w := cs.State.Waiting
+		if w == nil || w.Reason == "ContainerCreating" {
+			continue
 		}
+		msg := w.Reason
+		if t := cs.LastTerminationState.Terminated; t != nil && w.Reason == "CrashLoopBackOff" {
+			msg += fmt.Sprintf(": last run ended with %s (exit code %d)", t.Reason, t.ExitCode)
+			if t.Message != "" {
+				msg += ": " + errorTail(t.Message)
+			}
+			return msg
+		}
+		return strings.TrimSuffix(msg+": "+w.Message, ": ")
 	}
 	return ""
 }
@@ -239,11 +269,25 @@ func lastLine(s string) string {
 	return s
 }
 
+// errorTail is the last line of an error, keeping its end when it is long: a
+// runtime error names the cause last.
+func errorTail(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.LastIndexByte(s, '\n'); i >= 0 {
+		s = s[i+1:]
+	}
+	if r := []rune(s); len(r) > 200 {
+		s = "…" + string(r[len(r)-200:])
+	}
+	return s
+}
+
 // stuckWaiting are container waiting reasons a job does not recover from by itself.
 var stuckWaiting = map[string]string{
 	"ErrImagePull": ReasonImagePullFailed, "ImagePullBackOff": ReasonImagePullFailed,
 	"InvalidImageName": ReasonImagePullFailed, "CreateContainerConfigError": ReasonConfigError,
 	"CreateContainerError": ReasonConfigError, "CrashLoopBackOff": ReasonExitCode,
+	"RunContainerError": ReasonExitCode,
 }
 
 // Stuck reports a running job whose pods have been unable to start for

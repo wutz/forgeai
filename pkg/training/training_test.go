@@ -206,3 +206,53 @@ func TestJobPhase(t *testing.T) {
 		t.Errorf("phase = %s", ph)
 	}
 }
+
+// A crash-looping worker keeps the Running pod phase between restarts; the job
+// must still read as not running and say why.
+func TestJobPhaseCrashLoop(t *testing.T) {
+	tj := &kf.TrainJob{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}, Status: &kf.TrainJobStatus{}}
+	crash := corev1.Pod{Status: corev1.PodStatus{
+		Phase: corev1.PodRunning,
+		ContainerStatuses: []corev1.ContainerStatus{{
+			State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{
+				Reason: "CrashLoopBackOff", Message: "back-off 40s restarting failed container",
+			}},
+			LastTerminationState: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{
+				Reason: "StartError", ExitCode: 128,
+				Message: "failed to create containerd task: failed to create shim task: OCI runtime create failed: " +
+					"runc create failed: unable to start container process: error during container init: " +
+					"exec: \"/bin/bash\": stat /bin/bash: no such file or directory\n",
+			}},
+		}},
+	}}
+	ph, msg := JobPhase(tj, []corev1.Pod{crash})
+	if ph != PhasePending {
+		t.Fatalf("phase = %s, want Pending", ph)
+	}
+	// The runtime error names the cause last; the message keeps that end.
+	if want := "CrashLoopBackOff: last run ended with StartError (exit code 128): …"; !strings.HasPrefix(msg, want) ||
+		!strings.HasSuffix(msg, `exec: "/bin/bash": stat /bin/bash: no such file or directory`) {
+		t.Errorf("message = %q, want prefix %q and the exec error", msg, want)
+	}
+	if Running(&crash) {
+		t.Errorf("crash-looping pod reads as running")
+	}
+
+	healthy := corev1.Pod{Status: corev1.PodStatus{
+		Phase:             corev1.PodRunning,
+		ContainerStatuses: []corev1.ContainerStatus{{State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}}},
+	}}
+	if ph, _ := JobPhase(tj, []corev1.Pod{crash, healthy}); ph != PhaseRunning {
+		t.Errorf("phase with one healthy worker = %s, want Running", ph)
+	}
+
+	runErr := corev1.Pod{Status: corev1.PodStatus{
+		Phase: corev1.PodRunning,
+		ContainerStatuses: []corev1.ContainerStatus{{State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{
+			Reason: "RunContainerError", Message: "failed to start",
+		}}}},
+	}}
+	if Running(&runErr) {
+		t.Errorf("RunContainerError pod reads as running")
+	}
+}

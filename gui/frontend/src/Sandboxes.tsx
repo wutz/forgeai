@@ -305,14 +305,16 @@ function SandboxDetail({name, onDone, onDeleted}: {
               <dt>{t('common.created')}</dt><dd>{fmtDate(box.created)}</dd>
             </dl>
           )}
-          {tab === 'terminal' && (box.podPhase === 'Running' && box.phase !== 'Stopping'
+          {tab === 'terminal' && (box.containerRunning && box.phase !== 'Stopping'
             ? <SandboxTerminal name={box.name}/>
             // The idle box is the terminal's size, so opening it does not shift the layout.
             : <div className="term term-idle">
                 <span role="status">
-                  {box.phase === 'Pending' || box.phase === 'Starting' || box.podPhase === 'Pending'
-                    ? t('sandboxes.terminalStarting')
-                    : t('sandboxes.startToOpenTerminal')}
+                  {box.containerReason && !['ContainerCreating', 'PodInitializing'].includes(box.containerReason)
+                    ? t('sandboxes.containerNotRunning', {reason: box.containerReason})
+                    : box.phase === 'Pending' || box.phase === 'Starting' || box.podPhase === 'Pending'
+                      ? t('sandboxes.terminalStarting')
+                      : t('sandboxes.startToOpenTerminal')}
                 </span>
                 {!running && <button className="btn btn-sm btn-accent" disabled={busy}
                                      onClick={() => transition('start', StartSandbox(box.name))}>

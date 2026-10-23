@@ -53,8 +53,12 @@ export function SandboxTerminal({name}: {name: string}) {
       setEnded(true)
     })
     // A write that fails means the shell is gone or unreachable: the error is shown
-    // rather than the keys vanishing.
-    const onData = term.onData(data => SandboxTerminalInput(id, data).catch(e => setError(errText(e))))
+    // rather than the keys vanishing. Each call runs on its own goroutine in the
+    // backend, so the next chunk waits for this one: typed keys reach the shell in order.
+    let input: Promise<unknown> = Promise.resolve()
+    const onData = term.onData(data => {
+      input = input.then(() => SandboxTerminalInput(id, data)).catch(e => setError(errText(e)))
+    })
 
     // The terminal opens in a later task, not here. StrictMode runs this effect
     // twice, and a terminal disposed right after open leaves its viewport with a

@@ -685,6 +685,8 @@ export namespace app {
 	    nodeName?: string;
 	    podName?: string;
 	    podPhase?: string;
+	    containerRunning: boolean;
+	    containerReason?: string;
 	    cpu?: string;
 	    memory?: string;
 	    gpu?: number;
@@ -716,6 +718,8 @@ export namespace app {
 	        this.nodeName = source["nodeName"];
 	        this.podName = source["podName"];
 	        this.podPhase = source["podPhase"];
+	        this.containerRunning = source["containerRunning"];
+	        this.containerReason = source["containerReason"];
 	        this.cpu = source["cpu"];
 	        this.memory = source["memory"];
 	        this.gpu = source["gpu"];

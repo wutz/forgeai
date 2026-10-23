@@ -36,15 +36,19 @@ type Sandbox struct {
 	NodeName     string            `json:"nodeName,omitempty"`
 	PodName      string            `json:"podName,omitempty"`
 	PodPhase     string            `json:"podPhase,omitempty"`
-	CPU          string            `json:"cpu,omitempty"`
-	Memory       string            `json:"memory,omitempty"`
-	GPU          int64             `json:"gpu,omitempty"`
-	Volumes      []string          `json:"volumes,omitempty"`
-	Stopped      bool              `json:"stopped"`
-	IdleSince    string            `json:"idleSince,omitempty"`
-	ShutdownTime string            `json:"shutdownTime,omitempty"`
-	Created      string            `json:"created"`
-	Age          string            `json:"age"`
+	// ContainerRunning is set when the sandbox container runs; ContainerReason
+	// says why it does not otherwise (CrashLoopBackOff, ImagePullBackOff, ...).
+	ContainerRunning bool     `json:"containerRunning"`
+	ContainerReason  string   `json:"containerReason,omitempty"`
+	CPU              string   `json:"cpu,omitempty"`
+	Memory           string   `json:"memory,omitempty"`
+	GPU              int64    `json:"gpu,omitempty"`
+	Volumes          []string `json:"volumes,omitempty"`
+	Stopped          bool     `json:"stopped"`
+	IdleSince        string   `json:"idleSince,omitempty"`
+	ShutdownTime     string   `json:"shutdownTime,omitempty"`
+	Created          string   `json:"created"`
+	Age              string   `json:"age"`
 }
 
 // SandboxOptions are the platform defaults offered by the create dialog.
@@ -538,11 +542,32 @@ func toSandbox(ctx context.Context, c *Connection, u *unstructured.Unstructured)
 	name := sandbox.PodName(sb)
 	if err := c.k8s.Get(ctx, types.NamespacedName{Namespace: c.namespace(), Name: name}, pod); err == nil {
 		out.PodName, out.PodPhase = pod.Name, string(pod.Status.Phase)
+		out.ContainerRunning, out.ContainerReason = sandboxContainerState(pod)
 		if out.NodeName == "" {
 			out.NodeName = pod.Spec.NodeName
 		}
 	}
 	return out
+}
+
+// sandboxContainerState reports whether the sandbox container runs. A pod can
+// stay Running while its container crash-loops, so the pod phase is not
+// enough; when the container does not run, the reason says why it waits.
+func sandboxContainerState(pod *corev1.Pod) (bool, string) {
+	for _, st := range pod.Status.ContainerStatuses {
+		if st.Name != sandbox.ContainerName {
+			continue
+		}
+		switch {
+		case st.State.Running != nil:
+			return true, ""
+		case st.State.Waiting != nil:
+			return false, st.State.Waiting.Reason
+		case st.State.Terminated != nil:
+			return false, st.State.Terminated.Reason
+		}
+	}
+	return false, ""
 }
 
 func ptr[T any](p *T) T {

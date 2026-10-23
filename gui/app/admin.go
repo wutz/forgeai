@@ -260,6 +260,9 @@ func toProject(p *v1.Project) Project {
 	if p.Spec.Quota.Storage != nil {
 		out.Quota.Storage = p.Spec.Quota.Storage.String()
 	}
+	if p.Spec.Quota.RegistryStorage != nil {
+		out.Quota.RegistryStorage = p.Spec.Quota.RegistryStorage.String()
+	}
 	if p.Spec.Quota.Volumes != nil {
 		out.Quota.Volumes = *p.Spec.Quota.Volumes
 	}

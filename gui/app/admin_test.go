@@ -49,3 +49,24 @@ func TestApplyProjectQuotaRejectsBadStorage(t *testing.T) {
 		t.Error("expected parse error for storage")
 	}
 }
+
+// The edit form shows what the Project holds, and saving it unchanged keeps
+// every limit. Registry storage was dropped on the way to the form, so saving
+// an untouched project cleared it.
+func TestToProjectKeepsRegistryStorageThroughSave(t *testing.T) {
+	registry := resource.MustParse("200Gi")
+	storage := resource.MustParse("1Ti")
+	p := &v1.Project{}
+	p.Spec.Quota = v1.ProjectQuota{Storage: &storage, RegistryStorage: &registry}
+
+	form := toProject(p).Quota
+	if form.RegistryStorage != "200Gi" {
+		t.Fatalf("form RegistryStorage = %q, want 200Gi", form.RegistryStorage)
+	}
+	if err := applyProjectQuota(&p.Spec.Quota, form); err != nil {
+		t.Fatal(err)
+	}
+	if p.Spec.Quota.RegistryStorage == nil || p.Spec.Quota.RegistryStorage.Cmp(registry) != 0 {
+		t.Errorf("saving the form changed RegistryStorage to %v", p.Spec.Quota.RegistryStorage)
+	}
+}

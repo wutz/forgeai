@@ -200,6 +200,9 @@ export const en = {
   'deps.agent-sandbox.desc': 'Sandbox controller and CRDs for the Sandboxes view',
   'deps.forgeai.title': 'forgeai operator',
   'deps.forgeai.desc': 'Projects, instance types and the controllers; installed from the Helm chart',
+  'deps.msg.crdsInstalled': '{found} of {wanted} CRDs installed',
+  'deps.msg.notAvailable': 'Not available: {deployments}',
+  'deps.msg.installing': 'Installing',
 }
 
 export const zh: Record<keyof typeof en, string> = {
@@ -401,4 +404,7 @@ export const zh: Record<keyof typeof en, string> = {
   'deps.agent-sandbox.desc': '沙箱视图所需的 Sandbox 控制器与 CRD',
   'deps.forgeai.title': 'forgeai operator',
   'deps.forgeai.desc': '项目、实例类型与各控制器；通过 Helm chart 安装',
+  'deps.msg.crdsInstalled': '已安装 {found}/{wanted} 个 CRD',
+  'deps.msg.notAvailable': '未就绪：{deployments}',
+  'deps.msg.installing': '安装中',
 }

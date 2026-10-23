@@ -225,7 +225,8 @@ function desc(name: string, fallback = ''): string {
 }
 
 // detail is the line under a component's status. The view words the cases it
-// has a reason for; the other messages are backend diagnostics, shown as written.
+// has a reason for, and the diagnostics the backend keys; any other message is
+// shown as the backend wrote it.
 function detail(d: app.Dependency): string {
   if (d.status === 'missing') return '' // the status label already says it
   if (d.status === 'outdated') return t('deps.outdated', {installed: d.installed, pinned: d.pinned})
@@ -234,6 +235,11 @@ function detail(d: app.Dependency): string {
     case 'unmanagedHelm': return t('deps.reason.unmanagedHelm')
     case 'namespaceMismatch': return t('deps.reason.namespaceMismatch', {namespace: d.namespace, expected: d.expectedNamespace ?? ''})
     case 'operatorMissing': return t('deps.reason.operatorMissing')
+  }
+  if (d.messageKey) {
+    const key = `deps.msg.${d.messageKey}`
+    const text = t(key as MessageKey, d.messageArgs)
+    if (text !== key) return text
   }
   return d.message
 }

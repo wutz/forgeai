@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"strings"
 	"sync"
 	"time"
 
@@ -140,8 +141,19 @@ type Dependency struct {
 	// ExpectedNamespace is where the platform config expects the component when
 	// Reason is namespaceMismatch.
 	ExpectedNamespace string `json:"expectedNamespace,omitempty"`
-	Message           string `json:"message"`
-	Installable       bool   `json:"installable"`
+	// Message is the English diagnostic. MessageKey and MessageArgs name the same
+	// diagnostic for the GUI to word in the user's language. Empty when the GUI
+	// words the state from Status or Reason.
+	Message     string            `json:"message"`
+	MessageKey  string            `json:"messageKey,omitempty"`
+	MessageArgs map[string]string `json:"messageArgs,omitempty"`
+	Installable bool              `json:"installable"`
+}
+
+// diagnose sets the diagnostic of a state: the English text, and the key and
+// values the GUI words it with.
+func diagnose(dep *Dependency, key string, args map[string]string, english string) {
+	dep.Message, dep.MessageKey, dep.MessageArgs = english, key, args
 }
 
 // depRecord is the provenance of one install, stored in depRecordName.
@@ -281,7 +293,9 @@ func assess(dep *Dependency, h depHealth) {
 	}
 	if h.crdsFound < h.crdsWanted {
 		dep.Status = "degraded"
-		dep.Message = fmt.Sprintf("%d of %d CRDs installed", h.crdsFound, h.crdsWanted)
+		diagnose(dep, "crdsInstalled", map[string]string{
+			"found": fmt.Sprint(h.crdsFound), "wanted": fmt.Sprint(h.crdsWanted),
+		}, fmt.Sprintf("%d of %d CRDs installed", h.crdsFound, h.crdsWanted))
 		return
 	}
 	if dep.Name == "forgeai" && len(h.deployments) == 0 {
@@ -301,7 +315,9 @@ func assess(dep *Dependency, h depHealth) {
 	}
 	if len(notReady) > 0 {
 		dep.Status = "degraded"
-		dep.Message = fmt.Sprintf("Not available: %v", notReady)
+		diagnose(dep, "notAvailable", map[string]string{
+			"deployments": strings.Join(notReady, ", "),
+		}, fmt.Sprintf("Not available: %v", notReady))
 		return
 	}
 	if h.expectNamespace != "" && h.namespace != "" && h.namespace != h.expectNamespace {
@@ -377,7 +393,8 @@ func (a *App) ListDependencies() (*Dependencies, error) {
 			dep.AppliedBy, dep.AppliedAt = r.AppliedBy, r.AppliedAt
 		}
 		if a.installs.active(installKey(c, info.name)) {
-			dep.Status, dep.Message = "installing", "Installing"
+			dep.Status = "installing"
+			diagnose(&dep, "installing", nil, "Installing")
 		}
 		out.Items = append(out.Items, dep)
 	}

@@ -39,6 +39,8 @@ export namespace app {
 	    reason?: string;
 	    expectedNamespace?: string;
 	    message: string;
+	    messageKey?: string;
+	    messageArgs?: Record<string, string>;
 	    installable: boolean;
 
 	    static createFrom(source: any = {}) {
@@ -59,6 +61,8 @@ export namespace app {
 	        this.reason = source["reason"];
 	        this.expectedNamespace = source["expectedNamespace"];
 	        this.message = source["message"];
+	        this.messageKey = source["messageKey"];
+	        this.messageArgs = source["messageArgs"];
 	        this.installable = source["installable"];
 	    }
 	}

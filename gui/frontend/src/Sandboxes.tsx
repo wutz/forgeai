@@ -102,7 +102,7 @@ function SandboxTable({boxes, selected, onSelect}: {
         </thead>
         <tbody>
         {boxes.map(b => (
-          <tr key={b.name} className={selected === b.name ? 'selected' : ''}
+          <tr key={b.name} className={selected === b.name ? 'clickable selected' : 'clickable'}
               onClick={() => onSelect(b.name)}>
             <td className="mono">
               <button type="button" className="row-name cell-main">{b.name}</button>

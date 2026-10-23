@@ -150,7 +150,7 @@ function JobTable({jobs, filtered, selected, onSelect}: {
         </thead>
         <tbody>
         {jobs.map(j => (
-          <tr key={j.name} className={selected === j.name ? 'selected' : ''}
+          <tr key={j.name} className={selected === j.name ? 'clickable selected' : 'clickable'}
               onClick={() => onSelect(j.name)}>
             <td className="mono">
               <button type="button" className="row-name cell-main">{j.name}</button>

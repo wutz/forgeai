@@ -176,7 +176,7 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
               <thead><tr><th>{t('overview.colJob')}</th><th>{t('common.status')}</th><th>{t('overview.colReady')}</th><th>{t('common.created')}</th></tr></thead>
               <tbody>
               {jobs.slice(0, 6).map(j => (
-                <tr key={j.name} onClick={() => onOpen('jobs')}>
+                <tr key={j.name} className="clickable" onClick={() => onOpen('jobs')}>
                   <td className="mono trunc" title={j.name}><button type="button" className="row-name">{j.name}</button></td>
                   <td><Status phase={j.phase}/></td>
                   <td className="muted">{j.ready}/{j.workers}</td>

@@ -1,6 +1,6 @@
 import {FormEvent, useEffect, useState} from 'react'
 import {
-  CreateVolume, ListVolumes, ResizeVolume, RestoreVolume, SetVolumeExpiry,
+  CreateVolume, ListVolumes, ResetVolumeExpiry, ResizeVolume, RestoreVolume, SetVolumeExpiry,
   TrashVolume, PurgeVolume, Config, FileServerPhase,
 } from '../wailsjs/go/app/App'
 import {app, volumes as vol} from '../wailsjs/go/models'
@@ -361,10 +361,25 @@ function ExpiryDialog({volume, onClose, onDone}: {
       setError(errText(e)); setBusy(false)
     })
   }
+  // The default is computed on the server from the project's retention, so the
+  // dialog does not guess it; the recycle bin shows the date it lands on.
+  const useDefault = () => {
+    setBusy(true)
+    setError('')
+    ResetVolumeExpiry(volume.name).then(() => {
+      onDone()
+      onClose()
+    }).catch(e => {
+      setError(errText(e)); setBusy(false)
+    })
+  }
   return (
     <Dialog title={t('volumes.expiryTitle', {name: volume.name})} subtitle={t('volumes.expirySubtitle')}
             width={440} onClose={onClose} busy={busy} footer={<>
               <CancelButton/>
+              <button type="button" className="btn" disabled={busy} onClick={useDefault}>
+                {t('volumes.useDefault')}
+              </button>
               <button type="submit" form="expiry-volume" className="btn btn-primary" disabled={busy || !dayOK}>
                 {busy ? t('volumes.saving') : t('common.save')}
               </button>
@@ -375,7 +390,9 @@ function ExpiryDialog({volume, onClose, onDone}: {
           <label htmlFor="v-expiry">{t('volumes.purgeDay')}</label>
           <input id="v-expiry" className="input" type="date" min={tomorrow} value={day}
                  onChange={e => setDay(e.target.value)} aria-invalid={!dayOK} required/>
-          {day !== '' && !dayOK && <span className="hint hint-error">{t('volumes.purgeDayTooSoon')}</span>}
+          {day !== '' && !dayOK
+            ? <span className="hint hint-error">{t('volumes.purgeDayTooSoon')}</span>
+            : <span className="hint">{t('volumes.useDefaultHint')}</span>}
         </div>
       </form>
     </Dialog>

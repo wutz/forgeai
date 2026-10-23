@@ -52,6 +52,8 @@ export const en = {
   'volumes.expiryTitle': 'Set purge date for {name}',
   'volumes.expirySubtitle': 'Restore keeps the volume; purge is final',
   'volumes.purgeDay': 'Purge day',
+  'volumes.useDefault': 'Use default date',
+  'volumes.useDefaultHint': 'The default is the project\'s trash retention, counted from when the volume was moved to the trash.',
   'volumes.purgeDayTooSoon': 'Choose a day from tomorrow on.',
   'volumes.saving': 'Saving…',
 
@@ -169,6 +171,8 @@ export const zh: Record<keyof typeof en, string> = {
   'volumes.expiryTitle': '设置 {name} 的彻底删除日期',
   'volumes.expirySubtitle': '恢复会保留存储卷；彻底删除不可撤销',
   'volumes.purgeDay': '彻底删除日期',
+  'volumes.useDefault': '改回默认日期',
+  'volumes.useDefaultHint': '默认日期为项目的回收站保留期，从存储卷移入回收站时开始计算。',
   'volumes.purgeDayTooSoon': '请选择明天或之后的日期。',
   'volumes.saving': '保存中…',
 

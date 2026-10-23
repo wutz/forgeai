@@ -319,3 +319,45 @@ func TestTrashWaitsForUnfinishedJobs(t *testing.T) {
 		})
 	}
 }
+
+// TestResetExpiry checks that the default purge time is retention after the
+// volume was trashed, under the retention in force now, and that it is refused
+// once that time has passed.
+func TestResetExpiry(t *testing.T) {
+	ctx := context.Background()
+	k8s := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+	now := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	c := &Client{K8s: k8s, Namespace: "forge-a", Now: func() time.Time { return now }}
+	cfg, _ := platform.Parse([]byte("storageTypes: {shared: {storageClass: sc}}\ndefaultStorageType: shared"))
+	if _, err := c.Create(ctx, cfg, "data", "", 10); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.ResetExpiry(ctx, "data", time.Hour); err == nil {
+		t.Fatal("reset must require the trash")
+	}
+	if _, err := c.Trash(ctx, "data", 48*time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.SetExpiry(ctx, "data", now.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+
+	// The project now keeps trash for 7 days: the default counts from the trash time.
+	v, err := c.ResetExpiry(ctx, "data", 7*24*time.Hour)
+	if err != nil || v.ExpireAt != "2026-10-08T00:00:00Z" {
+		t.Fatalf("reset %+v %v", v, err)
+	}
+	if v.TrashedAt != "2026-10-01T00:00:00Z" {
+		t.Errorf("trashed-at changed: %q", v.TrashedAt)
+	}
+
+	// A default that has already passed is refused, and the purge time is kept.
+	now = time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC)
+	if _, err := c.ResetExpiry(ctx, "data", 7*24*time.Hour); !errors.Is(err, ErrPastExpiry) {
+		t.Fatalf("reset past its default: %v", err)
+	}
+	live, _ := c.List(ctx, true)
+	if len(live) != 1 || live[0].ExpireAt != "2026-10-08T00:00:00Z" {
+		t.Fatalf("expiry changed after refusal: %+v", live)
+	}
+}

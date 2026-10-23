@@ -88,6 +88,8 @@ export function Registry():Promise<app.Registry>;
 
 export function RerunJob(arg1:string,arg2:string):Promise<app.Job>;
 
+export function ResetVolumeExpiry(arg1:string):Promise<volumes.Volume>;
+
 export function ResizeSandboxTerminal(arg1:string,arg2:number,arg3:number):Promise<void>;
 
 export function ResizeVolume(arg1:string,arg2:number):Promise<volumes.Volume>;

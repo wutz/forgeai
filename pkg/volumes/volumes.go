@@ -428,6 +428,35 @@ func (c *Client) SetExpiry(ctx context.Context, name string, at time.Time) (*Vol
 	return &v, nil
 }
 
+// ResetExpiry puts a trashed volume's purge time back to the default: retention
+// after it was trashed, under the retention its project has now. A volume with
+// no trash time counts from now, as the controller does for one labelled by hand.
+func (c *Client) ResetExpiry(ctx context.Context, name string, retention time.Duration) (*Volume, error) {
+	pvc, err := c.get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	if !InTrash(pvc) {
+		return nil, fmt.Errorf("volume %s is not in the trash", name)
+	}
+	now := c.now()
+	base := now
+	if trashedAt, err := time.Parse(time.RFC3339, pvc.Annotations[naming.AnnotationTrashedAt]); err == nil {
+		base = trashedAt
+	}
+	at := base.Add(retention)
+	if !at.After(now) {
+		return nil, ErrPastExpiry
+	}
+	patch := client.MergeFrom(pvc.DeepCopy())
+	pvc.Annotations[naming.AnnotationExpireAt] = at.UTC().Format(time.RFC3339)
+	if err := c.K8s.Patch(ctx, pvc, patch); err != nil {
+		return nil, err
+	}
+	v := toVolume(pvc, nil)
+	return &v, nil
+}
+
 // Restore takes a volume out of the trash.
 func (c *Client) Restore(ctx context.Context, name string) (*Volume, error) {
 	pvc, err := c.get(ctx, name)

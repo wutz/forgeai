@@ -176,7 +176,9 @@ export function Images() {
                             const key = `address-${img.digest}-${tag}`
                           return (
                             <span key={tag} style={{display: 'inline-flex', gap: 2}}>
+                              {/* The name carries the address, not only the tag: the same tag exists in several repositories. */}
                               <button className="btn btn-sm mono" title={t('images.copyAddress')}
+                                      aria-label={`${t('images.copyAddress')}: ${address(r.name, tag)}`}
                                       onClick={() => copy(address(r.name, tag), key)}>
                                 <Icon name={copied === key ? 'check' : 'copy'} size={12}/>{tag}
                               </button>

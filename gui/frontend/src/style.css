@@ -137,7 +137,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 /* Card / table */
 .card { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius-md); }
 .card-head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--hairline); }
-.card-head h3 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.32px; }
+.card-head h2 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.32px; }
 
 .table { width: 100%; border-collapse: collapse; }
 .table th { text-align: left; font-size: 12px; font-weight: 500; color: var(--mute); padding: 10px 16px; border-bottom: 1px solid var(--hairline); }
@@ -163,13 +163,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .kv dt { color: var(--mute); }
 .kv dd { margin: 0; overflow-wrap: anywhere; }
 .section { padding: 16px; border-top: 1px solid var(--hairline); }
-.section h4 { margin: 0 0 10px; font-size: 13px; font-weight: 600; }
+.section h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; }
 .actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .logs {
   margin: 0; height: 280px; overflow: auto; padding: 12px; border-radius: var(--radius-sm);
   background: var(--ink); color: #ededed; font-family: var(--mono); font-size: 12px; line-height: 18px; white-space: pre-wrap;
 }
-.tabs h4 { margin: 0; }
 
 /* Banner / empty */
 .banner { padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 16px; }

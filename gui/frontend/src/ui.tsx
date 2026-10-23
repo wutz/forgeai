@@ -146,7 +146,7 @@ export function Card({title, subtitle, actions, children, className = ''}: {
       {(title || actions) && (
         <div className="card-head">
           <div>
-            {title && <h3 className="card-title">{title}</h3>}
+            {title && <h2 className="card-title">{title}</h2>}
             {subtitle && <div className="card-sub">{subtitle}</div>}
           </div>
           {actions && <div className="card-head-actions">{actions}</div>}

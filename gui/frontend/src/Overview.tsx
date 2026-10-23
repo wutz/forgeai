@@ -12,8 +12,10 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
   // jobs and types are null until their first read, so a failed read is not shown as an empty list.
   const [jobs, setJobs] = useState<app.Job[] | null>(null)
   const [types, setTypes] = useState<app.InstanceType[] | null>(null)
-  const [vols, setVols] = useState<volumes.Volume[]>([])
-  const [images, setImages] = useState<app.ImageRepo[]>([])
+  // vols, images and quota stay null until their first read, so the figures
+  // show a dash instead of a zero or a claim of no usage when a read fails.
+  const [vols, setVols] = useState<volumes.Volume[] | null>(null)
+  const [images, setImages] = useState<app.ImageRepo[] | null>(null)
   const [quota, setQuota] = useState<app.QuotaUsage | null>(null)
   const [error, setError] = useState('')
   const [loaded, setLoaded] = useState(false)
@@ -73,8 +75,8 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
   const gpuFree = gpuTypes.reduce((n, ty) => n + ty.free * ty.gpuCount, 0)
   const gpuUsed = Math.max(0, gpuTotal - gpuFree)
 
-  const storageGiB = vols.reduce((n, v) => n + (v.capacityGiB || v.requestedGiB || 0), 0)
-  const totalTags = images.reduce((n, r) => n + tagCount(r), 0)
+  const storageGiB = (vols ?? []).reduce((n, v) => n + (v.capacityGiB || v.requestedGiB || 0), 0)
+  const totalTags = images === null ? null : images.reduce((n, r) => n + tagCount(r), 0)
 
   if (!loaded) return <div className="page"><Spinner label={t('overview.loading')}/></div>
 
@@ -195,21 +197,21 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
           <div className="stat-row">
             <div className="stat">
               <div className="stat-label">{t('overview.volumes')}</div>
-              <div className="stat-value">{vols.length}</div>
-              <div className="stat-detail">{storageGiB ? t('overview.allocated', {size: storageGiB}) : t('overview.noneYet')}</div>
+              <div className="stat-value">{vols ? vols.length : '—'}</div>
+              <div className="stat-detail">{vols === null ? '—' : storageGiB ? t('overview.allocated', {size: storageGiB}) : t('overview.noneYet')}</div>
               <button className="btn btn-sm btn-ghost" onClick={() => onOpen('volumes')}>
                 {t('overview.manage')}<Icon name="chevron" size={13}/>
               </button>
             </div>
             <div className="stat">
               <div className="stat-label">{t('overview.storageQuota')}</div>
-              <div className="stat-value">{quota?.storage || '∞'}</div>
-              <div className="stat-detail">{quota?.storageUsed ? t('overview.storageUsed', {used: quota.storageUsed}) : t('overview.nothingUsed')}</div>
+              <div className="stat-value">{quota ? (quota.storage || '∞') : '—'}</div>
+              <div className="stat-detail">{quota === null ? '—' : quota.storageUsed ? t('overview.storageUsed', {used: quota.storageUsed}) : t('overview.nothingUsed')}</div>
             </div>
             <div className="stat">
               <div className="stat-label">{t('overview.imageTags')}</div>
-              <div className="stat-value">{totalTags}</div>
-              <div className="stat-detail">{images.length === 1 ? t('overview.repositoryOne') : t('overview.repositories', {count: images.length})}</div>
+              <div className="stat-value">{totalTags ?? '—'}</div>
+              <div className="stat-detail">{images === null ? '—' : images.length === 1 ? t('overview.repositoryOne') : t('overview.repositories', {count: images.length})}</div>
               <button className="btn btn-sm btn-ghost" onClick={() => onOpen('images')}>
                 {t('overview.imagesButton')}<Icon name="chevron" size={13}/>
               </button>

@@ -275,7 +275,7 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
     <Card className="detail">
       <div className="card-head">
         <div className="detail-title">
-          <h3 className="mono">{job.name}</h3>
+          <h2 className="mono">{job.name}</h2>
           <div className="card-sub">{t('jobs.detailSub', {
             template: job.template || t('jobs.defaultRuntime'), created: fmtDate(job.created),
           })}</div>
@@ -364,7 +364,7 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
 
               {job.retries?.length > 0 && (
                 <>
-                  <h4 className="sub-head">{t('jobs.retries')}</h4>
+                  <h3 className="sub-head">{t('jobs.retries')}</h3>
                   <div className="mini-table">
                     {job.retries.map(r => (
                       <button key={r.name} className="mini-row" onClick={() => onOpen(r.name)}>

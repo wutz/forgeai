@@ -225,7 +225,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
     <Card className="detail">
       <div className="card-head">
         <div className="detail-title">
-          <h3 className="mono">{box.name}</h3>
+          <h2 className="mono">{box.name}</h2>
           <div className="card-sub">{box.runtimeClass || 'runc'} · {t('sandboxes.createdAt', {date: fmtDate(box.created)})}</div>
         </div>
         <div className="card-head-actions"><Status phase={box.phase}/></div>

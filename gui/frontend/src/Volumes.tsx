@@ -57,7 +57,7 @@ export function Volumes() {
         {(phase === null || phase === 'Ready' || phase === 'Starting') && v.accessMode === 'ReadWriteMany' && <>
           <br/><br/>
           <span className="banner banner-warn" style={{display: 'block'}}>
-            {t('volumes.trashServerWarn')}
+            {t(phase === null ? 'volumes.trashServerUnknown' : 'volumes.trashServerWarn')}
           </span>
         </>}
       </>,

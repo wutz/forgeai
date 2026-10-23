@@ -70,7 +70,7 @@ export function Dependencies() {
   }), [])
 
   const install = (d: app.Dependency) => confirm.ask({
-    title: t('deps.confirmTitle', {action: verb(d), name: title(d.name)}),
+    title: t('deps.confirmTitle', {action: verb(d), name: title(d.name, d.title)}),
     message: <>
       {t(d.name === 'forgeai' ? 'deps.chartConfirmMessage' : 'deps.confirmMessage', {version: d.pinned})}
       {d.name === 'agent-sandbox' && ` ${t('deps.restartNote')}`}
@@ -136,8 +136,8 @@ export function Dependencies() {
                 <Fragment key={d.name}>
                 <tr>
                   <td>
-                    <span className="cell-main">{title(d.name)}</span>
-                    <span className="cell-sub">{desc(d.name)}</span>
+                    <span className="cell-main">{title(d.name, d.title)}</span>
+                    <span className="cell-sub">{desc(d.name, d.description)}</span>
                   </td>
                   <td className="mono">
                     {d.installed || <span className="muted">—</span>}
@@ -209,13 +209,19 @@ function InstallSteps({name, step}: {name: string, step: string}) {
 }
 
 // title and desc are the translated text of a component, keyed by its name in
-// the Go catalog.
-function title(name: string): string {
-  return t(`deps.${name}.title` as MessageKey)
+// the Go catalog. A component the UI has no copy for shows the backend text
+// rather than its message key.
+function copy(key: string, fallback: string): string {
+  const text = t(key as MessageKey)
+  return text === key ? fallback : text
 }
 
-function desc(name: string): string {
-  return t(`deps.${name}.desc` as MessageKey)
+function title(name: string, fallback = name): string {
+  return copy(`deps.${name}.title`, fallback)
+}
+
+function desc(name: string, fallback = ''): string {
+  return copy(`deps.${name}.desc`, fallback)
 }
 
 // detail is the line under a component's status. The view words the cases it

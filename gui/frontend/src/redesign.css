@@ -429,14 +429,14 @@ code {
 .split .table th, .split .table td { overflow: hidden; text-overflow: ellipsis; }
 .split .table .cell-main, .split .table .cell-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .detail-title { min-width: 0; }
-.detail-title h3 { overflow-wrap: anywhere; }
+.detail-title h2 { overflow-wrap: anywhere; }
 .detail-actions {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
   padding: 12px 18px; border-bottom: 1px solid var(--hairline-soft);
 }
 .section { padding: 16px 18px; }
 .detail .section { border-top: none; }
-.section h4 { font-size: 13px; font-weight: 600; letter-spacing: -0.2px; }
+.section h3 { font-size: 13px; font-weight: 600; letter-spacing: -0.2px; }
 .kv { grid-template-columns: 96px minmax(0, 1fr); gap: 9px 14px; font-size: 12.5px; margin: 0; }
 .sub-head { margin: 20px 0 8px; font-size: 12px; font-weight: 500; color: var(--mute); }
 pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 18px; }

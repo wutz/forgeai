@@ -19,7 +19,7 @@ export function Volumes() {
   const [configError, setConfigError] = useState('')
   const [creating, setCreating] = useState(false)
   const [growing, setGrowing] = useState<vol.Volume | null>(null)
-  const [expiring, setExpiring] = useState<vol.Volume | null>(null)
+  const [recycling, setRecycling] = useState(false)
   const confirm = useConfirm()
   const active = useActive()
 
@@ -56,12 +56,6 @@ export function Volumes() {
       action: t('volumes.moveToTrash'), danger: true,
       run: () => TrashVolume(v.name).then(refresh).catch(e => setError(errText(e))),
     }))
-  const purgeVolume = (v: vol.Volume) => confirm.ask({
-    title: t('volumes.purgeTitle', {name: v.name}),
-    message: t('volumes.purgeMessage'),
-    action: t('volumes.purgeNow'), danger: true,
-    run: () => PurgeVolume(v.name).then(refresh).catch(e => setError(errText(e))),
-  })
 
   return (
     <div className="page">
@@ -69,15 +63,21 @@ export function Volumes() {
                   meta={<span className="muted" style={{fontSize: 12.5}}>
                     {t('volumes.summary', {count: items.length, size: totalGiB})}
                   </span>}
-                  actions={<button className="btn btn-primary" onClick={() => setCreating(true)}>
-                    <Icon name="plus" size={14}/>{t('volumes.new')}
-                  </button>}/>
+                  actions={<>
+                    <button className="btn" onClick={() => setRecycling(true)}>
+                      <Icon name="trash" size={14}/>{t('volumes.recycleBin')}
+                      {trash.length > 0 && <Badge>{trash.length}</Badge>}
+                    </button>
+                    <button className="btn" onClick={() => setCreating(true)}>
+                      <Icon name="plus" size={14}/>{t('volumes.new')}
+                    </button>
+                  </>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {configError && <div className="banner banner-error" role="alert">{configError}</div>}
       {creating && config && <CreateVolumeDialog config={config} onClose={() => setCreating(false)}
                                                  onCreated={refresh}/>}
       {growing && <ResizeVolumeDialog volume={growing} onClose={() => setGrowing(null)} onDone={refresh}/>}
-      {expiring && <ExpiryDialog volume={expiring} onClose={() => setExpiring(null)} onDone={refresh}/>}
+      {recycling && <RecycleBinDialog volumes={trash} onChanged={refresh} onClose={() => setRecycling(false)}/>}
       {confirm.dialog}
 
       <Card>
@@ -122,38 +122,58 @@ export function Volumes() {
           </table>
         )}
       </Card>
-
-      <h2 className="subtitle">{t('volumes.recycleBin')}</h2>
-      <Card>
-        {trash.length === 0 ? (
-          <Empty icon="trash" title={t('volumes.trashEmpty')}>
-            {t('volumes.trashEmptyHint')}
-          </Empty>
-        ) : (
-          <table className="table">
-            <thead><tr><th>{t('common.name')}</th><th>{t('volumes.size')}</th><th>{t('volumes.purgeAt')}</th><th/></tr></thead>
-            <tbody>
-            {trash.map(v => (
-              <tr key={v.name} className="trashed">
-                <td className="mono">{v.name}</td>
-                <td>{v.capacityGiB || v.requestedGiB} GiB</td>
-                <td className="muted">{v.expireAt ? fmtDate(v.expireAt) : '—'}</td>
-                <td>
-                  <div className="actions">
-                    <button className="btn btn-sm" onClick={() =>
-                      RestoreVolume(v.name).then(refresh).catch(e => setError(errText(e)))}>{t('volumes.restore')}</button>
-                    <button className="btn btn-sm" onClick={() => setExpiring(v)}>{t('volumes.setExpiry')}</button>
-                    <button className="btn btn-sm btn-danger" onClick={() => purgeVolume(v)}>{t('volumes.purgeNow')}</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            </tbody>
-          </table>
-        )}
-      </Card>
     </div>
   )
+}
+
+// RecycleBinDialog manages trashed volumes behind the header button, so the
+// page carries no list of them. It sits over the page, so its own errors and
+// purge confirmation render inside it rather than in the page banner.
+function RecycleBinDialog({volumes, onChanged, onClose}: {
+  volumes: vol.Volume[], onChanged: () => void, onClose: () => void
+}) {
+  const [error, setError] = useState('')
+  const [expiring, setExpiring] = useState<vol.Volume | null>(null)
+  const confirm = useConfirm()
+
+  const restore = (v: vol.Volume) => RestoreVolume(v.name).then(onChanged).catch(e => setError(errText(e)))
+  const purge = (v: vol.Volume) => confirm.ask({
+    title: t('volumes.purgeTitle', {name: v.name}),
+    message: t('volumes.purgeMessage'),
+    action: t('volumes.purgeNow'), danger: true,
+    run: () => PurgeVolume(v.name).then(onChanged).catch(e => setError(errText(e))),
+  })
+
+  return <>
+    <Dialog title={t('volumes.recycleBin')} subtitle={t('volumes.trashEmptyHint')} width={720} onClose={onClose}>
+      {error && <div className="banner banner-error" role="alert">{error}</div>}
+      {volumes.length === 0 ? (
+        <Empty icon="trash" title={t('volumes.trashEmpty')}/>
+      ) : (
+        <table className="table recycle">
+          <thead><tr><th>{t('common.name')}</th><th>{t('volumes.size')}</th><th>{t('volumes.purgeAt')}</th><th/></tr></thead>
+          <tbody>
+          {volumes.map(v => (
+            <tr key={v.name} className="trashed">
+              <td className="mono">{v.name}</td>
+              <td className="mono">{v.capacityGiB || v.requestedGiB} GiB</td>
+              <td className="muted">{v.expireAt ? fmtDate(v.expireAt) : '—'}</td>
+              <td>
+                <div className="actions">
+                  <button className="btn btn-sm" onClick={() => restore(v)}>{t('volumes.restore')}</button>
+                  <button className="btn btn-sm" onClick={() => setExpiring(v)}>{t('volumes.setExpiry')}</button>
+                  <button className="btn btn-sm btn-danger" onClick={() => purge(v)}>{t('volumes.purgeNow')}</button>
+                </div>
+              </td>
+            </tr>
+          ))}
+          </tbody>
+        </table>
+      )}
+    </Dialog>
+    {expiring && <ExpiryDialog volume={expiring} onClose={() => setExpiring(null)} onDone={onChanged}/>}
+    {confirm.dialog}
+  </>
 }
 
 function CreateVolumeDialog({config, onClose, onCreated}: {
@@ -180,7 +200,7 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
     <Dialog title={t('volumes.new')} subtitle={t('volumes.createSubtitle')} width={440}
             onClose={onClose} footer={<>
               <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
-              <button type="submit" form="create-volume" className="btn btn-primary" disabled={busy}>
+              <button type="submit" form="create-volume" className="btn" disabled={busy}>
                 {busy ? t('volumes.creating') : t('volumes.createVolume')}
               </button>
             </>}>

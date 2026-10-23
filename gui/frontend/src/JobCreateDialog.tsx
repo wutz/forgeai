@@ -80,7 +80,7 @@ export function JobCreateDialog({onClose, onCreated}: {
     <Dialog title={t('jobCreate.title')} subtitle={t('jobCreate.subtitle')}
             onClose={onClose} footer={<>
               <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
-              <button type="submit" form="job-form" className="btn btn-primary" disabled={busy || !f.name || !f.image || !mountsOK}>
+              <button type="submit" form="job-form" className="btn" disabled={busy || !f.name || !f.image || !mountsOK}>
                 {busy ? t('jobCreate.creating') : t('jobCreate.create')}
               </button>
             </>}>

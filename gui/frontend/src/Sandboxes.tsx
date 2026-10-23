@@ -45,7 +45,7 @@ export function Sandboxes() {
                   meta={<span className="muted" style={{fontSize: 12.5}}>
                     {t('sandboxes.runningCount', {running, total: boxes.length})}
                   </span>}
-                  actions={<button className="btn btn-primary" onClick={() => setCreating(true)}>
+                  actions={<button className="btn" onClick={() => setCreating(true)}>
                     <Icon name="plus" size={14}/>{t('sandboxes.new')}
                   </button>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}

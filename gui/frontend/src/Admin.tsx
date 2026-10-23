@@ -48,7 +48,7 @@ export function Admin() {
                   meta={<span className="muted" style={{fontSize: 12.5}}>
                     {t('admin.meta', {total: projects.length, ready})}
                   </span>}
-                  actions={<button className="btn btn-primary" onClick={() => edit('')}>
+                  actions={<button className="btn" onClick={() => edit('')}>
                     <Icon name="plus" size={14}/>{t('admin.newProject')}
                   </button>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
@@ -176,7 +176,7 @@ function ProjectDialog({form, onClose, onSaved}: {
             subtitle={t('admin.dialogSubtitle')}
             onClose={onClose} footer={<>
               <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
-              <button type="submit" form="project-form" className="btn btn-primary" disabled={busy || !p.name}>
+              <button type="submit" form="project-form" className={create ? 'btn' : 'btn btn-primary'} disabled={busy || !p.name}>
                 {busy ? t('admin.saving') : create ? t('admin.createProject') : t('common.save')}
               </button>
             </>}>

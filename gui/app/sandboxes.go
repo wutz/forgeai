@@ -122,6 +122,16 @@ func (a *App) CreateSandbox(f sandbox.Form) (*Sandbox, error) {
 	}
 	ctx, cancel := a.call()
 	defer cancel()
+	// A deleted sandbox's pod can outlive its object while it shuts down. A new
+	// sandbox of the same name would then fail, since the controller finds the
+	// pod owned by the old one, so the create waits for the pod to go.
+	if f.Name != "" {
+		if err := c.k8s.Get(ctx, client.ObjectKey{Namespace: c.namespace(), Name: f.Name}, &corev1.Pod{}); err == nil {
+			return nil, fmt.Errorf("sandbox %s is still shutting down; try again once its pod is gone", f.Name)
+		} else if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+	}
 	cfg, err := platform.Load(ctx, c.k8s, c.namespace())
 	if err != nil {
 		return nil, err

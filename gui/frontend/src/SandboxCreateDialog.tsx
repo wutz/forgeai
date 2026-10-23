@@ -106,7 +106,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
               </button>
             </>}>
         <form id="sandbox-form" onSubmit={submit} className="dialog-form">
-          {error && <div className="banner banner-error">{error}</div>}
+          {error && <div className="banner banner-error" role="alert">{error}</div>}
           {templates.length > 0 && (
             <div className="field">
               <label htmlFor="s-template">{t('sandboxCreate.fromTemplate')}</label>

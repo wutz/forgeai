@@ -231,7 +231,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
         </div>
         <div className="card-head-actions"><Status phase={box.phase}/></div>
       </div>
-      {failure && <div className="banner banner-error">{failure}</div>}
+      {failure && <div className="banner banner-error" role="alert">{failure}</div>}
       {savedTemplate && <div className="banner" role="status">{t('sandboxes.savedTemplate', {name: savedTemplate})}</div>}
       {confirm.dialog}
       {saving && <SandboxTemplateDialog initial={sandboxTemplateForm(box)} onClose={() => setSaving(false)}

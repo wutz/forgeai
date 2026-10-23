@@ -245,7 +245,7 @@ function ProjectDialog({form, onClose, onSaved}: {
               </button>
             </>}>
       <form id="project-form" className="dialog-form" onSubmit={save}>
-        {error && <div className="banner banner-error">{error}</div>}
+        {error && <div className="banner banner-error" role="alert">{error}</div>}
         <div className="row">
           <div className="field">
             <label htmlFor="p-name">{t('common.name')}</label>

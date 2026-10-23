@@ -7,6 +7,9 @@ import {CancelButton, Dialog} from './ui'
 import {ImageField} from './ImageField'
 import {Mount, VolumeMountsField, mountProblems} from './VolumeMounts'
 
+// MAX_RETRIES is the most retries a job may ask for; the backend enforces the same bound.
+const MAX_RETRIES = 20
+
 // JobCreateDialog is the "New job" form: template prefill, instance type,
 // workers, volumes, env and retry defaults.
 export function JobCreateDialog({onClose, onCreated}: {
@@ -70,15 +73,19 @@ export function JobCreateDialog({onClose, onCreated}: {
   // The name is a DNS label of at most 50 characters, the TrainJob name limit.
   const nameOK = NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= NAME_MAX
   const workersOK = f.workers >= 1
+  // The platform accepts 0 to 20 retries; the backend rejects anything else.
+  const retries = f.maxRetries ?? 0
+  const retriesOK = Number.isInteger(retries) && retries >= 0 && retries <= MAX_RETRIES
   // blocker says why Create is off. A bad name, worker count or env line already
   // has a hint under its field, so the footer only names the blockers that have none.
   const blocker = !f.name ? t('common.nameRequired')
     : !nameOK ? t('common.nameInvalid', {max: NAME_MAX})
     : !f.image ? t('common.imageRequired')
     : !workersOK ? t('jobCreate.workersInvalid')
+    : !retriesOK ? t('jobCreate.retriesInvalid')
     : !mountsOK ? (vols === null ? t('mounts.loading') : t('mounts.fixFirst'))
     : envBad.length ? t('common.envInvalid', {lines: envBad.join(', ')}) : ''
-  const hasFieldHint = (!nameOK && (f.name ?? '') !== '') || !workersOK || envBad.length > 0
+  const hasFieldHint = (!nameOK && (f.name ?? '') !== '') || !workersOK || !retriesOK || envBad.length > 0
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -108,7 +115,7 @@ export function JobCreateDialog({onClose, onCreated}: {
               </button>
             </>}>
         <form id="job-form" onSubmit={submit} className="dialog-form">
-          {error && <div className="banner banner-error">{error}</div>}
+          {error && <div className="banner banner-error" role="alert">{error}</div>}
           <div className="field">
             <label htmlFor="j-name">{t('common.name')}</label>
             <input id="j-name" className="input mono" value={f.name}
@@ -178,8 +185,10 @@ export function JobCreateDialog({onClose, onCreated}: {
           <div className="row">
             <div className="field">
               <label htmlFor="j-retries">{t('jobCreate.maxRetries')}</label>
-              <input id="j-retries" className="input" type="number" min={0} max={20}
-                     value={f.maxRetries || 0} onChange={e => set('maxRetries', +e.target.value)}/>
+              <input id="j-retries" className="input" type="number" min={0} max={MAX_RETRIES}
+                     value={f.maxRetries || 0} aria-invalid={!retriesOK}
+                     onChange={e => set('maxRetries', +e.target.value)}/>
+              {!retriesOK && <span className="hint hint-error">{t('jobCreate.retriesInvalid')}</span>}
             </div>
             <div className="field">
               <label htmlFor="j-retryon">{t('jobCreate.retryOn')}</label>

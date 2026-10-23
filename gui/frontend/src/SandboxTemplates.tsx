@@ -127,7 +127,7 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
               </button>
             </>}>
       <form id="sandbox-template-form" className="dialog-form" onSubmit={e => { e.preventDefault(); save() }}>
-        {error && <div className="banner banner-error">{error}</div>}
+        {error && <div className="banner banner-error" role="alert">{error}</div>}
         <div className="row">
           <div className="field">
             <label htmlFor="st-name">{t('common.name')}</label>

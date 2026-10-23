@@ -289,7 +289,7 @@ function ResizeVolumeDialog({volume, onClose, onDone}: {
               </button>
             </>}>
       <form id="resize-volume" className="dialog-form" onSubmit={save}>
-        {error && <div className="banner banner-error">{error}</div>}
+        {error && <div className="banner banner-error" role="alert">{error}</div>}
         <div className="field">
           <label htmlFor="v-grow">{t('volumes.newSize')}</label>
           <input id="v-grow" className="input" type="number" min={current + 1} step={1} value={size}
@@ -336,7 +336,7 @@ function ExpiryDialog({volume, onClose, onDone}: {
               </button>
             </>}>
       <form id="expiry-volume" className="dialog-form" onSubmit={save}>
-        {error && <div className="banner banner-error">{error}</div>}
+        {error && <div className="banner banner-error" role="alert">{error}</div>}
         <div className="field">
           <label htmlFor="v-expiry">{t('volumes.purgeDay')}</label>
           <input id="v-expiry" className="input" type="date" min={tomorrow} value={day}

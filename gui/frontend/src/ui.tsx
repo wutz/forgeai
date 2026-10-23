@@ -338,6 +338,8 @@ export type ConfirmRequest = {
   message: ReactNode
   action: string
   danger?: boolean
+  // primary marks an install action; other confirms use the default role.
+  primary?: boolean
   run: () => void
 }
 
@@ -360,7 +362,7 @@ function ConfirmDialog({request, onClose}: {request: ConfirmRequest, onClose: ()
     <Dialog title={request.title} onClose={onClose} width={440} footer={<>
       {/* A destructive confirm opens on Cancel, so a stray Enter does not run it. */}
       <button className="btn" onClick={onClose} autoFocus={!!request.danger}>{t('common.cancel')}</button>
-      <button className={`btn ${request.danger ? 'btn-danger-tint' : 'btn-primary'}`} onClick={go} autoFocus={!request.danger}>
+      <button className={`btn ${request.danger ? 'btn-danger-tint' : request.primary ? 'btn-primary' : ''}`.trim()} onClick={go} autoFocus={!request.danger}>
         {request.action}
       </button>
     </>}>

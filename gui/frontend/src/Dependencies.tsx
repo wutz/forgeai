@@ -71,7 +71,7 @@ export function Dependencies() {
       {t(d.name === 'forgeai' ? 'deps.chartConfirmMessage' : 'deps.confirmMessage', {version: d.pinned})}
       {d.name === 'agent-sandbox' && ` ${t('deps.restartNote')}`}
     </>,
-    action: verb(d),
+    action: verb(d), primary: true,
     run: () => {
       fail('')
       setSteps(s => ({...s, [d.name]: 'starting'}))
@@ -107,7 +107,7 @@ export function Dependencies() {
         <span>{error}</span>
         {retry && offersInstall(retry) && !steps[retry.name] && <>
           <span className="spacer"/>
-          <button className="btn btn-sm" onClick={() => install(retry)}>{t('common.retry')}</button>
+          <button className="btn btn-sm btn-primary" onClick={() => install(retry)}>{t('common.retry')}</button>
         </>}
       </div>}
       {confirm.dialog}
@@ -154,7 +154,7 @@ export function Dependencies() {
                   <td>
                     <div className="actions">
                       {offersInstall(d) && !step && (
-                        <button className="btn btn-sm btn-accent" onClick={() => install(d)}>
+                        <button className="btn btn-sm btn-primary" onClick={() => install(d)}>
                           <Icon name="download" size={13}/>{verb(d)}
                         </button>
                       )}

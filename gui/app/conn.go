@@ -60,6 +60,11 @@ func clientConfig(contextName string) (*rest.Config, string, error) {
 		return nil, "", err
 	}
 	cfg.Timeout = 30 * time.Second
+	// client-go allows 5 requests a second by default. The pages read several objects
+	// at once (the dependency probes, the list polls), so that limit made the reads
+	// queue behind each other on the client; a person's desktop client gets a larger budget.
+	cfg.QPS = 50
+	cfg.Burst = 100
 	return cfg, namespace, nil
 }
 

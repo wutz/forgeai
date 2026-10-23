@@ -116,6 +116,12 @@ function JobTemplateTable({items, failed, onEdit, onDelete}: {
   items: app.Template[] | null, failed: boolean, onEdit: (t: app.Template) => void, onDelete: (name: string) => void
 }) {
   const confirm = useConfirm()
+  // The instance types say which templates name a type the project no longer offers. A failed
+  // read marks nothing, since the list cannot tell an unavailable type from an unread one.
+  const [offered, setOffered] = useState<Set<string> | null>(null)
+  useEffect(() => {
+    ListInstanceTypes().then(ts => setOffered(new Set(ts.map(ty => ty.name)))).catch(() => {})
+  }, [])
   if (!items) return failed ? null : <Spinner label={t('common.loading')}/>
   if (items.length === 0) {
     return (
@@ -141,7 +147,11 @@ function JobTemplateTable({items, failed, onEdit, onDelete}: {
           </td>
           <td className="mono trunc" title={tpl.form?.image}>{tpl.form?.image || '—'}</td>
           <td>{tpl.error ? '—' : (tpl.form?.workers ?? 1)}</td>
-          <td className="mono">{tpl.form?.instanceType || '—'}</td>
+          <td className="mono">{tpl.form?.instanceType
+            ? offered && !offered.has(tpl.form.instanceType)
+              ? <span className="muted">{t('templates.typeUnavailable', {name: tpl.form.instanceType})}</span>
+              : tpl.form.instanceType
+            : '—'}</td>
           <td className="muted">{fmtDate(tpl.created)}</td>
           <td>
             <div className="actions">

@@ -209,6 +209,9 @@ function RecycleBinDialog({volumes, loadError, onChanged, onClose}: {
   </>
 }
 
+// MAX_VOLUME_GIB is the largest volume the platform accepts (1 PiB); the backend rejects more.
+const MAX_VOLUME_GIB = 1 << 20
+
 function CreateVolumeDialog({config, onClose, onCreated}: {
   config: app.PlatformConfig, onClose: () => void, onCreated: () => void
 }) {
@@ -224,7 +227,7 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
   // Checked as the form reads them, so a bad value is named under its field
   // instead of a native browser bubble or a failed create.
   const nameOK = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(name) && name.length <= 50
-  const sizeOK = Number.isInteger(size) && size >= 1
+  const sizeOK = Number.isInteger(size) && size >= 1 && size <= MAX_VOLUME_GIB
   const typeOK = type !== ''
 
   const save = (e: FormEvent) => {
@@ -271,11 +274,11 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
         </div>
         <div className="field">
           <label htmlFor="v-size">{t('volumes.sizeGiB')}</label>
-          <input id="v-size" className="input" type="number" min={1} step={1} value={size}
+          <input id="v-size" className="input" type="number" min={1} max={MAX_VOLUME_GIB} step={1} value={size}
                  aria-invalid={!sizeOK} onChange={e => setSize(+e.target.value)} required/>
           {!sizeOK
-            ? <span className="hint hint-error">{t('volumes.sizeInvalid')}</span>
-            : <span className="hint">{t('volumes.sizeHelp')}</span>}
+            ? <span className="hint hint-error">{t('volumes.sizeInvalid', {max: MAX_VOLUME_GIB})}</span>
+            : <span className="hint">{t('volumes.sizeHelp', {max: MAX_VOLUME_GIB})}</span>}
         </div>
       </form>
     </Dialog>
@@ -291,7 +294,7 @@ function ResizeVolumeDialog({volume, onClose, onDone}: {
   const current = Math.max(volume.capacityGiB || 0, volume.requestedGiB || 0)
   const [size, setSize] = useState(current * 2)
   // A resize only grows: the size is a whole number above the current one.
-  const growOK = Number.isInteger(size) && size > current
+  const growOK = Number.isInteger(size) && size > current && size <= MAX_VOLUME_GIB
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -319,11 +322,11 @@ function ResizeVolumeDialog({volume, onClose, onDone}: {
         {error && <div className="banner banner-error" role="alert">{error}</div>}
         <div className="field">
           <label htmlFor="v-grow">{t('volumes.newSize')}</label>
-          <input id="v-grow" className="input" type="number" min={current + 1} step={1} value={size}
+          <input id="v-grow" className="input" type="number" min={current + 1} max={MAX_VOLUME_GIB} step={1} value={size}
                  aria-invalid={!growOK}
                  onChange={e => setSize(+e.target.value)} required/>
           {!growOK && <span className="hint hint-error">
-            {t('volumes.growTooSmall', {size: current})}
+            {size > MAX_VOLUME_GIB ? t('volumes.growTooLarge', {max: MAX_VOLUME_GIB}) : t('volumes.growTooSmall', {size: current})}
           </span>}
         </div>
       </form>

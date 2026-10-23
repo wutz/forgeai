@@ -151,6 +151,8 @@ function SandboxDetail({name, onDone, onDeleted}: {
   // its own error, so a failed Stop stays shown until the next action.
   const [error, setError] = useState('')
   const [loadError, setLoadError] = useState('')
+  // heartbeatError is the last failed keep-awake call; the next successful beat clears it.
+  const [heartbeatError, setHeartbeatError] = useState('')
   // logError is a failed log read; a successful read clears it, while an action's error stays.
   const [logError, setLogError] = useState('')
   const [tab, setTab] = useState<Tab>('overview')
@@ -221,6 +223,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
     setSaving(false)
     setSavedTemplate('')
     setLoadError('')
+    setHeartbeatError('')
   }, [name])
 
   // The poll runs only while the view is on screen: a hidden detail lets the
@@ -231,12 +234,14 @@ function SandboxDetail({name, onDone, onDeleted}: {
     return everyWhileVisible(reload, 5000)
   }, [name, active])
 
-  const running = box?.phase === 'Running' || box?.phase === 'Pending'
   // The heartbeat keeps a running sandbox from going idle. A stopped one is left alone.
+  // A failed beat is shown: the sandbox may then go idle and be suspended without the user knowing.
+  const running = box?.phase === 'Running' || box?.phase === 'Pending'
   useEffect(() => {
     if (!active || !running) return
-    KeepSandboxAwake(name).catch(() => {})
-    return everyWhileVisible(() => KeepSandboxAwake(name).catch(() => {}), HEARTBEAT)
+    const beat = () => KeepSandboxAwake(name).then(() => setHeartbeatError(''), e => setHeartbeatError(errText(e)))
+    beat()
+    return everyWhileVisible(beat, HEARTBEAT)
   }, [name, active, running])
 
   const failure = error || loadError
@@ -267,6 +272,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
         <div className="card-head-actions"><Status phase={box.phase}/></div>
       </div>
       {failure && <div className="banner banner-error" role="alert">{failure}</div>}
+      {running && heartbeatError && <div className="banner banner-warn" role="status">{t('sandboxes.heartbeatFailed', {error: heartbeatError})}</div>}
       {savedTemplate && <div className="banner" role="status">{t('sandboxes.savedTemplate', {name: savedTemplate})}</div>}
       {confirm.dialog}
       {saving && <SandboxTemplateDialog initial={sandboxTemplateForm(box)} onClose={() => setSaving(false)}
@@ -340,12 +346,12 @@ function SandboxDetail({name, onDone, onDeleted}: {
               <dt>{t('common.created')}</dt><dd>{fmtDate(box.created)}</dd>
             </dl>
           )}
-          {tab === 'terminal' && ((box.containerRunning || box.podUnknown) && box.phase !== 'Stopping'
+          {tab === 'terminal' && ((box.containerRunning || box.podUnknown)
             ? <SandboxTerminal name={box.name}/>
             // The idle box is the terminal's size, so opening it does not shift the layout.
             : <div className="term term-idle">
                 <span role="status">
-                  {containerNote(box) || (box.phase === 'Pending' || box.phase === 'Starting' || box.podPhase === 'Pending'
+                  {containerNote(box) || (box.phase === 'Pending' || box.podPhase === 'Pending'
                       ? t('sandboxes.terminalStarting')
                       : t('sandboxes.startToOpenTerminal'))}
                 </span>

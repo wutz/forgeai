@@ -355,9 +355,10 @@ function ProjectDialog({form, onClose, onSaved}: {
           {(p.members || []).map((m, i) => (
             <div className="row" key={i}>
               <input className="input mono" value={m.name} placeholder={t('admin.usernamePlaceholder')}
+                     aria-label={t('admin.memberName')}
                      autoCapitalize="none" autoCorrect="off" spellCheck={false}
                      onChange={e => setMember(i, e.target.value, m.role)}/>
-              <select className="select" value={m.role}
+              <select className="select" value={m.role} aria-label={t('admin.memberRole')}
                       onChange={e => setMember(i, m.name, e.target.value)}>
                 <option value="edit">{t('admin.roleEdit')}</option>
                 <option value="view">{t('admin.roleView')}</option>

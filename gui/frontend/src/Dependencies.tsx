@@ -204,7 +204,10 @@ function installSteps(name: string): string[] {
 // the one running and the ones to come. The bar counts the step running.
 function InstallSteps({name, step}: {name: string, step: string}) {
   const steps = installSteps(name)
-  const current = Math.max(0, steps.indexOf(step))
+  // Before the first step is reported the install is only starting: no step is current yet,
+  // so the view must not number the first step as running.
+  if (!steps.includes(step)) return <div className="install-steps muted">{t('deps.step.starting')}</div>
+  const current = steps.indexOf(step)
   return (
     <div className="install-steps">
       <Meter value={current + 1} max={steps.length}

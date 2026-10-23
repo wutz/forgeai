@@ -267,11 +267,19 @@ func TestListTemplatesKeepsMalformedSpec(t *testing.T) {
 	names := map[string]bool{}
 	for _, tpl := range list {
 		names[tpl.Name] = true
-		if tpl.Name == "broken-spec" && tpl.Form.Template != "broken-spec" {
-			t.Errorf("malformed template form = %+v, want it named", tpl.Form)
+		if tpl.Name == "broken-spec" && (tpl.Error == "" || tpl.Form != nil) {
+			t.Errorf("malformed template = %+v, want its error and no form", tpl)
 		}
 	}
 	if len(list) != 2 || !names["broken-spec"] || !names["good-spec"] {
 		t.Fatalf("ListTemplates = %+v, want both templates listed", list)
+	}
+	// Only the readable template can prefill a job, so only it is offered.
+	offered, err := a.TemplateNames()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(offered) != 1 || offered[0] != "good-spec" {
+		t.Fatalf("TemplateNames = %v, want only the readable template", offered)
 	}
 }

@@ -74,6 +74,8 @@ export const en = {
   'phase.idle': 'Idle',
   'phase.ready': 'Ready',
   'phase.resizing': 'Resizing',
+  'phase.deleting': 'Deleting',
+  'phase.lost': 'Lost',
   'phase.expired': 'Expired',
   // Top-bar preferences: the theme and language switches.
   'prefs.themeGroup': 'Theme',
@@ -187,6 +189,8 @@ export const zh: Record<keyof typeof en, string> = {
   'phase.idle': '空闲',
   'phase.ready': '就绪',
   'phase.resizing': '调整中',
+  'phase.deleting': '删除中',
+  'phase.lost': '已丢失',
   'phase.expired': '已过期',
   // 顶栏的主题与语言切换。
   'prefs.themeGroup': '主题',

@@ -26,25 +26,30 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
   // The lists are null until the first read, so a failed first read is not shown as an empty list.
   const [sandboxItems, setSandboxItems] = useState<app.SandboxTemplate[] | null>(null)
   const [jobItems, setJobItems] = useState<app.Template[] | null>(null)
-  const [error, setError] = useState('')
+  // Each kind reads and fails on its own: a sandbox template read that is refused
+  // must not hide the job templates, and the other way round.
+  const [sandboxError, setSandboxError] = useState('')
+  const [jobError, setJobError] = useState('')
   const [sandboxDialog, setSandboxDialog] = useState<SandboxDialogState | null>(null)
   const [jobDialog, setJobDialog] = useState<JobDialogState | null>(null)
   const active = useActive()
+  const isSandbox = sandboxes && kind === 'sandbox'
+  const error = isSandbox ? sandboxError : jobError
 
-  const refresh = () => Promise.all([
-    sandboxes ? ListSandboxTemplates() : Promise.resolve<app.SandboxTemplate[]>([]),
-    ListTemplates(),
-  ]).then(([s, j]) => {
-    setSandboxItems(byName(s)); setJobItems(byName(j)); setError('')
-  }).catch(e => setError(errText(e)))
+  const refreshSandbox = () => !sandboxes ? Promise.resolve() : ListSandboxTemplates()
+    .then(s => { setSandboxItems(byName(s)); setSandboxError('') })
+    .catch(e => setSandboxError(errText(e)))
+  const refreshJob = () => ListTemplates()
+    .then(j => { setJobItems(byName(j)); setJobError('') })
+    .catch(e => setJobError(errText(e)))
+  const refresh = () => Promise.all([refreshSandbox(), refreshJob()])
   useEffect(() => { if (active) refresh() }, [active])
 
   const onDeleteSandbox = (name: string) =>
-    DeleteSandboxTemplate(name).then(refresh).catch(e => setError(errText(e)))
+    DeleteSandboxTemplate(name).then(refreshSandbox).catch(e => setSandboxError(errText(e)))
   const onDeleteJob = (name: string) =>
-    DeleteTemplate(name).then(refresh).catch(e => setError(errText(e)))
+    DeleteTemplate(name).then(refreshJob).catch(e => setJobError(errText(e)))
 
-  const isSandbox = sandboxes && kind === 'sandbox'
 
   return (
     <div className="page">
@@ -65,13 +70,15 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
         <span className="spacer"/>
         <button className="btn btn-sm" onClick={() => refresh()}>{t('common.refresh')}</button>
       </div>}
+      {/* Closing a dialog reloads the list: a save that failed on a stale version
+          says to reload, and the reload here gives the reopened edit the current version. */}
       {sandboxDialog &&<SandboxTemplateDialog initial={sandboxDialog.initial} existing={sandboxDialog.existing} version={sandboxDialog.version}
-                                               onClose={() => setSandboxDialog(null)} onSaved={() => {
-        setSandboxDialog(null); refresh()
+                                               onClose={() => { setSandboxDialog(null); refreshSandbox() }} onSaved={() => {
+        setSandboxDialog(null); refreshSandbox()
       }}/>}
       {jobDialog && <TemplateDialog form={jobDialog.form} existing={jobDialog.existing} version={jobDialog.version}
-                                    onClose={() => setJobDialog(null)} onSaved={() => {
-        setJobDialog(null); refresh()
+                                    onClose={() => { setJobDialog(null); refreshJob() }} onSaved={() => {
+        setJobDialog(null); refreshJob()
       }}/>}
 
       {sandboxes && (
@@ -130,14 +137,16 @@ function JobTemplateTable({items, failed, onEdit, onDelete}: {
           <td className="mono">
             <span className="cell-main">{tpl.name}</span>
             {tpl.description && <span className="cell-sub">{tpl.description}</span>}
+            {tpl.error && <span className="cell-sub" role="status">{t('templates.unreadable')}</span>}
           </td>
           <td className="mono trunc" title={tpl.form?.image}>{tpl.form?.image || '—'}</td>
-          <td>{tpl.form?.workers ?? 1}</td>
+          <td>{tpl.error ? '—' : (tpl.form?.workers ?? 1)}</td>
           <td className="mono">{tpl.form?.instanceType || '—'}</td>
           <td className="muted">{fmtDate(tpl.created)}</td>
           <td>
             <div className="actions">
-              <button className="btn btn-sm" onClick={() => onEdit(tpl)}>{t('common.edit')}</button>
+              <button className="btn btn-sm" disabled={!!tpl.error} title={tpl.error ? t('templates.unreadableHint') : undefined}
+                      onClick={() => onEdit(tpl)}>{t('common.edit')}</button>
               <button className="btn btn-sm btn-danger" onClick={() =>
                 confirm.ask({
                   title: t('templates.deleteTitle', {name: tpl.name}),

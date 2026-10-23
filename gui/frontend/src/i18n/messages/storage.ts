@@ -25,6 +25,7 @@ export const en = {
   'volumes.recycleBin': 'Recycle bin',
   'volumes.purgeAt': 'Purge at',
   'volumes.trashEmpty': 'Recycle bin is empty',
+  'volumes.trashLoadFailed': 'Cannot read the recycle bin',
   'volumes.trashEmptyHint': 'Deleted volumes stay here and can be restored until they expire.',
   'volumes.restore': 'Restore',
   'volumes.setExpiry': 'Set purge date',
@@ -68,6 +69,7 @@ export const en = {
 
   'images.title': 'Images',
   'images.summary': 'Repositories: {repos} · Tags: {tags} · Pulls: {pulls}',
+  'images.unlistedCount': '{count} not listed',
   'images.pushTitle': 'Push an image',
   'images.pushSubtitle': 'Log in with the project robot account, then push to the project address',
   'images.copyLogin': 'Copy login',
@@ -139,6 +141,7 @@ export const zh: Record<keyof typeof en, string> = {
   'volumes.recycleBin': '回收站',
   'volumes.purgeAt': '彻底删除时间',
   'volumes.trashEmpty': '回收站为空',
+  'volumes.trashLoadFailed': '无法读取回收站',
   'volumes.trashEmptyHint': '已删除的存储卷会保留在这里，过期前都可以恢复。',
   'volumes.restore': '恢复',
   'volumes.setExpiry': '设置彻底删除日期',
@@ -182,6 +185,7 @@ export const zh: Record<keyof typeof en, string> = {
 
   'images.title': '镜像',
   'images.summary': '仓库：{repos} 个 · 标签：{tags} 个 · 拉取次数：{pulls}',
+  'images.unlistedCount': '{count} 个未能列出',
   'images.pushTitle': '推送镜像',
   'images.pushSubtitle': '使用项目机器人账号登录，然后推送到项目地址',
   'images.copyLogin': '复制登录命令',

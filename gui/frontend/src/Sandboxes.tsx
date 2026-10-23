@@ -95,7 +95,7 @@ function SandboxTable({boxes, failed, selected, onSelect}: {
   }
   return (
     <Card>
-      <table className="table">
+      <table className="table sandbox-table">
         <thead>
         <tr>
           <th>{t('common.name')}</th>
@@ -116,7 +116,9 @@ function SandboxTable({boxes, failed, selected, onSelect}: {
             </td>
             {/* A stopped sandbox's controller message is English and repeats the status label. */}
             <td><Status phase={b.phase}/>{b.phase !== 'Running' && !b.stopped && statusText(b).label &&
-              <div className="cell-sub" title={b.message}>{short(statusText(b).label)}</div>}</td>
+              <div className="cell-sub" title={b.message}>{short(statusText(b).label)}</div>}
+              {b.phase === 'Running' && containerNote(b) &&
+              <div className="cell-sub" title={containerNote(b)}>{short(containerNote(b))}</div>}</td>
             <td>{b.runtimeClass ? <Badge>{b.runtimeClass}</Badge> : <span className="muted">{t('sandboxes.runcNode')}</span>}</td>
             <td className="mono">{b.cpu || '—'}/{b.memory || '—'}{b.gpu ? ` · ${b.gpu} GPU` : ''}</td>
             <td className="mono trunc" title={b.serviceFQDN || b.podIPs?.[0]}>{b.serviceFQDN || b.podIPs?.[0] || '—'}</td>
@@ -149,6 +151,8 @@ function SandboxDetail({name, onDone, onDeleted}: {
   // its own error, so a failed Stop stays shown until the next action.
   const [error, setError] = useState('')
   const [loadError, setLoadError] = useState('')
+  // logError is a failed log read; a successful read clears it, while an action's error stays.
+  const [logError, setLogError] = useState('')
   const [tab, setTab] = useState<Tab>('overview')
   // null until the first read, so the view can tell "reading" from "no output".
   const [log, setLog] = useState<string | null>(null)
@@ -210,6 +214,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
   useEffect(() => {
     setBox(null)
     setLog(null)
+    setLogError('')
     setTab('overview')
     setPending(null)
     setDeleting(false)
@@ -218,37 +223,38 @@ function SandboxDetail({name, onDone, onDeleted}: {
     setLoadError('')
   }, [name])
 
-  // The poll and heartbeat run only while the view is on screen: a hidden
-  // detail lets the sandbox go idle, as it does when the detail closes.
+  // The poll runs only while the view is on screen: a hidden detail lets the
+  // sandbox go idle, as it does when the detail closes.
   useEffect(() => {
     if (!active) return
     reload()
-    const stopPoll = everyWhileVisible(reload, 5000)
-    // Keep the sandbox awake while its detail is open and running.
-    const stopBeat = everyWhileVisible(() => KeepSandboxAwake(name).catch(() => {}), HEARTBEAT)
-    KeepSandboxAwake(name).catch(() => {})
-    return () => {
-      stopPoll()
-      stopBeat()
-    }
+    return everyWhileVisible(reload, 5000)
   }, [name, active])
+
+  const running = box?.phase === 'Running' || box?.phase === 'Pending'
+  // The heartbeat keeps a running sandbox from going idle. A stopped one is left alone.
+  useEffect(() => {
+    if (!active || !running) return
+    KeepSandboxAwake(name).catch(() => {})
+    return everyWhileVisible(() => KeepSandboxAwake(name).catch(() => {}), HEARTBEAT)
+  }, [name, active, running])
 
   const failure = error || loadError
   if (!box) return <Card>{failure
     ? <div className="banner banner-error" role="alert">{failure}</div>
     : <Spinner label={t('sandboxes.loading')}/>}</Card>
-  const running = box.phase === 'Running' || box.phase === 'Pending'
   const busy = pending !== null || deleting
-  // showLog rejects when the logs cannot be read; the banner shows why.
+  // showLog rejects when the logs cannot be read; the log tab shows why.
   const showLog = () =>
-    SandboxLogs(box.name, 500).then(v => { setLog(v); setTab('log') }, e => {
-      setError(errText(e))
+    SandboxLogs(box.name, 500).then(v => { setLog(v); setLogError(''); setTab('log') }, e => {
+      setLogError(errText(e))
       throw e
     })
   // Selecting the log tab loads the logs, since the tab is the only entry point.
+  // The tab opens at once, so a failed read is shown in it rather than hidden.
   const selectTab = (next: Tab) => {
+    setTab(next)
     if (next === 'log') showLog().catch(() => {})
-    else setTab(next)
   }
 
   return (
@@ -327,6 +333,10 @@ function SandboxDetail({name, onDone, onDeleted}: {
                   {statusText(box).detail && <div className="cell-sub mono">{statusText(box).detail}</div>}
                 </dd>
               </>}
+              {box.phase === 'Running' && containerNote(box) && <>
+                <dt>{t('common.status')}</dt>
+                <dd>{containerNote(box)}</dd>
+              </>}
               <dt>{t('common.created')}</dt><dd>{fmtDate(box.created)}</dd>
             </dl>
           )}
@@ -335,11 +345,9 @@ function SandboxDetail({name, onDone, onDeleted}: {
             // The idle box is the terminal's size, so opening it does not shift the layout.
             : <div className="term term-idle">
                 <span role="status">
-                  {box.containerReason && !['ContainerCreating', 'PodInitializing'].includes(box.containerReason)
-                    ? t('sandboxes.containerNotRunning', {reason: box.containerReason})
-                    : box.phase === 'Pending' || box.phase === 'Starting' || box.podPhase === 'Pending'
+                  {containerNote(box) || (box.phase === 'Pending' || box.phase === 'Starting' || box.podPhase === 'Pending'
                       ? t('sandboxes.terminalStarting')
-                      : t('sandboxes.startToOpenTerminal')}
+                      : t('sandboxes.startToOpenTerminal'))}
                 </span>
                 {!running && <button className="btn btn-sm btn-accent" disabled={busy}
                                      onClick={() => transition('start', StartSandbox(box.name))}>
@@ -347,7 +355,10 @@ function SandboxDetail({name, onDone, onDeleted}: {
                   {pending === 'start' ? t('sandboxes.starting') : t('common.start')}
                 </button>}
               </div>)}
-          {tab === 'log' && <LogView text={log} onRefresh={showLog}/>}
+          {tab === 'log' && <>
+            {logError && <div className="banner banner-error" role="alert">{logError}</div>}
+            <LogView text={log} onRefresh={showLog}/>
+          </>}
           {tab === 'env' && <pre className="code">{box.command ? `$ ${box.command}\n\n` : ''}
             {envToLines(box.env) || '—'}</pre>}
         </div>
@@ -358,6 +369,14 @@ function SandboxDetail({name, onDone, onDeleted}: {
 
 function short(msg: string): string {
   return msg.length > 48 ? msg.slice(0, 48) + '…' : msg
+}
+
+// containerNote says why the sandbox's container is not running, or is empty
+// while it is starting. The pod can stay Running while its container crash-loops,
+// so the list and overview show this too, not only the terminal.
+function containerNote(b: app.Sandbox): string {
+  if (!b.containerReason || ['ContainerCreating', 'PodInitializing'].includes(b.containerReason)) return ''
+  return t('sandboxes.containerNotRunning', {reason: b.containerReason})
 }
 
 // reasonKeys maps the reasons the backend sends (sandbox.PhaseReason) to their

@@ -19,6 +19,9 @@ type Template struct {
 	Form            *training.Form `json:"form,omitempty"`
 	Created         string         `json:"created"`
 	ResourceVersion string         `json:"resourceVersion,omitempty"`
+	// Error is set for a template whose spec the app cannot read; it has no form,
+	// so it cannot be edited or used, only deleted.
+	Error string `json:"error,omitempty"`
 }
 
 // ListTemplates lists the job templates of the project. Cluster runtimes
@@ -38,19 +41,20 @@ func (a *App) ListTemplates() ([]Template, error) {
 	out := make([]Template, 0, len(items))
 	for i := range items {
 		rt := &items[i]
-		// A template whose spec annotation does not parse is still listed, with only its
-		// name, so the user can see it and delete or rewrite it; one bad annotation
+		// A template whose spec annotation does not parse is still listed, with its
+		// name and error, so the user can see it and delete it; one bad annotation
 		// does not hide the other templates.
 		f, err := training.TemplateForm(rt)
-		if err != nil {
-			f = &training.Form{Template: rt.Name}
-		}
 		t := Template{
 			Name:            rt.Name,
 			Description:     rt.Annotations[naming.AnnotationDescription],
 			Created:         rt.CreationTimestamp.UTC().Format(time.RFC3339),
-			Form:            f,
 			ResourceVersion: rt.ResourceVersion,
+		}
+		if err != nil {
+			t.Error = err.Error()
+		} else {
+			t.Form = f
 		}
 		out = append(out, t)
 	}
@@ -160,6 +164,10 @@ func (a *App) TemplateNames() ([]string, error) {
 	}
 	out := make([]string, 0, len(ts))
 	for _, t := range ts {
+		// An unreadable template has no form to prefill a job from, so it is not offered.
+		if t.Error != "" {
+			continue
+		}
 		out = append(out, t.Name)
 	}
 	return out, nil

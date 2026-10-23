@@ -804,6 +804,7 @@ export namespace app {
 	    form?: training.Form;
 	    created: string;
 	    resourceVersion?: string;
+	    error?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Template(source);
@@ -816,6 +817,7 @@ export namespace app {
 	        this.form = this.convertValues(source["form"], training.Form);
 	        this.created = source["created"];
 	        this.resourceVersion = source["resourceVersion"];
+	        this.error = source["error"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

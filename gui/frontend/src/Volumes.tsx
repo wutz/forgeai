@@ -15,6 +15,7 @@ export function Volumes() {
   // The lists are null until their first read, so a failed first read is not shown as an empty list.
   const [items, setItems] = useState<vol.Volume[] | null>(null)
   const [trash, setTrash] = useState<vol.Volume[] | null>(null)
+  const [trashError, setTrashError] = useState('')
   const [error, setError] = useState('')
   const [config, setConfig] = useState<app.PlatformConfig | null>(null)
   const [configError, setConfigError] = useState('')
@@ -25,10 +26,13 @@ export function Volumes() {
   const active = useActive()
 
   // refresh rejects when a list fails, so the refresh button reports it; reload
-  // is for the callers that have no place to show a rejection.
+  // is for the callers that have no place to show a rejection. The recycle bin
+  // reads on its own: its failure is shown in the bin, not as an empty bin.
+  const refreshTrash = () => ListVolumes(true)
+    .then(vs => { setTrash(vs); setTrashError('') }, e => setTrashError(errText(e)))
   const refresh = () => Promise.all([
     ListVolumes(false).then(vs => { setItems(vs); setError('') }),
-    ListVolumes(true).then(vs => setTrash(vs)),
+    refreshTrash(),
   ]).catch(e => {
     setError(errText(e))
     throw e
@@ -37,9 +41,17 @@ export function Volumes() {
   useEffect(() => {
     if (!active) return
     reload()
-    Config().then(setConfig).catch(e => setConfigError(errText(e)))
     return everyWhileVisible(reload, 10000)
   }, [active])
+
+  // The platform config is read until it arrives, so a failed read is retried on
+  // the same cadence instead of staying until the page is left and reopened.
+  useEffect(() => {
+    if (!active || config) return
+    const load = () => Config().then(c => { setConfig(c); setConfigError('') }, e => setConfigError(errText(e)))
+    load()
+    return everyWhileVisible(load, 10000)
+  }, [active, config])
 
   const totalGiB = (items ?? []).reduce((n, v) => n + (v.capacityGiB || v.requestedGiB || 0), 0)
 
@@ -84,7 +96,7 @@ export function Volumes() {
       {creating && config && <CreateVolumeDialog config={config} onClose={() => setCreating(false)}
                                                  onCreated={reload}/>}
       {growing && <ResizeVolumeDialog volume={growing} onClose={() => setGrowing(null)} onDone={reload}/>}
-      {recycling && <RecycleBinDialog volumes={trash ?? []} onChanged={refresh} onClose={() => setRecycling(false)}/>}
+      {recycling && <RecycleBinDialog volumes={trash} loadError={trashError} onChanged={refresh} onClose={() => setRecycling(false)}/>}
       {confirm.dialog}
 
       <Card>
@@ -138,8 +150,8 @@ export function Volumes() {
 // RecycleBinDialog manages trashed volumes behind the header button, so the
 // page carries no list of them. It sits over the page, so its own errors and
 // purge confirmation render inside it rather than in the page banner.
-function RecycleBinDialog({volumes, onChanged, onClose}: {
-  volumes: vol.Volume[], onChanged: () => void, onClose: () => void
+function RecycleBinDialog({volumes, loadError, onChanged, onClose}: {
+  volumes: vol.Volume[] | null, loadError: string, onChanged: () => void, onClose: () => void
 }) {
   const [error, setError] = useState('')
   const [expiring, setExpiring] = useState<vol.Volume | null>(null)
@@ -164,7 +176,11 @@ function RecycleBinDialog({volumes, onChanged, onClose}: {
   return <>
     <Dialog title={t('volumes.recycleBin')} subtitle={t('volumes.trashEmptyHint')} onClose={onClose}>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
-      {volumes.length === 0 ? (
+      {volumes === null ? (
+        loadError
+          ? <Empty icon="warning" title={t('volumes.trashLoadFailed')}>{loadError}</Empty>
+          : <Spinner label={t('common.loading')}/>
+      ) : volumes.length === 0 ? (
         <Empty icon="trash" title={t('volumes.trashEmpty')}/>
       ) : (
         <table className="table recycle">
@@ -270,7 +286,9 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
 function ResizeVolumeDialog({volume, onClose, onDone}: {
   volume: vol.Volume, onClose: () => void, onDone: () => void
 }) {
-  const current = volume.capacityGiB || volume.requestedGiB
+  // The floor is the larger of the size in use and the size asked for: a resize that is
+  // still settling has requested more than its capacity shows, and a smaller one is refused.
+  const current = Math.max(volume.capacityGiB || 0, volume.requestedGiB || 0)
   const [size, setSize] = useState(current * 2)
   // A resize only grows: the size is a whole number above the current one.
   const growOK = Number.isInteger(size) && size > current

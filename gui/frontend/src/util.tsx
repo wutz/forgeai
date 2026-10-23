@@ -1,12 +1,16 @@
 import {app} from '../wailsjs/go/models'
 import {MessageKey, getLocale, t} from './i18n'
 
+// conflictErrors are the backend messages for a save made from a version that a
+// later change has replaced: the Kubernetes conflict and the project check.
+const conflictErrors = [/has been modified; please apply your changes/, /the project changed while you were editing/]
+
 // knownErrors maps the backend messages users hit most to catalogue keys, so
 // they read well in both languages. Other backend text is shown as written.
 const knownErrors: [RegExp, MessageKey][] = [
   [/not connected: select a kubeconfig context/, 'error.notConnected'],
   [/is forbidden: /, 'error.forbidden'],
-  [/has been modified; please apply your changes/, 'error.conflict'],
+  ...conflictErrors.map((re): [RegExp, MessageKey] => [re, 'error.conflict']),
   [/volume "[^"]*" already exists \(check the trash\)/, 'volumes.errInTrash'],
   [/"[^"]*" already exists/, 'error.alreadyExists'],
   [/context deadline exceeded|Client\.Timeout exceeded/, 'error.timeout'],
@@ -20,12 +24,22 @@ const knownErrors: [RegExp, MessageKey][] = [
   [/instance type "[^"]*" not found/, 'error.instanceTypeNotFound'],
 ]
 
-export function errText(e: unknown): string {
-  const raw = typeof e === 'string' ? e
+function rawMessage(e: unknown): string {
+  return typeof e === 'string' ? e
     : e instanceof Error ? e.message
     : (e as { message?: string })?.message || JSON.stringify(e)
+}
+
+export function errText(e: unknown): string {
+  const raw = rawMessage(e)
   for (const [re, key] of knownErrors) if (re.test(raw)) return t(key)
   return raw
+}
+
+// isConflict reports whether a save failed because the object changed since it was loaded.
+export function isConflict(e: unknown): boolean {
+  const raw = rawMessage(e)
+  return conflictErrors.some(re => re.test(raw))
 }
 
 // latestAttempt is the attempt that decides a job family's state: the newest of
@@ -64,7 +78,7 @@ const phaseKeys = new Map<string, MessageKey>([
   ['starting', 'phase.starting'], ['restarting', 'phase.restarting'], ['stopping', 'phase.stopping'],
   ['stopped', 'phase.stopped'], ['suspended', 'phase.suspended'], ['succeeded', 'phase.succeeded'],
   ['failed', 'phase.failed'], ['retried', 'phase.retried'], ['idle', 'phase.idle'], ['ready', 'phase.ready'],
-  ['resizing', 'phase.resizing'],
+  ['resizing', 'phase.resizing'], ['deleting', 'phase.deleting'], ['lost', 'phase.lost'],
   ['expired', 'phase.expired'],
 ])
 

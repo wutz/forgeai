@@ -50,6 +50,8 @@ export function Images() {
   const address = (repo: string, tag: string) => reg ? `${reg.url}/${repo}:${tag}` : ''
   const totalTags = list.reduce((n, r) => n + tagCount(r), 0)
   const totalPulls = list.reduce((n, r) => n + r.pulls, 0)
+  // Repositories the registry could not list: their tags are not in the totals above.
+  const unlisted = list.filter(r => r.error).length
 
   const deleteRepo = (r: app.ImageRepo) => confirm.ask({
     title: t('images.deleteRepoTitle', {name: r.name}),
@@ -88,6 +90,7 @@ export function Images() {
       <PageHeader eyebrow={t('storage.eyebrow')} title={t('images.title')}
                   meta={list.length > 0 && <span className="muted" style={{fontSize: 12}}>
                     {t('images.summary', {repos: list.length, tags: totalTags, pulls: totalPulls})}
+                    {unlisted > 0 && <> · {t('images.unlistedCount', {count: unlisted})}</>}
                   </span>}
                   actions={<RefreshButton onRefresh={refresh}/>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
@@ -151,7 +154,7 @@ export function Images() {
               <summary>
                 <span className="mono">{reg?.url}/{r.name}</span>
                 {r.error
-                  ? <Badge tone="error">{t('images.notListed')}</Badge>
+                  ? <span title={r.error}><Badge tone="error">{t('images.notListed')}</Badge></span>
                   : <Badge>{t('images.tagsCount', {count: tagCount(r)})}</Badge>}
                 <span className="muted" style={{fontSize: 12}}>{t('images.pullsCount', {count: r.pulls})}</span>
               </summary>

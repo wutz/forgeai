@@ -431,6 +431,14 @@ code {
 .split .table th:last-child { width: 92px; }
 .split .table th, .split .table td { overflow: hidden; text-overflow: ellipsis; }
 .split .table .cell-main, .split .table .cell-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The sandbox list has six columns, too many for a fixed split: squeezed evenly
+   they leave the endpoint about 80px wide. Each column keeps its natural width
+   instead, the endpoint is capped and truncated, and the card scrolls sideways. */
+.split .table.sandbox-table { table-layout: auto; width: max-content; min-width: 100%; }
+.split .table.sandbox-table th, .split .table.sandbox-table td { white-space: nowrap; overflow: visible; }
+.split .table.sandbox-table td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+.split .table.sandbox-table td .cell-main, .split .table.sandbox-table td .cell-sub { max-width: 220px; }
+.split .table.sandbox-table th:first-child, .split .table.sandbox-table th:last-child { width: auto; }
 .detail-title { min-width: 0; }
 .detail-title h2 { overflow-wrap: anywhere; }
 .detail-actions {

@@ -14,14 +14,18 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	"github.com/wutz/forgeai/pkg/kf"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
+	"github.com/wutz/forgeai/pkg/training"
 )
 
 var (
@@ -256,9 +260,9 @@ func Users(pods []corev1.Pod) map[string][]string {
 	return out
 }
 
-// users maps PVC names to the active pods that block them. File server pods
-// do not count: the file server drops trashed volumes when it reconciles, and
-// its Recreate rollout stops the pod that mounted them.
+// users maps PVC names to the active pods and unfinished jobs that block them.
+// File server pods do not count: the file server drops trashed volumes when it
+// reconciles, and its Recreate rollout stops the pod that mounted them.
 func (c *Client) users(ctx context.Context) (map[string][]string, error) {
 	pods := &corev1.PodList{}
 	if err := c.K8s.List(ctx, pods, client.InNamespace(c.Namespace)); err != nil {
@@ -270,7 +274,48 @@ func (c *Client) users(ctx context.Context) (map[string][]string, error) {
 			others = append(others, p)
 		}
 	}
-	return Users(others), nil
+	out := Users(others)
+	jobs, err := c.jobUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for pvc, names := range jobs {
+		out[pvc] = append(out[pvc], names...)
+	}
+	return out, nil
+}
+
+// jobUsers maps PVC names to the unfinished jobs that mount them. A queued job has
+// no pods yet, but it mounts its volumes once admitted, and a stopped job resumes
+// where it left off, so both hold their volumes. A job that cannot be read is
+// skipped: it cannot show the mounts it holds.
+func (c *Client) jobUsers(ctx context.Context) (map[string][]string, error) {
+	list := &unstructured.UnstructuredList{}
+	list.SetGroupVersionKind(kf.TrainJobGVK.GroupVersion().WithKind("TrainJobList"))
+	if err := c.K8s.List(ctx, list, client.InNamespace(c.Namespace)); err != nil {
+		if meta.IsNoMatchError(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	out := map[string][]string{}
+	for i := range list.Items {
+		tj := &kf.TrainJob{}
+		if err := kf.FromUnstructured(list.Items[i].Object, tj); err != nil {
+			continue
+		}
+		if phase, _ := training.JobPhase(tj, nil); phase == training.PhaseSucceeded || phase == training.PhaseFailed {
+			continue
+		}
+		f, err := training.TrainJobForm(tj)
+		if err != nil {
+			continue
+		}
+		for _, m := range f.Volumes {
+			out[m.Volume] = append(out[m.Volume], tj.Name)
+		}
+	}
+	return out, nil
 }
 
 // List returns the volumes of the namespace; trash selects trashed or live volumes.

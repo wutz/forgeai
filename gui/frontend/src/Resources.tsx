@@ -116,7 +116,7 @@ export function Resources() {
                   ) : <span className="muted">{t('resources.noQuotaSet')}</span>}
                 </td>
                 <td>{g.used}</td>
-                <td>{quota.gpuQuota || t('resources.noQuotaSet')}</td>
+                <td>{quota.gpuQuota ? t('resources.gpuShared', {limit: quota.gpuQuota}) : t('resources.noQuotaSet')}</td>
               </tr>
             ))}
             <tr>

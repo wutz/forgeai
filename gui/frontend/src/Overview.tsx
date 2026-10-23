@@ -18,6 +18,7 @@ export function Overview({onOpen, onOpenJob}: {
   // show a dash instead of a zero or a claim of no usage when a read fails.
   const [vols, setVols] = useState<volumes.Volume[] | null>(null)
   const [images, setImages] = useState<app.ImageRepo[] | null>(null)
+  const [imagesFailed, setImagesFailed] = useState(false)
   const [quota, setQuota] = useState<app.QuotaUsage | null>(null)
   const [error, setError] = useState('')
   const [loaded, setLoaded] = useState(false)
@@ -52,7 +53,10 @@ export function Overview({onOpen, onOpenJob}: {
   // Images cost a Harbor call per repository, so they refresh on a slower beat.
   useEffect(() => {
     if (!onScreen) return
-    const load = () => ListImages().then(setImages).catch(() => {})
+    const load = () => ListImages().then(list => {
+      setImages(list)
+      setImagesFailed(false)
+    }, () => setImagesFailed(true))
     load()
     const timer = setInterval(load, 60000)
     return () => clearInterval(timer)
@@ -153,8 +157,11 @@ export function Overview({onOpen, onOpenJob}: {
                 <Meter key={g.class} value={g.used} max={Math.max(quota.gpuQuota, g.used, 1)}
                        tone={quota.gpuQuota && g.used >= quota.gpuQuota ? 'warning' : 'accent'}
                        label={<span className="mono">{g.class === '*' ? t('overview.gpusUnknownClass') : t('overview.gpusOfClass', {cls: g.class})}</span>}
-                       right={<span>{quota.gpuQuota ? `${g.used} / ${quota.gpuQuota}` : g.used}</span>}/>
+                       right={<span>{g.used}</span>}/>
               ))}
+              {quota.gpuQuota > 0 && (quota.gpuClasses || []).length > 0 && (
+                <div className="note">{t('overview.gpuShared', {limit: quota.gpuQuota})}</div>
+              )}
               {/* A zero or empty limit means unlimited: the bar stays empty rather than full. */}
               <Meter value={toGiB(quota.storageUsed)} max={toGiB(quota.storage)} tone="muted"
                      label={<span className="mono">{t('overview.volumeStorage')}</span>}
@@ -215,8 +222,8 @@ export function Overview({onOpen, onOpenJob}: {
             </div>
             <div className="stat">
               <div className="stat-label">{t('overview.imageTags')}</div>
-              <div className="stat-value">{totalTags ?? '—'}</div>
-              <div className="stat-detail">{images === null ? '—' : images.length === 1 ? t('overview.repositoryOne') : t('overview.repositories', {count: images.length})}</div>
+              <div className="stat-value">{imagesFailed ? '—' : totalTags ?? '—'}</div>
+              <div className="stat-detail">{imagesFailed ? t('overview.imagesUnavailable') : images === null ? '—' : images.length === 1 ? t('overview.repositoryOne') : t('overview.repositories', {count: images.length})}</div>
               <button className="btn btn-sm btn-ghost" onClick={() => onOpen('images')}>
                 {t('overview.imagesButton')}<Icon name="chevron" size={13}/>
               </button>

@@ -8,14 +8,17 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	"github.com/wutz/forgeai/pkg/kf"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
+	"github.com/wutz/forgeai/pkg/training"
 )
 
 func TestLifecycle(t *testing.T) {
@@ -239,5 +242,80 @@ func TestMountable(t *testing.T) {
 		if tc.want != nil && !errors.Is(err, tc.want) {
 			t.Errorf("%s: got %v, want %v", tc.name, err, tc.want)
 		}
+	}
+}
+
+// trainJob returns a TrainJob mounting the named volume, as the GUI renders it,
+// stored the way the cluster client reads it.
+func trainJob(t *testing.T, name, volume string, conditions ...metav1.Condition) *unstructured.Unstructured {
+	t.Helper()
+	cfg, err := platform.Parse([]byte("storageTypes: {shared: {storageClass: sc}}\ndefaultStorageType: shared"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	form := training.Form{
+		Name: name, Image: "img:1", InstanceType: "cpu.small", Workers: 1,
+		Volumes: []training.VolumeMount{{Volume: volume, MountPath: "/data"}},
+	}
+	it := &v1.InstanceType{ObjectMeta: metav1.ObjectMeta{Name: "cpu.small"}}
+	tj, err := training.TrainJob(&form, training.Context{Namespace: "forge-a", InstanceType: it, Config: cfg})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(conditions) > 0 {
+		tj.Status = &kf.TrainJobStatus{Conditions: conditions}
+	}
+	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := &unstructured.Unstructured{Object: obj}
+	u.SetGroupVersionKind(kf.TrainJobGVK)
+	return u
+}
+
+// An unfinished TrainJob holds the volumes it mounts, queued or running; a
+// finished one releases them.
+func TestTrashWaitsForUnfinishedJobs(t *testing.T) {
+	ctx := context.Background()
+	cfg, _ := platform.Parse([]byte("storageTypes: {shared: {storageClass: sc}}\ndefaultStorageType: shared"))
+	suspended := metav1.Condition{Type: kf.ConditionSuspended, Status: metav1.ConditionTrue, Reason: "Suspended"}
+	complete := metav1.Condition{Type: kf.ConditionComplete, Status: metav1.ConditionTrue, Reason: "Completed"}
+	failed := metav1.Condition{Type: kf.ConditionFailed, Status: metav1.ConditionTrue, Reason: "Failed"}
+
+	for _, tc := range []struct {
+		name    string
+		job     *unstructured.Unstructured
+		blocked bool
+	}{
+		{"queued", trainJob(t, "queued", "data", suspended), true},
+		{"pending", trainJob(t, "pending", "data"), true},
+		{"succeeded", trainJob(t, "done", "data", complete), false},
+		{"failed", trainJob(t, "broken", "data", failed), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			k8s := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+			c := &Client{K8s: k8s, Namespace: "forge-a"}
+			if _, err := c.Create(ctx, cfg, "data", "", 10); err != nil {
+				t.Fatal(err)
+			}
+			if err := k8s.Create(ctx, tc.job); err != nil {
+				t.Fatal(err)
+			}
+			live, err := c.List(ctx, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := live[0].Users; (len(got) > 0) != tc.blocked {
+				t.Fatalf("Users = %v, blocked want %v", got, tc.blocked)
+			}
+			_, err = c.Trash(ctx, "data", time.Hour)
+			if tc.blocked && !errors.Is(err, ErrInUse) {
+				t.Fatalf("Trash = %v, want ErrInUse", err)
+			}
+			if !tc.blocked && err != nil {
+				t.Fatalf("Trash = %v, a finished job must not block it", err)
+			}
+		})
 	}
 }

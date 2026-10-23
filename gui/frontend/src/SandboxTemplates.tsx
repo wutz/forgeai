@@ -157,6 +157,9 @@ export function SandboxTemplateDialog({initial, existing, version, onClose, onSa
                     onChange={e => set('runtimeClass', e.target.value)}>
               <option value="">{t('sandboxTemplates.runcNodeRuntime')}</option>
               {(opts?.runtimeClasses || []).map(r => <option key={r} value={r}>{r}</option>)}
+              {/* A stored class the platform no longer offers stays selectable, so the saved value is what the form shows. */}
+              {f.runtimeClass && !(opts?.runtimeClasses || []).includes(f.runtimeClass) &&
+                <option value={f.runtimeClass}>{t('templates.typeUnavailable', {name: f.runtimeClass})}</option>}
             </select>
           </div>
         </div>

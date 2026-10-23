@@ -81,7 +81,8 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   const idleOK = idleMinutes === null || (Number.isFinite(idleMinutes) && idleMinutes >= 0 && idleMinutes <= MAX_TTL_HOURS * 60)
   // The footer names the blocker that has no field hint of its own, so a disabled
   // Create is never unexplained.
-  const blocker = !f.image.trim() ? t('common.imageRequired')
+  const blocker = !f.name ? t('common.nameRequired')
+    : !f.image.trim() ? t('common.imageRequired')
     : !mountsOK ? (vols === null ? (volsError ? t('mounts.loadFailed') : t('mounts.loading')) : t('mounts.fixFirst'))
     : ''
 
@@ -126,7 +127,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
               <select id="s-template" className="select mono" value={f.template || ''}
                       onChange={e => useTemplate(e.target.value)}>
                 <option value="">{t('common.none')}</option>
-                {templates.map(tpl => <option key={tpl.name} value={tpl.name}>{tpl.name}</option>)}
+                {templates.filter(tpl => !tpl.error).map(tpl => <option key={tpl.name} value={tpl.name}>{tpl.name}</option>)}
               </select>
               <span className="hint">{t('sandboxCreate.templateHint')}</span>
             </div>

@@ -3,7 +3,7 @@ import {
   Config, DeleteProject, GetProject, ListProjects, MemberKubeconfig, SaveProject,
 } from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
-import {errText, fmtDate, generateName, phaseLabel} from './util'
+import {errText, fmtDate, generateName, isConflict, phaseLabel} from './util'
 import {Badge, Card, CancelButton, Dialog, Empty, Icon, PageHeader, RefreshButton, Spinner, useActive, useConfirm} from './ui'
 import {t} from './i18n'
 
@@ -52,7 +52,7 @@ export function Admin() {
   return (
     <div className="page">
       <PageHeader eyebrow={t('admin.eyebrow')} title={t('admin.title')}
-                  meta={<span className="muted" style={{fontSize: 12.5}}>
+                  meta={projects !== null && <span className="muted" style={{fontSize: 12.5}}>
                     {list.length === 1 ? t('admin.metaOne', {ready}) : t('admin.meta', {total: list.length, ready})}
                   </span>}
                   actions={<>
@@ -154,6 +154,8 @@ function ProjectDialog({form, onClose, onSaved}: {
   // gpuText is the draft of the GPU field; it is parsed on save.
   const [gpuText, setGpuText] = useState(() => gpuLines(form.quota?.gpus))
   const [error, setError] = useState('')
+  // stale is set when the save was refused because the project changed since it was loaded.
+  const [stale, setStale] = useState(false)
   const [busy, setBusy] = useState(false)
   const [kube, setKube] = useState('')
   const [kubeError, setKubeError] = useState('')
@@ -216,8 +218,16 @@ function ProjectDialog({form, onClose, onSaved}: {
     }
     setError('')
     setBusy(true)
-    SaveProject(project).then(onSaved).catch(err => { setError(errText(err)); setBusy(false) })
+    SaveProject(project).then(onSaved).catch(err => { setError(errText(err)); setStale(isConflict(err)); setBusy(false) })
   }
+  // A stale save is refused, so the project is read again. The reload replaces the
+  // unsaved edits with the saved project; the form is the only place they live.
+  const reload = () => GetProject(p.name).then(fresh => {
+    setP(fresh)
+    setGpuText(gpuLines(fresh.quota?.gpus))
+    setError('')
+    setStale(false)
+  }).catch(e => setError(errText(e)))
   // The export error stays by the member list, where the button was clicked,
   // and the previous member's YAML is dropped so it cannot be mistaken for this one.
   const exportKube = (member: string) => {
@@ -245,7 +255,15 @@ function ProjectDialog({form, onClose, onSaved}: {
               </button>
             </>}>
       <form id="project-form" className="dialog-form" onSubmit={save}>
-        {error && <div className="banner banner-error" role="alert">{error}</div>}
+        {error && <div className="banner banner-error" role="alert">
+          <span>{error}</span>
+          {stale && <>
+            <span className="spacer"/>
+            <button type="button" className="btn btn-sm" title={t('admin.reloadProjectHint')} onClick={reload}>
+              {t('admin.reloadProject')}
+            </button>
+          </>}
+        </div>}
         <div className="row">
           <div className="field">
             <label htmlFor="p-name">{t('common.name')}</label>

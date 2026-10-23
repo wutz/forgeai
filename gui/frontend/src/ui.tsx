@@ -2,7 +2,7 @@
 // segmented filters, tabs, badges, empty state and dialogs. Everything here
 // renders from tokens in style.css (gui/DESIGN.md).
 
-import {KeyboardEvent as ReactKeyboardEvent, ReactNode, createContext, useContext, useEffect, useRef, useState} from 'react'
+import {KeyboardEvent as ReactKeyboardEvent, ReactNode, createContext, useContext, useEffect, useLayoutEffect, useRef, useState} from 'react'
 import {createPortal} from 'react-dom'
 import {t} from './i18n'
 
@@ -86,6 +86,56 @@ export function PageHeader({eyebrow, title, meta, actions}: {
   return slot
     ? createPortal(<div className="page-head in-header">{content}</div>, slot)
     : <div className="page-head">{content}</div>
+}
+
+// LogView shows a read log. Long lines wrap. The box follows new output while
+// the reader is at the end and keeps their place once they have scrolled up.
+// text is null until the first read, and '' when the log has no output.
+export function LogView({title, text, onRefresh}: {
+  title?: ReactNode, text: string | null, onRefresh: () => Promise<unknown>
+}) {
+  const box = useRef<HTMLPreElement>(null)
+  const following = useRef(true)
+  const [copied, setCopied] = useState(false)
+  const timer = useRef(0)
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+
+  useLayoutEffect(() => {
+    const el = box.current
+    if (el && following.current) el.scrollTop = el.scrollHeight
+  }, [text])
+
+  const onScroll = () => {
+    const el = box.current
+    if (el) following.current = el.scrollHeight - el.scrollTop - el.clientHeight < 16
+  }
+
+  const copy = () => {
+    if (!text) return
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      window.clearTimeout(timer.current)
+      timer.current = window.setTimeout(() => setCopied(false), 1500)
+    }, () => {})
+  }
+
+  return (
+    <>
+      <div className="log-bar">
+        {title && <span className="mono muted log-title">{title}</span>}
+        <span className="spacer"/>
+        <button className="btn btn-sm btn-ghost" onClick={copy} disabled={!text}>
+          <Icon name={copied ? 'check' : 'copy'} size={13}/>{copied ? t('common.copied') : t('common.copy')}
+        </button>
+        <RefreshButton label="Reload" onRefresh={onRefresh}/>
+      </div>
+      {text === null
+        ? <div className="logs logs-empty"><span>{t('common.logLoading')}</span></div>
+        : text === ''
+          ? <div className="logs logs-empty"><Icon name="scroll" size={18}/><span>{t('common.logEmpty')}</span></div>
+          : <pre ref={box} className="logs" tabIndex={0} aria-label={t('common.logs')} onScroll={onScroll}>{text}</pre>}
+    </>
+  )
 }
 
 export function Card({title, subtitle, actions, children, className = ''}: {

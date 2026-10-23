@@ -420,9 +420,17 @@ a { color: inherit; text-decoration: none; }
   letter-spacing: 0.05em; text-transform: uppercase; color: var(--mute);
 }
 pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 18px; }
+/* Log output: long lines wrap, the box scrolls down, and the text stays
+   monospace. The box is dark in both themes, so its text colours are fixed. */
 .logs {
-  height: 300px; padding: 12px 14px; border-radius: 8px; background: #0f1117; color: #e4e4e7;
-  font-size: 11.5px; line-height: 18px;
+  height: 300px; margin: 0; padding: 12px 14px; border-radius: 8px; background: #0f1117; color: #e4e4e7;
+  font-family: var(--mono); font-size: 11.5px; line-height: 18px;
+  white-space: pre-wrap; overflow-wrap: anywhere; overflow-y: auto;
+}
+/* Empty and loading states use the same box, so the layout does not jump. */
+.logs-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  color: #a1a1aa; font-family: var(--font); font-size: 12.5px; text-align: center; white-space: normal;
 }
 .term-wrap { display: flex; flex-direction: column; gap: 8px; }
 .term { height: 340px; padding: 8px 10px; border-radius: 8px; background: #0f1117; overflow: hidden; }
@@ -436,6 +444,7 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
 }
 .term-wrap.term-max .term { flex: 1; height: auto; min-height: 0; }
 .log-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; }
+.log-bar .log-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mini-table {
   display: flex; flex-direction: column; border: 1px solid var(--hairline-soft);
   border-radius: 9px; overflow: hidden;

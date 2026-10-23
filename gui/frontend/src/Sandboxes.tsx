@@ -7,7 +7,7 @@ import {SandboxCreateDialog} from './SandboxCreateDialog'
 import {SandboxTemplateDialog} from './SandboxTemplates'
 import {SandboxTerminal} from './SandboxTerminal'
 import {Status, envToLines, fmtDate, errText} from './util'
-import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Spinner, Tabs, tabPanelProps, useActive, useConfirm} from './ui'
+import {Badge, Card, Empty, Icon, LogView, PageHeader, Spinner, Tabs, tabPanelProps, useActive, useConfirm} from './ui'
 import {t} from './i18n'
 
 // HEARTBEAT is how often an open sandbox detail resets the sandbox's idle
@@ -143,7 +143,8 @@ function SandboxDetail({name, onDone, onDeleted}: {
   const [error, setError] = useState('')
   const [loadError, setLoadError] = useState('')
   const [tab, setTab] = useState<Tab>('overview')
-  const [log, setLog] = useState('')
+  // null until the first read, so the view can tell "reading" from "no output".
+  const [log, setLog] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [savedTemplate, setSavedTemplate] = useState('')
   // pending is the transition in flight. It stays set until the phase reaches
@@ -180,7 +181,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
 
   useEffect(() => {
     setBox(null)
-    setLog('')
+    setLog(null)
     setTab('overview')
     setPending(null)
     setDeleting(false)
@@ -301,15 +302,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
           {tab === 'terminal' && (box.podPhase === 'Running'
             ? <SandboxTerminal name={box.name}/>
             : <p className="muted">{t('sandboxes.startToOpenTerminal')}</p>)}
-          {tab === 'log' && (
-            <>
-              <div className="log-bar">
-                <span className="spacer"/>
-                <RefreshButton label="Reload" onRefresh={showLog}/>
-              </div>
-              <pre className="logs">{log || t('sandboxes.noOutput')}</pre>
-            </>
-          )}
+          {tab === 'log' && <LogView text={log} onRefresh={showLog}/>}
           {tab === 'env' && <pre className="code">{box.command ? `$ ${box.command}\n\n` : ''}
             {envToLines(box.env) || '—'}</pre>}
         </div>

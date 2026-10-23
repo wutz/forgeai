@@ -40,7 +40,6 @@ export const en = {
   'sandboxes.idleSince': 'Idle since',
   'sandboxes.autoStop': 'Auto-stop',
   'sandboxes.startToOpenTerminal': 'Start the sandbox to open a terminal.',
-  'sandboxes.noOutput': 'No output',
 
   'sandboxCreate.title': 'New sandbox',
   'sandboxCreate.subtitle': 'An isolated, resumable agent environment',
@@ -118,7 +117,6 @@ export const zh: Record<keyof typeof en, string> = {
   'sandboxes.idleSince': '空闲始于',
   'sandboxes.autoStop': '自动停止',
   'sandboxes.startToOpenTerminal': '启动沙箱后即可打开终端。',
-  'sandboxes.noOutput': '暂无输出',
 
   'sandboxCreate.title': '新建沙箱',
   'sandboxCreate.subtitle': '隔离且可恢复的智能体运行环境',

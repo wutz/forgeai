@@ -6,7 +6,7 @@ import {JobCreateDialog} from './JobCreateDialog'
 import {TemplateDialog} from './Templates'
 import {Status, envToLines, fmtDate, errText} from './util'
 import {t} from './i18n'
-import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Segmented, Spinner, Tabs, tabPanelProps, useActive, useConfirm} from './ui'
+import {Badge, Card, Empty, Icon, LogView, PageHeader, Segmented, Spinner, Tabs, tabPanelProps, useActive, useConfirm} from './ui'
 
 type Filter = 'all' | 'running' | 'queued' | 'stopped' | 'failed' | 'done'
 
@@ -199,7 +199,8 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
   const [error, setError] = useState('')
   const [loadError, setLoadError] = useState('')
   const [tab, setTab] = useState<DetailTab>('overview')
-  const [log, setLog] = useState('')
+  // null until the first read, so the view can tell "reading" from "no output".
+  const [log, setLog] = useState<string | null>(null)
   const [logTitle, setLogTitle] = useState('')
   const [logWorker, setLogWorker] = useState(0)
   const [saving, setSaving] = useState(false)
@@ -220,7 +221,7 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
 
   useEffect(() => {
     setJob(null)
-    setLog('')
+    setLog(null)
     setLogWorker(0)
     setTab('overview')
     setSaving(false)
@@ -398,14 +399,9 @@ function JobDetail({name, onDone, onOpen, onDeleted}: {
           )}
 
           {tab === 'log' && (
-            <>
-              <div className="log-bar">
-                <span className="mono muted">{logTitle || t('jobs.workerLabel', {index: 0})}</span>
-                <span className="spacer"/>
-                <RefreshButton label="Reload" onRefresh={() => viewLog(logWorker, logTitle || t('jobs.workerLabel', {index: 0}))}/>
-              </div>
-              <pre className="logs">{log || t('jobs.noOutput')}</pre>
-            </>
+            // Keyed by the worker's log so switching workers starts at the end of the new log.
+            <LogView key={logTitle} title={logTitle || t('jobs.workerLabel', {index: 0})} text={log}
+                     onRefresh={() => viewLog(logWorker, logTitle || t('jobs.workerLabel', {index: 0}))}/>
           )}
 
           {tab === 'env' && <pre className="code">{envToLines(job.env) || '—'}</pre>}

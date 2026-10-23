@@ -50,8 +50,9 @@ func (a *App) ListInstanceTypes() ([]InstanceType, error) {
 	return out, nil
 }
 
-// pvcRequests is the ResourceQuota name counting volume claims.
-const pvcRequests = "requests.persistentvolumeclaims"
+// pvcRequests is the ResourceQuota name counting volume claims. The operator
+// writes it under the bare name, so the constant comes from the same API key.
+var pvcRequests = string(corev1.ResourcePersistentVolumeClaims)
 
 // QuotaUsage is what the project may consume and currently runs.
 type QuotaUsage struct {

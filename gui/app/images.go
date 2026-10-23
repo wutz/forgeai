@@ -157,8 +157,8 @@ func (a *App) DeleteImage(repository, reference string) error {
 	if err != nil {
 		return err
 	}
-	if !reg.Enabled {
-		return errNoRegistry
+	if err := registryWritable(reg); err != nil {
+		return err
 	}
 	ctx, cancel := a.call()
 	defer cancel()
@@ -177,8 +177,8 @@ func (a *App) DeleteImageTag(repository, digest, tag string) error {
 	if err != nil {
 		return err
 	}
-	if !reg.Enabled {
-		return errNoRegistry
+	if err := registryWritable(reg); err != nil {
+		return err
 	}
 	ctx, cancel := a.call()
 	defer cancel()
@@ -196,8 +196,8 @@ func (a *App) DeleteImageRepo(repository string) error {
 	if err != nil {
 		return err
 	}
-	if !reg.Enabled {
-		return errNoRegistry
+	if err := registryWritable(reg); err != nil {
+		return err
 	}
 	ctx, cancel := a.call()
 	defer cancel()
@@ -205,7 +205,22 @@ func (a *App) DeleteImageRepo(repository string) error {
 	return hc.DeleteRepository(ctx, harborProject(c), repository)
 }
 
-var errNoRegistry = errors.New("registry is not configured for this project")
+var (
+	errNoRegistry       = errors.New("registry is not configured for this project")
+	errNoRegistryAccess = errors.New("your account cannot change images in this project")
+)
+
+// registryWritable reports why the registry cannot be changed with this account.
+// Delete calls need the robot credentials as much as listing does.
+func registryWritable(reg *Registry) error {
+	if !reg.Enabled {
+		return errNoRegistry
+	}
+	if !reg.Credentials {
+		return errNoRegistryAccess
+	}
+	return nil
+}
 
 // harborProject is the Harbor project backing the namespace: equal to the
 // namespace (the operator keeps them in sync).

@@ -72,6 +72,12 @@ type Form struct {
 
 var nameRE = regexp.MustCompile(`^[a-z]([-a-z0-9]*[a-z0-9])?$`)
 
+// envNamePattern is the name a container environment variable can take.
+var envNamePattern = regexp.MustCompile(`^[-._a-zA-Z][-._a-zA-Z0-9]*$`)
+
+// reservedMountPath is the shared memory the job mounts itself (see volumes).
+const reservedMountPath = "/dev/shm"
+
 // Validate checks a form; it does not look up the instance type or volumes.
 func (f *Form) Validate() error {
 	if !nameRE.MatchString(f.Name) || len(f.Name) > MaxNameLength {
@@ -95,8 +101,8 @@ func (f *Form) Validate() error {
 	}
 	seen := map[string]bool{}
 	for _, e := range f.Env {
-		if e.Name == "" || seen[e.Name] {
-			return fmt.Errorf("environment variable names must be unique and non-empty")
+		if !envNamePattern.MatchString(e.Name) || seen[e.Name] {
+			return fmt.Errorf("environment variable names must be unique and valid")
 		}
 		seen[e.Name] = true
 	}
@@ -104,6 +110,12 @@ func (f *Form) Validate() error {
 	for _, m := range f.Volumes {
 		if m.Volume == "" || !strings.HasPrefix(m.MountPath, "/") || paths[m.MountPath] {
 			return fmt.Errorf("volume mounts need a volume and a unique absolute mount path")
+		}
+		if m.MountPath == reservedMountPath {
+			return fmt.Errorf("%s is mounted by the job itself", reservedMountPath)
+		}
+		if m.SubPath != "" && (strings.HasPrefix(m.SubPath, "/") || slices.Contains(strings.Split(m.SubPath, "/"), "..")) {
+			return fmt.Errorf("sub path must be relative and stay inside the volume")
 		}
 		paths[m.MountPath] = true
 	}
@@ -149,7 +161,7 @@ func volumes(f *Form, shm resource.Quantity) ([]corev1.Volume, []corev1.VolumeMo
 		EmptyDir: &corev1.EmptyDirVolumeSource{Medium: corev1.StorageMediumMemory, SizeLimit: &shm},
 	}}}
 	mounts := make([]corev1.VolumeMount, 1, 1+len(f.Volumes))
-	mounts[0] = corev1.VolumeMount{Name: "dshm", MountPath: "/dev/shm"}
+	mounts[0] = corev1.VolumeMount{Name: "dshm", MountPath: reservedMountPath}
 	seen := map[string]bool{}
 	for _, m := range f.Volumes {
 		name := "vol-" + m.Volume

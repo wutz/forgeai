@@ -96,6 +96,12 @@ func (p *fileProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "cross-origin request refused", http.StatusForbidden)
 		return
 	}
+	// Uploads, deletes and renames change files, so they must come from the proxy's
+	// own page. A browser always sends Origin on them, so a missing one is refused.
+	if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Header.Get("Origin") != origin {
+		http.Error(w, "changes must come from the file page", http.StatusForbidden)
+		return
+	}
 	if t == nil {
 		http.Error(w, "file server is not running", http.StatusServiceUnavailable)
 		return

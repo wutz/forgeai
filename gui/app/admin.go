@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -31,6 +32,9 @@ type Project struct {
 	Ready          bool            `json:"ready"`
 	Registry       string          `json:"registry"`
 	Created        string          `json:"created"`
+	// ResourceVersion is the version the form was read at; a save over a newer
+	// version is refused so a concurrent change is not overwritten.
+	ResourceVersion string `json:"resourceVersion,omitempty"`
 }
 
 // ProjectQuota is the quota form of a project. GPU classes map class->count.
@@ -90,6 +94,9 @@ func (a *App) GetProject(name string) (*Project, error) {
 }
 
 // SaveProject creates or updates a project from the admin form.
+// errProjectChanged is returned when the project was changed after the form read it.
+var errProjectChanged = errors.New("the project changed while you were editing it; reload it and save again")
+
 func (a *App) SaveProject(f Project) error {
 	c, err := a.current()
 	if err != nil {
@@ -108,6 +115,9 @@ func (a *App) SaveProject(f Project) error {
 		}
 		p = &v1.Project{ObjectMeta: metav1.ObjectMeta{Name: f.Name}}
 		create = true
+	}
+	if !create && f.ResourceVersion != "" && f.ResourceVersion != p.ResourceVersion {
+		return errProjectChanged
 	}
 	p.Spec.DisplayName = f.DisplayName
 	p.Spec.Network = v1.ProjectNetwork{
@@ -248,11 +258,12 @@ func toProject(p *v1.Project) Project {
 		Network: ProjectNetwork{
 			Isolation: string(p.Spec.Network.Isolation), DenyInternet: p.Spec.Network.DenyInternet,
 		},
-		DeletionPolicy: string(p.Spec.DeletionPolicy),
-		Ready:          meta.IsStatusConditionTrue(p.Status.Conditions, v1.ConditionReady),
-		Registry:       p.Status.Registry.URL,
-		Created:        p.CreationTimestamp.UTC().Format(time.RFC3339),
-		Quota:          ProjectQuota{GPUs: map[string]int32{}},
+		DeletionPolicy:  string(p.Spec.DeletionPolicy),
+		Ready:           meta.IsStatusConditionTrue(p.Status.Conditions, v1.ConditionReady),
+		Registry:        p.Status.Registry.URL,
+		Created:         p.CreationTimestamp.UTC().Format(time.RFC3339),
+		ResourceVersion: p.ResourceVersion,
+		Quota:           ProjectQuota{GPUs: map[string]int32{}},
 	}
 	for _, g := range p.Spec.Quota.GPUs {
 		out.Quota.GPUs[g.Class] = g.Count

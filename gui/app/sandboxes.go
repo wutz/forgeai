@@ -12,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/wutz/forgeai/pkg/naming"
@@ -38,17 +39,20 @@ type Sandbox struct {
 	PodPhase     string            `json:"podPhase,omitempty"`
 	// ContainerRunning is set when the sandbox container runs; ContainerReason
 	// says why it does not otherwise (CrashLoopBackOff, ImagePullBackOff, ...).
-	ContainerRunning bool     `json:"containerRunning"`
-	ContainerReason  string   `json:"containerReason,omitempty"`
-	CPU              string   `json:"cpu,omitempty"`
-	Memory           string   `json:"memory,omitempty"`
-	GPU              int64    `json:"gpu,omitempty"`
-	Volumes          []string `json:"volumes,omitempty"`
-	Stopped          bool     `json:"stopped"`
-	IdleSince        string   `json:"idleSince,omitempty"`
-	ShutdownTime     string   `json:"shutdownTime,omitempty"`
-	Created          string   `json:"created"`
-	Age              string   `json:"age"`
+	ContainerRunning bool   `json:"containerRunning"`
+	ContainerReason  string `json:"containerReason,omitempty"`
+	// PodUnknown is set when the pod could not be read this time; the container
+	// state above is then not known, not stopped.
+	PodUnknown   bool     `json:"podUnknown,omitempty"`
+	CPU          string   `json:"cpu,omitempty"`
+	Memory       string   `json:"memory,omitempty"`
+	GPU          int64    `json:"gpu,omitempty"`
+	Volumes      []string `json:"volumes,omitempty"`
+	Stopped      bool     `json:"stopped"`
+	IdleSince    string   `json:"idleSince,omitempty"`
+	ShutdownTime string   `json:"shutdownTime,omitempty"`
+	Created      string   `json:"created"`
+	Age          string   `json:"age"`
 }
 
 // SandboxOptions are the platform defaults offered by the create dialog.
@@ -128,8 +132,16 @@ func (a *App) CreateSandbox(f sandbox.Form) (*Sandbox, error) {
 	defer cancel()
 	// A deleted sandbox's pod can outlive its object while it shuts down. A new
 	// sandbox of the same name would then fail, since the controller finds the
-	// pod owned by the old one, so the create waits for the pod to go.
+	// pod owned by the old one, so the create waits for the pod to go. A live
+	// sandbox of the name is a clash, not a shutdown.
 	if f.Name != "" {
+		existing := &unstructured.Unstructured{}
+		existing.SetGroupVersionKind(sandbox.SandboxGVK)
+		if err := c.k8s.Get(ctx, client.ObjectKey{Namespace: c.namespace(), Name: f.Name}, existing); err == nil {
+			return nil, fmt.Errorf("sandbox %s already exists", f.Name)
+		} else if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
 		if err := c.k8s.Get(ctx, client.ObjectKey{Namespace: c.namespace(), Name: f.Name}, &corev1.Pod{}); err == nil {
 			return nil, fmt.Errorf("sandbox %s is still shutting down; try again once its pod is gone", f.Name)
 		} else if !apierrors.IsNotFound(err) {
@@ -427,8 +439,21 @@ type SandboxTemplate struct {
 	Error string `json:"error,omitempty"`
 }
 
-// mutateSandbox reads, changes and updates a sandbox.
+// mutateSandbox reads, changes and updates a sandbox. The heartbeat writes the
+// same object, so an update can meet a conflict; the change is then applied to
+// the object as it is now.
 func (a *App) mutateSandbox(name string, fn func(*sandbox.Sandbox)) (*Sandbox, error) {
+	var out *Sandbox
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var err error
+		out, err = a.mutateSandboxOnce(name, fn)
+		return err
+	})
+	return out, err
+}
+
+// mutateSandboxOnce is one read-change-update attempt of mutateSandbox.
+func (a *App) mutateSandboxOnce(name string, fn func(*sandbox.Sandbox)) (*Sandbox, error) {
 	c, err := a.current()
 	if err != nil {
 		return nil, err
@@ -546,6 +571,8 @@ func toSandbox(ctx context.Context, c *Connection, u *unstructured.Unstructured)
 		if out.NodeName == "" {
 			out.NodeName = pod.Spec.NodeName
 		}
+	} else if !apierrors.IsNotFound(err) {
+		out.PodUnknown = true
 	}
 	return out
 }

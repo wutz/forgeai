@@ -90,6 +90,11 @@ func TestValidate(t *testing.T) {
 		func(f *Form) { f.Env = append(f.Env, EnvVar{Name: "A"}) },
 		func(f *Form) { f.Volumes = append(f.Volumes, VolumeMount{Volume: "x", MountPath: "/data"}) },
 		func(f *Form) { f.Volumes = []VolumeMount{{Volume: "x", MountPath: "rel"}} },
+		func(f *Form) { f.Volumes = []VolumeMount{{Volume: "x", MountPath: "/dev/shm"}} },
+		func(f *Form) { f.Volumes = []VolumeMount{{Volume: "x", MountPath: "/data", SubPath: "../up"}} },
+		func(f *Form) { f.Volumes = []VolumeMount{{Volume: "x", MountPath: "/data", SubPath: "/abs"}} },
+		func(f *Form) { f.Env = []EnvVar{{Name: "BAD NAME", Value: "1"}} },
+		func(f *Form) { f.Env = []EnvVar{{Name: "1A", Value: "1"}} },
 	} {
 		f := form()
 		mut(f)

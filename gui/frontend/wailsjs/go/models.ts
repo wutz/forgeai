@@ -547,6 +547,7 @@ export namespace app {
 	    ready: boolean;
 	    registry: string;
 	    created: string;
+	    resourceVersion?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Project(source);
@@ -565,6 +566,7 @@ export namespace app {
 	        this.ready = source["ready"];
 	        this.registry = source["registry"];
 	        this.created = source["created"];
+	        this.resourceVersion = source["resourceVersion"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -687,6 +689,7 @@ export namespace app {
 	    podPhase?: string;
 	    containerRunning: boolean;
 	    containerReason?: string;
+	    podUnknown?: boolean;
 	    cpu?: string;
 	    memory?: string;
 	    gpu?: number;
@@ -720,6 +723,7 @@ export namespace app {
 	        this.podPhase = source["podPhase"];
 	        this.containerRunning = source["containerRunning"];
 	        this.containerReason = source["containerReason"];
+	        this.podUnknown = source["podUnknown"];
 	        this.cpu = source["cpu"];
 	        this.memory = source["memory"];
 	        this.gpu = source["gpu"];

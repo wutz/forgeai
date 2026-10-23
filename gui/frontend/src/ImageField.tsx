@@ -142,10 +142,12 @@ export function ImageField({id, value, onChange, offered, placeholder, required}
     setActive(null)
     setOpen(true)
   }
+  // pick keeps focus in the field, so a mouse pick does not drop focus to the body.
   const pick = (address: string) => {
     onChange(address)
     setOpen(false)
     setQuery(null)
+    inputRef.current?.focus()
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -196,14 +198,14 @@ export function ImageField({id, value, onChange, offered, placeholder, required}
   const menuNode = open && createPortal(
     <div ref={menu} id={`${id}-menu`} className="combo-menu" role="listbox" style={pos}>
       {typedChoice && option(typedChoice)}
-      {(projects.length > 0 || !q) && <>
-        <div className="combo-group">{t('imagePicker.projects')}</div>
+      {(projects.length > 0 || !q) && <div role="group" aria-label={t('imagePicker.projects')}>
+        <div className="combo-group" aria-hidden="true">{t('imagePicker.projects')}</div>
         {projects.length > 0 ? projects.map(option) : <div className="combo-note">{projectNote}</div>}
-      </>}
-      {platforms.length > 0 && <>
-        <div className="combo-group">{t('imagePicker.platform')}</div>
+      </div>}
+      {platforms.length > 0 && <div role="group" aria-label={t('imagePicker.platform')}>
+        <div className="combo-group" aria-hidden="true">{t('imagePicker.platform')}</div>
         {platforms.map(option)}
-      </>}
+      </div>}
       <div className="combo-foot">{t('imagePicker.keys')}</div>
     </div>,
     document.body,

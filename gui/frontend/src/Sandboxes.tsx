@@ -181,6 +181,11 @@ function SandboxDetail({name, onDone, onDeleted}: {
       setError(errText(e))
       throw e
     })
+  // Selecting the log tab loads the logs, since the tab is the only entry point.
+  const selectTab = (next: Tab) => {
+    if (next === 'log') showLog().catch(() => {})
+    else setTab(next)
+  }
 
   return (
     <Card className="detail">
@@ -198,9 +203,6 @@ function SandboxDetail({name, onDone, onDeleted}: {
                                         onSaved={n => { setSaving(false); setSavedTemplate(n) }}/>}
 
       <div className="detail-actions">
-        <button className="btn btn-sm" onClick={() => showLog().catch(() => {})}>
-          <Icon name="scroll" size={13}/>{t('common.logs')}
-        </button>
         {running && <button className="btn btn-sm" disabled={pending !== null}
                            onClick={() => transition('stop', StopSandbox(box.name))}>
           {pending === 'stop' ? <span className="spinner" aria-hidden/> : <Icon name="square" size={12}/>}
@@ -229,7 +231,7 @@ function SandboxDetail({name, onDone, onDeleted}: {
           {value: 'terminal', label: t('sandboxes.tabTerminal'), icon: 'terminal'},
           {value: 'log', label: t('sandboxes.tabLog'), icon: 'scroll'},
           {value: 'env', label: t('sandboxes.tabEnv'), icon: 'layers'},
-        ]} value={tab} onChange={setTab}/>
+        ]} value={tab} onChange={selectTab}/>
 
         {tab === 'overview' && (
           <dl className="kv">

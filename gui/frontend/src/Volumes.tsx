@@ -74,7 +74,7 @@ export function Volumes() {
                   actions={<>
                     <button className="btn" onClick={() => setRecycling(true)}>
                       <Icon name="trash" size={14}/>{t('volumes.recycleBin')}
-                      {trash.length > 0 && <Badge>{trash.length}</Badge>}
+                      {(trash?.length ?? 0) > 0 && <Badge>{trash?.length}</Badge>}
                     </button>
                     <button className="btn" onClick={() => setCreating(true)}>
                       <Icon name="plus" size={14}/>{t('volumes.new')}
@@ -85,7 +85,7 @@ export function Volumes() {
       {creating && config && <CreateVolumeDialog config={config} onClose={() => setCreating(false)}
                                                  onCreated={refresh}/>}
       {growing && <ResizeVolumeDialog volume={growing} onClose={() => setGrowing(null)} onDone={refresh}/>}
-      {recycling && <RecycleBinDialog volumes={trash} onChanged={refresh} onClose={() => setRecycling(false)}/>}
+      {recycling && <RecycleBinDialog volumes={trash ?? []} onChanged={refresh} onClose={() => setRecycling(false)}/>}
       {confirm.dialog}
 
       <Card>

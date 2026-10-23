@@ -51,7 +51,7 @@ export function Admin() {
     <div className="page">
       <PageHeader eyebrow={t('admin.eyebrow')} title={t('admin.title')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>
-                    {t('admin.meta', {total: projects.length, ready})}
+                    {projects.length === 1 ? t('admin.metaOne', {ready}) : t('admin.meta', {total: projects.length, ready})}
                   </span>}
                   actions={<>
                     <RefreshButton onRefresh={refresh}/>

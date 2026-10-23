@@ -100,7 +100,7 @@ export function Dependencies() {
     <div className="page">
       <PageHeader eyebrow={t('nav.admin')} title={t('deps.title')}
                   meta={data && <span className="muted" style={{fontSize: 12.5}}>
-                    {t('deps.meta', {total: items.length, ready})}
+                    {items.length === 1 ? t('deps.metaOne', {ready}) : t('deps.meta', {total: items.length, ready})}
                   </span>}
                   actions={<RefreshButton onRefresh={refresh}/>}/>
       {error && <div className="banner banner-error" role="alert">

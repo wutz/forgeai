@@ -206,7 +206,7 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
             <div className="stat">
               <div className="stat-label">{t('overview.imageTags')}</div>
               <div className="stat-value">{totalTags}</div>
-              <div className="stat-detail">{t('overview.repositories', {count: images.length})}</div>
+              <div className="stat-detail">{images.length === 1 ? t('overview.repositoryOne') : t('overview.repositories', {count: images.length})}</div>
               <button className="btn btn-sm btn-ghost" onClick={() => onOpen('images')}>
                 {t('overview.imagesButton')}<Icon name="chevron" size={13}/>
               </button>

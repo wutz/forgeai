@@ -47,7 +47,7 @@ export function Resources() {
 
       <div className="metrics">
         <MetricTile icon="cpu" label={t('resources.gpusInCluster')} tone="accent"
-                    value={total} detail={t('resources.instanceTypeCount', {count: types.length})}/>
+                    value={total} detail={types.length === 1 ? t('resources.instanceTypeOne') : t('resources.instanceTypeCount', {count: types.length})}/>
         <MetricTile icon="check" label={t('resources.freeNow')} tone="success"
                     value={free} detail={total ? t('resources.percentInUse', {percent: pct(used, total)}) : t('resources.noGpuNodes')}/>
         <MetricTile icon="shield" label={t('resources.projectGpuQuota')} tone="violet"

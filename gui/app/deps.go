@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -22,6 +23,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
@@ -587,6 +589,39 @@ func checkInstallTarget(b *depBundle, cfg *platform.Config) error {
 	return nil
 }
 
+// checkSelectors refuses a bundle whose Deployments would change a selector the
+// cluster already runs with. Kubernetes makes selectors immutable, so the apply
+// would fail partway through the stages. A Deployment installed by Helm names its
+// release, which has to be uninstalled before the bundle can take its place.
+func checkSelectors(ctx context.Context, k8s client.Reader, b *depBundle) error {
+	for _, o := range b.objects {
+		if o.GetKind() != "Deployment" || o.GroupVersionKind().Group != appsv1.GroupName {
+			continue
+		}
+		want := &appsv1.Deployment{}
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(o.Object, want); err != nil {
+			return fmt.Errorf("%s: %w", b.Name, err)
+		}
+		live := &appsv1.Deployment{}
+		err := k8s.Get(ctx, client.ObjectKey{Namespace: o.GetNamespace(), Name: o.GetName()}, live)
+		if apierrors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if reflect.DeepEqual(live.Spec.Selector, want.Spec.Selector) {
+			continue
+		}
+		ref := live.Namespace + "/" + live.Name
+		if release := live.Annotations["meta.helm.sh/release-name"]; live.Labels["app.kubernetes.io/managed-by"] == "Helm" && release != "" {
+			return fmt.Errorf("%s is installed by Helm release %s with a different selector; uninstall that release before installing %s", ref, release, b.Name)
+		}
+		return fmt.Errorf("%s has a selector the %s bundle cannot change in place; delete the Deployment before installing %s", ref, b.Name, b.Name)
+	}
+	return nil
+}
+
 // readRecords returns the install records by component. A missing record
 // ConfigMap means nothing was recorded.
 func readRecords(ctx context.Context, k8s client.Reader) (map[string]depRecord, error) {
@@ -684,6 +719,9 @@ func (a *App) InstallDependency(name string) error {
 	}
 	if b != nil {
 		if err := checkInstallTarget(b, cfg); err != nil {
+			return err
+		}
+		if err := checkSelectors(ctx, c.k8s, b); err != nil {
 			return err
 		}
 	} else if err := checkChartTarget(ctx, c.k8s); err != nil {

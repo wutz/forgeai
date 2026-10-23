@@ -62,7 +62,8 @@ function retryOnLabel(retryOn: string): string {
 }
 
 export function Jobs() {
-  const [jobs, setJobs] = useState<app.Job[]>([])
+  // jobs is null until the first read, so a failed first read is not shown as an empty list.
+  const [jobs, setJobs] = useState<app.Job[] | null>(null)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -82,7 +83,8 @@ export function Jobs() {
       if (seq === latest.current) setError(errText(e))
     })
   }
-  const busy = jobs.some(j => settling(j.phase))
+  const list = jobs ?? []
+  const busy = list.some(j => settling(j.phase))
   useEffect(() => {
     if (!active) return
     refresh()
@@ -91,17 +93,17 @@ export function Jobs() {
   }, [active, busy])
 
   const counts = useMemo(() => {
-    const c: Record<Filter, number> = {all: jobs.length, running: 0, queued: 0, stopped: 0, failed: 0, done: 0}
-    for (const j of jobs) c[bucket(j.phase)]++
+    const c: Record<Filter, number> = {all: list.length, running: 0, queued: 0, stopped: 0, failed: 0, done: 0}
+    for (const j of list) c[bucket(j.phase)]++
     return c
-  }, [jobs])
+  }, [list])
 
-  const shown = filter === 'all' ? jobs : jobs.filter(j => bucket(j.phase) === filter)
+  const shown = jobs && (filter === 'all' ? jobs : jobs.filter(j => bucket(j.phase) === filter))
 
   return (
     <div className="page">
       <PageHeader eyebrow={t('jobs.eyebrow')} title={t('jobs.title')}
-                  meta={<span className="muted" style={{fontSize: 12.5}}>{t('jobs.total', {count: jobs.length})}</span>}
+                  meta={<span className="muted" style={{fontSize: 12.5}}>{t('jobs.total', {count: list.length})}</span>}
                   actions={<button className="btn" onClick={() => setCreating(true)}>
                     <Icon name="plus" size={14}/>{t('jobs.newJob')}
                   </button>}/>
@@ -117,7 +119,7 @@ export function Jobs() {
       </div>
 
       <div className="split">
-        <JobTable jobs={shown} filtered={filter !== 'all'} selected={selected} onSelect={n =>
+        <JobTable jobs={shown} failed={!!error} filtered={filter !== 'all'} selected={selected} onSelect={n =>
           setSelected(prev => prev === n ? null : n)}/>
         {/* Keyed by name: a read still in flight for the previous job lands on an unmounted detail. */}
         {selected && <JobDetail key={selected} name={selected} onDone={refresh} onOpen={n => { setSelected(n); refresh() }}
@@ -127,9 +129,10 @@ export function Jobs() {
   )
 }
 
-function JobTable({jobs, filtered, selected, onSelect}: {
-  jobs: app.Job[], filtered: boolean, selected: string | null, onSelect: (name: string) => void
+function JobTable({jobs, failed, filtered, selected, onSelect}: {
+  jobs: app.Job[] | null, failed: boolean, filtered: boolean, selected: string | null, onSelect: (name: string) => void
 }) {
+  if (!jobs) return <Card>{failed ? null : <Spinner label={t('common.loading')}/>}</Card>
   if (!jobs.length) {
     return <Card>{filtered
       ? <Empty icon="play" title={t('jobs.emptyFiltered')}/>

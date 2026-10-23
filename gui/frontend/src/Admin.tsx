@@ -4,13 +4,14 @@ import {
 } from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {errText, fmtDate, generateName, phaseLabel} from './util'
-import {Badge, Card, CancelButton, Dialog, Empty, Icon, PageHeader, RefreshButton, useActive, useConfirm} from './ui'
+import {Badge, Card, CancelButton, Dialog, Empty, Icon, PageHeader, RefreshButton, Spinner, useActive, useConfirm} from './ui'
 import {t} from './i18n'
 
 // Admin manages Projects: quota (GPU classes, storage), network isolation,
 // members and their kubeconfigs. Shown only to platform admins.
 export function Admin() {
-  const [projects, setProjects] = useState<app.Project[]>([])
+  // projects is null until the first read, so a failed first read is not shown as an empty list.
+  const [projects, setProjects] = useState<app.Project[] | null>(null)
   const [error, setError] = useState('')
   const [editing, setEditing] = useState<app.Project | null>(null)
   const confirm = useConfirm()
@@ -37,7 +38,8 @@ export function Admin() {
   const edit = (name: string) =>
     (name ? GetProject(name) : Promise.resolve(newProject())).then(setEditing).catch(e => setError(errText(e)))
 
-  const ready = projects.filter(p => p.ready).length
+  const list = projects ?? []
+  const ready = list.filter(p => p.ready).length
   const deleteProject = (p: app.Project) => confirm.ask({
     title: t('admin.deleteTitle', {name: p.name}),
     message: p.deletionPolicy === 'Delete'
@@ -51,7 +53,7 @@ export function Admin() {
     <div className="page">
       <PageHeader eyebrow={t('admin.eyebrow')} title={t('admin.title')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>
-                    {projects.length === 1 ? t('admin.metaOne', {ready}) : t('admin.meta', {total: projects.length, ready})}
+                    {list.length === 1 ? t('admin.metaOne', {ready}) : t('admin.meta', {total: list.length, ready})}
                   </span>}
                   actions={<>
                     <RefreshButton onRefresh={refresh}/>
@@ -65,7 +67,9 @@ export function Admin() {
                                  onSaved={() => { setEditing(null); refresh().catch(() => undefined) }}/>}
 
       <Card>
-        {projects.length === 0 ? (
+        {!projects ? (
+          error ? null : <Spinner label={t('common.loading')}/>
+        ) : projects.length === 0 ? (
           <Empty icon="shield" title={t('admin.noProjects')}>
             {t('admin.noProjectsHint')}
           </Empty>

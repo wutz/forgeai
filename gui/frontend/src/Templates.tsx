@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {ListTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, DeleteSandboxTemplate, SandboxTemplates as ListSandboxTemplates, ListInstanceTypes} from '../wailsjs/go/app/App'
 import {app, sandbox, training} from '../wailsjs/go/models'
 import {envErrors, envToLines, linesToEnv, fmtDate, errText, generateName, NAME_MAX, NAME_PATTERN} from './util'
-import {Card, CancelButton, Dialog, Empty, Icon, PageHeader, Segmented, useActive, useConfirm} from './ui'
+import {Card, CancelButton, Dialog, Empty, Icon, PageHeader, Segmented, Spinner, useActive, useConfirm} from './ui'
 import {SandboxTemplateDialog, SandboxTemplateTable} from './SandboxTemplates'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
@@ -23,8 +23,9 @@ const byName = <T extends {name: string}>(items: T[]) =>
 // that prefill the job form). Each kind is sorted by name.
 export function Templates({sandboxes}: {sandboxes: boolean}) {
   const [kind, setKind] = useState<Kind>(sandboxes ? 'sandbox' : 'job')
-  const [sandboxItems, setSandboxItems] = useState<app.SandboxTemplate[]>([])
-  const [jobItems, setJobItems] = useState<app.Template[]>([])
+  // The lists are null until the first read, so a failed first read is not shown as an empty list.
+  const [sandboxItems, setSandboxItems] = useState<app.SandboxTemplate[] | null>(null)
+  const [jobItems, setJobItems] = useState<app.Template[] | null>(null)
   const [error, setError] = useState('')
   const [sandboxDialog, setSandboxDialog] = useState<SandboxDialogState | null>(null)
   const [jobDialog, setJobDialog] = useState<JobDialogState | null>(null)
@@ -50,8 +51,8 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
       <PageHeader eyebrow={t('templates.eyebrow')} title={t('templates.title')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>
                     {isSandbox
-                      ? t('templates.countSandbox', {count: sandboxItems.length})
-                      : t('templates.countJob', {count: jobItems.length})}
+                      ? t('templates.countSandbox', {count: sandboxItems?.length ?? 0})
+                      : t('templates.countJob', {count: jobItems?.length ?? 0})}
                   </span>}
                   actions={<button className="btn" onClick={() => isSandbox
                     ? setSandboxDialog({})
@@ -71,16 +72,16 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
       {sandboxes && (
         <div className="list-toolbar">
           <Segmented options={kindOptions()} value={kind} onChange={setKind}
-                     counts={{sandbox: sandboxItems.length, job: jobItems.length}}/>
+                     counts={{sandbox: sandboxItems?.length ?? 0, job: jobItems?.length ?? 0}}/>
         </div>
       )}
 
       <Card>
         {isSandbox
-          ? <SandboxTemplateTable items={sandboxItems} onEdit={tpl => setSandboxDialog({
+          ? <SandboxTemplateTable items={sandboxItems} failed={!!error} onEdit={tpl => setSandboxDialog({
               initial: sandbox.TemplateForm.createFrom({...tpl.form, name: tpl.name}), existing: tpl.name,
             })} onDelete={onDeleteSandbox}/>
-          : <JobTemplateTable items={jobItems} onEdit={tpl => setJobDialog({
+          : <JobTemplateTable items={jobItems} failed={!!error} onEdit={tpl => setJobDialog({
               form: training.Form.createFrom({...tpl.form, name: tpl.name}), existing: tpl.name,
             })} onDelete={onDeleteJob}/>}
       </Card>
@@ -99,10 +100,11 @@ function blankJobForm() {
   })
 }
 
-function JobTemplateTable({items, onEdit, onDelete}: {
-  items: app.Template[], onEdit: (t: app.Template) => void, onDelete: (name: string) => void
+function JobTemplateTable({items, failed, onEdit, onDelete}: {
+  items: app.Template[] | null, failed: boolean, onEdit: (t: app.Template) => void, onDelete: (name: string) => void
 }) {
   const confirm = useConfirm()
+  if (!items) return failed ? null : <Spinner label={t('common.loading')}/>
   if (items.length === 0) {
     return (
       <Empty icon="scroll" title={t('templates.emptyJobTitle')}>

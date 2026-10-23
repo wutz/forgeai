@@ -17,7 +17,8 @@ const HEARTBEAT = 60_000
 
 // Sandboxes is the view of the project's agent sandboxes (agents.x-k8s.io).
 export function Sandboxes() {
-  const [boxes, setBoxes] = useState<app.Sandbox[]>([])
+  // boxes is null until the first read, so a failed first read is not shown as an empty list.
+  const [boxes, setBoxes] = useState<app.Sandbox[] | null>(null)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -52,13 +53,14 @@ export function Sandboxes() {
   }, [active])
 
   // Same definition as the detail view: a Pending sandbox is on its way up.
-  const running = boxes.filter(b => b.phase === 'Running' || b.phase === 'Pending').length
+  const list = boxes ?? []
+  const running = list.filter(b => b.phase === 'Running' || b.phase === 'Pending').length
 
   return (
     <div className="page">
       <PageHeader eyebrow={t('sandboxes.eyebrow')} title={t('sandboxes.title')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>
-                    {t('sandboxes.runningCount', {running, total: boxes.length})}
+                    {t('sandboxes.runningCount', {running, total: list.length})}
                   </span>}
                   actions={<button className="btn" onClick={() => setCreating(true)}>
                     <Icon name="plus" size={14}/>{t('sandboxes.new')}
@@ -70,7 +72,7 @@ export function Sandboxes() {
         refresh()
       }}/>}
       <div className="split">
-        <SandboxTable boxes={boxes} selected={selected} onSelect={n =>
+        <SandboxTable boxes={boxes} failed={!!error} selected={selected} onSelect={n =>
           setSelected(prev => prev === n ? null : n)}/>
         {/* Keyed by name: a read still in flight for the previous sandbox must not land on this detail, where Stop and Delete would act on it. */}
         {selected && <SandboxDetail key={selected} name={selected} onDone={refresh}
@@ -80,9 +82,10 @@ export function Sandboxes() {
   )
 }
 
-function SandboxTable({boxes, selected, onSelect}: {
-  boxes: app.Sandbox[], selected: string | null, onSelect: (name: string) => void
+function SandboxTable({boxes, failed, selected, onSelect}: {
+  boxes: app.Sandbox[] | null, failed: boolean, selected: string | null, onSelect: (name: string) => void
 }) {
+  if (!boxes) return <Card>{failed ? null : <Spinner label={t('common.loading')}/>}</Card>
   if (!boxes.length) {
     return <Card><Empty icon="box" title={t('sandboxes.emptyTitle')}>
       {t('sandboxes.emptyHint')}</Empty></Card>

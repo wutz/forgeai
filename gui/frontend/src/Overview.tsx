@@ -9,8 +9,9 @@ import {t} from './i18n'
 // catalogue and the quota it may still use. Every figure is derived from the
 // same list calls the other views use — there is no separate metrics API.
 export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resources' | 'images') => void}) {
-  const [jobs, setJobs] = useState<app.Job[]>([])
-  const [types, setTypes] = useState<app.InstanceType[]>([])
+  // jobs and types are null until their first read, so a failed read is not shown as an empty list.
+  const [jobs, setJobs] = useState<app.Job[] | null>(null)
+  const [types, setTypes] = useState<app.InstanceType[] | null>(null)
   const [vols, setVols] = useState<volumes.Volume[]>([])
   const [images, setImages] = useState<app.ImageRepo[]>([])
   const [quota, setQuota] = useState<app.QuotaUsage | null>(null)
@@ -54,18 +55,20 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
     return () => clearInterval(timer)
   }, [onScreen])
 
-  const running = jobs.filter(j => j.phase === 'Running')
-  const queued = jobs.filter(j => j.phase === 'Queued' || j.phase === 'Pending')
-  const failed = jobs.filter(j => j.phase === 'Failed')
+  const jobList = jobs ?? []
+  const typeList = types ?? []
+  const running = jobList.filter(j => j.phase === 'Running')
+  const queued = jobList.filter(j => j.phase === 'Queued' || j.phase === 'Pending')
+  const failed = jobList.filter(j => j.phase === 'Failed')
   // Workers count only jobs that still hold or wait for pods: a finished,
   // failed or stopped job no longer expects its workers to be ready.
-  const active = jobs.filter(j => j.phase !== 'Succeeded' && j.phase !== 'Failed' && j.phase !== 'Stopped')
+  const active = jobList.filter(j => j.phase !== 'Succeeded' && j.phase !== 'Failed' && j.phase !== 'Stopped')
   const readyWorkers = active.reduce((n, j) => n + (j.ready || 0), 0)
   const wantedWorkers = active.reduce((n, j) => n + (j.workers || 0), 0)
 
   // total and free count instances; the GPU tiles count GPUs, so each GPU type
   // is weighted by its GPUs per instance, as on Resources. CPU-only types have none.
-  const gpuTypes = types.filter(ty => ty.gpuCount > 0)
+  const gpuTypes = typeList.filter(ty => ty.gpuCount > 0)
   const gpuTotal = gpuTypes.reduce((n, ty) => n + ty.total * ty.gpuCount, 0)
   const gpuFree = gpuTypes.reduce((n, ty) => n + ty.free * ty.gpuCount, 0)
   const gpuUsed = Math.max(0, gpuTotal - gpuFree)
@@ -84,19 +87,19 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
 
       <div className="metrics">
         <MetricTile icon="play" label={t('overview.runningJobs')} tone="success"
-                    value={running.length} unit={`/ ${jobs.length}`}
+                    value={running.length} unit={`/ ${jobList.length}`}
                     detail={t('overview.workersReady', {ready: readyWorkers, wanted: wantedWorkers})}>
-          <Meter value={running.length} max={Math.max(jobs.length, 1)} tone="success"/>
+          <Meter value={running.length} max={Math.max(jobList.length, 1)} tone="success"/>
         </MetricTile>
         <MetricTile icon="clock" label={phaseLabel('Queued')} tone="warning"
                     value={queued.length}
                     detail={queued.length ? t('overview.waitingForQuota') : t('overview.nothingWaiting')}>
-          <Meter value={queued.length} max={Math.max(jobs.length, 1)} tone="warning"/>
+          <Meter value={queued.length} max={Math.max(jobList.length, 1)} tone="warning"/>
         </MetricTile>
         <MetricTile icon="warning" label={phaseLabel('Failed')} tone={failed.length ? 'error' : undefined}
                     value={failed.length}
                     detail={failed.length ? t('overview.openJobs') : t('overview.noFailures')}>
-          <Meter value={failed.length} max={Math.max(jobs.length, 1)} tone={failed.length ? 'error' : 'muted'}/>
+          <Meter value={failed.length} max={Math.max(jobList.length, 1)} tone={failed.length ? 'error' : 'muted'}/>
         </MetricTile>
         <MetricTile icon="cpu" label={t('overview.gpusInUse')} tone="accent"
                     value={gpuUsed} unit={gpuTotal ? `/ ${gpuTotal}` : undefined}
@@ -110,7 +113,7 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
               actions={<button className="btn btn-sm btn-ghost" onClick={() => onOpen('resources')}>
                 {t('overview.resourcesButton')}<Icon name="chevron" size={13}/>
               </button>}>
-          {types.length === 0 ? (
+          {types === null ? null : types.length === 0 ? (
             <div className="empty"><div className="empty-title">{t('overview.noGpuNodes')}</div></div>
           ) : (
             <div className="pool-list">
@@ -166,7 +169,7 @@ export function Overview({onOpen}: {onOpen: (area: 'jobs' | 'volumes' | 'resourc
               actions={<button className="btn btn-sm btn-ghost" onClick={() => onOpen('jobs')}>
                 {t('overview.allJobs')}<Icon name="chevron" size={13}/>
               </button>}>
-          {jobs.length === 0 ? (
+          {jobs === null ? null : jobs.length === 0 ? (
             <div className="empty">
               <div className="empty-title">{t('overview.noJobs')}</div>
               <div className="empty-text">{t('overview.createJobHint')}</div>

@@ -6,14 +6,15 @@ import {
 import {app, volumes as vol} from '../wailsjs/go/models'
 import {fmtDate, errText, generateName, phaseLabel} from './util'
 import {t} from './i18n'
-import {Badge, Card, CancelButton, Dialog, Empty, Icon, PageHeader, RefreshButton, useActive, useConfirm} from './ui'
+import {Badge, Card, CancelButton, Dialog, Empty, Icon, PageHeader, RefreshButton, useActive, useConfirm, Spinner} from './ui'
 
 // Volumes manages shared filesystems: create, grow, trash (recycle bin),
 // restore and purge. Deleting is delayed — the operator purges expired
 // trashed volumes; users can restore or set the expiry.
 export function Volumes() {
-  const [items, setItems] = useState<vol.Volume[]>([])
-  const [trash, setTrash] = useState<vol.Volume[]>([])
+  // The lists are null until their first read, so a failed first read is not shown as an empty list.
+  const [items, setItems] = useState<vol.Volume[] | null>(null)
+  const [trash, setTrash] = useState<vol.Volume[] | null>(null)
   const [error, setError] = useState('')
   const [config, setConfig] = useState<app.PlatformConfig | null>(null)
   const [configError, setConfigError] = useState('')
@@ -41,7 +42,7 @@ export function Volumes() {
     return () => clearInterval(timer)
   }, [active])
 
-  const totalGiB = items.reduce((n, v) => n + (v.capacityGiB || v.requestedGiB || 0), 0)
+  const totalGiB = (items ?? []).reduce((n, v) => n + (v.capacityGiB || v.requestedGiB || 0), 0)
 
   // The file server serves ReadWriteMany volumes, so trashing one rebuilds it
   // and ends any transfer in progress. The phase read does not wake or
@@ -74,7 +75,7 @@ export function Volumes() {
     <div className="page">
       <PageHeader eyebrow={t('storage.eyebrow')} title={t('volumes.title')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>
-                    {t('volumes.summary', {count: items.length, size: totalGiB})}
+                    {t('volumes.summary', {count: items?.length ?? 0, size: totalGiB})}
                   </span>}
                   actions={<>
                     <RefreshButton onRefresh={refresh}/>
@@ -91,7 +92,9 @@ export function Volumes() {
       {confirm.dialog}
 
       <Card>
-        {items.length === 0 ? (
+        {!items ? (
+          error ? null : <Spinner label={t('common.loading')}/>
+        ) : items.length === 0 ? (
           <Empty icon="database" title={t('volumes.emptyTitle')}>{t('volumes.emptyHint')}</Empty>
         ) : (
           <table className="table">
@@ -135,7 +138,9 @@ export function Volumes() {
 
       <h2 className="subtitle">{t('volumes.recycleBin')}</h2>
       <Card>
-        {trash.length === 0 ? (
+        {!trash ? (
+          error ? null : <Spinner label={t('common.loading')}/>
+        ) : trash.length === 0 ? (
           <Empty icon="trash" title={t('volumes.trashEmpty')}>
             {t('volumes.trashEmptyHint')}
           </Empty>

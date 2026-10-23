@@ -2,16 +2,17 @@ import {useEffect, useState} from 'react'
 import {CreateSandboxTemplate, UpdateSandboxTemplate, SandboxOptions} from '../wailsjs/go/app/App'
 import {app, sandbox} from '../wailsjs/go/models'
 import {envErrors, envMap, envToLines, linesToEnv, fmtDate, errText, generateName, NAME_MAX, NAME_PATTERN} from './util'
-import {CancelButton, Dialog, Empty, useConfirm} from './ui'
+import {CancelButton, Dialog, Empty, Spinner, useConfirm} from './ui'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
 
 // SandboxTemplateTable lists SandboxTemplates (agent blueprints new sandboxes
 // start from) inside the Templates page.
-export function SandboxTemplateTable({items, onEdit, onDelete}: {
-  items: app.SandboxTemplate[], onEdit: (t: app.SandboxTemplate) => void, onDelete: (name: string) => void
+export function SandboxTemplateTable({items, failed, onEdit, onDelete}: {
+  items: app.SandboxTemplate[] | null, failed: boolean, onEdit: (t: app.SandboxTemplate) => void, onDelete: (name: string) => void
 }) {
   const confirm = useConfirm()
+  if (!items) return failed ? null : <Spinner label={t('common.loading')}/>
   if (items.length === 0) {
     return (
       <Empty icon="layers" title={t('sandboxTemplates.emptyTitle')}>

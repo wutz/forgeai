@@ -32,6 +32,7 @@ export namespace app {
 	    description: string;
 	    pinned: string;
 	    installed: string;
+	    running?: string;
 	    namespace: string;
 	    appliedBy: string;
 	    appliedAt: string;
@@ -54,6 +55,7 @@ export namespace app {
 	        this.description = source["description"];
 	        this.pinned = source["pinned"];
 	        this.installed = source["installed"];
+	        this.running = source["running"];
 	        this.namespace = source["namespace"];
 	        this.appliedBy = source["appliedBy"];
 	        this.appliedAt = source["appliedAt"];

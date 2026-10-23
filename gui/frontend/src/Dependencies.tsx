@@ -140,7 +140,12 @@ export function Dependencies() {
                     <span className="cell-sub">{desc(d.name, d.description)}</span>
                   </td>
                   <td className="mono">
-                    {d.installed || <span className="muted">—</span>}
+                    {d.installed || (d.running
+                      ? <>
+                          {d.running}
+                          <div className="muted" style={{fontSize: 12, marginTop: 4}}>{t('deps.runningHint')}</div>
+                        </>
+                      : <span className="muted">—</span>)}
                     {d.namespace && <div className="muted" style={{fontSize: 12, marginTop: 4}}>
                       {d.namespace}
                     </div>}

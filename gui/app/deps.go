@@ -125,6 +125,9 @@ type Dependency struct {
 	Pinned string `json:"pinned"`
 	// Installed is the version the cluster runs, empty when the GUI did not install it.
 	Installed string `json:"installed"`
+	// Running is the image tag of a component the GUI did not install, so its
+	// version still shows. Empty when the image is pinned by digest or untagged.
+	Running string `json:"running,omitempty"`
 	// Namespace is where the cluster runs the component, empty when unknown.
 	Namespace string `json:"namespace"`
 	// AppliedBy and AppliedAt come from the install record: who installed the
@@ -306,8 +309,12 @@ func assess(dep *Dependency, h depHealth) {
 	var notReady []string
 	for i := range h.deployments {
 		d := &h.deployments[i]
-		if v := d.Labels[depVersionLabel]; v != "" && dep.Installed == "" {
-			dep.Installed = v
+		if v := d.Labels[depVersionLabel]; v != "" {
+			if dep.Installed == "" {
+				dep.Installed = v
+			}
+		} else if dep.Running == "" {
+			dep.Running = imageTag(d)
 		}
 		if !deploymentAvailable(d) {
 			notReady = append(notReady, d.Namespace+"/"+d.Name)
@@ -344,6 +351,26 @@ func assess(dep *Dependency, h depHealth) {
 		return
 	}
 	dep.Status = "ready"
+}
+
+// imageTag returns the tag of the Deployment's first container image, or ""
+// when the image has no tag or is pinned by digest.
+func imageTag(d *appsv1.Deployment) string {
+	cs := d.Spec.Template.Spec.Containers
+	if len(cs) == 0 {
+		return ""
+	}
+	image := cs[0].Image
+	if strings.Contains(image, "@") {
+		return ""
+	}
+	// The last colon is a tag separator only when it comes after the last slash;
+	// otherwise it is a registry port.
+	i := strings.LastIndex(image, ":")
+	if i < 0 || i < strings.LastIndex(image, "/") {
+		return ""
+	}
+	return image[i+1:]
 }
 
 // deploymentAvailable reports whether the Deployment has rolled out and is available.

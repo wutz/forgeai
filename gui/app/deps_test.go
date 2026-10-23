@@ -199,6 +199,55 @@ func TestAssessReason(t *testing.T) {
 	}
 }
 
+// TestAssessRunningVersion checks that a component the GUI did not install
+// shows the tag of its image, while its status stays unmanaged.
+func TestAssessRunningVersion(t *testing.T) {
+	sandbox := Dependency{Name: "agent-sandbox", Pinned: "v1.0.7", Installable: true}
+	withImage := func(image string) appsv1.Deployment {
+		d := testDeployment("", true)
+		d.Spec.Template.Spec.Containers = []corev1.Container{{Image: image}}
+		return d
+	}
+	tests := []struct {
+		name    string
+		deploy  appsv1.Deployment
+		status  string
+		running string
+	}{
+		{"tagged image outside forgeai", withImage("registry.k8s.io/agent-sandbox/agent-sandbox-controller:v1.0.7"), "unmanaged", "v1.0.7"},
+		{"digest-pinned image", withImage("ghcr.io/wutz/gatessh@sha256:36d4c4acba9e432a2459563c51a1a10ddabe2f9de663b78be9d53f56cf742cef"), "unmanaged", ""},
+		{"managed deployment has no running version", testDeployment("v1.0.7", true), "ready", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dep := sandbox
+			assess(&dep, depHealth{crdsWanted: 1, crdsFound: 1, deployments: []appsv1.Deployment{tt.deploy}})
+			if dep.Status != tt.status || dep.Running != tt.running {
+				t.Errorf("assess = status %q running %q, want %q %q", dep.Status, dep.Running, tt.status, tt.running)
+			}
+		})
+	}
+}
+
+func TestImageTag(t *testing.T) {
+	tests := []struct{ image, tag string }{
+		{"registry.k8s.io/agent-sandbox/controller:v1.0.7", "v1.0.7"},
+		{"nginx:1.25", "1.25"},
+		{"localhost:5000/app", ""},
+		{"localhost:5000/app:2", "2"},
+		{"app@sha256:abc", ""},
+		{"app:1.0@sha256:abc", ""},
+		{"app", ""},
+	}
+	for _, tt := range tests {
+		d := appsv1.Deployment{}
+		d.Spec.Template.Spec.Containers = []corev1.Container{{Image: tt.image}}
+		if got := imageTag(&d); got != tt.tag {
+			t.Errorf("imageTag(%q) = %q, want %q", tt.image, got, tt.tag)
+		}
+	}
+}
+
 func TestRecordRoundTrip(t *testing.T) {
 	s := runtime.NewScheme()
 	if err := clientgoscheme.AddToScheme(s); err != nil {

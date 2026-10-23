@@ -28,8 +28,6 @@ import (
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"github.com/wutz/forgeai/pkg/platform"
 )
 
@@ -664,7 +662,7 @@ func (a *App) InstallDependency(name string) error {
 		ctx, cancel := context.WithTimeout(a.ctx, depInstallTimeout)
 		defer cancel()
 		progress := func(step string) {
-			runtime.EventsEmit(a.ctx, depProgressEvent, DependencyProgress{Cluster: cluster, Name: name, Step: step})
+			a.emitEvent(a.ctx, depProgressEvent, DependencyProgress{Cluster: cluster, Name: name, Step: step})
 		}
 		rec, err := installComponent(ctx, c, b, progress)
 		if err == nil {
@@ -684,7 +682,7 @@ func (a *App) InstallDependency(name string) error {
 		if err != nil {
 			done.Error = err.Error()
 		}
-		runtime.EventsEmit(a.ctx, depProgressEvent, done)
+		a.emitEvent(a.ctx, depProgressEvent, done)
 	}()
 	return nil
 }

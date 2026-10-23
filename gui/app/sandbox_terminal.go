@@ -12,8 +12,6 @@ import (
 	kubescheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/remotecommand"
 
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"github.com/wutz/forgeai/pkg/sandbox"
 )
 
@@ -64,6 +62,7 @@ func (q *sizeQueue) set(s remotecommand.TerminalSize) {
 // eventWriter emits what the shell writes as a Wails event. A multi-byte
 // UTF-8 character split across two reads is held back until it is complete.
 type eventWriter struct {
+	app     *App
 	ctx     context.Context
 	event   string
 	pending []byte
@@ -76,7 +75,7 @@ func (w *eventWriter) Write(p []byte) (int, error) {
 	chunk := string(buf[:cut])
 	w.pending = append(w.pending[:0], buf[cut:]...)
 	if chunk != "" {
-		runtime.EventsEmit(w.ctx, w.event, chunk)
+		w.app.emitEvent(w.ctx, w.event, chunk)
 	}
 	return len(p), nil
 }
@@ -164,7 +163,7 @@ func (a *App) OpenSandboxTerminal(name, id string, cols, rows int) error {
 		return fmt.Errorf("terminal session %s is already open", id)
 	}
 
-	out := &eventWriter{ctx: a.ctx, event: "sandbox-terminal:" + id}
+	out := &eventWriter{app: a, ctx: a.ctx, event: "sandbox-terminal:" + id}
 	go func() {
 		err := exec.StreamWithContext(sctx, remotecommand.StreamOptions{
 			Stdin: pr, Stdout: out, Tty: true, TerminalSizeQueue: t.sizes,
@@ -178,7 +177,7 @@ func (a *App) OpenSandboxTerminal(name, id string, cols, rows int) error {
 		if err != nil {
 			msg = err.Error()
 		}
-		runtime.EventsEmit(a.ctx, "sandbox-terminal:"+id+":exit", msg)
+		a.emitEvent(a.ctx, "sandbox-terminal:"+id+":exit", msg)
 	}()
 	return nil
 }

@@ -43,6 +43,8 @@ type App struct {
 	files fileProxy
 	// installs tracks the cluster component installs in progress.
 	installs depInstalls
+	// emit replaces the Wails runtime as the event sink when set; see emitEvent.
+	emit func(ctx context.Context, name string, data ...interface{})
 }
 
 // New creates the bound application.

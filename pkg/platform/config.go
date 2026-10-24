@@ -188,6 +188,10 @@ type Inference struct {
 	// Claim, so that a restart loads them again instead of downloading them.
 	// Empty uses an emptyDir, and every start downloads the weights.
 	Cache InferenceCache `json:"cache,omitempty"`
+	// StartupTimeout is how long a model server may take to become healthy: a
+	// cold start downloads the weights (tens of GB, over a mirror at a few MB/s)
+	// before it loads them into the GPUs. The pod is killed when it expires.
+	StartupTimeout metav1.Duration `json:"startupTimeout,omitzero"`
 }
 
 // InferenceCache is the volume holding the downloaded weights of a model.
@@ -342,6 +346,7 @@ func Parse(data []byte) (*Config, error) {
 		c.Inference.RouterImage = "ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0"
 	}
 	defaultQuantity(&c.Inference.ShmSize, "16Gi")
+	defaultDuration(&c.Inference.StartupTimeout, 2*time.Hour)
 	if c.Inference.Cache.Enabled() {
 		defaultQuantity(&c.Inference.Cache.Size, "200Gi")
 	}

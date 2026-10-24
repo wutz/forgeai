@@ -32,10 +32,8 @@ const (
 	hfCacheDir = "/root/.cache/huggingface"
 	// shutdownTimeout is how long vLLM drains requests on shutdown, in seconds.
 	shutdownTimeout = 45
-	// startupFailures allows the model to start for up to an hour: a cold start
-	// downloads the weights (tens of GB, over a mirror at a few MB/s) before it
-	// loads them into the GPUs.
-	startupFailures = 360
+	// startupPeriodSeconds is the interval of the startup probe.
+	startupPeriodSeconds = 10
 )
 
 // Objects returns the objects of svc: the vLLM model servers on it, the llm-d
@@ -203,7 +201,8 @@ func modelDeployment(
 						Ports:   []corev1.ContainerPort{{Name: portName, ContainerPort: ModelPort}},
 						// The weights take minutes to load, so the readiness check
 						// waits for a startup probe to pass first.
-						StartupProbe:   &corev1.Probe{ProbeHandler: health, PeriodSeconds: 10, FailureThreshold: startupFailures},
+						StartupProbe: &corev1.Probe{ProbeHandler: health, PeriodSeconds: startupPeriodSeconds,
+							FailureThreshold: startupFailureThreshold(cfg)},
 						ReadinessProbe: &corev1.Probe{ProbeHandler: health, PeriodSeconds: 10},
 						Resources:      corev1.ResourceRequirements{Requests: res, Limits: res},
 						VolumeMounts: []corev1.VolumeMount{
@@ -221,6 +220,16 @@ func modelDeployment(
 			},
 		},
 	}
+}
+
+// startupFailureThreshold is how many startup probes of startupPeriodSeconds
+// must fail before the pod is killed, at least one.
+func startupFailureThreshold(cfg *platform.Config) int32 {
+	n := int32(cfg.Inference.StartupTimeout.Seconds()) / startupPeriodSeconds
+	if n < 1 {
+		return 1
+	}
+	return n
 }
 
 func secretKey(name, key string, optional bool) *corev1.EnvVarSource {

@@ -3,6 +3,7 @@ package inference
 import (
 	"slices"
 	"testing"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -50,6 +51,7 @@ func testConfig() *platform.Config {
 	cfg.Inference.RouterImage = testImage
 	cfg.Inference.ShmSize = resource.MustParse("16Gi")
 	cfg.Inference.HFEndpoint = "https://hf-mirror.com"
+	cfg.Inference.StartupTimeout = metav1.Duration{Duration: 2 * time.Hour}
 	return cfg
 }
 
@@ -189,8 +191,8 @@ func TestObjectsServeModelWithTensorParallelGPUs(t *testing.T) {
 		t.Errorf("HF_HUB_DISABLE_XET %+v, want Xet off when downloading through a mirror", env)
 	}
 	spec := model.Spec.Template.Spec
-	if p := spec.Containers[0].StartupProbe; p == nil || p.FailureThreshold*int32(p.PeriodSeconds) < 3600 {
-		t.Errorf("startup probe %+v, want at least an hour for a cold start", p)
+	if p := spec.Containers[0].StartupProbe; p == nil || p.FailureThreshold*int32(p.PeriodSeconds) < 7200 {
+		t.Errorf("startup probe %+v, want the configured two hours for a cold start", p)
 	}
 	if spec.NodeSelector[naming.LabelGPUProduct] != "NVIDIA-GeForce-RTX-5090" {
 		t.Errorf("node selector %v misses the GPU product", spec.NodeSelector)

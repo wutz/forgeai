@@ -50,4 +50,7 @@ inference:
   hfEndpoint: https://hf-mirror.com
   # Weights are tens of GB: keep them across restarts on shared storage.
   cache: {storageClass: shared-vast-cs, size: 200Gi}
+  # A cold start downloads the weights over the mirror at ~5 MB/s, which takes
+  # longer than the default; give it the time to finish.
+  startupTimeout: 2h
 trashRetention: 168h

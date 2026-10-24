@@ -50,8 +50,6 @@ export function GetProject(arg1:string):Promise<app.Project>;
 
 export function GetSandbox(arg1:string):Promise<app.Sandbox>;
 
-export function Heartbeat():Promise<void>;
-
 export function InstallDependency(arg1:string):Promise<void>;
 
 export function KeepSandboxAwake(arg1:string):Promise<void>;

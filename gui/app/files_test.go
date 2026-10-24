@@ -27,7 +27,7 @@ func TestHeartbeatUpdatesExistingAnnotation(t *testing.T) {
 	a := testApp(t, fs)
 	ctx := context.Background()
 
-	if err := a.Heartbeat(); err != nil {
+	if err := a.heartbeat(ctx, a.conn); err != nil {
 		t.Fatal(err)
 	}
 	got := &v1.FileServer{}
@@ -43,7 +43,7 @@ func TestHeartbeatUpdatesExistingAnnotation(t *testing.T) {
 	}
 
 	// A second call inside the throttle window leaves the object alone.
-	if err := a.Heartbeat(); err != nil {
+	if err := a.heartbeat(ctx, a.conn); err != nil {
 		t.Fatal(err)
 	}
 	if err := a.conn.k8s.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: naming.FileServerName}, got); err != nil {

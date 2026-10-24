@@ -90,10 +90,6 @@ export function GetSandbox(arg1) {
   return window['go']['app']['App']['GetSandbox'](arg1);
 }
 
-export function Heartbeat() {
-  return window['go']['app']['App']['Heartbeat']();
-}
-
 export function InstallDependency(arg1) {
   return window['go']['app']['App']['InstallDependency'](arg1);
 }

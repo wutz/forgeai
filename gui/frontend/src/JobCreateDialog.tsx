@@ -16,6 +16,8 @@ export function JobCreateDialog({onClose, onCreated}: {
   const [busy, setBusy] = useState(false)
   const [types, setTypes] = useState<app.InstanceType[]>([])
   const [templates, setTemplates] = useState<string[]>([])
+  // A failed read says so; an empty picker would read as a cluster with no templates.
+  const [templatesError, setTemplatesError] = useState('')
   // vols is null until the project's volumes load.
   const [vols, setVols] = useState<volumes.Volume[] | null>(null)
   const [volsError, setVolsError] = useState('')
@@ -33,7 +35,7 @@ export function JobCreateDialog({onClose, onCreated}: {
       // The first type is the default only while none is set, so a template's type is kept.
       if (ts.length) setF(prev => prev.instanceType ? prev : training.Form.createFrom({...prev, instanceType: ts[0].name}))
     }).catch(e => setError(errText(e)))
-    TemplateNames().then(setTemplates).catch(() => {})
+    TemplateNames().then(ns => { setTemplates(ns); setTemplatesError('') }, e => setTemplatesError(errText(e)))
     ListVolumes(false).then(setVols).catch(e => setVolsError(errText(e)))
   }, [])
 
@@ -129,6 +131,7 @@ export function JobCreateDialog({onClose, onCreated}: {
             <span className="hint">{t('jobCreate.nameHint')}</span>
             {!nameOK && (f.name ?? '') !== '' && <span className="hint hint-error">{t('common.nameInvalid', {max: NAME_MAX})}</span>}
           </div>
+          {templatesError && <div className="banner banner-warn" role="status">{t('jobCreate.templatesUnavailable', {error: templatesError})}</div>}
           <div className="row">
             <div className="field">
               <label htmlFor="j-template">{t('jobCreate.template')}</label>

@@ -175,21 +175,12 @@ func (a *App) FileServerPhase() (string, error) {
 	return string(fs.Status.Phase), nil
 }
 
-// Heartbeat touches the last-active annotation without returning anything.
-// Writes are throttled to heartbeatEvery, so calling it often is cheap.
-func (a *App) Heartbeat() error {
-	c, err := a.current()
-	if err != nil {
-		return err
-	}
-	ctx, cancel := a.call()
-	defer cancel()
-	return a.heartbeat(ctx, c)
-}
-
-// heartbeatEvery bounds how often a view's heartbeat writes the FileServer.
+// heartbeatEvery bounds how often the Files poll's heartbeat writes the FileServer.
 // Files is polled every few seconds; each write would reconcile the object.
 const heartbeatEvery = 30 * time.Second
+
+// heartbeat touches the last-active annotation. Files calls it on every poll,
+// so the view keeps the server awake without a separate binding.
 
 func (a *App) heartbeat(ctx context.Context, c *Connection) error {
 	fs := &v1.FileServer{}

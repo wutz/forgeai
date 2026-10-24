@@ -34,6 +34,8 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   // 0 turns the idle policy off for this sandbox.
   const [idleMinutes, setIdleMinutes] = useState<number | null>(null)
   const [templates, setTemplates] = useState<app.SandboxTemplate[]>([])
+  // A failed read says so; an empty picker would read as a cluster with no templates.
+  const [templatesError, setTemplatesError] = useState('')
 
   useEffect(() => {
     SandboxOptions().then(o => {
@@ -45,7 +47,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
     }).catch(e => setError(errText(e)))
     ListInstanceTypes().then(setTypes).catch(e => setError(errText(e)))
     ListVolumes(false).then(setVols).catch(e => setVolsError(errText(e)))
-    SandboxTemplates().then(setTemplates).catch(() => {})
+    SandboxTemplates().then(ts => { setTemplates(ts); setTemplatesError('') }, e => setTemplatesError(errText(e)))
   }, [])
 
   const set = <K extends keyof sandbox.Form>(k: K, v: sandbox.Form[K]) =>
@@ -121,6 +123,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
             </>}>
         <form id="sandbox-form" onSubmit={submit} className="dialog-form">
           {error && <div className="banner banner-error" role="alert">{error}</div>}
+          {templatesError && <div className="banner banner-warn" role="status">{t('sandboxCreate.templatesUnavailable', {error: templatesError})}</div>}
           {templates.length > 0 && (
             <div className="field">
               <label htmlFor="s-template">{t('sandboxCreate.fromTemplate')}</label>

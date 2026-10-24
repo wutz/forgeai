@@ -39,6 +39,16 @@ git push origin v0.1.0
 
 The tag's version becomes the app version (`info.productVersion` in `wails.json`, set by CI) and the installer file names. Pull requests that touch the GUI build the same installers as workflow artifacts without publishing them. The CI build also pins the wails CLI to v2.16.0 with `golang.org/x/tools` v0.52.0, as described above.
 
+## Updates
+
+The client compares its version with the latest GitHub release (`app.Version`, set by the release workflow with `-ldflags`; a local build is `dev` and never offers an update). Six hours after the start, and on each start, it asks GitHub for the latest release; when that is newer, the top bar shows an update button. Clicking it downloads the release file for the platform, checks it against `SHA256SUMS.txt`, replaces the running app and restarts it:
+
+- macOS: the `.dmg` is mounted and its `forgeai.app` replaces the running bundle.
+- Windows: an installed client runs the `-setup.exe` silently (it asks for administrator rights, since the installer is per machine by default); the portable client replaces its executable.
+- Linux: the `.tar.gz` binary replaces the running executable. A `.deb` install under `/usr` needs root, so the update fails there; install the new `.deb` instead.
+
+The update code is in `app/update.go`. Only the macOS path has been run end to end.
+
 Installers are not code-signed or notarized. `hack/gui-package.sh <version> <darwin|windows|linux>` packages the output of `wails build` the way CI does; the release notes text is in `hack/gui-release-notes.md`.
 
 The Dependencies view installs the forgeai operator from the Helm chart `oci://ghcr.io/wutz/charts/forgeai` at the version pinned as `forgeaiChartVersion` in `app/chart.go`. Bump that constant in the same change that tags the release publishing the new chart version. The chart and operator image packages on ghcr.io must be public, because the GUI pulls the chart without credentials.

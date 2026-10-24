@@ -114,8 +114,10 @@ jobs:
         env:
           PLATFORM: ${{ matrix.platform }}
           PACKAGE: ${{ matrix.package }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          args=(-clean -platform "$PLATFORM")
+          # The running client compares this version with the latest release to offer an update (gui/app/update.go).
+          args=(-clean -platform "$PLATFORM" -ldflags "-X github.com/wutz/forgeai/gui/app.Version=$VERSION")
           case "$PACKAGE" in
             windows) args+=(-nsis) ;;
             linux) args+=(-tags webkit2_41) ;;

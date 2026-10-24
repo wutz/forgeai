@@ -6,6 +6,10 @@ import {sandbox} from '../models';
 import {volumes} from '../models';
 import {time} from '../models';
 
+export function AppVersion():Promise<string>;
+
+export function CheckUpdate():Promise<app.UpdateInfo>;
+
 export function CloseSandboxTerminal(arg1:string):Promise<void>;
 
 export function Config():Promise<app.PlatformConfig>;
@@ -51,6 +55,8 @@ export function GetProject(arg1:string):Promise<app.Project>;
 export function GetSandbox(arg1:string):Promise<app.Sandbox>;
 
 export function InstallDependency(arg1:string):Promise<void>;
+
+export function InstallUpdate():Promise<void>;
 
 export function KeepSandboxAwake(arg1:string):Promise<void>;
 

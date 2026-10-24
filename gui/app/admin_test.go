@@ -1,6 +1,7 @@
 package app
 
 import (
+	"slices"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -68,5 +69,24 @@ func TestToProjectKeepsRegistryStorageThroughSave(t *testing.T) {
 	}
 	if p.Spec.Quota.RegistryStorage == nil || p.Spec.Quota.RegistryStorage.Cmp(registry) != 0 {
 		t.Errorf("saving the form changed RegistryStorage to %v", p.Spec.Quota.RegistryStorage)
+	}
+}
+
+// The GPU list is written in class order, so saving the same form twice leaves
+// the Project unchanged instead of reordering its list.
+func TestApplyProjectQuotaSortsGPUClasses(t *testing.T) {
+	gpus := map[string]int32{"rtx-5090": 1, "a100": 2, "h100": 3, "l4": 4}
+	for range 20 {
+		q := &v1.ProjectQuota{}
+		if err := applyProjectQuota(q, ProjectQuota{GPUs: gpus}); err != nil {
+			t.Fatal(err)
+		}
+		var got []string
+		for _, g := range q.GPUs {
+			got = append(got, g.Class)
+		}
+		if want := []string{"a100", "h100", "l4", "rtx-5090"}; !slices.Equal(got, want) {
+			t.Fatalf("GPU classes = %v, want %v", got, want)
+		}
 	}
 }

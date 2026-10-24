@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {ListTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, DeleteSandboxTemplate, SandboxTemplates as ListSandboxTemplates, ListInstanceTypes} from '../wailsjs/go/app/App'
 import {app, sandbox, training} from '../wailsjs/go/models'
-import {envErrors, envToLines, linesToEnv, fmtDate, errText, generateName, MAX_RETRIES, NAME_MAX, NAME_PATTERN} from './util'
+import {envErrors, envToLines, linesToEnv, everyWhileVisible, fmtDate, errText, generateName, MAX_RETRIES, NAME_MAX, NAME_PATTERN} from './util'
 import {Card, CancelButton, Dialog, Empty, HintButton, Icon, PageHeader, RefreshButton, Segmented, Spinner, useActive, useConfirm} from './ui'
 import {SandboxTemplateDialog, SandboxTemplateTable} from './SandboxTemplates'
 import {t} from './i18n'
@@ -45,7 +45,12 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
   const refresh = () => Promise.all([refreshSandbox(), refreshJob()])
   // reload is for the callers with no place to show a rejection; the failure is already in the page.
   const reload = () => refresh().catch(() => undefined)
-  useEffect(() => { if (active) reload() }, [active])
+  // The lists poll like the other views, so a template saved elsewhere shows without leaving the page.
+  useEffect(() => {
+    if (!active) return
+    reload()
+    return everyWhileVisible(reload, 10000)
+  }, [active])
 
   const onDeleteSandbox = (name: string) =>
     DeleteSandboxTemplate(name).then(refreshSandbox).catch(e => setSandboxError(errText(e)))

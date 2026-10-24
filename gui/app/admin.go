@@ -3,6 +3,8 @@ package app
 import (
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
@@ -156,9 +158,10 @@ func (a *App) SaveProject(f Project) error {
 // field is unset, so the platform default applies (or unlimited for the
 // registry); clearing a limit in the form clears it on the Project.
 func applyProjectQuota(q *v1.ProjectQuota, f ProjectQuota) error {
+	// Sorted by class: map order would reorder the Project's list on every save.
 	q.GPUs = q.GPUs[:0]
-	for class, count := range f.GPUs {
-		q.GPUs = append(q.GPUs, v1.GPUQuota{Class: class, Count: count})
+	for _, class := range slices.Sorted(maps.Keys(f.GPUs)) {
+		q.GPUs = append(q.GPUs, v1.GPUQuota{Class: class, Count: f.GPUs[class]})
 	}
 	q.Storage, q.RegistryStorage, q.Volumes, q.Pods = nil, nil, nil, nil
 	for _, field := range []struct {

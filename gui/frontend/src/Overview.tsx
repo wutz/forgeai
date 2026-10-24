@@ -58,8 +58,7 @@ export function Overview({onOpen, onOpenJob}: {
       setImagesFailed(false)
     }, () => setImagesFailed(true))
     load()
-    const timer = setInterval(load, 60000)
-    return () => clearInterval(timer)
+    return everyWhileVisible(load, 60000)
   }, [onScreen])
 
   const jobList = jobs ?? []

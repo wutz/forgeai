@@ -106,7 +106,7 @@ func (a *App) Quota() (*QuotaUsage, error) {
 	if err := c.k8s.List(ctx, pods, client.InNamespace(c.namespace())); err != nil {
 		return nil, err
 	}
-	gpuUsed := map[string]int32{}
+	usage := map[string]GPUUsage{}
 	for i := range pods.Items {
 		pod := &pods.Items[i]
 		if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodPending {
@@ -122,25 +122,33 @@ func (a *App) Quota() (*QuotaUsage, error) {
 		if gpus == 0 {
 			continue
 		}
-		class := naming.GPUClass(pod.Spec.NodeSelector[naming.LabelGPUProduct])
-		gpuUsed[class] += gpus
+		class := gpuUsageClass(pod.Spec.NodeSelector[naming.LabelGPUProduct])
+		u := usage[class]
+		u.Class, u.Used, u.Pods = class, u.Used+gpus, u.Pods+1
+		usage[class] = u
 	}
-	// InstanceType status has the free counts per class; the pod scan gives
-	// the current use.
-	classes := map[string]GPUUsage{}
-	for class, n := range gpuUsed {
-		u := classes[class]
-		u.Class, u.Used = class, n
-		classes[class] = u
-	}
-	for _, g := range slices.Sorted(maps.Keys(classes)) {
-		out.GPUClasses = append(out.GPUClasses, classes[g])
+	// Sorted by class so the list keeps its order between polls.
+	for _, class := range slices.Sorted(maps.Keys(usage)) {
+		out.GPUClasses = append(out.GPUClasses, usage[class])
 	}
 	// Without a running pod to attribute, the quota's use is shown unclassed.
 	if n := quantityValue32(used, "requests."+string(instancetype.ResourceGPU)); len(out.GPUClasses) == 0 && n > 0 {
 		out.GPUClasses = append(out.GPUClasses, GPUUsage{Class: "*", Used: n})
 	}
 	return out, nil
+}
+
+// unclassedGPU is the class of GPUs whose pod names no product, so the class
+// is not known. Resources shows it as unclassed use.
+const unclassedGPU = "*"
+
+// gpuUsageClass is the class a pod's GPUs count against, from the product
+// label on its node selector. A pod without one is unclassed, not a class "".
+func gpuUsageClass(product string) string {
+	if class := naming.GPUClass(product); class != "" {
+		return class
+	}
+	return unclassedGPU
 }
 
 func quantityString(list corev1.ResourceList, name corev1.ResourceName, zero string) string {

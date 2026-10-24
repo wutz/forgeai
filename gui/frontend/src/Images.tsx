@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from 'react'
 import {DeleteImage, DeleteImageRepo, DeleteImageTag, ListImages, Registry} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
-import {errText, fmtDate, tagCount} from './util'
+import {errText, everyWhileVisible, fmtDate, tagCount} from './util'
 import {t} from './i18n'
 import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Spinner, useActive, useConfirm} from './ui'
 
@@ -32,7 +32,13 @@ export function Images() {
     setError(errText(e))
     throw e
   })
-  useEffect(() => { if (active) refresh().catch(() => {}) }, [active])
+  // Harbor is asked once per repository, so the page re-reads on the Overview's slower beat.
+  useEffect(() => {
+    if (!active) return
+    const poll = () => refresh().catch(() => {})
+    poll()
+    return everyWhileVisible(poll, 60000)
+  }, [active])
 
   const copy = (text: string, key: string) =>
     navigator.clipboard.writeText(text).then(() => {

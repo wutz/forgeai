@@ -71,10 +71,12 @@ export function JobCreateDialog({onClose, onCreated}: {
   const envBad = envErrors(envText)
   // The name is a DNS label of at most 50 characters, the TrainJob name limit.
   const nameOK = NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= NAME_MAX
+  // An empty workers field is NaN, not 0: it stays visibly empty and says so, instead of snapping to 0.
   const workersOK = Number.isInteger(f.workers) && f.workers >= 1
   // A template can name a type the project no longer offers; the backend rejects it, so Create waits.
   const typeOK = !!f.instanceType && types.some(it => it.name === f.instanceType)
   // The platform accepts 0 to 20 retries; the backend rejects anything else.
+  // An empty retries field is NaN too: a cleared field is not a request for zero retries.
   const retries = f.maxRetries ?? 0
   const retriesOK = Number.isInteger(retries) && retries >= 0 && retries <= MAX_RETRIES
   // blocker says why Create is off. A bad name, worker count or env line already
@@ -154,8 +156,8 @@ export function JobCreateDialog({onClose, onCreated}: {
             </div>
             <div className="field">
               <label htmlFor="j-workers">{t('jobCreate.workers')}</label>
-              <input id="j-workers" className="input" type="number" min={1} value={f.workers}
-                     onChange={e => set('workers', +e.target.value)} aria-invalid={!workersOK}/>
+              <input id="j-workers" className="input" type="number" min={1} value={Number.isNaN(f.workers) ? '' : f.workers}
+                     onChange={e => set('workers', e.target.value === '' ? NaN : +e.target.value)} aria-invalid={!workersOK}/>
               {!workersOK && <span className="hint hint-error">{t('jobCreate.workersInvalid')}</span>}
             </div>
           </div>
@@ -190,8 +192,8 @@ export function JobCreateDialog({onClose, onCreated}: {
             <div className="field">
               <label htmlFor="j-retries">{t('jobCreate.maxRetries')}</label>
               <input id="j-retries" className="input" type="number" min={0} max={MAX_RETRIES}
-                     value={f.maxRetries || 0} aria-invalid={!retriesOK}
-                     onChange={e => set('maxRetries', +e.target.value)}/>
+                     value={Number.isNaN(f.maxRetries) ? '' : f.maxRetries ?? 0} aria-invalid={!retriesOK}
+                     onChange={e => set('maxRetries', e.target.value === '' ? NaN : +e.target.value)}/>
               {!retriesOK && <span className="hint hint-error">{t('jobCreate.retriesInvalid')}</span>}
             </div>
             <div className="field">

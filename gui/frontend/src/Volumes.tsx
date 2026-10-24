@@ -222,6 +222,7 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
   // fallback for a config that names none.
   const [type, setType] = useState(() => config.defaultStorageType && config.storageTypes?.[config.defaultStorageType]
     ? config.defaultStorageType : types[0]?.[0] || '')
+  // An empty size is NaN, not 0, so the field stays empty and the hint says why.
   const [size, setSize] = useState(100)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -260,7 +261,7 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
                  autoCapitalize="none" autoCorrect="off" spellCheck={false}
                  maxLength={50} aria-invalid={!nameOK}
                  onChange={e => setName(e.target.value)} required/>
-          {!nameOK && name !== ''
+          {!nameOK
             ? <span className="hint hint-error">{t('volumes.nameHint')}</span>
             : <span className="hint">{t('volumes.nameHelp')}</span>}
         </div>
@@ -275,8 +276,9 @@ function CreateVolumeDialog({config, onClose, onCreated}: {
         </div>
         <div className="field">
           <label htmlFor="v-size">{t('volumes.sizeGiB')}</label>
-          <input id="v-size" className="input" type="number" min={1} max={MAX_VOLUME_GIB} step={1} value={size}
-                 aria-invalid={!sizeOK} onChange={e => setSize(+e.target.value)} required/>
+          <input id="v-size" className="input" type="number" min={1} max={MAX_VOLUME_GIB} step={1}
+                 value={Number.isNaN(size) ? '' : size}
+                 aria-invalid={!sizeOK} onChange={e => setSize(e.target.value === '' ? NaN : +e.target.value)} required/>
           {!sizeOK
             ? <span className="hint hint-error">{t('volumes.sizeInvalid', {max: MAX_VOLUME_GIB})}</span>
             : <span className="hint">{t('volumes.sizeHelp', {max: MAX_VOLUME_GIB})}</span>}
@@ -303,6 +305,7 @@ function ResizeVolumeDialog({volume, onClose, onDone}: {
 
   const save = (e: FormEvent) => {
     e.preventDefault()
+    if (!growOK) return
     setBusy(true)
     ResizeVolume(volume.name, size).then(() => {
       onDone()
@@ -325,9 +328,10 @@ function ResizeVolumeDialog({volume, onClose, onDone}: {
         {error && <div className="banner banner-error" role="alert">{error}</div>}
         <div className="field">
           <label htmlFor="v-grow">{t('volumes.newSize')}</label>
-          <input id="v-grow" className="input" type="number" min={current + 1} max={MAX_VOLUME_GIB} step={1} value={size}
+          <input id="v-grow" className="input" type="number" min={current + 1} max={MAX_VOLUME_GIB} step={1}
+                 value={Number.isNaN(size) ? '' : size}
                  aria-invalid={!growOK}
-                 onChange={e => setSize(+e.target.value)} required/>
+                 onChange={e => setSize(e.target.value === '' ? NaN : +e.target.value)} required/>
           {!growOK && <span className="hint hint-error">
             {size > MAX_VOLUME_GIB ? t('volumes.growTooLarge', {max: MAX_VOLUME_GIB}) : t('volumes.growTooSmall', {size: current})}
           </span>}

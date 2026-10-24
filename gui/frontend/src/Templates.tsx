@@ -300,7 +300,8 @@ export function TemplateDialog({form, existing, version, onClose, onSaved}: {
           <div className="field">
             <label htmlFor="t-workers">{t('templates.workers')}</label>
             <input id="t-workers" className="input" type="number" min={1}
-                   value={f.workers} onChange={e => set('workers', +e.target.value)}
+                   value={Number.isNaN(f.workers) ? '' : f.workers}
+                   onChange={e => set('workers', e.target.value === '' ? NaN : +e.target.value)}
                    aria-invalid={!workersOK}/>
             {!workersOK && <span className="hint hint-error">{t('jobCreate.workersInvalid')}</span>}
           </div>
@@ -309,8 +310,8 @@ export function TemplateDialog({form, existing, version, onClose, onSaved}: {
           <div className="field">
             <label htmlFor="t-retries">{t('jobCreate.maxRetries')}</label>
             <input id="t-retries" className="input" type="number" min={0} max={MAX_RETRIES}
-                   value={f.maxRetries || 0} aria-invalid={!retriesOK}
-                   onChange={e => set('maxRetries', +e.target.value)}/>
+                   value={Number.isNaN(f.maxRetries) ? '' : f.maxRetries ?? 0} aria-invalid={!retriesOK}
+                   onChange={e => set('maxRetries', e.target.value === '' ? NaN : +e.target.value)}/>
             {!retriesOK && <span className="hint hint-error">{t('jobCreate.retriesInvalid')}</span>}
           </div>
           <div className="field">

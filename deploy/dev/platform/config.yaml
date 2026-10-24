@@ -48,4 +48,6 @@ training:
 inference:
   # bz1-dev1 cannot reach huggingface.co; weights come through the mirror.
   hfEndpoint: https://hf-mirror.com
+  # Weights are tens of GB: keep them across restarts on shared storage.
+  cache: {storageClass: shared-vast-cs, size: 200Gi}
 trashRetention: 168h

@@ -26,13 +26,16 @@ const (
 	// as port 80.
 	routerPort = 8081
 	portName   = "http"
-	// hfCacheDir is the Hugging Face cache: an emptyDir, so that the weights
-	// are downloaded once per pod rather than written into the image.
+	// hfCacheDir is the Hugging Face cache: a claim when the platform sets a
+	// cache storage class, so a restart loads the weights again, and an
+	// emptyDir otherwise.
 	hfCacheDir = "/root/.cache/huggingface"
 	// shutdownTimeout is how long vLLM drains requests on shutdown, in seconds.
 	shutdownTimeout = 45
-	// startupFailures allows the model to load for up to 30 minutes.
-	startupFailures = 180
+	// startupFailures allows the model to start for up to an hour: a cold start
+	// downloads the weights (tens of GB, over a mirror at a few MB/s) before it
+	// loads them into the GPUs.
+	startupFailures = 360
 )
 
 // Objects returns the objects of svc: the vLLM model servers on it, the llm-d
@@ -50,11 +53,42 @@ func Objects(
 	if err != nil {
 		return nil, err
 	}
-	objs := make([]client.Object, 0, len(router)+2)
+	objs := make([]client.Object, 0, len(router)+3)
 	for _, o := range router {
 		objs = append(objs, o)
 	}
+	if claim := CacheClaim(svc, cfg); claim != nil {
+		objs = append(objs, claim)
+	}
 	return append(objs, modelDeployment(svc, cfg, it, replicas), ingress(svc, cfg)), nil
+}
+
+// CacheClaimName is the name of the claim holding the weights of svc.
+func CacheClaimName(svc *v1.InferenceService) string { return svc.Name + "-hf-cache" }
+
+// CacheClaim is the claim the model servers keep the downloaded weights on, or
+// nil when the platform configures no cache.
+func CacheClaim(svc *v1.InferenceService, cfg *platform.Config) *corev1.PersistentVolumeClaim {
+	cache := cfg.Inference.Cache
+	if !cache.Enabled() {
+		return nil
+	}
+	cls := cache.StorageClass
+	return &corev1.PersistentVolumeClaim{
+		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "PersistentVolumeClaim"},
+		ObjectMeta: metav1.ObjectMeta{Name: CacheClaimName(svc), Namespace: svc.Namespace,
+			Labels: map[string]string{
+				naming.LabelManagedBy: naming.ManagedBy, naming.LabelComponent: naming.ComponentInference,
+				naming.LabelInference: svc.Name,
+			}},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
+			StorageClassName: &cls,
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{corev1.ResourceStorage: cache.Size},
+			},
+		},
+	}
 }
 
 // ModelName is the name of the model server Deployment of svc.
@@ -139,6 +173,17 @@ func modelDeployment(
 	}
 	health := corev1.ProbeHandler{HTTPGet: &corev1.HTTPGetAction{Path: "/health", Port: intstr.FromInt32(ModelPort)}}
 	shm := cfg.Inference.ShmSize
+	volumes := []corev1.Volume{
+		{Name: "dshm", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{
+			Medium: corev1.StorageMediumMemory, SizeLimit: &shm,
+		}}},
+		{Name: "hf-cache", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
+	}
+	if cfg.Inference.Cache.Enabled() {
+		volumes[1].VolumeSource = corev1.VolumeSource{PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+			ClaimName: CacheClaimName(svc),
+		}}
+	}
 	return &appsv1.Deployment{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"},
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: svc.Namespace, Labels: labels},
@@ -166,12 +211,7 @@ func modelDeployment(
 							{Name: "hf-cache", MountPath: hfCacheDir},
 						},
 					}},
-					Volumes: []corev1.Volume{
-						{Name: "dshm", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{
-							Medium: corev1.StorageMediumMemory, SizeLimit: &shm,
-						}}},
-						{Name: "hf-cache", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
-					},
+					Volumes:      volumes,
 					NodeSelector: it.Spec.NodeSelector,
 					Tolerations: []corev1.Toleration{{
 						Key: string(instancetype.ResourceGPU), Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule,

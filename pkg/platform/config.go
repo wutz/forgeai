@@ -184,7 +184,22 @@ type Inference struct {
 	// weights from (HF_ENDPOINT). Clusters without access to huggingface.co set
 	// a mirror here, such as https://hf-mirror.com.
 	HFEndpoint string `json:"hfEndpoint,omitempty"`
+	// Cache keeps the weights of each InferenceService on a PersistentVolume-
+	// Claim, so that a restart loads them again instead of downloading them.
+	// Empty uses an emptyDir, and every start downloads the weights.
+	Cache InferenceCache `json:"cache,omitempty"`
 }
+
+// InferenceCache is the volume holding the downloaded weights of a model.
+type InferenceCache struct {
+	// StorageClass of the claim; the default StorageClass when empty.
+	StorageClass string `json:"storageClass,omitempty"`
+	// Size of the claim.
+	Size resource.Quantity `json:"size"`
+}
+
+// Enabled reports whether a cache was configured.
+func (c InferenceCache) Enabled() bool { return c.StorageClass != "" || !c.Size.IsZero() }
 
 // DefaultSandboxNamespace is where agent-sandbox is installed.
 const DefaultSandboxNamespace = "agent-sandbox-system"
@@ -327,6 +342,9 @@ func Parse(data []byte) (*Config, error) {
 		c.Inference.RouterImage = "ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0"
 	}
 	defaultQuantity(&c.Inference.ShmSize, "16Gi")
+	if c.Inference.Cache.Enabled() {
+		defaultQuantity(&c.Inference.Cache.Size, "200Gi")
+	}
 	defaultDuration(&c.TrashRetention, 7*24*time.Hour)
 	return c, nil
 }

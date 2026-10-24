@@ -189,6 +189,9 @@ func TestObjectsServeModelWithTensorParallelGPUs(t *testing.T) {
 		t.Errorf("HF_HUB_DISABLE_XET %+v, want Xet off when downloading through a mirror", env)
 	}
 	spec := model.Spec.Template.Spec
+	if p := spec.Containers[0].StartupProbe; p == nil || p.FailureThreshold*int32(p.PeriodSeconds) < 3600 {
+		t.Errorf("startup probe %+v, want at least an hour for a cold start", p)
+	}
 	if spec.NodeSelector[naming.LabelGPUProduct] != "NVIDIA-GeForce-RTX-5090" {
 		t.Errorf("node selector %v misses the GPU product", spec.NodeSelector)
 	}
@@ -203,6 +206,45 @@ func TestObjectsServeModelWithTensorParallelGPUs(t *testing.T) {
 	backend := ing.Spec.Rules[0].HTTP.Paths[0].Backend.Service
 	if backend.Name != "qwen-epp" || backend.Port.Name != "http" {
 		t.Errorf("ingress backend %+v, want the router Service", backend)
+	}
+}
+
+func TestObjectsMountWeightsCache(t *testing.T) {
+	cfg := testConfig()
+	cfg.Inference.Cache.StorageClass = "shared-vast-cs"
+	cfg.Inference.Cache.Size = resource.MustParse("200Gi")
+	objs, err := Objects(testService(), cfg, testInstanceType(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	claim := objectsOf[*corev1.PersistentVolumeClaim](t, objs, "PersistentVolumeClaim")[0]
+	if claim.Name != "qwen-hf-cache" || *claim.Spec.StorageClassName != "shared-vast-cs" {
+		t.Errorf("claim %s class %v", claim.Name, claim.Spec.StorageClassName)
+	}
+	var model *appsv1.Deployment
+	for _, d := range objectsOf[*appsv1.Deployment](t, objs, "Deployment") {
+		if d.Name == "qwen-model" {
+			model = d
+		}
+	}
+	if model == nil {
+		t.Fatal("no qwen-model Deployment")
+	}
+	pvc := model.Spec.Template.Spec.Volumes[1]
+	if pvc.PersistentVolumeClaim == nil || pvc.PersistentVolumeClaim.ClaimName != "qwen-hf-cache" {
+		t.Errorf("hf-cache volume %+v, want the cache claim", pvc.VolumeSource)
+	}
+}
+
+func TestObjectsUseEmptyDirWithoutCache(t *testing.T) {
+	objs, err := Objects(testService(), testConfig(), testInstanceType(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, o := range objs {
+		if _, ok := o.(*corev1.PersistentVolumeClaim); ok {
+			t.Fatalf("rendered %s without a configured cache", o.GetName())
+		}
 	}
 }
 

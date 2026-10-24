@@ -1,6 +1,6 @@
 import {FormEvent, useEffect, useState} from 'react'
 import {
-  Config, DeleteProject, GetProject, ListProjects, MemberKubeconfig, SaveProject,
+  Config, DeleteProject, GetProject, ListInstanceTypes, ListProjects, MemberKubeconfig, SaveProject,
 } from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {errText, fmtDate, generateName, isConflict, phaseLabel} from './util'
@@ -128,16 +128,29 @@ function gpuLines(gpus: Record<string, number> = {}): string {
   return Object.entries(gpus).map(([c, n]) => `${c}:${n}`).join(' ')
 }
 
+// gpuClassRE is the form a GPU class takes in the cluster: naming.GPUClass
+// lowercases the product label and keeps letters, digits and dashes, so a class
+// written any other way can never match a node.
+const gpuClassRE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/
+// The backend stores a count as int32.
+const maxGPUCount = 2147483647
+
 // parseGPUs reads the GPU field. Partial pairs are rejected here rather than
 // typed into the quota, so a half-typed class never reaches the Project. A class
-// listed twice is rejected too: the second count would silently replace the first.
+// listed twice is rejected too, a zero count included: the second count would
+// silently replace the first, and a zero would hide the repeat.
 function parseGPUs(text: string): Record<string, number> {
   const gpus: Record<string, number> = {}
+  const seen = new Set<string>()
   for (const pair of text.split(/\s+/).filter(Boolean)) {
     const m = /^([^:]+):(\d+)$/.exec(pair)
     if (!m) throw new Error(t('admin.gpuFormatError', {pair}))
-    if (m[1] in gpus) throw new Error(t('admin.gpuDuplicate', {cls: m[1]}))
-    if (+m[2] > 0) gpus[m[1]] = +m[2]
+    const [, cls, count] = m
+    if (!gpuClassRE.test(cls) || cls.length > 40) throw new Error(t('admin.gpuClassInvalid', {cls}))
+    if (seen.has(cls)) throw new Error(t('admin.gpuDuplicate', {cls}))
+    seen.add(cls)
+    if (+count > maxGPUCount) throw new Error(t('admin.gpuTooLarge', {cls, max: maxGPUCount}))
+    if (+count > 0) gpus[cls] = +count
   }
   return gpus
 }
@@ -167,15 +180,28 @@ function ProjectDialog({form, onClose, onSaved}: {
   // prefix is the platform's namespace prefix, so the preview names the namespace
   // the controller will create. A failed read only hides the preview.
   const [prefix, setPrefix] = useState('')
+  // gpuClasses are the GPU classes the cluster has, so a quota for another class
+  // is named as one that will not apply. Null until read; a failed read warns nothing.
+  const [gpuClasses, setGPUClasses] = useState<string[] | null>(null)
   useEffect(() => {
     let live = true
     Config().then(c => { if (live) setPrefix(c.namespacePrefix) }).catch(() => undefined)
+    ListInstanceTypes().then(ts => {
+      if (live) setGPUClasses([...new Set(ts.filter(ty => ty.gpuCount > 0).map(ty => ty.class))].sort())
+    }).catch(() => undefined)
     return () => { live = false }
   }, [])
   const create = !form.name
   // gpuErr is the message for the first bad GPU pair, or '' when the field parses.
   const gpuErr = (() => {
     try { parseGPUs(gpuText); return '' } catch (err) { return errText(err) }
+  })()
+  // A quota for a class the cluster does not have is saved (a node pool may come
+  // later) but is named here. An empty catalogue says nothing: the cluster may
+  // simply have no GPU nodes right now.
+  const gpuUnknown = (() => {
+    if (gpuErr || !gpuClasses?.length) return []
+    return Object.keys(parseGPUs(gpuText)).filter(c => !gpuClasses.includes(c))
   })()
   const nameOK = !p.name || dnsLabelOK(p.name)
   const nsPreview = prefix && p.name && nameOK ? prefix + p.name : ''
@@ -298,9 +324,12 @@ function ProjectDialog({form, onClose, onSaved}: {
           <input id="p-gpus" className="input mono" value={gpuText}
                  autoCapitalize="none" autoCorrect="off" spellCheck={false}
                  onChange={e => setGpuText(e.target.value)} aria-invalid={!!gpuErr}
-                 placeholder="rtx-5090:8 a100:2"/>
+                 placeholder={gpuClasses?.length ? gpuClasses.map(c => `${c}:8`).slice(0, 2).join(' ') : 'rtx-5090:8 a100:2'}/>
           <span className="hint">{t('admin.jobsOverQuota')}</span>
           {gpuErr && <span className="hint hint-error">{gpuErr}</span>}
+          {!gpuErr && gpuUnknown.length > 0 && <span className="hint hint-warn">
+            {t('admin.gpuClassUnknown', {classes: gpuUnknown.join('、'), known: gpuClasses?.join('、') || ''})}
+          </span>}
         </div>
         <div className="row">
           <div className="field">

@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {ListTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, DeleteSandboxTemplate, SandboxTemplates as ListSandboxTemplates, ListInstanceTypes} from '../wailsjs/go/app/App'
 import {app, sandbox, training} from '../wailsjs/go/models'
 import {envErrors, envToLines, linesToEnv, fmtDate, errText, generateName, MAX_RETRIES, NAME_MAX, NAME_PATTERN} from './util'
-import {Card, CancelButton, Dialog, Empty, HintButton, Icon, PageHeader, Segmented, Spinner, useActive, useConfirm} from './ui'
+import {Card, CancelButton, Dialog, Empty, HintButton, Icon, PageHeader, RefreshButton, Segmented, Spinner, useActive, useConfirm} from './ui'
 import {SandboxTemplateDialog, SandboxTemplateTable} from './SandboxTemplates'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
@@ -36,14 +36,16 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
   const isSandbox = sandboxes && kind === 'sandbox'
   const error = isSandbox ? sandboxError : jobError
 
+  // A refused read is shown in its kind's banner and rejects, so the header's refresh
+  // button reports it too.
   const refreshSandbox = () => !sandboxes ? Promise.resolve() : ListSandboxTemplates()
-    .then(s => { setSandboxItems(byName(s)); setSandboxError('') })
-    .catch(e => setSandboxError(errText(e)))
+    .then(s => { setSandboxItems(byName(s)); setSandboxError('') }, e => { setSandboxError(errText(e)); throw e })
   const refreshJob = () => ListTemplates()
-    .then(j => { setJobItems(byName(j)); setJobError('') })
-    .catch(e => setJobError(errText(e)))
+    .then(j => { setJobItems(byName(j)); setJobError('') }, e => { setJobError(errText(e)); throw e })
   const refresh = () => Promise.all([refreshSandbox(), refreshJob()])
-  useEffect(() => { if (active) refresh() }, [active])
+  // reload is for the callers with no place to show a rejection; the failure is already in the page.
+  const reload = () => refresh().catch(() => undefined)
+  useEffect(() => { if (active) reload() }, [active])
 
   const onDeleteSandbox = (name: string) =>
     DeleteSandboxTemplate(name).then(refreshSandbox).catch(e => setSandboxError(errText(e)))
@@ -59,26 +61,29 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
                       ? sandboxItems !== null && t('templates.countSandbox', {count: sandboxItems.length})
                       : jobItems !== null && t('templates.countJob', {count: jobItems.length})}
                   </span>}
-                  actions={<button className="btn" onClick={() => isSandbox
-                    ? setSandboxDialog({})
-                    : setJobDialog({form: blankJobForm()})}>
-                    <Icon name="plus" size={14}/>{isSandbox ? t('templates.newSandbox') : t('templates.newJob')}
-                  </button>}/>
+                  actions={<>
+                    <button className="btn" onClick={() => isSandbox
+                      ? setSandboxDialog({})
+                      : setJobDialog({form: blankJobForm()})}>
+                      <Icon name="plus" size={14}/>{isSandbox ? t('templates.newSandbox') : t('templates.newJob')}
+                    </button>
+                    <RefreshButton onRefresh={refresh}/>
+                  </>}/>
       {error && <div className="banner banner-error" role="alert">
         <span>{error}</span>
         {/* A conflict says to reload; the refresh is here so the user does not have to find it. */}
         <span className="spacer"/>
-        <button className="btn btn-sm" onClick={() => refresh()}>{t('common.refresh')}</button>
+        <button className="btn btn-sm" onClick={() => reload()}>{t('common.refresh')}</button>
       </div>}
       {/* Closing a dialog reloads the list: a save that failed on a stale version
           says to reload, and the reload here gives the reopened edit the current version. */}
       {sandboxDialog &&<SandboxTemplateDialog initial={sandboxDialog.initial} existing={sandboxDialog.existing} version={sandboxDialog.version}
-                                               onClose={() => { setSandboxDialog(null); refreshSandbox() }} onSaved={() => {
-        setSandboxDialog(null); refreshSandbox()
+                                               onClose={() => { setSandboxDialog(null); reload() }} onSaved={() => {
+        setSandboxDialog(null); reload()
       }}/>}
       {jobDialog && <TemplateDialog form={jobDialog.form} existing={jobDialog.existing} version={jobDialog.version}
-                                    onClose={() => { setJobDialog(null); refreshJob() }} onSaved={() => {
-        setJobDialog(null); refreshJob()
+                                    onClose={() => { setJobDialog(null); reload() }} onSaved={() => {
+        setJobDialog(null); reload()
       }}/>}
 
       {sandboxes && (
@@ -88,7 +93,8 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
         </div>
       )}
 
-      <Card>
+      {/* A failed first read leaves no list, so the card is left out rather than drawn empty under the banner. */}
+      {((isSandbox ? sandboxItems : jobItems) || !error) && <Card>
         {isSandbox
           ? <SandboxTemplateTable items={sandboxItems} failed={!!error} onEdit={tpl => setSandboxDialog({
               initial: sandbox.TemplateForm.createFrom({...tpl.form, name: tpl.name}), existing: tpl.name, version: tpl.resourceVersion,
@@ -96,7 +102,7 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
           : <JobTemplateTable items={jobItems} failed={!!error} onEdit={tpl => setJobDialog({
               form: training.Form.createFrom({...tpl.form, name: tpl.name}), existing: tpl.name, version: tpl.resourceVersion,
             })} onDelete={onDeleteJob}/>}
-      </Card>
+      </Card>}
     </div>
   )
 }

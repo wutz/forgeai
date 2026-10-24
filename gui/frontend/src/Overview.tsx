@@ -123,7 +123,10 @@ export function Overview({onOpen, onOpenJob}: {
               actions={<button className="btn btn-sm btn-ghost" onClick={() => onOpen('resources')}>
                 {t('overview.resourcesButton')}<Icon name="chevron" size={13}/>
               </button>}>
-          {types === null ? null : types.length === 0 ? (
+          {/* After the first load a null list is a failed read, so the card says so instead of staying empty. */}
+          {types === null ? (
+            <div className="empty"><div className="empty-title">{t('overview.poolsUnavailable')}</div></div>
+          ) : types.length === 0 ? (
             <div className="empty"><div className="empty-title">{t('overview.noGpuNodes')}</div></div>
           ) : (
             <div className="pool-list">
@@ -182,7 +185,9 @@ export function Overview({onOpen, onOpenJob}: {
               actions={<button className="btn btn-sm btn-ghost" onClick={() => onOpen('jobs')}>
                 {t('overview.allJobs')}<Icon name="chevron" size={13}/>
               </button>}>
-          {jobs === null ? null : jobs.length === 0 ? (
+          {jobs === null ? (
+            <div className="empty"><div className="empty-title">{t('overview.jobsUnavailable')}</div></div>
+          ) : jobs.length === 0 ? (
             <div className="empty">
               <div className="empty-title">{t('overview.noJobs')}</div>
               <div className="empty-text">{t('overview.createJobHint')}</div>

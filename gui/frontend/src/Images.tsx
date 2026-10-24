@@ -131,7 +131,8 @@ export function Images() {
         </Card>
       )}
 
-      <Card title={t('images.repositories')} className="card-spaced">
+      {/* A failed first read leaves no list, so the card is left out rather than drawn empty under the banner. */}
+      {(repos || !error) && <Card title={t('images.repositories')} className="card-spaced">
         {reg?.enabled && !reg.credentials && (
           <Empty icon="shield" title={t('images.viewOnlyTitle')}>
             {t('images.viewOnlyHint')}
@@ -214,7 +215,7 @@ export function Images() {
             <button className="btn btn-sm btn-danger" onClick={() => deleteRepo(r)}>{t('images.deleteRepo')}</button>
           </div>
         ))}
-      </Card>
+      </Card>}
     </div>
   )
 }

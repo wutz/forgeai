@@ -2,7 +2,6 @@
 // as Cancel, Save, Name and Status come from common.ts.
 
 export const en = {
-  'overview.loading': 'Loading overview…',
   'overview.eyebrow': 'Workspace',
   'overview.title': 'Overview',
   'overview.live': 'live · every 8s',
@@ -224,7 +223,6 @@ export const en = {
 }
 
 export const zh: Record<keyof typeof en, string> = {
-  'overview.loading': '加载概览…',
   'overview.eyebrow': '工作区',
   'overview.title': '概览',
   'overview.live': '实时 · 每 8 秒',

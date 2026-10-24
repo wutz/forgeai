@@ -8,6 +8,16 @@ import {t} from './i18n'
 // Overview is the landing view of a project: what is running now, the GPU
 // catalogue and the quota it may still use. Every figure is derived from the
 // same list calls the other views use — there is no separate metrics API.
+type Read = 'jobs' | 'types' | 'vols' | 'quota'
+
+// CardRead is what a card body shows while its list is still loading, or the
+// unavailable note once that list's read has answered without data.
+function CardRead({done, unavailable}: {done: boolean, unavailable: string}) {
+  return done
+    ? <div className="empty"><div className="empty-title">{unavailable}</div></div>
+    : <Spinner label={t('common.loading')}/>
+}
+
 export function Overview({onOpen, onOpenJob}: {
   onOpen: (area: 'jobs' | 'volumes' | 'resources' | 'images') => void, onOpenJob: (name: string) => void
 }) {
@@ -20,20 +30,31 @@ export function Overview({onOpen, onOpenJob}: {
   const [images, setImages] = useState<app.ImageRepo[] | null>(null)
   const [imagesFailed, setImagesFailed] = useState(false)
   const [quota, setQuota] = useState<app.QuotaUsage | null>(null)
-  const [error, setError] = useState('')
-  const [loaded, setLoaded] = useState(false)
+  // Each card fills in as its own read answers. settled tells a read still in flight
+  // (a card shows a spinner) from one that answered without a list (a card says unavailable).
+  const [settled, setSettled] = useState<Record<Read, boolean>>({jobs: false, types: false, vols: false, quota: false})
+  const [failures, setFailures] = useState<Partial<Record<Read, string>>>({})
+  const error = Object.values(failures).find(Boolean) ?? ''
   const onScreen = useActive()
 
-  // refresh rejects when any list failed; the banner already shows why.
+  // track records one read's answer or failure as soon as it arrives, so a slow read
+  // does not hold back the cards and banner of the reads that already answered.
+  const track = <T,>(key: Read, call: Promise<T>, set: (v: T) => void) => call.then(v => {
+    set(v)
+    setFailures(f => ({...f, [key]: ''}))
+  }, e => {
+    setFailures(f => ({...f, [key]: errText(e)}))
+    throw e
+  }).finally(() => setSettled(s => ({...s, [key]: true})))
+
+  // refresh rejects when any read failed, so RefreshButton can say so; the banner already shows why.
   const refresh = () => Promise.allSettled([
-    ListJobs().then(setJobs),
-    ListInstanceTypes().then(setTypes),
-    ListVolumes(false).then(setVols),
-    Quota().then(setQuota),
+    track('jobs', ListJobs(), setJobs),
+    track('types', ListInstanceTypes(), setTypes),
+    track('vols', ListVolumes(false), setVols),
+    track('quota', Quota(), setQuota),
   ]).then(results => {
     const failed = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined
-    setError(failed ? errText(failed.reason) : '')
-    setLoaded(true)
     if (failed) throw failed.reason
   })
   useEffect(() => {
@@ -85,8 +106,6 @@ export function Overview({onOpen, onOpenJob}: {
   const storageGiB = (vols ?? []).reduce((n, v) => n + (v.capacityGiB || v.requestedGiB || 0), 0)
   const totalTags = images === null ? null : images.reduce((n, r) => n + tagCount(r), 0)
 
-  if (!loaded) return <div className="page"><Spinner label={t('overview.loading')}/></div>
-
   return (
     <div className="page">
       <PageHeader eyebrow={t('overview.eyebrow')} title={t('overview.title')}
@@ -122,9 +141,8 @@ export function Overview({onOpen, onOpenJob}: {
               actions={<button className="btn btn-sm btn-ghost" onClick={() => onOpen('resources')}>
                 {t('overview.resourcesButton')}<Icon name="chevron" size={13}/>
               </button>}>
-          {/* After the first load a null list is a failed read, so the card says so instead of staying empty. */}
           {types === null ? (
-            <div className="empty"><div className="empty-title">{t('overview.poolsUnavailable')}</div></div>
+            <CardRead done={settled.types} unavailable={t('overview.poolsUnavailable')}/>
           ) : types.length === 0 ? (
             <div className="empty"><div className="empty-title">{t('overview.noGpuNodes')}</div></div>
           ) : (
@@ -153,7 +171,7 @@ export function Overview({onOpen, onOpenJob}: {
         </Card>
 
         <Card title={t('overview.quota')} subtitle={t('overview.quotaSubtitle')}>
-          {!quota ? <div className="empty"><div className="empty-title">{t('overview.quotaUnavailable')}</div></div> : (
+          {!quota ? <CardRead done={settled.quota} unavailable={t('overview.quotaUnavailable')}/> : (
             <div className="quota-list">
               {(quota.gpuClasses || []).map(g => (
                 <Meter key={g.class} value={g.used} max={Math.max(quota.gpuQuota, g.used, 1)}
@@ -185,7 +203,7 @@ export function Overview({onOpen, onOpenJob}: {
                 {t('overview.allJobs')}<Icon name="chevron" size={13}/>
               </button>}>
           {jobs === null ? (
-            <div className="empty"><div className="empty-title">{t('overview.jobsUnavailable')}</div></div>
+            <CardRead done={settled.jobs} unavailable={t('overview.jobsUnavailable')}/>
           ) : jobs.length === 0 ? (
             <div className="empty">
               <div className="empty-title">{t('overview.noJobs')}</div>

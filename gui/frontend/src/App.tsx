@@ -17,6 +17,7 @@ import {Scope} from './Scope'
 import {errText} from './util'
 import {ActiveView, Empty, HeaderSlot, Icon, IconName, Spinner} from './ui'
 import {Preferences} from './Preferences'
+import {UpdateButton, useUpdate} from './Update'
 import {getLocale, subscribeLocale, t} from './i18n'
 
 // PREFS is the last connection. NAMESPACES maps each kubeconfig context to the
@@ -110,6 +111,7 @@ export default function App() {
   // first visit and stays mounted after that.
   const [visited, setVisited] = useState<Area[]>([])
   const [error, setError] = useState('')
+  const update = useUpdate(setError)
   const [loading, setLoading] = useState(false)
   // The rail remembers its state across launches, like the connection does.
   // A narrow window overlays the page with the rail, so it always starts closed.
@@ -250,6 +252,7 @@ export default function App() {
           </div>
           <div className="header-main">
             <div className="header-slot" ref={setHeaderSlot}/>
+            <UpdateButton update={update}/>
           </div>
         </header>
         <div className={`shell ${collapsed ? 'collapsed' : ''}`}>
@@ -273,7 +276,7 @@ export default function App() {
                 ))}
               </div>
             ))}
-            <Preferences/>
+            <Preferences update={update}/>
           </nav>
           <main className="main">
             {error && <div className="banner banner-error" role="alert">{error}</div>}
@@ -305,6 +308,7 @@ export default function App() {
             )}
           </main>
         </div>
+        {update.dialog}
       </div>
     </HeaderSlot.Provider>
   )

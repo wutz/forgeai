@@ -217,7 +217,7 @@ make deploy-dev                # ko build -> ghcr.io/wutz/forgeai (public), kube
 The operator also ships as a Helm chart in `charts/chart`: CRDs, RBAC and the controller Deployment, with the platform config under `platform.config`. The Dependencies view installs the pinned chart version as release `forgeai` in `forgeai-system`; the same install from the CLI:
 
 ```sh
-helm install forgeai oci://ghcr.io/wutz/charts/forgeai --version 0.2.0 \
+helm install forgeai oci://ghcr.io/wutz/charts/forgeai --version 0.3.0 \
   --namespace forgeai-system --create-namespace
 ```
 

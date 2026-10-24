@@ -113,19 +113,19 @@ function SandboxTable({boxes, failed, selected, onSelect}: {
         {boxes.map(b => (
           <tr key={b.name} className={selected === b.name ? 'clickable selected' : 'clickable'}
               onClick={() => onSelect(b.name)}>
-            <td className="mono">
+            <td data-label={t('common.name')} className="mono">
               <button type="button" className="row-name cell-main">{b.name}</button>
               <span className="cell-sub">{b.image.split('/').pop()}</span>
             </td>
             {/* A stopped sandbox's controller message is English and repeats the status label. */}
-            <td><Status phase={b.phase}/>{b.phase !== 'Running' && !b.stopped && statusText(b).label &&
+            <td data-label={t('common.status')}><Status phase={b.phase}/>{b.phase !== 'Running' && !b.stopped && statusText(b).label &&
               <div className="cell-sub" title={b.message}>{short(statusText(b).label)}</div>}
               {b.phase === 'Running' && containerNote(b) &&
               <div className="cell-sub" title={containerNote(b)}>{short(containerNote(b))}</div>}</td>
-            {!selected && <td>{b.runtimeClass ? <Badge>{b.runtimeClass}</Badge> : <span className="muted">{t('sandboxes.runcNode')}</span>}</td>}
-            <td className="mono">{b.cpu || '—'}/{b.memory || '—'}{b.gpu ? ` · ${b.gpu} GPU` : ''}</td>
-            <td className="mono trunc" title={b.serviceFQDN || b.podIPs?.[0]}>{b.serviceFQDN || b.podIPs?.[0] || '—'}</td>
-            {!selected && <td className="muted">{b.age}</td>}
+            {!selected && <td data-label={t('sandboxes.isolation')}>{b.runtimeClass ? <Badge>{b.runtimeClass}</Badge> : <span className="muted">{t('sandboxes.runcNode')}</span>}</td>}
+            <td data-label={t('sandboxes.resources')} className="mono">{b.cpu || '—'}/{b.memory || '—'}{b.gpu ? ` · ${b.gpu} GPU` : ''}</td>
+            <td data-label={t('sandboxes.endpoint')} className="mono trunc" title={b.serviceFQDN || b.podIPs?.[0]}>{b.serviceFQDN || b.podIPs?.[0] || '—'}</td>
+            {!selected && <td data-label={t('sandboxes.age')} className="muted">{b.age}</td>}
           </tr>
         ))}
         </tbody>

@@ -117,18 +117,18 @@ export function Volumes() {
             <tbody>
             {items.map(v => (
               <tr key={v.name}>
-                <td className="mono">
+                <td data-label={t('common.name')} className="mono">
                   <span className="cell-main">{v.name}</span>
                   <span className="cell-sub">{v.storageClass}</span>
                 </td>
-                <td><Badge>{config?.storageTypes?.[v.type]?.description || v.type}</Badge></td>
-                <td className="mono">{v.capacityGiB || v.requestedGiB} GiB
+                <td data-label={t('volumes.type')}><Badge>{config?.storageTypes?.[v.type]?.description || v.type}</Badge></td>
+                <td data-label={t('volumes.size')} className="mono">{v.capacityGiB || v.requestedGiB} GiB
                   {v.phase === 'Resizing' && <span className="muted"> → {v.requestedGiB} GiB</span>}
                 </td>
-                <td><span className={`status status-${v.phase === 'Bound' ? 'running' : v.phase.toLowerCase()}`}>
+                <td data-label={t('volumes.phase')}><span className={`status status-${v.phase === 'Bound' ? 'running' : v.phase.toLowerCase()}`}>
                   <span className="dot" aria-hidden/>{v.phase === 'Bound' ? t('volumes.bound') : phaseLabel(v.phase)}</span></td>
-                <td className="muted mono trunc" title={v.users?.join(', ')}>{v.users?.join(', ') || '—'}</td>
-                <td className="muted">{fmtDate(v.created)}</td>
+                <td data-label={t('volumes.usedBy')} className="muted mono trunc" title={v.users?.join(', ')}>{v.users?.join(', ') || '—'}</td>
+                <td data-label={t('common.created')} className="muted">{fmtDate(v.created)}</td>
                 <td>
                   <div className="actions">
                     <HintButton className="btn btn-sm" disabled={v.phase !== 'Bound' && v.phase !== 'Resizing'}
@@ -190,9 +190,9 @@ function RecycleBinDialog({volumes, loadError, onChanged, onClose}: {
           <tbody>
           {volumes.map(v => (
             <tr key={v.name} className="trashed">
-              <td className="mono">{v.name}</td>
-              <td className="mono">{v.capacityGiB || v.requestedGiB} GiB</td>
-              <td className="muted">{v.expireAt ? fmtDate(v.expireAt) : '—'}</td>
+              <td data-label={t('common.name')} className="mono">{v.name}</td>
+              <td data-label={t('volumes.size')} className="mono">{v.capacityGiB || v.requestedGiB} GiB</td>
+              <td data-label={t('volumes.purgeAt')} className="muted">{v.expireAt ? fmtDate(v.expireAt) : '—'}</td>
               <td>
                 <div className="actions">
                   <button className="btn btn-sm" disabled={!!busy} onClick={() => restore(v)}>{t('volumes.restore')}</button>

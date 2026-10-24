@@ -216,10 +216,10 @@ export function Overview({onOpen, onOpenJob}: {
               {jobs.slice(0, 6).map(j => {
                 const live = latestAttempt(j)
                 return <tr key={j.name} className="clickable" onClick={() => onOpenJob(j.name)}>
-                  <td className="mono trunc" title={j.name}><button type="button" className="row-name">{j.name}</button></td>
-                  <td><Status phase={live.phase}/></td>
-                  <td className="muted">{live.ready}/{live.workers}</td>
-                  <td className="muted">{fmtDate(j.created)}</td>
+                  <td data-label={t('overview.colJob')} className="mono trunc" title={j.name}><button type="button" className="row-name">{j.name}</button></td>
+                  <td data-label={t('common.status')}><Status phase={live.phase}/></td>
+                  <td data-label={t('overview.colReady')} className="muted">{live.ready}/{live.workers}</td>
+                  <td data-label={t('common.created')} className="muted">{fmtDate(j.created)}</td>
                 </tr>
               })}
               </tbody>

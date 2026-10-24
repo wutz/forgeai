@@ -176,7 +176,7 @@ export function Images() {
                   const tags = img.tags?.filter(Boolean) ?? []
                   return (
                   <tr key={img.digest}>
-                    <td>
+                    <td data-label={t('images.tag')}>
                       {tags.length
                         ? <div style={{display: 'flex', flexWrap: 'wrap', gap: 6}}>
                           {tags.map(tag => {
@@ -200,9 +200,9 @@ export function Images() {
                       </div>
                       : <span className="muted">{t('images.untagged')}</span>}
                   </td>
-                  <td className="mono trunc" title={img.digest}>{img.digest.slice(7, 19)}</td>
-                  <td>{img.sizeMiB ? `${img.sizeMiB} MiB` : '—'}</td>
-                  <td className="muted">{fmtDate(img.pushedAt)}</td>
+                  <td data-label={t('images.digest')} className="mono trunc" title={img.digest}>{img.digest.slice(7, 19)}</td>
+                  <td data-label={t('images.size')}>{img.sizeMiB ? `${img.sizeMiB} MiB` : '—'}</td>
+                  <td data-label={t('images.pushed')} className="muted">{fmtDate(img.pushedAt)}</td>
                   <td>
                     <div className="actions">
                       <button className="btn btn-sm btn-danger" onClick={() => deleteImage(r, img)}>

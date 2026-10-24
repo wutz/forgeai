@@ -151,19 +151,19 @@ function JobTemplateTable({items, failed, onEdit, onDelete}: {
       <tbody>
       {items.map(tpl => (
         <tr key={tpl.name}>
-          <td className="mono">
+          <td data-label={t('common.name')} className="mono">
             <span className="cell-main">{tpl.name}</span>
             {tpl.description && <span className="cell-sub">{tpl.description}</span>}
             {tpl.error && <span className="cell-sub" role="status">{t('templates.unreadable')}</span>}
           </td>
-          <td className="mono trunc" title={tpl.form?.image}>{tpl.form?.image || '—'}</td>
-          <td>{tpl.error ? '—' : (tpl.form?.workers ?? 1)}</td>
-          <td className="mono">{tpl.form?.instanceType
+          <td data-label={t('common.image')} className="mono trunc" title={tpl.form?.image}>{tpl.form?.image || '—'}</td>
+          <td data-label={t('templates.workers')}>{tpl.error ? '—' : (tpl.form?.workers ?? 1)}</td>
+          <td data-label={t('templates.colInstance')} className="mono">{tpl.form?.instanceType
             ? offered && !offered.has(tpl.form.instanceType)
               ? <span className="muted">{t('templates.typeUnavailable', {name: tpl.form.instanceType})}</span>
               : tpl.form.instanceType
             : '—'}</td>
-          <td className="muted col-optional">{fmtDate(tpl.created)}</td>
+          <td data-label={t('common.created')} className="muted col-optional">{fmtDate(tpl.created)}</td>
           <td>
             <div className="actions">
               <HintButton className="btn btn-sm" disabled={!!tpl.error} reason={t('templates.unreadableHint')}

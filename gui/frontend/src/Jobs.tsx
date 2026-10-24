@@ -157,7 +157,7 @@ function JobTable({jobs, failed, filtered, selected, onSelect}: {
           const live = latestAttempt(j)
           return <tr key={j.name} className={selected === j.name ? 'clickable selected' : 'clickable'}
               onClick={() => onSelect(j.name)}>
-            <td className="mono">
+            <td data-label={t('common.name')} className="mono">
               <button type="button" className="row-name cell-main">{j.name}</button>
               <span className="cell-sub">
                 {workerCount(live.workers)}
@@ -165,14 +165,14 @@ function JobTable({jobs, failed, filtered, selected, onSelect}: {
                 {j.template ? ` · ${j.template}` : ''}
               </span>
             </td>
-            <td className="nowrap"><Status phase={live.phase}/>{live.failureReason && live.phase === 'Failed' &&
+            <td data-label={t('common.status')} className="nowrap"><Status phase={live.phase}/>{live.failureReason && live.phase === 'Failed' &&
               <div className="cell-sub" title={live.message}>{failureLabel(live.failureReason)}</div>}</td>
-            <td className="mono nowrap">{j.instanceType}</td>
-            <td className="mono nowrap">{live.ready}/{live.workers}</td>
-            <td>{j.maxRetries
+            <td data-label={t('jobs.instance')} className="mono nowrap">{j.instanceType}</td>
+            <td data-label={t('jobs.colReady')} className="mono nowrap">{live.ready}/{live.workers}</td>
+            <td data-label={t('jobs.colRetry')}>{j.maxRetries
               ? <Badge>{retryOnLabel(j.retryOn || 'Infra')} × {j.maxRetries}</Badge>
               : <span className="muted">—</span>}</td>
-            {!selected && <td className="muted">{j.age}</td>}
+            {!selected && <td data-label={t('jobs.colAge')} className="muted">{j.age}</td>}
           </tr>
         })}
         </tbody>

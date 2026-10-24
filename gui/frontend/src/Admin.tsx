@@ -85,28 +85,28 @@ export function Admin({onProjectsChanged}: {onProjectsChanged: () => void}) {
             <tbody>
             {projects.map(p => (
               <tr key={p.name}>
-                <td className="mono">
+                <td data-label={t('admin.project')} className="mono">
                   <span className="cell-main">{p.name}</span>
                   <span className="cell-sub">{p.namespace || t('admin.noNamespace')}</span>
                 </td>
-                <td><span className={`status status-${p.ready ? 'running' : 'pending'}`}>
+                <td data-label={t('common.status')}><span className={`status status-${p.ready ? 'running' : 'pending'}`}>
                   <span className="dot" aria-hidden/>{p.ready ? phaseLabel('Ready') : phaseLabel('Pending')}</span></td>
-                <td>
+                <td data-label={t('admin.gpus')}>
                   <div className="actions">
                     {Object.entries(p.quota?.gpus || {}).map(([c, n]) =>
                       <Badge key={c}>{c} · {n}</Badge>)}
                     {!Object.keys(p.quota?.gpus || {}).length && <span className="muted">—</span>}
                   </div>
                 </td>
-                <td className="mono">{p.quota?.storage || '—'}</td>
-                <td>
+                <td data-label={t('admin.storage')} className="mono">{p.quota?.storage || '—'}</td>
+                <td data-label={t('admin.network')}>
                   {p.network?.isolation === 'None'
                     ? <span className="muted">{t('admin.isolationNone')}</span>
                     : <Badge tone="accent">{t('admin.isolated')}</Badge>}
                   {p.network?.denyInternet && <span className="muted" style={{fontSize: 12}}> · {t('admin.noInternet')}</span>}
                 </td>
-                <td className="muted">{p.members?.map(m => m.name).join(', ') || '—'}</td>
-                <td className="muted">{fmtDate(p.created)}</td>
+                <td data-label={t('admin.members')} className="muted">{p.members?.map(m => m.name).join(', ') || '—'}</td>
+                <td data-label={t('common.created')} className="muted">{fmtDate(p.created)}</td>
                 <td>
                   <div className="actions">
                     <button className="btn btn-sm" onClick={() => edit(p.name)}>{t('common.edit')}</button>

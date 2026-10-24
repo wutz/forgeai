@@ -76,17 +76,17 @@ export function Resources() {
             <tbody>
             {types.map(ty => (
               <tr key={ty.name} className={ty.free >= 1 ? '' : 'row-full'}>
-                <td className="mono nowrap">
+                <td data-label={t('resources.colType')} className="mono nowrap">
                   <span className="cell-main">{ty.name}</span>
                   <span className="cell-sub">{ty.class}</span>
                 </td>
-                <td>{ty.gpuCount
+                <td data-label={t('resources.colGpu')}>{ty.gpuCount
                   ? <Badge>{ty.gpuCount}× {ty.product}</Badge>
                   : <span className="muted">{t('resources.cpuOnly')}</span>}</td>
-                <td>{ty.cpu}</td>
-                <td>{ty.memory}</td>
-                <td className="mono">{ty.total}</td>
-                <td>
+                <td data-label={t('resources.colCpuPerWorker')}>{ty.cpu}</td>
+                <td data-label={t('resources.colMemoryPerWorker')}>{ty.memory}</td>
+                <td data-label={t('resources.colCapacity')} className="mono">{ty.total}</td>
+                <td data-label={t('resources.colFree')}>
                   <Meter value={ty.total - ty.free} max={Math.max(ty.total, 1)}
                          tone={ty.free >= 1 ? 'success' : 'muted'}
                          label={<span><strong className={ty.free >= 1 ? 'free' : 'muted'}>{ty.free}</strong> {t('resources.free')}</span>}
@@ -108,8 +108,8 @@ export function Resources() {
             {/* A zero limit means the quota sets none, so there is no bar to fill. */}
             {quota.gpuClasses?.map(g => (
               <tr key={g.class}>
-                <td className="mono">{g.class === '*' ? t('resources.gpusUnknownClass') : t('resources.gpusOfClass', {cls: g.class})}</td>
-                <td>
+                <td data-label={t('resources.colResource')} className="mono">{g.class === '*' ? t('resources.gpusUnknownClass') : t('resources.gpusOfClass', {cls: g.class})}</td>
+                <td data-label={t('resources.colUse')}>
                   {quota.gpuQuota ? (
                     <Meter value={g.used} max={Math.max(quota.gpuQuota, g.used, 1)}
                            tone={g.used >= quota.gpuQuota ? 'warning' : 'accent'}
@@ -118,42 +118,42 @@ export function Resources() {
                              : t('resources.percentInUse', {percent: pct(g.used, quota.gpuQuota)})}</span>}/>
                   ) : <span className="muted">{t('resources.noQuotaSet')}</span>}
                 </td>
-                <td>{g.used}</td>
-                <td>{quota.gpuQuota ? t('resources.gpuShared', {limit: quota.gpuQuota}) : t('resources.noQuotaSet')}</td>
+                <td data-label={t('resources.colUsed')}>{g.used}</td>
+                <td data-label={t('resources.colLimit')}>{quota.gpuQuota ? t('resources.gpuShared', {limit: quota.gpuQuota}) : t('resources.noQuotaSet')}</td>
               </tr>
             ))}
             <tr>
-              <td className="mono">{t('resources.volumeStorage')}</td>
-              <td>
+              <td data-label={t('resources.colResource')} className="mono">{t('resources.volumeStorage')}</td>
+              <td data-label={t('resources.colUse')}>
                 {quota.storage ? (
                   <Meter value={toGiB(quota.storageUsed)} max={Math.max(toGiB(quota.storage), 1)} tone="muted"
                          right={<span>{t('resources.percentInUse', {percent: pct(toGiB(quota.storageUsed), toGiB(quota.storage))})}</span>}/>
                 ) : <span className="muted">{t('resources.unlimited')}</span>}
               </td>
-              <td>{quota.storageUsed || '0'}</td>
-              <td>{quota.storage || t('resources.unlimited')}</td>
+              <td data-label={t('resources.colUsed')}>{quota.storageUsed || '0'}</td>
+              <td data-label={t('resources.colLimit')}>{quota.storage || t('resources.unlimited')}</td>
             </tr>
             <tr>
-              <td className="mono">{t('resources.volumes')}</td>
-              <td>
+              <td data-label={t('resources.colResource')} className="mono">{t('resources.volumes')}</td>
+              <td data-label={t('resources.colUse')}>
                 {quota.volumeMax ? (
                   <Meter value={quota.volumes} max={Math.max(quota.volumeMax, quota.volumes, 1)} tone="muted"
                          right={<span>{t('resources.percentInUse', {percent: pct(quota.volumes, quota.volumeMax)})}</span>}/>
                 ) : <span className="muted">{t('resources.unlimited')}</span>}
               </td>
-              <td>{quota.volumes}</td>
-              <td>{quota.volumeMax || t('resources.unlimited')}</td>
+              <td data-label={t('resources.colUsed')}>{quota.volumes}</td>
+              <td data-label={t('resources.colLimit')}>{quota.volumeMax || t('resources.unlimited')}</td>
             </tr>
             <tr>
-              <td className="mono">{t('resources.pods')}</td>
-              <td>
+              <td data-label={t('resources.colResource')} className="mono">{t('resources.pods')}</td>
+              <td data-label={t('resources.colUse')}>
                 {quota.podMax ? (
                   <Meter value={quota.pods} max={Math.max(quota.podMax, quota.pods, 1)} tone="muted"
                          right={<span>{t('resources.percentInUse', {percent: pct(quota.pods, quota.podMax)})}</span>}/>
                 ) : <span className="muted">{t('resources.unlimited')}</span>}
               </td>
-              <td>{quota.pods}</td>
-              <td>{quota.podMax || t('resources.unlimited')}</td>
+              <td data-label={t('resources.colUsed')}>{quota.pods}</td>
+              <td data-label={t('resources.colLimit')}>{quota.podMax || t('resources.unlimited')}</td>
             </tr>
             </tbody>
           </table>

@@ -143,11 +143,11 @@ export function Dependencies() {
               return (
                 <Fragment key={d.name}>
                 <tr>
-                  <td>
+                  <td data-label={t('deps.component')}>
                     <span className="cell-main">{title(d.name, d.title)}</span>
                     <span className="cell-sub">{desc(d.name, d.description)}</span>
                   </td>
-                  <td className="mono">
+                  <td data-label={t('deps.installed')} className="mono">
                     {d.installed || (d.running
                       ? <>
                           {/* Each tag stays on one line; the list wraps only between tags. */}
@@ -167,8 +167,8 @@ export function Dependencies() {
                       {t('deps.appliedBy', {user: d.appliedBy, time: new Date(d.appliedAt).toLocaleString(getLocale())})}
                     </div>}
                   </td>
-                  <td className="mono">{d.pinned || <span className="muted">—</span>}</td>
-                  <td>
+                  <td data-label={t('deps.pinned')} className="mono">{d.pinned || <span className="muted">—</span>}</td>
+                  <td data-label={t('deps.status')}>
                     <Badge tone={tone(d.status)} dot>{label(d.status)}</Badge>
                     {installing && !step && <div className="muted" style={{fontSize: 12, marginTop: 4}}>
                       {t('deps.step.starting')}

@@ -30,14 +30,14 @@ export function SandboxTemplateTable({items, failed, onEdit, onDelete}: {
       <tbody>
       {items.map(tpl => (
         <tr key={tpl.name}>
-          <td className="mono">
+          <td data-label={t('common.name')} className="mono">
             <span className="cell-main">{tpl.name}</span>
             {tpl.description && <span className="cell-sub">{tpl.description}</span>}
             {tpl.error && <span className="cell-sub hint-error">{t('sandboxTemplates.unreadable', {error: tpl.error})}</span>}
           </td>
-          <td className="mono trunc" title={tpl.form?.image}>{tpl.form?.image || '—'}</td>
-          <td className="mono">{tpl.form?.runtimeClass || t('sandboxes.runcNode')}</td>
-          <td className="muted">{fmtDate(tpl.created)}</td>
+          <td data-label={t('common.image')} className="mono trunc" title={tpl.form?.image}>{tpl.form?.image || '—'}</td>
+          <td data-label={t('sandboxTemplates.colIsolation')} className="mono">{tpl.form?.runtimeClass || t('sandboxes.runcNode')}</td>
+          <td data-label={t('common.created')} className="muted">{fmtDate(tpl.created)}</td>
           <td>
             <div className="actions">
               <HintButton className="btn btn-sm" disabled={!!tpl.error} reason={t('templates.unreadableHint')}

@@ -600,6 +600,9 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
   transition: transform 120ms ease;
 }
 .repo[open] summary::before { transform: rotate(90deg); }
+/* The name, tag count and pull count wrap onto a second line in a narrow row rather than shrinking. */
+.repo summary { flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.repo summary > * { flex: none; }
 /* The delete sits beside the repository's disclosure, aligned with its summary line. */
 .repo-row { display: flex; align-items: flex-start; gap: 8px; }
 .repo-row > .repo { flex: 1; min-width: 0; }
@@ -642,6 +645,9 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
 .split .table.jobs-table th, .split .table.jobs-table td { overflow: visible; }
 .split .table.jobs-table td:first-child .cell-sub { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
 
+/* A banner's own button (Refresh, Retry) keeps a gap from the message it follows. */
+.banner .btn { margin-left: 12px; vertical-align: middle; }
+
 /* Responsive */
 @media (max-width: 900px) {
   /* A table's least important column goes first at narrow widths; the row actions stay in view. */
@@ -658,6 +664,14 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
   .split .table th:first-child, .split .table th:last-child { width: auto; }
   .split .table th, .split .table td { overflow: visible; }
   .split .table .cell-main, .split .table .cell-sub { overflow: visible; text-overflow: clip; }
+  /* A table with row actions scrolls sideways inside its card; its action column stays pinned
+     to the card's right edge so Grow, Delete and the rest are in reach without scrolling. */
+  .table:has(td > .actions) th:last-child,
+  .table:has(td > .actions) td:last-child {
+    position: sticky; right: 0; z-index: 1; background: var(--surface);
+    box-shadow: -10px 0 10px -10px rgba(0, 0, 0, 0.14);
+  }
+  .table:has(td > .actions) tbody tr:hover > td:last-child { background: var(--wash); }
 }
 /* Phone-width windows: a page's header sits in the page, and its actions wrap below the title. */
 @media (max-width: 560px) {

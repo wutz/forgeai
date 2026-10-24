@@ -16,11 +16,9 @@ templates/
   index.yaml                          the index: every template and its summary
   jobs/<name>/template.yaml           a job template (kind Job)
   sandboxes/<name>/template.yaml      a sandbox template (kind Sandbox)
-  images/<name>/Dockerfile            the image a template runs, when forgeai builds it
 ```
 
-Only `index.yaml` and the files it lists are read. Files under `images/` are
-sources for the images the templates name; they are not read by the GUI.
+Only `index.yaml` and the files it lists are read.
 
 ## Index
 
@@ -37,7 +35,7 @@ spec:
       kind: Job                      # Job or Sandbox
       displayName: NCCL tests
       description: All-reduce bandwidth of every GPU on each worker.
-      version: 1.0.0
+      version: 1.1.0
       path: jobs/nccl-tests/template.yaml
 ```
 
@@ -63,15 +61,17 @@ metadata:
 spec:
   displayName: NCCL tests            # must equal the index entry
   description: All-reduce bandwidth of every GPU on each worker.
-  version: 1.0.0                     # must equal the index entry
-  image: ghcr.io/wutz/nccl-tests:2.21.1-cuda13.0.2
+  version: 1.1.0                     # must equal the index entry
+  image: ghcr.io/coreweave/nccl-tests:12.9.1-devel-ubuntu22.04-nccl2.27.6-1-7c12c62
   command: |
     set -euo pipefail
-    exec /opt/nccl-tests/build/all_reduce_perf -b 8 -e 8G -f 2 -g "$(nvidia-smi -L | wc -l)"
+    exec /opt/nccl_tests/build/all_reduce_perf -b 8 -e 8G -f 2 -g "$(nvidia-smi -L | wc -l)"
   workers: 1
   maxRetries: 0                      # optional
   retryOn: Infra                     # optional: Infra or Any
   env:
+    - name: NCCL_ALGO
+      value: Ring
     - name: NCCL_DEBUG
       value: WARN
 ```
@@ -140,18 +140,21 @@ shows up without restarting the app.
 ## Images
 
 A job or sandbox template names an image, and the image must be pullable from
-the cluster. `images/nccl-tests` builds the image the `nccl-tests` template
-uses: CUDA 13 with NCCL tests built for sm_80, sm_90, sm_100 and sm_120, so
-Blackwell GPUs run native kernels. The binaries are compiled on the CUDA devel
-image and shipped on the CUDA base image with only the runtime libraries, so
-the image is about 1 GB instead of the devel image's 7.6 GB.
+the cluster. The templates use public images and forgeai builds none:
 
-```bash
-docker buildx build --platform linux/amd64 -t ghcr.io/wutz/nccl-tests:2.21.1-cuda13.0.2 templates/images/nccl-tests
-```
+- `nccl-tests` runs the public CoreWeave image
+  `ghcr.io/coreweave/nccl-tests`, the one the scclabs `k8s-in-action`
+  `ai/nccl-tests` guide uses. Its CUDA 12.9 tag runs on RTX 5090 nodes; use the
+  CUDA 13.1 tag (`13.1.0-devel-ubuntu22.04-nccl2.29.2-1-2276a5e`) on B200 and
+  B300. The binaries are in `/opt/nccl_tests/build`.
+- `nccl-tests` is single node: forgeai workers expose no SSH, so the MPI
+  launcher of the reference guide does not apply. Each worker runs
+  `all_reduce_perf` over its own GPUs, so a pool is checked with one worker per
+  node. The pass criteria of the guide carry over: no NCCL error, 0 wrong
+  values in every row, and a peak `busbw` near the hardware limit.
 
-Publishing that image is a separate step: a public image is visible to anyone,
-so it is pushed by a maintainer and not by a template change.
+A cluster that cannot reach `ghcr.io` mirrors the image into its project
+registry and overrides the image in the form.
 
 ## Adding a template
 

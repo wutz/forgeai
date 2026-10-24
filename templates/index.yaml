@@ -12,8 +12,8 @@ spec:
     - name: nccl-tests
       kind: Job
       displayName: NCCL tests
-      description: All-reduce bandwidth of every GPU on each worker (single node, no MPI). Run it with one worker per node to check a whole pool.
-      version: 1.0.0
+      description: All-reduce bandwidth and correctness of every GPU on each worker (single node, no MPI). Passes when the log has no NCCL error and every row shows 0 wrong values.
+      version: 1.1.0
       path: jobs/nccl-tests/template.yaml
     - name: python-runtime
       kind: Sandbox

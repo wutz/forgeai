@@ -170,6 +170,22 @@ type Sandbox struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
+// Inference configures the model servers of InferenceServices and the llm-d
+// routers in front of them.
+type Inference struct {
+	// Image is the vLLM server image, used by services without an image.
+	Image string `json:"image,omitempty"`
+	// RouterImage is the llm-d router Endpoint Picker image, with its tag.
+	RouterImage string `json:"routerImage,omitempty"`
+	// ShmSize is the /dev/shm emptyDir of a model server: tensor parallel
+	// workers exchange data through shared memory.
+	ShmSize resource.Quantity `json:"shmSize"`
+	// HFEndpoint is the Hugging Face endpoint the model servers download
+	// weights from (HF_ENDPOINT). Clusters without access to huggingface.co set
+	// a mirror here, such as https://hf-mirror.com.
+	HFEndpoint string `json:"hfEndpoint,omitempty"`
+}
+
 // DefaultSandboxNamespace is where agent-sandbox is installed.
 const DefaultSandboxNamespace = "agent-sandbox-system"
 
@@ -212,6 +228,7 @@ type Config struct {
 	FileServer    FileServer    `json:"fileServer"`
 	Training      Training      `json:"training"`
 	Sandbox       Sandbox       `json:"sandbox"`
+	Inference     Inference     `json:"inference"`
 
 	// TrashRetention is the default retention of deleted volumes.
 	TrashRetention metav1.Duration `json:"trashRetention,omitzero"`
@@ -303,6 +320,13 @@ func Parse(data []byte) (*Config, error) {
 		c.Sandbox.DefaultRuntimeClass = c.Sandbox.RuntimeClasses[0]
 	}
 	defaultQuantity(&c.Sandbox.ShmSize, "2Gi")
+	if c.Inference.Image == "" {
+		c.Inference.Image = "vllm/vllm-openai:v0.32.0"
+	}
+	if c.Inference.RouterImage == "" {
+		c.Inference.RouterImage = "ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0"
+	}
+	defaultQuantity(&c.Inference.ShmSize, "16Gi")
 	defaultDuration(&c.TrashRetention, 7*24*time.Hour)
 	return c, nil
 }

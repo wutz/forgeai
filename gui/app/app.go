@@ -98,6 +98,9 @@ type ConnInfo struct {
 	// Sandboxes is set when the cluster runs agent-sandbox and the user may
 	// use it; the Sandboxes view is hidden otherwise.
 	Sandboxes bool `json:"sandboxes"`
+	// Inference is set when the InferenceService CRD is installed; the
+	// Inference view is hidden otherwise.
+	Inference bool `json:"inference"`
 }
 
 func scheme() *runtime.Scheme {

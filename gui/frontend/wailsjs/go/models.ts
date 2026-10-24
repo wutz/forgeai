@@ -9,6 +9,7 @@ export namespace app {
 	    clusterAdmin: boolean;
 	    forgeai: boolean;
 	    sandboxes: boolean;
+	    inference: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ConnInfo(source);
@@ -24,6 +25,7 @@ export namespace app {
 	        this.clusterAdmin = source["clusterAdmin"];
 	        this.forgeai = source["forgeai"];
 	        this.sandboxes = source["sandboxes"];
+	        this.inference = source["inference"];
 	    }
 	}
 	export class Dependency {
@@ -43,11 +45,11 @@ export namespace app {
 	    messageKey?: string;
 	    messageArgs?: Record<string, string>;
 	    installable: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Dependency(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -224,6 +226,72 @@ export namespace app {
 		    }
 		    return a;
 		}
+	}
+	export class InferenceForm {
+	    name: string;
+	    model: string;
+	    servedName: string;
+	    instanceType: string;
+	    replicas: number;
+	    args: string[];
+	    huggingFaceSecret: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new InferenceForm(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.model = source["model"];
+	        this.servedName = source["servedName"];
+	        this.instanceType = source["instanceType"];
+	        this.replicas = source["replicas"];
+	        this.args = source["args"];
+	        this.huggingFaceSecret = source["huggingFaceSecret"];
+	    }
+	}
+	export class InferenceService {
+	    name: string;
+	    model: string;
+	    servedName: string;
+	    instanceType: string;
+	    replicas: number;
+	    readyReplicas: number;
+	    endpoint?: string;
+	    apiKeySecret?: string;
+	    args?: string[];
+	    huggingFaceSecret?: string;
+	    reason: string;
+	    message?: string;
+	    ready: boolean;
+	    stopped: boolean;
+	    created: string;
+	    age: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new InferenceService(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.model = source["model"];
+	        this.servedName = source["servedName"];
+	        this.instanceType = source["instanceType"];
+	        this.replicas = source["replicas"];
+	        this.readyReplicas = source["readyReplicas"];
+	        this.endpoint = source["endpoint"];
+	        this.apiKeySecret = source["apiKeySecret"];
+	        this.args = source["args"];
+	        this.huggingFaceSecret = source["huggingFaceSecret"];
+	        this.reason = source["reason"];
+	        this.message = source["message"];
+	        this.ready = source["ready"];
+	        this.stopped = source["stopped"];
+	        this.created = source["created"];
+	        this.age = source["age"];
+	    }
 	}
 	export class InstanceType {
 	    name: string;
@@ -621,7 +689,7 @@ export namespace app {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.gpuQuota = source["gpuQuota"];
-        this.gpuClasses = this.convertValues(source["gpuClasses"], GPUUsage);
+	        this.gpuClasses = this.convertValues(source["gpuClasses"], GPUUsage);
 	        this.storage = source["storage"];
 	        this.storageUsed = source["storageUsed"];
 	        this.volumes = source["volumes"];

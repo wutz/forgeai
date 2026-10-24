@@ -4,6 +4,7 @@ import {Environment} from '../wailsjs/runtime/runtime'
 import {app} from '../wailsjs/go/models'
 import {Overview} from './Overview'
 import {Jobs} from './Jobs'
+import {Inference} from './Inference'
 import {Sandboxes} from './Sandboxes'
 import {Templates} from './Templates'
 import {Volumes} from './Volumes'
@@ -27,7 +28,7 @@ const SIDEBAR = 'forgeai.sidebar'
 const NARROW = '(max-width: 820px)'
 const isNarrow = () => window.matchMedia(NARROW).matches
 
-type Area = 'overview' | 'jobs' | 'sandboxes' | 'templates' | 'volumes' | 'files' | 'images' | 'resources'
+type Area = 'overview' | 'jobs' | 'sandboxes' | 'inference' | 'templates' | 'volumes' | 'files' | 'images' | 'resources'
   | 'admin' | 'dependencies'
 
 type NavItem = {area: Area, label: string, icon: IconName}
@@ -75,6 +76,7 @@ function areaFor(current: Area, info: app.ConnInfo): Area {
   if (offered.includes(current)) return current
   if (current === 'admin' || current === 'dependencies') return 'overview'
   if (current === 'sandboxes' && !info.sandboxes) return 'overview'
+  if (current === 'inference' && !info.inference) return 'overview'
   return current
 }
 
@@ -213,6 +215,7 @@ export default function App() {
         {area: 'overview', label: t('nav.overview'), icon: 'grid'},
         {area: 'jobs', label: t('nav.jobs'), icon: 'play'},
         ...(conn.sandboxes ? [{area: 'sandboxes', label: t('nav.sandboxes'), icon: 'box'} as NavItem] : []),
+        ...(conn.inference ? [{area: 'inference', label: t('nav.inference'), icon: 'bolt'} as NavItem] : []),
         {area: 'templates', label: t('nav.templates'), icon: 'scroll'},
       ],
     },
@@ -284,6 +287,7 @@ export default function App() {
                 {shown('overview', <Overview onOpen={setArea} onOpenJob={name => { setJobFocus({name}); setArea('jobs') }}/>)}
                 {shown('jobs', <Jobs focus={jobFocus}/>)}
                 {shown('sandboxes', <Sandboxes/>)}
+                {shown('inference', <Inference/>)}
                 {shown('templates', <Templates sandboxes={conn.sandboxes}/>)}
                 {shown('volumes', <Volumes/>)}
                 {shown('files', <FilesView/>)}

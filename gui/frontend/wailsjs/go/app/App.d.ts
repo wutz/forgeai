@@ -14,6 +14,8 @@ export function Connect(arg1:string,arg2:string):Promise<app.ConnInfo>;
 
 export function Contexts():Promise<Array<app.KubeContext>>;
 
+export function CreateInferenceService(arg1:app.InferenceForm):Promise<app.InferenceService>;
+
 export function CreateJob(arg1:training.Form):Promise<app.Job>;
 
 export function CreateSandbox(arg1:sandbox.Form):Promise<app.Sandbox>;
@@ -30,6 +32,8 @@ export function DeleteImageRepo(arg1:string):Promise<void>;
 
 export function DeleteImageTag(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function DeleteInferenceService(arg1:string):Promise<void>;
+
 export function DeleteJob(arg1:string):Promise<void>;
 
 export function DeleteProject(arg1:string):Promise<void>;
@@ -44,11 +48,15 @@ export function FileServerPhase():Promise<string>;
 
 export function Files():Promise<app.Files>;
 
+export function GetInferenceService(arg1:string):Promise<app.InferenceService>;
+
 export function GetJob(arg1:string):Promise<app.Job>;
 
 export function GetProject(arg1:string):Promise<app.Project>;
 
 export function GetSandbox(arg1:string):Promise<app.Sandbox>;
+
+export function InferenceAPIKey(arg1:string):Promise<string>;
 
 export function InstallDependency(arg1:string):Promise<void>;
 
@@ -57,6 +65,8 @@ export function KeepSandboxAwake(arg1:string):Promise<void>;
 export function ListDependencies():Promise<app.Dependencies>;
 
 export function ListImages():Promise<Array<app.ImageRepo>>;
+
+export function ListInferenceServices():Promise<Array<app.InferenceService>>;
 
 export function ListInstanceTypes():Promise<Array<app.InstanceType>>;
 
@@ -106,9 +116,13 @@ export function SaveProject(arg1:app.Project):Promise<void>;
 
 export function SetVolumeExpiry(arg1:string,arg2:time.Time):Promise<volumes.Volume>;
 
+export function StartInferenceService(arg1:string):Promise<app.InferenceService>;
+
 export function StartJob(arg1:string):Promise<app.Job>;
 
 export function StartSandbox(arg1:string):Promise<app.Sandbox>;
+
+export function StopInferenceService(arg1:string):Promise<app.InferenceService>;
 
 export function StopJob(arg1:string):Promise<app.Job>;
 

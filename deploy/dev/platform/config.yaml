@@ -45,4 +45,7 @@ training:
   shmSize: 16Gi
   stuckTimeout: 15m
   maxRetries: 0
+inference:
+  # bz1-dev1 cannot reach huggingface.co; weights come through the mirror.
+  hfEndpoint: https://hf-mirror.com
 trashRetention: 168h

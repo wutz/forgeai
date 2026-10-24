@@ -37,13 +37,14 @@ func TestEmbeddedBundlesVerify(t *testing.T) {
 		}
 	}
 	// Kueue's TrainJob integration needs the Trainer CRDs, so Trainer comes first.
-	if got, want := strings.Join(names, ","), "trainer,kueue,agent-sandbox"; got != want {
+	if got, want := strings.Join(names, ","), "trainer,kueue,agent-sandbox,gateway-api-inference-extension"; got != want {
 		t.Errorf("bundle order = %s, want %s", got, want)
 	}
 	wantCRDs := map[string]string{
-		"trainer":       "trainjobs.trainer.kubeflow.org",
-		"kueue":         "workloads.kueue.x-k8s.io",
-		"agent-sandbox": "sandboxes.agents.x-k8s.io",
+		"trainer":                         "trainjobs.trainer.kubeflow.org",
+		"kueue":                           "workloads.kueue.x-k8s.io",
+		"agent-sandbox":                   "sandboxes.agents.x-k8s.io",
+		"gateway-api-inference-extension": "inferencepools.inference.networking.k8s.io",
 	}
 	for _, b := range bs {
 		if !slices.Contains(b.crdNames(), wantCRDs[b.Name]) {

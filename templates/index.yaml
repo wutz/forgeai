@@ -1,0 +1,29 @@
+# Public template source of forgeai. The GUI reads this file first and lists
+# the templates it offers in the New job and New sandbox dialogs. Each entry's
+# summary must match its template file; pkg/catalog tests check that.
+apiVersion: templates.forgeai.wutz.dev/v1alpha1
+kind: TemplateIndex
+metadata:
+  name: forgeai-default
+spec:
+  displayName: forgeai default templates
+  homepage: https://github.com/wutz/forgeai
+  templates:
+    - name: nccl-tests
+      kind: Job
+      displayName: NCCL tests
+      description: All-reduce bandwidth of every GPU on each worker (single node, no MPI). Run it with one worker per node to check a whole pool.
+      version: 1.0.0
+      path: jobs/nccl-tests/template.yaml
+    - name: python-runtime
+      kind: Sandbox
+      displayName: Python runtime
+      description: The agent-sandbox Python runtime image (the platform default) for code execution and tooling.
+      version: 1.0.0
+      path: sandboxes/python-runtime/template.yaml
+    - name: cuda-devbox
+      kind: Sandbox
+      displayName: CUDA devbox
+      description: CUDA 13 development image for interactive GPU work. Idle until you open a shell from the GUI terminal.
+      version: 1.0.0
+      path: sandboxes/cuda-devbox/template.yaml

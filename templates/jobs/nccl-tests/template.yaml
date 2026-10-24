@@ -1,0 +1,21 @@
+apiVersion: templates.forgeai.wutz.dev/v1alpha1
+kind: JobTemplate
+metadata:
+  name: nccl-tests
+spec:
+  displayName: NCCL tests
+  description: All-reduce bandwidth of every GPU on each worker (single node, no MPI). Run it with one worker per node to check a whole pool.
+  version: 1.0.0
+  # Built from templates/images/nccl-tests (CUDA 13, sm_80 to sm_120).
+  image: ghcr.io/wutz/nccl-tests:2.21.1-cuda13.0.2
+  # Each worker runs its own single-node test over the GPUs the pod holds.
+  command: |
+    set -euo pipefail
+    gpus="$(nvidia-smi -L | wc -l)"
+    echo "nccl-tests on $(hostname): ${gpus} GPUs"
+    nvidia-smi -L
+    exec /opt/nccl-tests/build/all_reduce_perf -b 8 -e 8G -f 2 -g "${gpus}"
+  workers: 1
+  env:
+    - name: NCCL_DEBUG
+      value: WARN

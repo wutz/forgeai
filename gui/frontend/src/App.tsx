@@ -16,6 +16,7 @@ import {Scope} from './Scope'
 import {errText} from './util'
 import {ActiveView, Empty, HeaderSlot, Icon, IconName, Spinner} from './ui'
 import {Preferences} from './Preferences'
+import {UpdateButton} from './Update'
 import {getLocale, subscribeLocale, t} from './i18n'
 
 // PREFS is the last connection. NAMESPACES maps each kubeconfig context to the
@@ -247,6 +248,7 @@ export default function App() {
           </div>
           <div className="header-main">
             <div className="header-slot" ref={setHeaderSlot}/>
+            <UpdateButton onError={setError}/>
           </div>
         </header>
         <div className={`shell ${collapsed ? 'collapsed' : ''}`}>

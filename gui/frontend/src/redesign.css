@@ -87,6 +87,8 @@ a { color: inherit; text-decoration: none; }
 .platform-darwin .header.header-shell { padding-left: 0; }
 .platform-darwin .header-side { padding-left: 84px; }
 .header-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: 16px; padding: 0 20px 0 24px; }
+/* The update button sits at the right end of the top bar, after the page header. */
+.header-main .update-btn { flex-shrink: 0; }
 /* Theme and language menus at the foot of the sidebar: pushed to the bottom
    by the auto top margin, one row of compact buttons. Each popover opens
    upward, over the nav. */

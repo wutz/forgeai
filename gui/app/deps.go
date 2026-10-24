@@ -23,7 +23,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
@@ -589,20 +588,23 @@ func checkInstallTarget(b *depBundle, cfg *platform.Config) error {
 	return nil
 }
 
-// checkSelectors refuses a bundle whose Deployments would change a selector the
+// selectorKinds are the apps/v1 workload kinds whose spec.selector the API server
+// makes immutable. A bundle that names one of them with a different selector
+// cannot be applied over the live object.
+var selectorKinds = []string{"Deployment", "StatefulSet", "DaemonSet"}
+
+// checkSelectors refuses a bundle whose workloads would change a selector the
 // cluster already runs with. Kubernetes makes selectors immutable, so the apply
-// would fail partway through the stages. A Deployment installed by Helm names its
+// would fail partway through the stages. A workload installed by Helm names its
 // release, which has to be uninstalled before the bundle can take its place.
 func checkSelectors(ctx context.Context, k8s client.Reader, b *depBundle) error {
 	for _, o := range b.objects {
-		if o.GetKind() != "Deployment" || o.GroupVersionKind().Group != appsv1.GroupName {
+		if o.GroupVersionKind().Group != appsv1.GroupName || !slices.Contains(selectorKinds, o.GetKind()) {
 			continue
 		}
-		want := &appsv1.Deployment{}
-		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(o.Object, want); err != nil {
-			return fmt.Errorf("%s: %w", b.Name, err)
-		}
-		live := &appsv1.Deployment{}
+		want, _, _ := unstructured.NestedMap(o.Object, "spec", "selector")
+		live := &unstructured.Unstructured{}
+		live.SetGroupVersionKind(o.GroupVersionKind())
 		err := k8s.Get(ctx, client.ObjectKey{Namespace: o.GetNamespace(), Name: o.GetName()}, live)
 		if apierrors.IsNotFound(err) {
 			continue
@@ -610,14 +612,15 @@ func checkSelectors(ctx context.Context, k8s client.Reader, b *depBundle) error 
 		if err != nil {
 			return err
 		}
-		if reflect.DeepEqual(live.Spec.Selector, want.Spec.Selector) {
+		got, _, _ := unstructured.NestedMap(live.Object, "spec", "selector")
+		if reflect.DeepEqual(got, want) {
 			continue
 		}
-		ref := live.Namespace + "/" + live.Name
-		if release := live.Annotations["meta.helm.sh/release-name"]; live.Labels["app.kubernetes.io/managed-by"] == "Helm" && release != "" {
+		ref := live.GetNamespace() + "/" + live.GetName()
+		if release := live.GetAnnotations()["meta.helm.sh/release-name"]; live.GetLabels()["app.kubernetes.io/managed-by"] == "Helm" && release != "" {
 			return fmt.Errorf("%s is installed by Helm release %s with a different selector; uninstall that release before installing %s", ref, release, b.Name)
 		}
-		return fmt.Errorf("%s has a selector the %s bundle cannot change in place; delete the Deployment before installing %s", ref, b.Name, b.Name)
+		return fmt.Errorf("%s has a selector the %s bundle cannot change in place; delete the %s before installing %s", ref, b.Name, o.GetKind(), b.Name)
 	}
 	return nil
 }

@@ -100,6 +100,17 @@ func Router(name, namespace, image string, replicas int32) ([]*unstructured.Unst
 			if u.GetNamespace() == "" {
 				u.SetNamespace(namespace)
 			}
+			// The manager caches Deployments and Services by the managed-by
+			// label, so an unlabelled router object is invisible to its client:
+			// the EPP would read as never ready and its watch would not fire.
+			labels := u.GetLabels()
+			if labels == nil {
+				labels = map[string]string{}
+			}
+			labels[naming.LabelManagedBy] = naming.ManagedBy
+			labels[naming.LabelComponent] = naming.ComponentInference
+			labels[naming.LabelInference] = name
+			u.SetLabels(labels)
 			if u.GetKind() == "Deployment" && u.GetName() == EPPName(name) {
 				if err := unstructured.SetNestedField(u.Object, int64(replicas), "spec", "replicas"); err != nil {
 					return nil, err

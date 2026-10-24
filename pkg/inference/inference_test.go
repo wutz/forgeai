@@ -1,6 +1,7 @@
 package inference
 
 import (
+	"maps"
 	"slices"
 	"testing"
 	"time"
@@ -117,6 +118,11 @@ func TestRouterRendersEndpointPickerForModelServers(t *testing.T) {
 		if u.GetNamespace() != "forge-demo" {
 			t.Errorf("%s %s in namespace %q, want forge-demo", u.GetKind(), u.GetName(), u.GetNamespace())
 		}
+		// The manager's cache keeps only objects labelled managed-by, so an
+		// unlabelled router Deployment or Service reads as absent.
+		if got := u.GetLabels()[naming.LabelManagedBy]; got != naming.ManagedBy {
+			t.Errorf("%s %s label %s=%q, want %q", u.GetKind(), u.GetName(), naming.LabelManagedBy, got, naming.ManagedBy)
+		}
 	}
 }
 
@@ -208,6 +214,37 @@ func TestObjectsServeModelWithTensorParallelGPUs(t *testing.T) {
 	backend := ing.Spec.Rules[0].HTTP.Paths[0].Backend.Service
 	if backend.Name != "qwen-epp" || backend.Port.Name != "http" {
 		t.Errorf("ingress backend %+v, want the router Service", backend)
+	}
+}
+
+func TestObjectsMergeTheNodeSelector(t *testing.T) {
+	svc := testService()
+	svc.Spec.NodeSelector = map[string]string{
+		"kubernetes.io/hostname": "gn-10-243-145-105",
+		// The service can override what the InstanceType sets.
+		naming.LabelGPUProduct: "other",
+	}
+	it := testInstanceType()
+	objs, err := Objects(svc, testConfig(), it, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var model *appsv1.Deployment
+	for _, d := range objectsOf[*appsv1.Deployment](t, objs, "Deployment") {
+		if d.Name == "qwen-model" {
+			model = d
+		}
+	}
+	if model == nil {
+		t.Fatal("no qwen-model Deployment")
+	}
+	want := map[string]string{"kubernetes.io/hostname": "gn-10-243-145-105", naming.LabelGPUProduct: "other"}
+	if !maps.Equal(model.Spec.Template.Spec.NodeSelector, want) {
+		t.Errorf("node selector %v, want %v", model.Spec.Template.Spec.NodeSelector, want)
+	}
+	// The InstanceType's own map is not mutated by the merge.
+	if it.Spec.NodeSelector[naming.LabelGPUProduct] != "NVIDIA-GeForce-RTX-5090" {
+		t.Errorf("InstanceType node selector changed to %v", it.Spec.NodeSelector)
 	}
 }
 

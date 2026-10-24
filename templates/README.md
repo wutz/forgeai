@@ -142,7 +142,9 @@ shows up without restarting the app.
 A job or sandbox template names an image, and the image must be pullable from
 the cluster. `images/nccl-tests` builds the image the `nccl-tests` template
 uses: CUDA 13 with NCCL tests built for sm_80, sm_90, sm_100 and sm_120, so
-Blackwell GPUs run native kernels.
+Blackwell GPUs run native kernels. The binaries are compiled on the CUDA devel
+image and shipped on the CUDA base image with only the runtime libraries, so
+the image is about 1 GB instead of the devel image's 7.6 GB.
 
 ```bash
 docker buildx build --platform linux/amd64 -t ghcr.io/wutz/nccl-tests:2.21.1-cuda13.0.2 templates/images/nccl-tests

@@ -2,8 +2,15 @@
 # Built on CUDA 13 so that Blackwell (sm_120) GPUs get native kernels; the
 # nodes run driver 580, which supports CUDA 13. Single-process mode only:
 # no MPI or SSH, each worker tests the GPUs of its own node.
-ARG CUDA_IMAGE=nvidia/cuda:13.0.2-devel-ubuntu22.04
-FROM ${CUDA_IMAGE}
+#
+# Two stages keep the image small: the binaries are compiled on the devel
+# image (compiler, headers, NCCL development files) and run on the base image
+# with only the CUDA runtime and NCCL libraries, so nodes pull about a tenth
+# of the devel image.
+ARG CUDA_VERSION=13.0.2
+ARG UBUNTU=ubuntu22.04
+
+FROM nvidia/cuda:${CUDA_VERSION}-devel-${UBUNTU} AS build
 
 ARG NCCL_TESTS_REF=v2.21.1
 
@@ -17,6 +24,19 @@ RUN git clone --depth 1 --branch "${NCCL_TESTS_REF}" https://github.com/NVIDIA/n
  && make -C /opt/nccl-tests -j"$(nproc)" \
       CUDA_HOME=/usr/local/cuda NCCL_HOME=/usr MPI=0 \
       NVCC_GENCODE="-gencode=arch=compute_80,code=sm_80 -gencode=arch=compute_90,code=sm_90 -gencode=arch=compute_100,code=sm_100 -gencode=arch=compute_120,code=sm_120" \
- && rm -rf /opt/nccl-tests/src /opt/nccl-tests/.git
+ && rm -rf /opt/nccl-tests/build/*.o /opt/nccl-tests/build/verifiable
+
+FROM nvidia/cuda:${CUDA_VERSION}-base-${UBUNTU}
+
+# The runtime libraries the binaries link against. The package names follow
+# the CUDA major.minor of the base image; the NCCL package comes from the same
+# NVIDIA repository the base image configures. The apt lists stay out of the
+# layer.
+ARG CUDA_PACKAGE_SUFFIX=13-0
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends cuda-cudart-${CUDA_PACKAGE_SUFFIX} libnccl2 \
+ && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /opt/nccl-tests/build /opt/nccl-tests/build
 
 WORKDIR /opt/nccl-tests/build

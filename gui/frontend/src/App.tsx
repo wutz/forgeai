@@ -24,7 +24,8 @@ const PREFS = 'forgeai.connection'
 const NAMESPACES = 'forgeai.namespaces'
 const SIDEBAR = 'forgeai.sidebar'
 // Matches the redesign.css breakpoint where the rail becomes an overlay.
-const isNarrow = () => window.matchMedia('(max-width: 820px)').matches
+const NARROW = '(max-width: 820px)'
+const isNarrow = () => window.matchMedia(NARROW).matches
 
 type Area = 'overview' | 'jobs' | 'sandboxes' | 'templates' | 'volumes' | 'files' | 'images' | 'resources'
   | 'admin' | 'dependencies'
@@ -121,6 +122,15 @@ export default function App() {
     localStorage.setItem(SIDEBAR, v ? 'open' : 'collapsed')
     return !v
   })
+  // Crossing the breakpoint re-applies the state for that width: a narrow window
+  // closes the overlay, and a wide one goes back to the rail the user saved, so an
+  // overlay closed on a phone does not leave the desktop rail hidden.
+  useEffect(() => {
+    const query = window.matchMedia(NARROW)
+    const sync = () => setCollapsed(query.matches || localStorage.getItem(SIDEBAR) === 'collapsed')
+    query.addEventListener('change', sync)
+    return () => query.removeEventListener('change', sync)
+  }, [])
 
   const connectTo = async (contextName: string, requested = '') => {
     const seq = ++attempt.current

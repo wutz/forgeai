@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"time"
 
 	"github.com/wutz/forgeai/pkg/platform"
@@ -66,14 +67,24 @@ func (a *App) TrashVolume(name string) (*Volume, error) {
 	if err != nil {
 		return nil, err
 	}
-	retention, err := volumes.Retention(ctx, c.k8s, c.namespace(), cfg.TrashRetention.Duration)
+	retention, err := trashRetention(ctx, c, cfg)
 	if err != nil {
 		return nil, err
+	}
+	return volumesClient(c).Trash(ctx, name, retention)
+}
+
+// trashRetention is how long a volume trashed now is kept: its project's
+// retention when it sets one, else the platform default.
+func trashRetention(ctx context.Context, c *Connection, cfg *platform.Config) (time.Duration, error) {
+	retention, err := volumes.Retention(ctx, c.k8s, c.namespace(), cfg.TrashRetention.Duration)
+	if err != nil {
+		return 0, err
 	}
 	if retention <= 0 {
 		retention = 7 * 24 * time.Hour
 	}
-	return volumesClient(c).Trash(ctx, name, retention)
+	return retention, nil
 }
 
 // SetVolumeExpiry overrides when a trashed volume is purged.
@@ -85,6 +96,26 @@ func (a *App) SetVolumeExpiry(name string, at time.Time) (*Volume, error) {
 	ctx, cancel := a.call()
 	defer cancel()
 	return volumesClient(c).SetExpiry(ctx, name, at)
+}
+
+// ResetVolumeExpiry puts a trashed volume's purge time back to the default for
+// its project, undoing SetVolumeExpiry.
+func (a *App) ResetVolumeExpiry(name string) (*Volume, error) {
+	c, err := a.current()
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := a.call()
+	defer cancel()
+	cfg, err := platform.Load(ctx, c.k8s, c.namespace())
+	if err != nil {
+		return nil, err
+	}
+	retention, err := trashRetention(ctx, c, cfg)
+	if err != nil {
+		return nil, err
+	}
+	return volumesClient(c).ResetExpiry(ctx, name, retention)
 }
 
 // RestoreVolume takes a volume out of the recycle bin.

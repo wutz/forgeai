@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 	"unicode/utf8"
 
 	corev1 "k8s.io/api/core/v1"
@@ -11,8 +12,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	kubescheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/remotecommand"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/wutz/forgeai/pkg/sandbox"
 )
@@ -61,24 +60,54 @@ func (q *sizeQueue) set(s remotecommand.TerminalSize) {
 	}
 }
 
+// sandboxOutput is one chunk of shell output. Seq numbers the chunks of a
+// session in the order the shell wrote them.
+type sandboxOutput struct {
+	Seq  uint64 `json:"seq"`
+	Data string `json:"data"`
+}
+
+// sandboxExit ends a session. Its Seq follows the last output chunk, so the
+// GUI shows it after all of the output.
+type sandboxExit struct {
+	Seq     uint64 `json:"seq"`
+	Message string `json:"message"`
+}
+
 // eventWriter emits what the shell writes as a Wails event. A multi-byte
 // UTF-8 character split across two reads is held back until it is complete.
+// The event bridge does not keep events in the order they are emitted under
+// a burst of output, so each chunk carries its sequence number and the GUI
+// writes them in that order.
 type eventWriter struct {
+	app     *App
 	ctx     context.Context
 	event   string
+	mu      sync.Mutex
 	pending []byte
+	seq     uint64
 }
 
 // Write implements io.Writer.
 func (w *eventWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	buf := append(w.pending, p...)
 	cut := completeLen(buf)
 	chunk := string(buf[:cut])
 	w.pending = append(w.pending[:0], buf[cut:]...)
 	if chunk != "" {
-		runtime.EventsEmit(w.ctx, w.event, chunk)
+		w.seq++
+		w.app.emitEvent(w.ctx, w.event, sandboxOutput{Seq: w.seq, Data: chunk})
 	}
 	return len(p), nil
+}
+
+// nextSeq returns the sequence number for the next event after the output.
+func (w *eventWriter) nextSeq() uint64 {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.seq + 1
 }
 
 // completeLen returns the length of the prefix of b that ends on a rune
@@ -155,21 +184,30 @@ func (a *App) OpenSandboxTerminal(name, id string, cols, rows int) error {
 		cancel: scancel,
 	}
 	t.sizes.set(remotecommand.TerminalSize{Width: clampSize(cols), Height: clampSize(rows)})
-	a.terminals.Store(id, t)
+	// The lookup above only fails fast: two opens with one id can both pass it
+	// while the pod is read. Registering is the step that must be atomic.
+	if _, busy := a.terminals.LoadOrStore(id, t); busy {
+		scancel()
+		_ = pr.Close()
+		_ = pw.Close()
+		return fmt.Errorf("terminal session %s is already open", id)
+	}
 
-	out := &eventWriter{ctx: a.ctx, event: "sandbox-terminal:" + id}
+	out := &eventWriter{app: a, ctx: a.ctx, event: "sandbox-terminal:" + id}
 	go func() {
 		err := exec.StreamWithContext(sctx, remotecommand.StreamOptions{
 			Stdin: pr, Stdout: out, Tty: true, TerminalSizeQueue: t.sizes,
 		})
-		a.terminals.Delete(id)
+		// Only the entry this session registered is removed: a later session with
+		// the same id must not lose its entry to this one's exit.
+		a.terminals.CompareAndDelete(id, t)
 		_ = pr.Close()
 		scancel()
 		msg := ""
 		if err != nil {
 			msg = err.Error()
 		}
-		runtime.EventsEmit(a.ctx, "sandbox-terminal:"+id+":exit", msg)
+		a.emitEvent(a.ctx, "sandbox-terminal:"+id+":exit", sandboxExit{Seq: out.nextSeq(), Message: msg})
 	}()
 	return nil
 }

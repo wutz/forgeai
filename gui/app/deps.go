@@ -11,6 +11,9 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"reflect"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,8 +28,6 @@ import (
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/wutz/forgeai/pkg/platform"
 )
@@ -58,6 +59,21 @@ const (
 	// forgeaiDeployment is the operator Deployment: config/default prefixes
 	// its names with forgeai-.
 	forgeaiDeployment = "forgeai-controller-manager"
+)
+
+// Install steps, the values of DependencyProgress.Step. The GUI keys its text
+// on them as deps.step.<step>.
+const (
+	stepNamespaces     = "namespaces"
+	stepCRDs           = "crds"
+	stepControllers    = "controllers"
+	stepDeployments    = "deployments"
+	stepWebhooks       = "webhooks"
+	stepChartNamespace = "chart-namespace"
+	stepChartPull      = "chart-pull"
+	stepChartInstall   = "chart-install"
+	stepRecord         = "record"
+	stepRestart        = "restart"
 )
 
 var (
@@ -109,6 +125,9 @@ type Dependency struct {
 	Pinned string `json:"pinned"`
 	// Installed is the version the cluster runs, empty when the GUI did not install it.
 	Installed string `json:"installed"`
+	// Running is the image tag of a component the GUI did not install, so its
+	// version still shows. Empty when the image is pinned by digest or untagged.
+	Running string `json:"running,omitempty"`
 	// Namespace is where the cluster runs the component, empty when unknown.
 	Namespace string `json:"namespace"`
 	// AppliedBy and AppliedAt come from the install record: who installed the
@@ -117,9 +136,27 @@ type Dependency struct {
 	AppliedAt string `json:"appliedAt"`
 	// Status is missing, degraded, mismatch, unmanaged, outdated, installing or ready.
 	// mismatch means the component runs where the platform config does not expect it.
-	Status      string `json:"status"`
-	Message     string `json:"message"`
-	Installable bool   `json:"installable"`
+	Status string `json:"status"`
+	// Reason names the state the GUI explains in its own words: unmanaged,
+	// unmanagedHelm, namespaceMismatch or operatorMissing. Empty for the other
+	// states. Message stays the English diagnostic.
+	Reason string `json:"reason,omitempty"`
+	// ExpectedNamespace is where the platform config expects the component when
+	// Reason is namespaceMismatch.
+	ExpectedNamespace string `json:"expectedNamespace,omitempty"`
+	// Message is the English diagnostic. MessageKey and MessageArgs name the same
+	// diagnostic for the GUI to word in the user's language. Empty when the GUI
+	// words the state from Status or Reason.
+	Message     string            `json:"message"`
+	MessageKey  string            `json:"messageKey,omitempty"`
+	MessageArgs map[string]string `json:"messageArgs,omitempty"`
+	Installable bool              `json:"installable"`
+}
+
+// diagnose sets the diagnostic of a state: the English text, and the key and
+// values the GUI words it with.
+func diagnose(dep *Dependency, key string, args map[string]string, english string) {
+	dep.Message, dep.MessageKey, dep.MessageArgs = english, key, args
 }
 
 // depRecord is the provenance of one install, stored in depRecordName.
@@ -136,16 +173,22 @@ type depRecord struct {
 // Dependencies is the Dependencies view: the components and whether the user
 // may install them. Only cluster administrators may read or change them.
 type Dependencies struct {
+	Cluster      string       `json:"cluster"`
 	ClusterAdmin bool         `json:"clusterAdmin"`
 	Items        []Dependency `json:"items"`
 }
 
 // DependencyProgress is one step of an install, or its outcome when Done is set.
 type DependencyProgress struct {
+	// Cluster is the context the install runs on; a view of another cluster
+	// ignores the event.
+	Cluster string `json:"cluster"`
 	Name    string `json:"name"`
-	Message string `json:"message"`
-	Done    bool   `json:"done"`
-	Error   string `json:"error,omitempty"`
+	// Step is the install step under way, one of the step constants. The GUI
+	// shows its translated text, so the backend sends no English prose here.
+	Step  string `json:"step,omitempty"`
+	Done  bool   `json:"done"`
+	Error string `json:"error,omitempty"`
 }
 
 // depBundle is an embedded install manifest of one component at its pinned version.
@@ -253,18 +296,25 @@ func assess(dep *Dependency, h depHealth) {
 	}
 	if h.crdsFound < h.crdsWanted {
 		dep.Status = "degraded"
-		dep.Message = fmt.Sprintf("%d of %d CRDs installed", h.crdsFound, h.crdsWanted)
+		diagnose(dep, "crdsInstalled", map[string]string{
+			"found": fmt.Sprint(h.crdsFound), "wanted": fmt.Sprint(h.crdsWanted),
+		}, fmt.Sprintf("%d of %d CRDs installed", h.crdsFound, h.crdsWanted))
 		return
 	}
 	if dep.Name == "forgeai" && len(h.deployments) == 0 {
 		dep.Status, dep.Message = "degraded", "Operator Deployment not found"
+		dep.Reason = "operatorMissing"
 		return
 	}
 	var notReady []string
 	for i := range h.deployments {
 		d := &h.deployments[i]
-		if v := d.Labels[depVersionLabel]; v != "" && dep.Installed == "" {
-			dep.Installed = v
+		if v := d.Labels[depVersionLabel]; v != "" {
+			if dep.Installed == "" {
+				dep.Installed = v
+			}
+		} else if dep.Running == "" {
+			dep.Running = imageTag(d)
 		}
 		if !deploymentAvailable(d) {
 			notReady = append(notReady, d.Namespace+"/"+d.Name)
@@ -272,19 +322,25 @@ func assess(dep *Dependency, h depHealth) {
 	}
 	if len(notReady) > 0 {
 		dep.Status = "degraded"
-		dep.Message = fmt.Sprintf("Not available: %v", notReady)
+		diagnose(dep, "notAvailable", map[string]string{
+			"deployments": strings.Join(notReady, ", "),
+		}, fmt.Sprintf("Not available: %v", notReady))
 		return
 	}
 	if h.expectNamespace != "" && h.namespace != "" && h.namespace != h.expectNamespace {
 		dep.Status = "mismatch"
+		dep.Reason = "namespaceMismatch"
+		dep.ExpectedNamespace = h.expectNamespace
 		dep.Message = fmt.Sprintf("Runs in %s, but the platform config sets sandbox.namespace to %s",
 			h.namespace, h.expectNamespace)
 		return
 	}
 	if dep.Installable && dep.Installed == "" {
 		dep.Status = "unmanaged"
+		dep.Reason = "unmanaged"
 		dep.Message = "Installed outside forgeai; installing replaces it with the pinned version"
 		if dep.Name == "forgeai" {
+			dep.Reason = "unmanagedHelm"
 			dep.Message = "Deployed outside Helm (make deploy-dev); remove it before installing the chart"
 		}
 		return
@@ -295,6 +351,26 @@ func assess(dep *Dependency, h depHealth) {
 		return
 	}
 	dep.Status = "ready"
+}
+
+// imageTag returns the tag of the Deployment's first container image, or ""
+// when the image has no tag or is pinned by digest.
+func imageTag(d *appsv1.Deployment) string {
+	cs := d.Spec.Template.Spec.Containers
+	if len(cs) == 0 {
+		return ""
+	}
+	image := cs[0].Image
+	if strings.Contains(image, "@") {
+		return ""
+	}
+	// The last colon is a tag separator only when it comes after the last slash;
+	// otherwise it is a registry port.
+	i := strings.LastIndex(image, ":")
+	if i < 0 || i < strings.LastIndex(image, "/") {
+		return ""
+	}
+	return image[i+1:]
 }
 
 // deploymentAvailable reports whether the Deployment has rolled out and is available.
@@ -319,7 +395,7 @@ func (a *App) ListDependencies() (*Dependencies, error) {
 	}
 	ctx, cancel := a.call()
 	defer cancel()
-	out := &Dependencies{ClusterAdmin: mustBeClusterAdmin(ctx, c.k8s), Items: []Dependency{}}
+	out := &Dependencies{Cluster: c.Info.Context, ClusterAdmin: mustBeClusterAdmin(ctx, c.k8s), Items: []Dependency{}}
 	if !out.ClusterAdmin {
 		return out, nil
 	}
@@ -331,24 +407,51 @@ func (a *App) ListDependencies() (*Dependencies, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, info := range depCatalog {
+	// The components are probed at once: each probe is a few independent reads, so
+	// the page waits for the slowest component, not the sum of all of them.
+	items := make([]Dependency, len(depCatalog))
+	err = forEachConcurrently(len(depCatalog), func(i int) error {
+		info := depCatalog[i]
 		b, err := bundleByName(info.name)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		dep, err := probeDependency(ctx, c.k8s, info, b, expectedNamespace(cfg, info.name))
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if r, ok := records[info.name]; ok {
 			dep.AppliedBy, dep.AppliedAt = r.AppliedBy, r.AppliedAt
 		}
-		if a.installs.active(info.name) {
-			dep.Status, dep.Message = "installing", "Installing"
+		if a.installs.active(installKey(c, info.name)) {
+			dep.Status = "installing"
+			diagnose(&dep, "installing", nil, "Installing")
 		}
-		out.Items = append(out.Items, dep)
+		items[i] = dep
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
+	out.Items = append(out.Items, items...)
 	return out, nil
+}
+
+// forEachConcurrently runs fn for each index in [0, n) at once and returns the
+// first error by index. Each fn writes only its own slot, so callers need no lock.
+func forEachConcurrently(n int, fn func(i int) error) error {
+	errs := make([]error, n)
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Go(func() { errs[i] = fn(i) })
+	}
+	wg.Wait()
+	for _, err := range errs {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // probeDependency reads the CRDs and Deployments of a component. Bundled
@@ -367,15 +470,25 @@ func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *de
 		dep.Pinned = forgeaiChartVersion
 	}
 	h.crdsWanted = len(crds)
-	for _, name := range crds {
+	// Each CRD is read at once; a slot per CRD keeps the count free of a lock.
+	found := make([]bool, len(crds))
+	if err := forEachConcurrently(len(crds), func(i int) error {
 		u := &unstructured.Unstructured{}
 		u.SetGroupVersionKind(crdGVK)
-		err := k8s.Get(ctx, client.ObjectKey{Name: name}, u)
+		err := k8s.Get(ctx, client.ObjectKey{Name: crds[i]}, u)
 		switch {
 		case err == nil:
-			h.crdsFound++
+			found[i] = true
 		case !apierrors.IsNotFound(err):
-			return dep, err
+			return err
+		}
+		return nil
+	}); err != nil {
+		return dep, err
+	}
+	for _, ok := range found {
+		if ok {
+			h.crdsFound++
 		}
 	}
 	if b != nil {
@@ -400,7 +513,39 @@ func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *de
 	}
 	dep.Namespace = h.namespace
 	assess(&dep, h)
+	// An install outside forgeai carries no labels, so its Deployments are not
+	// found above. Its running version comes from the Deployments the bundle declares.
+	if b != nil && len(h.deployments) == 0 && dep.Status != "missing" {
+		running, err := bundleRunningTags(ctx, k8s, b)
+		if err != nil {
+			return dep, err
+		}
+		dep.Running = running
+	}
 	return dep, nil
+}
+
+// bundleRunningTags returns the distinct image tags of the Deployments the
+// bundle declares that exist in the cluster, joined in bundle order. A
+// component with several Deployments, such as Trainer with JobSet, lists each.
+func bundleRunningTags(ctx context.Context, k8s client.Reader, b *depBundle) (string, error) {
+	var tags []string
+	for _, o := range b.objects {
+		if o.GetKind() != "Deployment" || o.GroupVersionKind().Group != appsv1.GroupName {
+			continue
+		}
+		d := &appsv1.Deployment{}
+		err := k8s.Get(ctx, client.ObjectKey{Namespace: o.GetNamespace(), Name: o.GetName()}, d)
+		switch {
+		case err == nil:
+			if tag := imageTag(d); tag != "" && !slices.Contains(tags, tag) {
+				tags = append(tags, tag)
+			}
+		case !apierrors.IsNotFound(err):
+			return "", err
+		}
+	}
+	return strings.Join(tags, ", "), nil
 }
 
 // loadPlatform reads the platform config. Without the ConfigMap the defaults apply.
@@ -439,6 +584,43 @@ func checkInstallTarget(b *depBundle, cfg *platform.Config) error {
 	if want != "" && got != "" && want != got {
 		return fmt.Errorf("%s installs into %s, but the platform config sets sandbox.namespace to %s",
 			b.Name, got, want)
+	}
+	return nil
+}
+
+// selectorKinds are the apps/v1 workload kinds whose spec.selector the API server
+// makes immutable. A bundle that names one of them with a different selector
+// cannot be applied over the live object.
+var selectorKinds = []string{"Deployment", "StatefulSet", "DaemonSet"}
+
+// checkSelectors refuses a bundle whose workloads would change a selector the
+// cluster already runs with. Kubernetes makes selectors immutable, so the apply
+// would fail partway through the stages. A workload installed by Helm names its
+// release, which has to be uninstalled before the bundle can take its place.
+func checkSelectors(ctx context.Context, k8s client.Reader, b *depBundle) error {
+	for _, o := range b.objects {
+		if o.GroupVersionKind().Group != appsv1.GroupName || !slices.Contains(selectorKinds, o.GetKind()) {
+			continue
+		}
+		want, _, _ := unstructured.NestedMap(o.Object, "spec", "selector")
+		live := &unstructured.Unstructured{}
+		live.SetGroupVersionKind(o.GroupVersionKind())
+		err := k8s.Get(ctx, client.ObjectKey{Namespace: o.GetNamespace(), Name: o.GetName()}, live)
+		if apierrors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		got, _, _ := unstructured.NestedMap(live.Object, "spec", "selector")
+		if reflect.DeepEqual(got, want) {
+			continue
+		}
+		ref := live.GetNamespace() + "/" + live.GetName()
+		if release := live.GetAnnotations()["meta.helm.sh/release-name"]; live.GetLabels()["app.kubernetes.io/managed-by"] == "Helm" && release != "" {
+			return fmt.Errorf("%s is installed by Helm release %s with a different selector; uninstall that release before installing %s", ref, release, b.Name)
+		}
+		return fmt.Errorf("%s has a selector the %s bundle cannot change in place; delete the %s before installing %s", ref, b.Name, o.GetKind(), b.Name)
 	}
 	return nil
 }
@@ -542,37 +724,42 @@ func (a *App) InstallDependency(name string) error {
 		if err := checkInstallTarget(b, cfg); err != nil {
 			return err
 		}
+		if err := checkSelectors(ctx, c.k8s, b); err != nil {
+			return err
+		}
 	} else if err := checkChartTarget(ctx, c.k8s); err != nil {
 		return err
 	}
-	if !a.installs.start(name) {
+	key := installKey(c, name)
+	cluster := c.Info.Context
+	if !a.installs.start(key) {
 		return fmt.Errorf("%s is already being installed", name)
 	}
 	go func() {
 		ctx, cancel := context.WithTimeout(a.ctx, depInstallTimeout)
 		defer cancel()
-		progress := func(msg string) {
-			runtime.EventsEmit(a.ctx, depProgressEvent, DependencyProgress{Name: name, Message: msg})
+		progress := func(step string) {
+			a.emitEvent(a.ctx, depProgressEvent, DependencyProgress{Cluster: cluster, Name: name, Step: step})
 		}
 		rec, err := installComponent(ctx, c, b, progress)
 		if err == nil {
-			progress("Recording the install")
+			progress(stepRecord)
 			rec.AppliedBy = currentUser(ctx, c.k8s)
 			rec.AppliedAt = time.Now().UTC().Format(time.RFC3339)
 			err = writeRecord(ctx, c.k8s, name, rec)
 		}
 		if err == nil && name == "agent-sandbox" {
-			progress("Restarting the forgeai operator to start the Sandbox controller")
+			progress(stepRestart)
 			err = restartOperator(ctx, c.k8s)
 		}
 		// Release the component before the outcome is emitted: the view
 		// refreshes on it and must not still see the install in progress.
-		a.installs.finish(name)
-		done := DependencyProgress{Name: name, Message: "Installed " + rec.Version, Done: true}
+		a.installs.finish(key)
+		done := DependencyProgress{Cluster: cluster, Name: name, Done: true}
 		if err != nil {
-			done = DependencyProgress{Name: name, Message: "Install failed", Done: true, Error: err.Error()}
+			done.Error = err.Error()
 		}
-		runtime.EventsEmit(a.ctx, depProgressEvent, done)
+		a.emitEvent(a.ctx, depProgressEvent, done)
 	}()
 	return nil
 }
@@ -608,23 +795,23 @@ func installBundle(ctx context.Context, k8s client.Client, b *depBundle, progres
 		stages[s] = append(stages[s], u)
 	}
 
-	progress("Applying namespaces and CRDs")
+	progress(stepNamespaces)
 	if err := applyAll(ctx, k8s, stages[0]); err != nil {
 		return err
 	}
-	progress("Waiting for the CRDs to be established")
+	progress(stepCRDs)
 	if err := waitCRDs(ctx, k8s, stages[0]); err != nil {
 		return err
 	}
-	progress("Applying controllers and RBAC")
+	progress(stepControllers)
 	if err := applyAll(ctx, k8s, stages[1]); err != nil {
 		return err
 	}
-	progress("Waiting for the Deployments to be available")
+	progress(stepDeployments)
 	if err := waitDeployments(ctx, k8s, stages[1]); err != nil {
 		return err
 	}
-	progress("Applying webhooks and custom resources")
+	progress(stepWebhooks)
 	return applyAll(ctx, k8s, stages[2])
 }
 
@@ -746,6 +933,10 @@ func restartOperator(ctx context.Context, k8s client.Client) error {
 	d.Spec.Template.Annotations["kubectl.kubernetes.io/restartedAt"] = time.Now().UTC().Format(time.RFC3339)
 	return k8s.Patch(ctx, d, client.MergeFrom(orig))
 }
+
+// installKey names an install by its cluster context as well as its component:
+// the same component installing on another cluster is not this one.
+func installKey(c *Connection, name string) string { return c.Info.Context + "/" + name }
 
 // depInstalls tracks the installs in progress, by component.
 type depInstalls struct {

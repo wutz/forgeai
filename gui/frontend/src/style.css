@@ -6,7 +6,6 @@
   --mute: #71717a;
   --hairline: #e4e4e7;
   --hairline-soft: #f4f4f5;
-  --canvas: #fafafa;
   --surface: #ffffff;
   --link: #4f46e5;
   --error: #dc2626;
@@ -16,6 +15,8 @@
   --warning-soft: #fef3c7;
   --success: #059669;
   --success-soft: #d1fae5;
+  /* Success as text on white and the accent wash: --success is 3.8:1 there. */
+  --success-deep: #047857;
   --accent: #4f46e5;
   --accent-deep: #4338ca;
   --accent-soft: #eef2ff;
@@ -35,8 +36,6 @@
   /* Indigo → violet, for the logo tile. */
   --accent-gradient: linear-gradient(135deg, #6366f1 0%, #7c3aed 100%);
   --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
   --font: Geist, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", Arial, sans-serif;
   --mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   color-scheme: light;
@@ -52,7 +51,6 @@
   --mute: #a1a1aa;
   --hairline: #27272a;
   --hairline-soft: #222226;
-  --canvas: #111113;
   --surface: #18181b;
   --link: #818cf8;
   --error: #f87171;
@@ -62,6 +60,7 @@
   --warning-soft: rgba(251, 191, 36, 0.14);
   --success: #34d399;
   --success-soft: rgba(52, 211, 153, 0.14);
+  --success-deep: #34d399;
   --accent: #818cf8;
   --accent-deep: #a5b4fc;
   --accent-soft: rgba(129, 140, 248, 0.12);
@@ -122,7 +121,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-weight: 500; font-size: 14px; cursor: pointer; white-space: nowrap;
 }
 .btn:hover:not(:disabled) { background: var(--hairline-soft); }
-.btn-sm { height: 28px; padding: 0 8px; font-size: 13px; }
 
 .input, .select, .textarea {
   height: 32px; padding: 0 10px; border-radius: var(--radius-sm);
@@ -135,20 +133,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .field label { font-size: 13px; font-weight: 500; color: var(--body); }
 .field .hint { font-size: 12px; color: var(--mute); }
 .row { display: flex; gap: 12px; }
-.row > * { flex: 1; }
 
 /* Card / table */
 .card { background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius-md); }
-.card-body { padding: 16px; }
 .card-head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--hairline); }
-.card-head h3 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.32px; }
+.card-head h2 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -0.32px; }
 
 .table { width: 100%; border-collapse: collapse; }
 .table th { text-align: left; font-size: 12px; font-weight: 500; color: var(--mute); padding: 10px 16px; border-bottom: 1px solid var(--hairline); }
 .table td { padding: 10px 16px; border-bottom: 1px solid var(--hairline-soft); vertical-align: middle; }
 .table tr:last-child td { border-bottom: none; }
-.table tbody tr { cursor: pointer; }
-.table tbody tr:hover { background: var(--canvas); }
+.table tbody tr.clickable { cursor: pointer; }
 .table tbody tr.selected { background: var(--accent-soft); }
 .mono { font-family: var(--mono); font-size: 13px; }
 .muted { color: var(--mute); }
@@ -159,29 +154,33 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--mute); }
 .status-running .dot { background: var(--success); }
 .status-queued .dot, .status-pending .dot, .status-restarting .dot, .status-stopping .dot { background: var(--warning); }
-.status-stopped .dot, .status-suspended .dot { background: var(--mute); }
-.status-succeeded .dot { background: var(--success); }
+.status-suspended .dot { background: var(--mute); }
 .status-failed { color: var(--error); }
 .status-failed .dot { background: var(--error); }
+/* A lost volume has no usable storage behind it, so it reads as a failure, not as idle. */
+.status-lost { color: var(--error); }
+.status-lost .dot { background: var(--error); }
+.status-deleting .dot { background: var(--warning); }
+.status-retried .dot { background: var(--faint); }
 
 /* Detail */
 .kv { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px 12px; font-size: 13px; }
 .kv dt { color: var(--mute); }
 .kv dd { margin: 0; overflow-wrap: anywhere; }
 .section { padding: 16px; border-top: 1px solid var(--hairline); }
-.section h4 { margin: 0 0 10px; font-size: 13px; font-weight: 600; }
+.section h3 { margin: 0 0 10px; font-size: 13px; font-weight: 600; }
 .actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .logs {
   margin: 0; height: 280px; overflow: auto; padding: 12px; border-radius: var(--radius-sm);
   background: var(--ink); color: #ededed; font-family: var(--mono); font-size: 12px; line-height: 18px; white-space: pre-wrap;
 }
-.tabs { display: flex; align-items: center; gap: 4px; margin-bottom: 10px; }
-.tabs h4 { margin: 0; }
 
 /* Banner / empty */
 .banner { padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 16px; }
-.banner-error { background: var(--error-soft); color: var(--error); }
+/* The label is --error-deep on the tint: --error on --error-soft is under 4.5:1 for body text. */
+.banner-error { background: var(--error-soft); color: var(--error-deep); }
 .banner-warn { background: var(--warning-soft); color: var(--warning-deep); }
+.banner-success { background: var(--success-soft); color: var(--success-deep); }
 .empty { padding: 48px 16px; text-align: center; color: var(--mute); }
 
 /* Dialog */
@@ -219,4 +218,4 @@ button, input, select, textarea { font: inherit; color: inherit; }
   border-bottom: 1px solid var(--hairline-soft); list-style: none; }
 .repo[open] summary { border-bottom-color: transparent; }
 .row-full { opacity: 0.55; }
-.free { color: var(--success); }
+.free { color: var(--success-deep); }

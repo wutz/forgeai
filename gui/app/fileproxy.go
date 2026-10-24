@@ -35,6 +35,8 @@ type fileTarget struct {
 	base *url.URL
 	user string
 	pass string
+	// insecure skips TLS verification of the file server (private CA).
+	insecure bool
 }
 
 // fileProxy is a reverse proxy on the loopback interface. The file browser
@@ -94,6 +96,12 @@ func (p *fileProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "cross-origin request refused", http.StatusForbidden)
 		return
 	}
+	// Uploads, deletes and renames change files, so they must come from the proxy's
+	// own page. A browser always sends Origin on them, so a missing one is refused.
+	if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Header.Get("Origin") != origin {
+		http.Error(w, "changes must come from the file page", http.StatusForbidden)
+		return
+	}
 	if t == nil {
 		http.Error(w, "file server is not running", http.StatusServiceUnavailable)
 		return
@@ -104,7 +112,12 @@ func (p *fileProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Pages are rewritten below, so they must arrive uncompressed.
+	tr := fileTransport
+	if t.insecure {
+		tr = fileTransportInsecure
+	}
 	rp := &httputil.ReverseProxy{
+		Transport: tr,
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetURL(t.base)
 			pr.Out.SetBasicAuth(t.user, t.pass)

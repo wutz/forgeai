@@ -27,7 +27,7 @@ func TestHeartbeatUpdatesExistingAnnotation(t *testing.T) {
 	a := testApp(t, fs)
 	ctx := context.Background()
 
-	if err := a.Heartbeat(); err != nil {
+	if err := a.heartbeat(ctx, a.conn); err != nil {
 		t.Fatal(err)
 	}
 	got := &v1.FileServer{}
@@ -43,7 +43,7 @@ func TestHeartbeatUpdatesExistingAnnotation(t *testing.T) {
 	}
 
 	// A second call inside the throttle window leaves the object alone.
-	if err := a.Heartbeat(); err != nil {
+	if err := a.heartbeat(ctx, a.conn); err != nil {
 		t.Fatal(err)
 	}
 	if err := a.conn.k8s.Get(ctx, client.ObjectKey{Namespace: testNamespace, Name: naming.FileServerName}, got); err != nil {
@@ -85,6 +85,19 @@ func TestFileServerPhaseWithoutServer(t *testing.T) {
 	phase, err := a.FileServerPhase()
 	if err != nil || phase != "" {
 		t.Fatalf("phase = %q, %v; want empty", phase, err)
+	}
+}
+
+// Files creates the server on first use, before the operator has written any
+// status. The view must read that as Starting, not as an empty phase.
+func TestFilesNewServerIsStarting(t *testing.T) {
+	a := testApp(t)
+	got, err := a.Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Phase != string(v1.FileServerStarting) || got.Address != "" {
+		t.Fatalf("new server: phase %q address %q; want Starting and no address", got.Phase, got.Address)
 	}
 }
 

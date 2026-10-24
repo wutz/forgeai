@@ -87,9 +87,11 @@ export function subscribeLocale(fn: () => void): () => void {
 }
 
 // t returns the message for key in the current language. {name} placeholders
-// are filled from vars; a placeholder without a value is left as it is.
+// are filled from vars; a placeholder without a value is left as it is. A key
+// with no text in the language falls back to English, then to the key itself,
+// so a missing message is never shown blank.
 export function t(key: MessageKey, vars?: Record<string, string | number>): string {
-  const text = catalogs[current][key]
+  const text = catalogs[current][key] ?? en[key] ?? key
   if (!vars) return text
   return text.replace(/\{(\w+)\}/g, (match, name: string) => (name in vars ? String(vars[name]) : match))
 }

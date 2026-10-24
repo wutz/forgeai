@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"crypto/tls"
+	"errors"
 	"net/http"
 	"net/url"
 	"time"
@@ -24,6 +26,9 @@ type Files struct {
 	Volumes []string `json:"volumes"`
 }
 
+// errConnectionChanged is returned when the connection moved on while Files read the server.
+var errConnectionChanged = errors.New("the connection changed while the file server was read; try again")
+
 // Files reports the file server: it wakes or keeps it alive (heartbeat) and
 // points the loopback proxy at it. The basic-auth credentials from the file
 // server Secret stay in this process; the webview only gets the proxy
@@ -35,6 +40,9 @@ func (a *App) Files() (*Files, error) {
 	}
 	ctx, cancel := a.call()
 	defer cancel()
+
+	a.filesMu.Lock()
+	defer a.filesMu.Unlock()
 
 	// Wake the server (or keep it awake): the operator treats a fresh
 	// last-active annotation as activity and scales to one replica.
@@ -59,7 +67,10 @@ func (a *App) Files() (*Files, error) {
 	out := &Files{Phase: "Starting"}
 	fs = &v1.FileServer{}
 	if err := c.k8s.Get(ctx, key, fs); err == nil {
-		out.Phase = string(fs.Status.Phase)
+		// A server the operator has not reconciled yet has no phase; it is still starting.
+		if p := string(fs.Status.Phase); p != "" {
+			out.Phase = p
+		}
 		out.Volumes = fs.Status.Volumes
 	}
 	// View-only members cannot read the Secret: they get no address.
@@ -74,17 +85,28 @@ func (a *App) Files() (*Files, error) {
 		// The pod can be Ready before the ingress routes to it; until then the
 		// browser gets 503 and the frame would never recover. Report Starting
 		// until the server answers through the ingress.
-		if !fileServerServing(ctx, base) {
+		if !fileServerServing(ctx, base, c.insecure) {
 			out.Phase = string(v1.FileServerStarting)
 		} else {
 			target = &fileTarget{
-				base: base,
-				user: string(sec.Data[corev1.BasicAuthUsernameKey]),
-				pass: string(sec.Data[corev1.BasicAuthPasswordKey]),
+				base:     base,
+				user:     string(sec.Data[corev1.BasicAuthUsernameKey]),
+				pass:     string(sec.Data[corev1.BasicAuthPasswordKey]),
+				insecure: c.insecure,
 			}
 		}
 	}
-	a.files.SetTarget(target)
+	// The target is published only while this connection is still the current one:
+	// a Connect or a disconnect during the reads has already reset the proxy.
+	a.mu.RLock()
+	current := a.conn == c
+	if current {
+		a.files.SetTarget(target)
+	}
+	a.mu.RUnlock()
+	if !current {
+		return nil, errConnectionChanged
+	}
 	if target != nil {
 		origin, err := a.files.Origin()
 		if err != nil {
@@ -95,17 +117,37 @@ func (a *App) Files() (*Files, error) {
 	return out, nil
 }
 
+// fileServerTransport is the transport to the file server. The ingress serves
+// the same private CA as the registry, so insecure skips verification the way
+// the registry setting does.
+func fileServerTransport(insecure bool) *http.Transport {
+	tr := http.DefaultTransport.(*http.Transport).Clone()
+	if insecure {
+		tr.TLSClientConfig = &tls.Config{InsecureSkipVerify: true} //nolint:gosec // private CA, opt-in
+	}
+	return tr
+}
+
+var (
+	fileTransport         = fileServerTransport(false)
+	fileTransportInsecure = fileServerTransport(true)
+)
+
 // fileServerServing reports whether the file server answers at base. dufs
 // serves its health check before authentication, so no credentials are needed.
 // Any failure, including a 503 from the ingress, counts as not serving.
-func fileServerServing(ctx context.Context, base *url.URL) bool {
+func fileServerServing(ctx context.Context, base *url.URL, insecure bool) bool {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base.JoinPath("__dufs__", "health").String(), nil)
 	if err != nil {
 		return false
 	}
-	resp, err := http.DefaultClient.Do(req)
+	tr := fileTransport
+	if insecure {
+		tr = fileTransportInsecure
+	}
+	resp, err := (&http.Client{Transport: tr}).Do(req)
 	if err != nil {
 		return false
 	}
@@ -133,21 +175,12 @@ func (a *App) FileServerPhase() (string, error) {
 	return string(fs.Status.Phase), nil
 }
 
-// Heartbeat touches the last-active annotation without returning anything.
-// Writes are throttled to heartbeatEvery, so calling it often is cheap.
-func (a *App) Heartbeat() error {
-	c, err := a.current()
-	if err != nil {
-		return err
-	}
-	ctx, cancel := a.call()
-	defer cancel()
-	return a.heartbeat(ctx, c)
-}
-
-// heartbeatEvery bounds how often a view's heartbeat writes the FileServer.
+// heartbeatEvery bounds how often the Files poll's heartbeat writes the FileServer.
 // Files is polled every few seconds; each write would reconcile the object.
 const heartbeatEvery = 30 * time.Second
+
+// heartbeat touches the last-active annotation. Files calls it on every poll,
+// so the view keeps the server awake without a separate binding.
 
 func (a *App) heartbeat(ctx context.Context, c *Connection) error {
 	fs := &v1.FileServer{}

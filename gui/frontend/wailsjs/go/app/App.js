@@ -46,6 +46,10 @@ export function DeleteImageRepo(arg1) {
   return window['go']['app']['App']['DeleteImageRepo'](arg1);
 }
 
+export function DeleteImageTag(arg1, arg2, arg3) {
+  return window['go']['app']['App']['DeleteImageTag'](arg1, arg2, arg3);
+}
+
 export function DeleteJob(arg1) {
   return window['go']['app']['App']['DeleteJob'](arg1);
 }
@@ -84,10 +88,6 @@ export function GetProject(arg1) {
 
 export function GetSandbox(arg1) {
   return window['go']['app']['App']['GetSandbox'](arg1);
-}
-
-export function Heartbeat() {
-  return window['go']['app']['App']['Heartbeat']();
 }
 
 export function InstallDependency(arg1) {
@@ -130,10 +130,6 @@ export function ListVolumes(arg1) {
   return window['go']['app']['App']['ListVolumes'](arg1);
 }
 
-export function Logout() {
-  return window['go']['app']['App']['Logout']();
-}
-
 export function Logs(arg1, arg2, arg3) {
   return window['go']['app']['App']['Logs'](arg1, arg2, arg3);
 }
@@ -164,6 +160,10 @@ export function Registry() {
 
 export function RerunJob(arg1, arg2) {
   return window['go']['app']['App']['RerunJob'](arg1, arg2);
+}
+
+export function ResetVolumeExpiry(arg1) {
+  return window['go']['app']['App']['ResetVolumeExpiry'](arg1);
 }
 
 export function ResizeSandboxTerminal(arg1, arg2, arg3) {
@@ -226,10 +226,10 @@ export function TrashVolume(arg1) {
   return window['go']['app']['App']['TrashVolume'](arg1);
 }
 
-export function UpdateSandboxTemplate(arg1, arg2) {
-  return window['go']['app']['App']['UpdateSandboxTemplate'](arg1, arg2);
+export function UpdateSandboxTemplate(arg1, arg2, arg3) {
+  return window['go']['app']['App']['UpdateSandboxTemplate'](arg1, arg2, arg3);
 }
 
-export function UpdateTemplate(arg1, arg2) {
-  return window['go']['app']['App']['UpdateTemplate'](arg1, arg2);
+export function UpdateTemplate(arg1, arg2, arg3) {
+  return window['go']['app']['App']['UpdateTemplate'](arg1, arg2, arg3);
 }

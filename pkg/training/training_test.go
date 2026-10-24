@@ -90,6 +90,11 @@ func TestValidate(t *testing.T) {
 		func(f *Form) { f.Env = append(f.Env, EnvVar{Name: "A"}) },
 		func(f *Form) { f.Volumes = append(f.Volumes, VolumeMount{Volume: "x", MountPath: "/data"}) },
 		func(f *Form) { f.Volumes = []VolumeMount{{Volume: "x", MountPath: "rel"}} },
+		func(f *Form) { f.Volumes = []VolumeMount{{Volume: "x", MountPath: "/dev/shm"}} },
+		func(f *Form) { f.Volumes = []VolumeMount{{Volume: "x", MountPath: "/data", SubPath: "../up"}} },
+		func(f *Form) { f.Volumes = []VolumeMount{{Volume: "x", MountPath: "/data", SubPath: "/abs"}} },
+		func(f *Form) { f.Env = []EnvVar{{Name: "BAD NAME", Value: "1"}} },
+		func(f *Form) { f.Env = []EnvVar{{Name: "1A", Value: "1"}} },
 	} {
 		f := form()
 		mut(f)
@@ -204,5 +209,73 @@ func TestJobPhase(t *testing.T) {
 	tj.Annotations[naming.AnnotationRetriedAs] = "demo-r1"
 	if ph, _ := JobPhase(tj, nil); ph != PhaseRetried {
 		t.Errorf("phase = %s", ph)
+	}
+}
+
+// A runtime error can be longer than a message keeps; the cause it names last
+// must survive the cut.
+func TestClassifyKeepsErrorEnd(t *testing.T) {
+	cause := `exec: "/bin/bash": stat /bin/bash: no such file or directory`
+	pod := corev1.Pod{Status: corev1.PodStatus{
+		Phase: corev1.PodFailed,
+		ContainerStatuses: []corev1.ContainerStatus{{
+			State: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{
+				ExitCode: 128, Message: strings.Repeat("runc create failed: ", 20) + cause,
+			}},
+		}},
+	}}
+	f := Classify([]corev1.Pod{pod}, nil)
+	if f.Reason != ReasonExitCode || !strings.HasSuffix(f.Message, cause) {
+		t.Errorf("failure = %+v, want an exit code failure ending with the cause", f)
+	}
+}
+
+// A crash-looping worker keeps the Running pod phase between restarts; the job
+// must still read as not running and say why.
+func TestJobPhaseCrashLoop(t *testing.T) {
+	tj := &kf.TrainJob{ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{}}, Status: &kf.TrainJobStatus{}}
+	crash := corev1.Pod{Status: corev1.PodStatus{
+		Phase: corev1.PodRunning,
+		ContainerStatuses: []corev1.ContainerStatus{{
+			State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{
+				Reason: "CrashLoopBackOff", Message: "back-off 40s restarting failed container",
+			}},
+			LastTerminationState: corev1.ContainerState{Terminated: &corev1.ContainerStateTerminated{
+				Reason: "StartError", ExitCode: 128,
+				Message: "failed to create containerd task: failed to create shim task: OCI runtime create failed: " +
+					"runc create failed: unable to start container process: error during container init: " +
+					"exec: \"/bin/bash\": stat /bin/bash: no such file or directory\n",
+			}},
+		}},
+	}}
+	ph, msg := JobPhase(tj, []corev1.Pod{crash})
+	if ph != PhasePending {
+		t.Fatalf("phase = %s, want Pending", ph)
+	}
+	// The runtime error names the cause last; the message keeps that end.
+	if want := "CrashLoopBackOff: last run ended with StartError (exit code 128): …"; !strings.HasPrefix(msg, want) ||
+		!strings.HasSuffix(msg, `exec: "/bin/bash": stat /bin/bash: no such file or directory`) {
+		t.Errorf("message = %q, want prefix %q and the exec error", msg, want)
+	}
+	if Running(&crash) {
+		t.Errorf("crash-looping pod reads as running")
+	}
+
+	healthy := corev1.Pod{Status: corev1.PodStatus{
+		Phase:             corev1.PodRunning,
+		ContainerStatuses: []corev1.ContainerStatus{{State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}}},
+	}}
+	if ph, _ := JobPhase(tj, []corev1.Pod{crash, healthy}); ph != PhaseRunning {
+		t.Errorf("phase with one healthy worker = %s, want Running", ph)
+	}
+
+	runErr := corev1.Pod{Status: corev1.PodStatus{
+		Phase: corev1.PodRunning,
+		ContainerStatuses: []corev1.ContainerStatus{{State: corev1.ContainerState{Waiting: &corev1.ContainerStateWaiting{
+			Reason: "RunContainerError", Message: "failed to start",
+		}}}},
+	}}
+	if Running(&runErr) {
+		t.Errorf("RunContainerError pod reads as running")
 	}
 }

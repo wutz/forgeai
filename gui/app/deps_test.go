@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io/fs"
 	"reflect"
 	"slices"
@@ -164,6 +165,131 @@ func TestAssess(t *testing.T) {
 	}
 }
 
+// TestAssessReason checks the reason codes the GUI explains in its own words,
+// and the namespace a mismatched component should run in.
+func TestAssessReason(t *testing.T) {
+	bundled := Dependency{Name: "kueue", Pinned: "v0.20.2", Installable: true}
+	operator := Dependency{Name: "forgeai", Installable: true, Pinned: forgeaiChartVersion}
+	sandbox := Dependency{Name: "agent-sandbox", Pinned: "v1.0.7", Installable: true}
+	tests := []struct {
+		name   string
+		dep    Dependency
+		h      depHealth
+		reason string
+		expect string
+	}{
+		{"installed outside forgeai", bundled, depHealth{crdsWanted: 2, crdsFound: 2}, "unmanaged", ""},
+		{"operator deployed outside Helm", operator, depHealth{crdsWanted: 2, crdsFound: 2,
+			deployments: []appsv1.Deployment{testDeployment("", true)}}, "unmanagedHelm", ""},
+		{"runs elsewhere than the config expects", sandbox, depHealth{crdsWanted: 1, crdsFound: 1,
+			deployments: []appsv1.Deployment{testDeployment("v1.0.7", true)},
+			namespace:   "other", expectNamespace: "agent-sandbox-system"}, "namespaceMismatch", "agent-sandbox-system"},
+		{"operator deployment missing", operator, depHealth{crdsWanted: 2, crdsFound: 2}, "operatorMissing", ""},
+		{"pinned and available", bundled, depHealth{crdsWanted: 2, crdsFound: 2,
+			deployments: []appsv1.Deployment{testDeployment("v0.20.2", true)}}, "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dep := tt.dep
+			assess(&dep, tt.h)
+			if dep.Reason != tt.reason || dep.ExpectedNamespace != tt.expect {
+				t.Errorf("assess = reason %q expected namespace %q, want %q %q",
+					dep.Reason, dep.ExpectedNamespace, tt.reason, tt.expect)
+			}
+		})
+	}
+}
+
+// TestAssessRunningVersion checks that a component the GUI did not install
+// shows the tag of its image, while its status stays unmanaged.
+func TestAssessRunningVersion(t *testing.T) {
+	sandbox := Dependency{Name: "agent-sandbox", Pinned: "v1.0.7", Installable: true}
+	withImage := func(image string) appsv1.Deployment {
+		d := testDeployment("", true)
+		d.Spec.Template.Spec.Containers = []corev1.Container{{Image: image}}
+		return d
+	}
+	tests := []struct {
+		name    string
+		deploy  appsv1.Deployment
+		status  string
+		running string
+	}{
+		{"tagged image outside forgeai", withImage("registry.k8s.io/agent-sandbox/agent-sandbox-controller:v1.0.7"), "unmanaged", "v1.0.7"},
+		{"digest-pinned image", withImage("ghcr.io/wutz/gatessh@sha256:36d4c4acba9e432a2459563c51a1a10ddabe2f9de663b78be9d53f56cf742cef"), "unmanaged", ""},
+		{"managed deployment has no running version", testDeployment("v1.0.7", true), "ready", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dep := sandbox
+			assess(&dep, depHealth{crdsWanted: 1, crdsFound: 1, deployments: []appsv1.Deployment{tt.deploy}})
+			if dep.Status != tt.status || dep.Running != tt.running {
+				t.Errorf("assess = status %q running %q, want %q %q", dep.Status, dep.Running, tt.status, tt.running)
+			}
+		})
+	}
+}
+
+func TestImageTag(t *testing.T) {
+	tests := []struct{ image, tag string }{
+		{"registry.k8s.io/agent-sandbox/controller:v1.0.7", "v1.0.7"},
+		{"nginx:1.25", "1.25"},
+		{"localhost:5000/app", ""},
+		{"localhost:5000/app:2", "2"},
+		{"app@sha256:abc", ""},
+		{"app:1.0@sha256:abc", ""},
+		{"app", ""},
+	}
+	for _, tt := range tests {
+		d := appsv1.Deployment{}
+		d.Spec.Template.Spec.Containers = []corev1.Container{{Image: tt.image}}
+		if got := imageTag(&d); got != tt.tag {
+			t.Errorf("imageTag(%q) = %q, want %q", tt.image, got, tt.tag)
+		}
+	}
+}
+
+func TestBundleRunningTags(t *testing.T) {
+	s := runtime.NewScheme()
+	if err := clientgoscheme.AddToScheme(s); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	// Each bundle Deployment runs an image tagged with its own name, so the
+	// expected string lists every one of them in bundle order.
+	for _, name := range []string{"agent-sandbox", "trainer"} {
+		t.Run(name, func(t *testing.T) {
+			b, err := bundleByName(name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var objs []client.Object
+			var want []string
+			for _, o := range b.objects {
+				if o.GetKind() != "Deployment" || o.GroupVersionKind().Group != appsv1.GroupName {
+					continue
+				}
+				tag := "v" + o.GetName()
+				d := testDeployment("", true)
+				d.Namespace, d.Name = o.GetNamespace(), o.GetName()
+				d.Spec.Template.Spec.Containers = []corev1.Container{{Image: "registry.example/" + o.GetName() + ":" + tag}}
+				objs = append(objs, &d)
+				want = append(want, tag)
+			}
+			if len(objs) == 0 {
+				t.Fatal("bundle declares no Deployment")
+			}
+			if got, err := bundleRunningTags(ctx, fake.NewClientBuilder().WithScheme(s).Build(), b); err != nil || got != "" {
+				t.Fatalf("bundleRunningTags without the Deployments = %q, %v; want empty", got, err)
+			}
+			k8s := fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
+			if got, err := bundleRunningTags(ctx, k8s, b); err != nil || got != strings.Join(want, ", ") {
+				t.Fatalf("bundleRunningTags = %q, %v; want %q", got, err, strings.Join(want, ", "))
+			}
+		})
+	}
+}
+
 func TestRecordRoundTrip(t *testing.T) {
 	s := runtime.NewScheme()
 	if err := clientgoscheme.AddToScheme(s); err != nil {
@@ -276,5 +402,28 @@ func TestDepInstallsRejectsSecondStart(t *testing.T) {
 	d.finish("kueue")
 	if d.active("kueue") || !d.start("kueue") {
 		t.Fatal("component not reusable after finish")
+	}
+}
+
+func TestForEachConcurrentlyRunsEachIndexAndReturnsFirstError(t *testing.T) {
+	const n = 8
+	ran := make([]bool, n)
+	err := forEachConcurrently(n, func(i int) error {
+		ran[i] = true
+		if i == 5 || i == 2 {
+			return fmt.Errorf("probe %d failed", i)
+		}
+		return nil
+	})
+	for i, ok := range ran {
+		if !ok {
+			t.Errorf("index %d did not run", i)
+		}
+	}
+	if err == nil || err.Error() != "probe 2 failed" {
+		t.Errorf("err = %v, want the first failure by index (probe 2)", err)
+	}
+	if err := forEachConcurrently(n, func(int) error { return nil }); err != nil {
+		t.Errorf("no failures: err = %v", err)
 	}
 }

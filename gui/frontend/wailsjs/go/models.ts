@@ -32,17 +32,22 @@ export namespace app {
 	    description: string;
 	    pinned: string;
 	    installed: string;
+	    running?: string;
 	    namespace: string;
 	    appliedBy: string;
 	    appliedAt: string;
 	    status: string;
+	    reason?: string;
+	    expectedNamespace?: string;
 	    message: string;
+	    messageKey?: string;
+	    messageArgs?: Record<string, string>;
 	    installable: boolean;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Dependency(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -50,15 +55,21 @@ export namespace app {
 	        this.description = source["description"];
 	        this.pinned = source["pinned"];
 	        this.installed = source["installed"];
+	        this.running = source["running"];
 	        this.namespace = source["namespace"];
 	        this.appliedBy = source["appliedBy"];
 	        this.appliedAt = source["appliedAt"];
 	        this.status = source["status"];
+	        this.reason = source["reason"];
+	        this.expectedNamespace = source["expectedNamespace"];
 	        this.message = source["message"];
+	        this.messageKey = source["messageKey"];
+	        this.messageArgs = source["messageArgs"];
 	        this.installable = source["installable"];
 	    }
 	}
 	export class Dependencies {
+	    cluster: string;
 	    clusterAdmin: boolean;
 	    items: Dependency[];
 	
@@ -68,6 +79,7 @@ export namespace app {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cluster = source["cluster"];
 	        this.clusterAdmin = source["clusterAdmin"];
 	        this.items = this.convertValues(source["items"], Dependency);
 	    }
@@ -139,7 +151,6 @@ export namespace app {
 	}
 	export class GPUUsage {
 	    class: string;
-	    quota: number;
 	    used: number;
 	    pods: number;
 	
@@ -150,7 +161,6 @@ export namespace app {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.class = source["class"];
-	        this.quota = source["quota"];
 	        this.used = source["used"];
 	        this.pods = source["pods"];
 	    }
@@ -182,6 +192,7 @@ export namespace app {
 	    count: number;
 	    pulls: number;
 	    images: Image[];
+	    error?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ImageRepo(source);
@@ -193,6 +204,7 @@ export namespace app {
 	        this.count = source["count"];
 	        this.pulls = source["pulls"];
 	        this.images = this.convertValues(source["images"], Image);
+	        this.error = source["error"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -285,6 +297,7 @@ export namespace app {
 	    duration?: string;
 	    workerPods: Worker[];
 	    volumes?: string[];
+	    mounts?: training.VolumeMount[];
 	    maxRetries?: number;
 	    retryOn?: string;
 	    retriedAs?: string;
@@ -319,6 +332,7 @@ export namespace app {
 	        this.duration = source["duration"];
 	        this.workerPods = this.convertValues(source["workerPods"], Worker);
 	        this.volumes = source["volumes"];
+	        this.mounts = this.convertValues(source["mounts"], training.VolumeMount);
 	        this.maxRetries = source["maxRetries"];
 	        this.retryOn = source["retryOn"];
 	        this.retriedAs = source["retriedAs"];
@@ -429,9 +443,11 @@ export namespace app {
 	}
 	export class PlatformConfig {
 	    apiServer: string;
+	    namespacePrefix: string;
 	    ingress: platform.Ingress;
 	    registry: RegistryInfo;
 	    storageTypes: Record<string, StorageTypeInfo>;
+	    defaultStorageType: string;
 	    fileServer: FileServerInfo;
 	    trash: v1.Duration;
 	    training: TrainingInfo;
@@ -443,9 +459,11 @@ export namespace app {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.apiServer = source["apiServer"];
+	        this.namespacePrefix = source["namespacePrefix"];
 	        this.ingress = this.convertValues(source["ingress"], platform.Ingress);
 	        this.registry = this.convertValues(source["registry"], RegistryInfo);
 	        this.storageTypes = this.convertValues(source["storageTypes"], StorageTypeInfo, true);
+	        this.defaultStorageType = source["defaultStorageType"];
 	        this.fileServer = this.convertValues(source["fileServer"], FileServerInfo);
 	        this.trash = this.convertValues(source["trash"], v1.Duration);
 	        this.training = this.convertValues(source["training"], TrainingInfo);
@@ -529,6 +547,7 @@ export namespace app {
 	    ready: boolean;
 	    registry: string;
 	    created: string;
+	    resourceVersion?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Project(source);
@@ -547,6 +566,7 @@ export namespace app {
 	        this.ready = source["ready"];
 	        this.registry = source["registry"];
 	        this.created = source["created"];
+	        this.resourceVersion = source["resourceVersion"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -585,6 +605,7 @@ export namespace app {
 	
 	
 	export class QuotaUsage {
+	    gpuQuota: number;
 	    gpuClasses: GPUUsage[];
 	    storage: string;
 	    storageUsed: string;
@@ -599,7 +620,8 @@ export namespace app {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.gpuClasses = this.convertValues(source["gpuClasses"], GPUUsage);
+	        this.gpuQuota = source["gpuQuota"];
+        this.gpuClasses = this.convertValues(source["gpuClasses"], GPUUsage);
 	        this.storage = source["storage"];
 	        this.storageUsed = source["storageUsed"];
 	        this.volumes = source["volumes"];
@@ -629,6 +651,7 @@ export namespace app {
 	export class Registry {
 	    enabled: boolean;
 	    url: string;
+	    credentials: boolean;
 	    username?: string;
 	    password?: string;
 	    secret: string;
@@ -641,6 +664,7 @@ export namespace app {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.enabled = source["enabled"];
 	        this.url = source["url"];
+	        this.credentials = source["credentials"];
 	        this.username = source["username"];
 	        this.password = source["password"];
 	        this.secret = source["secret"];
@@ -651,6 +675,7 @@ export namespace app {
 	    name: string;
 	    phase: string;
 	    message?: string;
+	    reason?: string;
 	    image: string;
 	    command?: string;
 	    env: Record<string, string>;
@@ -662,6 +687,9 @@ export namespace app {
 	    nodeName?: string;
 	    podName?: string;
 	    podPhase?: string;
+	    containerRunning: boolean;
+	    containerReason?: string;
+	    podUnknown?: boolean;
 	    cpu?: string;
 	    memory?: string;
 	    gpu?: number;
@@ -681,6 +709,7 @@ export namespace app {
 	        this.name = source["name"];
 	        this.phase = source["phase"];
 	        this.message = source["message"];
+	        this.reason = source["reason"];
 	        this.image = source["image"];
 	        this.command = source["command"];
 	        this.env = source["env"];
@@ -692,6 +721,9 @@ export namespace app {
 	        this.nodeName = source["nodeName"];
 	        this.podName = source["podName"];
 	        this.podPhase = source["podPhase"];
+	        this.containerRunning = source["containerRunning"];
+	        this.containerReason = source["containerReason"];
+	        this.podUnknown = source["podUnknown"];
 	        this.cpu = source["cpu"];
 	        this.memory = source["memory"];
 	        this.gpu = source["gpu"];
@@ -729,6 +761,8 @@ export namespace app {
 	    images?: string[];
 	    created: string;
 	    form?: sandbox.TemplateForm;
+	    resourceVersion?: string;
+	    error?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SandboxTemplate(source);
@@ -741,6 +775,8 @@ export namespace app {
 	        this.images = source["images"];
 	        this.created = source["created"];
 	        this.form = this.convertValues(source["form"], sandbox.TemplateForm);
+	        this.resourceVersion = source["resourceVersion"];
+	        this.error = source["error"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -767,6 +803,8 @@ export namespace app {
 	    description?: string;
 	    form?: training.Form;
 	    created: string;
+	    resourceVersion?: string;
+	    error?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Template(source);
@@ -778,6 +816,8 @@ export namespace app {
 	        this.description = source["description"];
 	        this.form = this.convertValues(source["form"], training.Form);
 	        this.created = source["created"];
+	        this.resourceVersion = source["resourceVersion"];
+	        this.error = source["error"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

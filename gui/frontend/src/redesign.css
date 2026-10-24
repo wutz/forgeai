@@ -3,7 +3,7 @@
    with meters, segmented filters, underline tabs. */
 
 :root {
-  --faint: #a1a1aa;
+  --faint: #6b6b75;
   --canvas: #f6f7f9;
   /* Window chrome sits one step below the canvas so the sidebar reads as a
      separate surface without needing a heavy divider. */
@@ -34,7 +34,7 @@
    light. Shadows are black here, since slate would vanish on dark. */
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --faint: #71717a;
+  --faint: #8b8b94;
   --canvas: #111113;
   --chrome: #0c0c0e;
   --chrome-line: #1f1f23;
@@ -188,10 +188,16 @@ a { color: inherit; text-decoration: none; }
 
 .header-slot { flex: 1; min-width: 0; display: flex; align-items: center; }
 .page-head.in-header { flex: 1; min-width: 0; align-items: center; gap: 12px; margin: 0; }
-.page-head.in-header .page-head-text { display: flex; align-items: baseline; gap: 10px; }
-.page-head.in-header .eyebrow { margin: 0; }
-.page-head.in-header .page-title { font-size: 15px; line-height: 22px; letter-spacing: -0.3px; }
-.page-head.in-header .page-head-actions { margin-left: auto; }
+.page-head.in-header .page-head-text { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.page-head.in-header .eyebrow { margin: 0; white-space: nowrap; }
+.page-head.in-header .page-head-row { flex-wrap: nowrap; min-width: 0; gap: 10px; }
+.page-head.in-header .page-title {
+  font-size: 15px; line-height: 22px; letter-spacing: -0.3px;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* The live meta (counts, refresh time) yields to the title and actions when the bar runs short. */
+.page-meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page-head.in-header .page-head-actions { margin-left: auto; flex-shrink: 0; }
 
 /* Controls
    One button system with a few roles. Fills stay light and the page reads as
@@ -233,6 +239,12 @@ a { color: inherit; text-decoration: none; }
   box-shadow: none; cursor: not-allowed;
 }
 .btn-ghost:disabled { background: none; border-color: transparent; }
+.hint-button { position: relative; display: inline-flex; }
+/* A HintButton that is unavailable looks disabled but keeps focus (aria-disabled, see ui.tsx). */
+.btn[aria-disabled='true'], .btn[aria-disabled='true']:hover, .btn[aria-disabled='true']:active {
+  background: var(--hairline-soft); border-color: var(--hairline-soft); color: var(--faint);
+  box-shadow: none; cursor: not-allowed;
+}
 .icon-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; border-radius: 7px; border: none; background: none;
@@ -251,6 +263,8 @@ a { color: inherit; text-decoration: none; }
 .field { min-width: 0; }
 .field label { font-size: 12.5px; }
 .row > * { flex: 1; min-width: 0; }
+/* A member row keeps its buttons and role select at their own width; only the name takes the rest. */
+.member-row > .btn, .member-row > .select { flex: 0 0 auto; }
 .checkbox { height: 34px; }
 .checkbox input { accent-color: var(--accent); }
 
@@ -267,6 +281,10 @@ a { color: inherit; text-decoration: none; }
 .mount-line .checkbox { font-size: 12.5px; white-space: nowrap; }
 .mount-hint { font-size: 12px; line-height: 16px; color: var(--mute); }
 .mount-hint-error { color: var(--error); }
+.hint-error { color: var(--error); }
+/* .field .hint sets the grey hint colour with a higher specificity, so the error colour is restated for fields. */
+.field .hint.hint-error { color: var(--error); }
+.field .hint.hint-warn { color: var(--warning-deep); }
 .mounts-foot { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 
 /* Cards */
@@ -326,15 +344,21 @@ a { color: inherit; text-decoration: none; }
 .segmented {
   display: inline-flex; align-items: center; gap: 2px; padding: 3px;
   background: var(--hairline-soft); border-radius: 9px;
+  /* A long filter row scrolls sideways rather than wrapping each label. */
+  max-width: 100%; overflow-x: auto; scrollbar-width: none;
 }
 .segment {
   display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px;
+  flex: 0 0 auto; white-space: nowrap;
   border: none; background: none; border-radius: 7px; cursor: pointer;
   font-size: 12.5px; font-weight: 500; color: var(--body);
 }
 .segment:hover { color: var(--ink); }
+/* The filter row scrolls, so its focus ring sits inside the segment rather than
+   spilling past the row's padding, where the scroll container would clip it. */
+.segment:focus-visible { outline-offset: -2px; }
 .segment.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-seg); }
-.segment-count { font-size: 11px; color: var(--mute); font-variant-numeric: tabular-nums; }
+.segment-count { font-size: 11px; color: var(--body); font-variant-numeric: tabular-nums; }
 .segment.active .segment-count { color: var(--accent-deep); }
 
 .tabs { display: flex; align-items: center; gap: 4px; margin-bottom: 12px; border-bottom: 1px solid var(--hairline); }
@@ -352,6 +376,9 @@ a { color: inherit; text-decoration: none; }
   border-radius: 99px; background: var(--hairline-soft); color: var(--body);
   font-size: 11px; font-weight: 500; letter-spacing: -0.05px; white-space: nowrap;
 }
+/* visually-hidden keeps text for screen readers only. */
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 .badge-accent { background: var(--accent-soft); color: var(--accent-deep); }
 .badge-success { background: var(--success-soft); color: var(--success); }
 .badge-warning { background: var(--warning-soft); color: var(--warning-deep); }
@@ -360,11 +387,15 @@ a { color: inherit; text-decoration: none; }
 
 /* Table */
 /* Column heads are muted sentence case, as in Claude desktop's lists. */
-.table th { font-size: 12px; font-weight: 500; color: var(--mute); padding: 9px 16px; }
+.table th { font-size: 12px; font-weight: 500; color: var(--mute); padding: 9px 16px; white-space: nowrap; }
 .table td { padding: 12px 16px; font-size: 13px; }
 .table tbody tr:hover { background: var(--wash); }
 .table tbody tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
 .table tbody tr.selected:hover { background: var(--accent-tint); }
+/* The selected row sits on the accent wash, where the muted and error labels fall
+   below 4.5:1; the deeper labels keep them readable. */
+.table tbody tr.selected .cell-sub { color: var(--body); }
+.table tbody tr.selected .status-failed { color: var(--error-deep); }
 .mono { font-size: 12.5px; }
 /* Inline code is a quiet hairline chip, as in Claude desktop's messages. */
 code {
@@ -372,19 +403,28 @@ code {
   background: var(--hairline-soft); color: var(--body);
 }
 .cell-main { display: block; color: var(--ink); }
+/* The name of a clickable row is a real button, so the row opens from the keyboard.
+   Its click bubbles to the row's onClick, so the button needs no handler of its own. */
+.row-name {
+  display: block; max-width: 100%; padding: 0; border: 0; background: none;
+  font: inherit; color: var(--ink); text-align: left; cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.row-name:hover { text-decoration: underline; }
+.table td.nowrap { white-space: nowrap; }
 .cell-sub { display: block; margin-top: 2px; font-size: 11.5px; line-height: 16px; color: var(--mute); }
 .table td .cell-sub { font-family: var(--font); }
 .trashed td { color: var(--mute); }
 /* Recycle bin dialog: sizes, dates and the row actions stay on one line; only the name wraps. */
 .recycle td { white-space: nowrap; }
-.recycle td:first-child { white-space: normal; }
-.recycle .actions { flex-wrap: nowrap; }
+.recycle td:last-child { white-space: normal; }
+.table.recycle .actions { flex-wrap: wrap; }
 .list-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
 
 /* Status */
 .status { font-size: 12.5px; }
 .dot { width: 7px; height: 7px; }
-.status-succeeded .dot, .status-stopped .dot, .status-idle .dot { background: var(--faint); }
+.status-succeeded .dot, .status-stopped .dot, .status-idle .dot, .status-retried .dot { background: var(--faint); }
 .status-starting .dot, .status-resizing .dot { background: var(--warning); }
 
 /* Detail pane */
@@ -398,29 +438,52 @@ code {
 .split > .card { overflow-x: auto; }
 .split .table { table-layout: fixed; }
 .split .table th:first-child { width: 26%; }
-.split .table th:last-child { width: 9%; }
+/* Wide enough for the last header ("存在时间") to stay on one line. */
+.split .table th:last-child { width: 92px; }
 .split .table th, .split .table td { overflow: hidden; text-overflow: ellipsis; }
 .split .table .cell-main, .split .table .cell-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The sandbox list has six columns, too many for a fixed split: squeezed evenly
+   they leave the endpoint about 80px wide. Each column keeps its natural width
+   instead, the endpoint is capped and truncated, and the card scrolls sideways. */
+.split .table.sandbox-table { table-layout: auto; width: max-content; min-width: 100%; }
+.split .table.sandbox-table th, .split .table.sandbox-table td { white-space: nowrap; overflow: visible; }
+.split .table.sandbox-table td.trunc { max-width: 240px; overflow: hidden; text-overflow: ellipsis; }
+.split .table.sandbox-table td .cell-main, .split .table.sandbox-table td .cell-sub { max-width: 220px; }
+.split .table.sandbox-table th:first-child, .split .table.sandbox-table th:last-child { width: auto; }
 .detail-title { min-width: 0; }
-.detail-title h3 { overflow-wrap: anywhere; }
+.detail-title h2 { overflow-wrap: anywhere; }
 .detail-actions {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
   padding: 12px 18px; border-bottom: 1px solid var(--hairline-soft);
 }
 .section { padding: 16px 18px; }
 .detail .section { border-top: none; }
-.section h4 { font-size: 13px; font-weight: 600; letter-spacing: -0.2px; }
+.section h3 { font-size: 13px; font-weight: 600; letter-spacing: -0.2px; }
 .kv { grid-template-columns: 96px minmax(0, 1fr); gap: 9px 14px; font-size: 12.5px; margin: 0; }
 .sub-head { margin: 20px 0 8px; font-size: 12px; font-weight: 500; color: var(--mute); }
 pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 18px; }
+/* Log output: long lines wrap, the box scrolls down, and the text stays
+   monospace. The box is dark in both themes, so its text colours are fixed. */
 .logs {
-  height: 300px; padding: 12px 14px; border-radius: 8px; background: #0f1117; color: #e4e4e7;
-  font-size: 11.5px; line-height: 18px;
+  height: 300px; margin: 0; padding: 12px 14px; border-radius: 8px; background: #0f1117; color: #e4e4e7;
+  font-family: var(--mono); font-size: 11.5px; line-height: 18px;
+  white-space: pre-wrap; overflow-wrap: anywhere; overflow-y: auto;
+}
+/* Empty and loading states use the same box, so the layout does not jump. */
+.logs-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  color: #a1a1aa; font-family: var(--font); font-size: 12.5px; text-align: center; white-space: normal;
 }
 .term-wrap { display: flex; flex-direction: column; gap: 8px; }
 .term { height: 340px; padding: 8px 10px; border-radius: 8px; background: #0f1117; overflow: hidden; }
 .term .xterm { height: 100%; }
-.term-bar { display: flex; align-items: center; }
+.term-bar { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.term-status { font-size: 12px; }
+/* Before the shell opens: the terminal's own box, with a line of text where the shell will be. */
+.term.term-idle {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px;
+  color: #a1a1aa; font-size: 12.5px; text-align: center;
+}
 /* Covers the main content area only: below the 56px app header and right of
    the sidebar (--sidebar-w is 0 when the sidebar is hidden). Padding matches .main. */
 .term-wrap.term-max {
@@ -428,7 +491,19 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
   padding: 20px 28px 24px; background: var(--canvas);
 }
 .term-wrap.term-max .term { flex: 1; height: auto; min-height: 0; }
+/* Install steps: under the component being installed, in the order the backend runs them. */
+.install-row > td { padding-top: 0; }
+.install-steps { display: flex; flex-direction: column; gap: 10px; max-width: 420px; }
+.install-steps ol { display: flex; flex-direction: column; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; color: var(--mute); }
+.install-steps li { display: flex; align-items: center; gap: 8px; }
+.install-steps li .step-mark { width: 6px; height: 6px; border-radius: 50%; background: var(--hairline); flex-shrink: 0; }
+.install-steps li.done { color: var(--body); }
+.install-steps li.done .step-mark { display: none; }
+.install-steps li.done .icon { color: var(--success); flex-shrink: 0; }
+.install-steps li.current { color: var(--ink); font-weight: 600; }
+.install-steps li.current .step-mark { background: var(--accent); }
 .log-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; }
+.log-bar .log-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mini-table {
   display: flex; flex-direction: column; border: 1px solid var(--hairline-soft);
   border-radius: 9px; overflow: hidden;
@@ -466,7 +541,7 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
 /* Dialog */
 .overlay { background: var(--scrim); padding: 24px; backdrop-filter: blur(4px); }
 .dialog {
-  width: 620px; max-height: 88vh; display: flex; flex-direction: column;
+  width: min(620px, 100%); max-height: 88vh; display: flex; flex-direction: column;
   border-radius: var(--radius-lg); box-shadow: var(--shadow-pop); overflow: hidden;
 }
 .dialog-head {
@@ -494,8 +569,7 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
   box-shadow: var(--shadow-pop);
 }
 .combo-group {
-  padding: 8px 8px 4px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.05em;
-  text-transform: uppercase; color: var(--faint);
+  padding: 8px 8px 4px; font-size: 12px; font-weight: 500; color: var(--mute);
 }
 .combo-option {
   display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 4px 8px;
@@ -526,7 +600,13 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
   transition: transform 120ms ease;
 }
 .repo[open] summary::before { transform: rotate(90deg); }
-.repo summary .btn { margin-left: auto; }
+/* The name, tag count and pull count wrap onto a second line in a narrow row rather than shrinking. */
+.repo summary { flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.repo summary > * { flex: none; }
+/* The delete sits beside the repository's disclosure, aligned with its summary line. */
+.repo-row { display: flex; align-items: flex-start; gap: 8px; }
+.repo-row > .repo { flex: 1; min-width: 0; }
+.repo-row > .btn { margin-top: 12px; margin-right: 12px; flex: none; }
 
 /* Overview */
 .overview-grid {
@@ -547,26 +627,95 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
 .stat-detail { font-size: 12px; color: var(--mute); }
 .stat .btn { align-self: flex-start; margin-top: 8px; padding-left: 0; }
 
+/* Tables keep their columns and scroll sideways inside their card instead of
+   squeezing the text into narrow, wrapped cells. Code blocks and collapsible
+   sections in a card scroll on their own, so the card never clips them. */
+.card:has(> .table) { overflow-x: auto; }
+/* A table whose cells hold text beside actions wraps the text instead of scrolling
+   sideways, so the row actions stay in view at the narrowest window width. */
+.table.table-wrap td { white-space: normal; }
+.card pre { max-width: 100%; overflow-x: auto; }
+/* Row buttons stay on one line; a narrow table scrolls rather than stacking them. */
+.table .actions { flex-wrap: nowrap; }
+.card details { min-width: 0; overflow-x: auto; }
+
+/* The job list beside an open job: its status, instance and ready columns keep their
+   natural width and the card scrolls sideways, instead of cutting the text. */
+.split .table.jobs-table { table-layout: auto; }
+.split .table.jobs-table th, .split .table.jobs-table td { overflow: visible; }
+.split .table.jobs-table td:first-child .cell-sub { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+
+/* A banner's own button (Refresh, Retry) keeps a gap from the message it follows. */
+.banner .btn { margin-left: 12px; vertical-align: middle; }
+
 /* Responsive */
+@media (max-width: 900px) {
+  /* A table's least important column goes first at narrow widths; the row actions stay in view. */
+  .col-optional { display: none; }
+}
 @media (max-width: 1100px) {
   .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .split { grid-template-columns: minmax(0, 1fr); }
   .overview-grid, .overview-grid-even { grid-template-columns: minmax(0, 1fr); }
   /* The top bar carries the title now; drop the least important pieces first. */
   .page-head.in-header .eyebrow { display: none; }
+  .table th, .table td { white-space: nowrap; }
+  .split .table { table-layout: auto; }
+  .split .table th:first-child, .split .table th:last-child { width: auto; }
+  .split .table th, .split .table td { overflow: visible; }
+  .split .table .cell-main, .split .table .cell-sub { overflow: visible; text-overflow: clip; }
+  /* A table with row actions scrolls sideways inside its card; its action column stays pinned
+     to the card's right edge so Grow, Delete and the rest are in reach without scrolling. */
+  .table:has(td > .actions) th:last-child,
+  .table:has(td > .actions) td:last-child {
+    position: sticky; right: 0; z-index: 1; background: var(--surface);
+    box-shadow: -10px 0 10px -10px rgba(0, 0, 0, 0.14);
+  }
+  .table:has(td > .actions) tbody tr:hover > td:last-child { background: var(--wash); }
+}
+/* Phone-width windows: a page's header sits in the page, and its actions wrap below the title. */
+@media (max-width: 560px) {
+  .page-head { flex-wrap: wrap; }
+  .page-head-actions { margin-left: 0; flex-wrap: wrap; }
+}
+/* Phone-width tables stack instead of scrolling sideways: each row is a block, its first
+   cell is the title, every other cell shows its column name above its value (data-label),
+   and the row actions sit at the bottom. Cells keep their text, so nothing is cut off. */
+@media (max-width: 560px) {
+  .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
+  .table thead { display: none; }
+  .table tr { padding: 12px 14px; border-bottom: 1px solid var(--hairline-soft); }
+  .table tr:last-child { border-bottom: none; }
+  .table td { padding: 3px 0; border: 0; white-space: normal; overflow-wrap: anywhere; min-width: 0; }
+  .table td.col-optional { display: none; }
+  .table td:first-child { font-weight: 500; padding-bottom: 6px; }
+  .table td[data-label]:not(:first-child)::before {
+    content: attr(data-label); display: block; font-size: 11.5px; line-height: 16px; color: var(--mute);
+  }
+  .table td:not([data-label]):not(:first-child) { padding-top: 8px; }
+  .table .actions { flex-wrap: wrap; }
+  /* The sticky action column is for sideways scrolling, which stacked rows do not do. */
+  .table:has(td > .actions) th:last-child,
+  .table:has(td > .actions) td:last-child { position: static; box-shadow: none; background: none; }
 }
 @media (max-width: 820px) {
-  /* Narrow windows start with the sidebar hidden; the toggle is the only way
-     back, so it stays in the header. */
-  .app, .app.sidebar-collapsed { --sidebar-w: 0px; }
-  .app .shell { grid-template-columns: 0 minmax(0, 1fr); }
-  .app .sidebar { display: none; }
-  .app:not(.sidebar-collapsed) { --sidebar-w: 224px; }
-  .app:not(.sidebar-collapsed) .header { background: linear-gradient(to right, var(--chrome) 0 calc(var(--sidebar-w) - 1px), var(--chrome-line) calc(var(--sidebar-w) - 1px) var(--sidebar-w), var(--canvas) var(--sidebar-w) 100%); }
-  .app:not(.sidebar-collapsed) .header-side { flex: 0 0 var(--sidebar-w); width: var(--sidebar-w); padding: 0 14px; }
-  .platform-darwin .app:not(.sidebar-collapsed) .header-side { padding-left: 84px; }
-  .app:not(.sidebar-collapsed) .shell { grid-template-columns: var(--sidebar-w) minmax(0, 1fr); }
-  .app:not(.sidebar-collapsed) .sidebar { display: flex; }
+  /* Narrow windows: the sidebar is a drawer over the content, not a column
+     beside it, so the content keeps the full width. It starts hidden (see App)
+     and the header holds only the toggle. */
+  .app { --sidebar-w: 0px; }
+  .shell { grid-template-columns: 0 minmax(0, 1fr); position: relative; }
+  .app .sidebar {
+    position: absolute; top: 0; bottom: 0; left: 0; z-index: 40; width: 224px;
+    box-shadow: var(--shadow-pop);
+  }
+  .app .header { background: var(--canvas); }
+  .app .header-side { flex: 0 0 auto; width: auto; justify-content: flex-start; padding: 0 12px 0 20px; }
+  .platform-darwin .app .header-side { padding-left: 84px; }
+  .main { padding: 16px 14px 32px; }
+  /* Dialogs take the phone width; the footer wraps its buttons rather than
+     pushing them past the right edge. */
+  .overlay { padding: 12px; }
+  .dialog-foot { flex-wrap: wrap; }
 }
 
 /* Robot password on the Images push card: hidden until the user asks. */

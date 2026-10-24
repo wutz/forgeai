@@ -47,6 +47,8 @@ export function ImageField({id, value, onChange, offered, placeholder, required}
   // registry calls it does not need.
   const [pushed, setPushed] = useState<Choice[] | null>(null)
   const [pushedFailed, setPushedFailed] = useState(false)
+  // registryOff is set when the cluster has no project registry, which is not a failure.
+  const [registryOff, setRegistryOff] = useState(false)
   const [pos, setPos] = useState<CSSProperties>({})
   const inputRef = useRef<HTMLInputElement>(null)
   const wrap = useRef<HTMLDivElement>(null)
@@ -60,6 +62,7 @@ export function ImageField({id, value, onChange, offered, placeholder, required}
     if (requested.current) return
     requested.current = true
     Promise.all([Registry(), ListImages()]).then(([reg, repos]) => {
+      setRegistryOff(!reg.enabled)
       if (!reg.enabled) return []
       const out: Choice[] = []
       for (const r of repos) for (const img of r.images ?? []) for (const tag of img.tags ?? []) {
@@ -142,10 +145,12 @@ export function ImageField({id, value, onChange, offered, placeholder, required}
     setActive(null)
     setOpen(true)
   }
+  // pick keeps focus in the field, so a mouse pick does not drop focus to the body.
   const pick = (address: string) => {
     onChange(address)
     setOpen(false)
     setQuery(null)
+    inputRef.current?.focus()
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -190,20 +195,21 @@ export function ImageField({id, value, onChange, offered, placeholder, required}
   }
 
   const projectNote = pushed === null ? t('imagePicker.loading')
+    : registryOff ? t('images.notConfiguredHint')
     : pushedFailed ? t('imagePicker.unavailable')
     : t('imagePicker.none')
 
   const menuNode = open && createPortal(
     <div ref={menu} id={`${id}-menu`} className="combo-menu" role="listbox" style={pos}>
       {typedChoice && option(typedChoice)}
-      {(projects.length > 0 || !q) && <>
-        <div className="combo-group">{t('imagePicker.projects')}</div>
+      {(projects.length > 0 || !q) && <div role="group" aria-label={t('imagePicker.projects')}>
+        <div className="combo-group" aria-hidden="true">{t('imagePicker.projects')}</div>
         {projects.length > 0 ? projects.map(option) : <div className="combo-note">{projectNote}</div>}
-      </>}
-      {platforms.length > 0 && <>
-        <div className="combo-group">{t('imagePicker.platform')}</div>
+      </div>}
+      {platforms.length > 0 && <div role="group" aria-label={t('imagePicker.platform')}>
+        <div className="combo-group" aria-hidden="true">{t('imagePicker.platform')}</div>
         {platforms.map(option)}
-      </>}
+      </div>}
       <div className="combo-foot">{t('imagePicker.keys')}</div>
     </div>,
     document.body,
@@ -219,6 +225,7 @@ export function ImageField({id, value, onChange, offered, placeholder, required}
              onClick={() => { if (!open) openMenu() }}
              placeholder={placeholder} required={required}/>
       <button type="button" className="icon-btn combo-toggle" tabIndex={-1} aria-label={t('imagePicker.show')}
+              aria-expanded={open}
               onClick={() => {
                 if (open) setOpen(false)
                 else {

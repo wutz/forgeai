@@ -23,11 +23,24 @@ import {getLocale, subscribeLocale, t} from './i18n'
 const PREFS = 'forgeai.connection'
 const NAMESPACES = 'forgeai.namespaces'
 const SIDEBAR = 'forgeai.sidebar'
+// Matches the redesign.css breakpoint where the rail becomes an overlay.
+const NARROW = '(max-width: 820px)'
+const isNarrow = () => window.matchMedia(NARROW).matches
 
 type Area = 'overview' | 'jobs' | 'sandboxes' | 'templates' | 'volumes' | 'files' | 'images' | 'resources'
   | 'admin' | 'dependencies'
 
 type NavItem = {area: Area, label: string, icon: IconName}
+
+// readJSON reads a JSON value from localStorage. A damaged entry counts as
+// absent, so it cannot stop the connection that reads it.
+function readJSON<T>(key: string, fallback: T): T {
+  try {
+    return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback
+  } catch {
+    return fallback
+  }
+}
 
 // pickNamespace chooses the project a context opens with: the requested one,
 // else the one last used there, else the first project. Users that may not
@@ -48,11 +61,17 @@ function adminAreas(info: app.ConnInfo): Area[] {
   ]
 }
 
+// nothingOpen reports a connection with neither a project nor an admin area:
+// there is no view to show, so the page says why instead.
+function nothingOpen(info: app.ConnInfo): boolean {
+  return !info.project && adminAreas(info).length === 0
+}
+
 // areaFor keeps the open view when the new connection offers it. A connection
 // without a project only has the admin areas, and opens on the first of them.
 function areaFor(current: Area, info: app.ConnInfo): Area {
   const offered = adminAreas(info)
-  if (!info.project) return offered.includes(current) ? current : offered[0] ?? 'dependencies'
+  if (!info.project) return offered.includes(current) ? current : offered[0] ?? 'overview'
   if (offered.includes(current)) return current
   if (current === 'admin' || current === 'dependencies') return 'overview'
   if (current === 'sandboxes' && !info.sandboxes) return 'overview'
@@ -83,13 +102,16 @@ export default function App() {
   const [projects, setProjects] = useState<app.ProjectNamespace[]>([])
   const [conn, setConn] = useState<app.ConnInfo | null>(null)
   const [area, setArea] = useState<Area>('overview')
+  // jobFocus asks the Jobs page to select a job; a new object each time, so the same job can be picked again.
+  const [jobFocus, setJobFocus] = useState<{name: string} | null>(null)
   // visited lists the areas opened on this connection. A view mounts on its
   // first visit and stays mounted after that.
   const [visited, setVisited] = useState<Area[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   // The rail remembers its state across launches, like the connection does.
-  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(SIDEBAR) === 'collapsed')
+  // A narrow window overlays the page with the rail, so it always starts closed.
+  const [collapsed, setCollapsed] = useState(() => isNarrow() || localStorage.getItem(SIDEBAR) === 'collapsed')
   // Views portal their PageHeader into this node in the top bar.
   const [headerSlot, setHeaderSlot] = useState<HTMLDivElement | null>(null)
   // Each connect takes a number; a slower, superseded switch must not win.
@@ -100,10 +122,19 @@ export default function App() {
     localStorage.setItem(SIDEBAR, v ? 'open' : 'collapsed')
     return !v
   })
+  // Crossing the breakpoint re-applies the state for that width: a narrow window
+  // closes the overlay, and a wide one goes back to the rail the user saved, so an
+  // overlay closed on a phone does not leave the desktop rail hidden.
+  useEffect(() => {
+    const query = window.matchMedia(NARROW)
+    const sync = () => setCollapsed(query.matches || localStorage.getItem(SIDEBAR) === 'collapsed')
+    query.addEventListener('change', sync)
+    return () => query.removeEventListener('change', sync)
+  }, [])
 
   const connectTo = async (contextName: string, requested = '') => {
     const seq = ++attempt.current
-    const remembered: Record<string, string> = JSON.parse(localStorage.getItem(NAMESPACES) || '{}')
+    const remembered = readJSON<Record<string, string>>(NAMESPACES, {})
     setCluster(contextName)
     setLoading(true)
     setError('')
@@ -134,7 +165,7 @@ export default function App() {
     Environment().then(env => document.body.classList.toggle('platform-darwin', env.platform === 'darwin'))
     Contexts().then(list => {
       setContexts(list)
-      const last: {ctx?: string, ns?: string} = JSON.parse(localStorage.getItem(PREFS) || '{}')
+      const last = readJSON<{ctx?: string, ns?: string}>(PREFS, {})
       const start = list.find(c => c.name === last.ctx) || list.find(c => c.current) || list[0]
       if (!start) {
         setError(t('app.noContext'))
@@ -158,6 +189,18 @@ export default function App() {
 
   const switchProject = (namespace: string) => {
     if (conn && namespace !== conn.namespace) connectTo(conn.context, namespace)
+  }
+
+  // refreshProjects re-reads the connected cluster's projects after an admin
+  // created, saved or deleted one. If the connected project is gone, it connects
+  // to a project that is left.
+  const refreshProjects = () => {
+    if (!conn) return
+    const context = conn.context
+    Projects(context).then(list => {
+      setProjects(list)
+      if (!list.some(p => p.namespace === conn.namespace)) connectTo(context)
+    }).catch(() => undefined)
   }
 
   // The sidebar groups areas like the reference consoles: workspace, storage,
@@ -215,7 +258,11 @@ export default function App() {
                 <div className="nav-label">{g.label}</div>
                 {g.items.map(item => (
                   <button key={item.area} className={`nav-item ${area === item.area ? 'active' : ''}`}
-                          onClick={() => setArea(item.area)}
+                          onClick={() => {
+                            setArea(item.area)
+                            // On a narrow window the rail is an overlay; picking a page dismisses it.
+                            if (isNarrow()) setCollapsed(true)
+                          }}
                           title={collapsed ? item.label : undefined}
                           aria-label={item.label} aria-current={area === item.area ? 'page' : undefined}>
                     <Icon name={item.icon}/><span>{item.label}</span>
@@ -227,18 +274,22 @@ export default function App() {
           </nav>
           <main className="main">
             {error && <div className="banner banner-error" role="alert">{error}</div>}
-            {conn ? (
+            {conn && nothingOpen(conn) ? (
+              <Empty icon="shield" title={t('app.noAccess')}>
+                {t('app.noAccessHint')}
+              </Empty>
+            ) : conn ? (
               // Keyed by the connection so every view refetches after a switch.
               <Fragment key={`${conn.context}/${conn.namespace}`}>
-                {shown('overview', <Overview onOpen={setArea}/>)}
-                {shown('jobs', <Jobs/>)}
+                {shown('overview', <Overview onOpen={setArea} onOpenJob={name => { setJobFocus({name}); setArea('jobs') }}/>)}
+                {shown('jobs', <Jobs focus={jobFocus}/>)}
                 {shown('sandboxes', <Sandboxes/>)}
                 {shown('templates', <Templates sandboxes={conn.sandboxes}/>)}
                 {shown('volumes', <Volumes/>)}
                 {shown('files', <FilesView/>)}
                 {shown('images', <Images/>)}
                 {shown('resources', <Resources/>)}
-                {shown('admin', <Admin/>)}
+                {shown('admin', <Admin onProjectsChanged={refreshProjects}/>)}
                 {shown('dependencies', <Dependencies/>)}
               </Fragment>
             ) : loading ? (

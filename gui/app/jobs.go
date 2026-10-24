@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
@@ -25,33 +27,34 @@ import (
 // Job is the view model of a TrainJob. Retries stay under their original job
 // group (Group); RetryOf is empty on the first attempt.
 type Job struct {
-	Name       string            `json:"name"`
-	Group      string            `json:"group"`
-	RetryOf    string            `json:"retryOf,omitempty"`
-	Template   string            `json:"template,omitempty"`
-	Image      string            `json:"image"`
-	Command    string            `json:"command"`
-	Env        map[string]string `json:"env"`
-	Instance   string            `json:"instanceType"`
-	Workers    int32             `json:"workers"`
-	Phase      string            `json:"phase"`
-	Message    string            `json:"message,omitempty"`
-	Reason     string            `json:"failureReason,omitempty"`
-	Stopped    bool              `json:"stopped"`
-	Superseded bool              `json:"superseded"`
-	Ready      int32             `json:"ready"`
-	CPU        string            `json:"cpu,omitempty"`
-	GPUClass   string            `json:"gpuClass,omitempty"`
-	GPUCount   int32             `json:"gpuCount,omitempty"`
-	Created    string            `json:"created"`
-	Age        string            `json:"age"`
-	Duration   string            `json:"duration,omitempty"`
-	WorkerPods []Worker          `json:"workerPods"`
-	Volumes    []string          `json:"volumes,omitempty"`
-	MaxRetries int32             `json:"maxRetries,omitempty"`
-	RetryOn    string            `json:"retryOn,omitempty"`
-	RetriedAs  string            `json:"retriedAs,omitempty"`
-	Retries    []*Job            `json:"retries"`
+	Name       string                 `json:"name"`
+	Group      string                 `json:"group"`
+	RetryOf    string                 `json:"retryOf,omitempty"`
+	Template   string                 `json:"template,omitempty"`
+	Image      string                 `json:"image"`
+	Command    string                 `json:"command"`
+	Env        map[string]string      `json:"env"`
+	Instance   string                 `json:"instanceType"`
+	Workers    int32                  `json:"workers"`
+	Phase      string                 `json:"phase"`
+	Message    string                 `json:"message,omitempty"`
+	Reason     string                 `json:"failureReason,omitempty"`
+	Stopped    bool                   `json:"stopped"`
+	Superseded bool                   `json:"superseded"`
+	Ready      int32                  `json:"ready"`
+	CPU        string                 `json:"cpu,omitempty"`
+	GPUClass   string                 `json:"gpuClass,omitempty"`
+	GPUCount   int32                  `json:"gpuCount,omitempty"`
+	Created    string                 `json:"created"`
+	Age        string                 `json:"age"`
+	Duration   string                 `json:"duration,omitempty"`
+	WorkerPods []Worker               `json:"workerPods"`
+	Volumes    []string               `json:"volumes,omitempty"`
+	Mounts     []training.VolumeMount `json:"mounts,omitempty"`
+	MaxRetries int32                  `json:"maxRetries,omitempty"`
+	RetryOn    string                 `json:"retryOn,omitempty"`
+	RetriedAs  string                 `json:"retriedAs,omitempty"`
+	Retries    []*Job                 `json:"retries"`
 }
 
 // Worker is one worker pod of a job.
@@ -76,13 +79,14 @@ func (a *App) ListJobs() ([]*Job, error) {
 	if err != nil {
 		return nil, err
 	}
+	ix, err := loadJobIndex(ctx, c)
+	if err != nil {
+		return nil, err
+	}
+	ix.names = trainJobNames(items)
 	out := make([]*Job, 0, len(items))
 	for i := range items {
-		j, err := toJob(ctx, c, &items[i])
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, j)
+		out = append(out, ix.job(&items[i]))
 	}
 	group(out)
 	slices.SortFunc(out, func(a, b *Job) int { return strings.Compare(b.Created, a.Created) })
@@ -113,10 +117,12 @@ func (a *App) GetJob(name string) (*Job, error) {
 	if self == nil {
 		return nil, fmt.Errorf("job %q not found", name)
 	}
-	j, err := toJob(ctx, c, self)
+	ix, err := loadJobIndex(ctx, c)
 	if err != nil {
 		return nil, err
 	}
+	ix.names = trainJobNames(items)
+	j := ix.job(self)
 	if j.Group != j.Name {
 		return j, nil
 	}
@@ -124,11 +130,7 @@ func (a *App) GetJob(name string) (*Job, error) {
 		if items[i].Name == name || groupOf(&items[i]) != name {
 			continue
 		}
-		r, err := toJob(ctx, c, &items[i])
-		if err != nil {
-			return nil, err
-		}
-		j.Retries = append(j.Retries, r)
+		j.Retries = append(j.Retries, ix.job(&items[i]))
 	}
 	slices.SortFunc(j.Retries, func(a, b *Job) int { return strings.Compare(a.Name, b.Name) })
 	return j, nil
@@ -175,7 +177,9 @@ func (a *App) CreateJob(f training.Form) (*Job, error) {
 	return toJob(ctx, c, tj)
 }
 
-// DeleteJob deletes a TrainJob (pods go with it, Kueue releases the quota).
+// DeleteJob deletes a TrainJob (pods go with it, Kueue releases the quota). A
+// group leader takes its retries with it: they are TrainJobs of their own, and
+// left behind they would show as top-level jobs still holding pods and quota.
 func (a *App) DeleteJob(name string) error {
 	c, err := a.current()
 	if err != nil {
@@ -183,7 +187,31 @@ func (a *App) DeleteJob(name string) error {
 	}
 	ctx, cancel := a.call()
 	defer cancel()
-	return c.k8s.Delete(ctx, trainJobStub(c, name))
+	items, err := listTrainJobs(ctx, c)
+	if err != nil {
+		return err
+	}
+	targets := []string{name}
+	for i := range items {
+		if items[i].Name != name {
+			continue
+		}
+		if groupOf(&items[i]) == name {
+			targets = nil
+			for j := range items {
+				if groupOf(&items[j]) == name {
+					targets = append(targets, items[j].Name)
+				}
+			}
+		}
+		break
+	}
+	for _, t := range targets {
+		if err := c.k8s.Delete(ctx, trainJobStub(c, t)); err != nil && !apierrors.IsNotFound(err) {
+			return err
+		}
+	}
+	return nil
 }
 
 // StopJob stops a running or queued job: the operator deactivates its Kueue
@@ -209,17 +237,20 @@ func (a *App) StartJob(name string) (*Job, error) {
 	})
 }
 
-// RerunJob submits a fresh job from the form of an existing one.
+// RerunJob submits a fresh job from the form of an existing one. Without a name
+// the copy takes the first free "-rN" suffix, so a job can be rerun again.
 func (a *App) RerunJob(name, newName string) (*Job, error) {
 	c, err := a.current()
 	if err != nil {
 		return nil, err
 	}
-	if newName == "" {
-		newName = name + "-r2"
-	}
 	ctx, cancel := a.call()
 	defer cancel()
+	if newName == "" {
+		if newName, err = freeRerunName(ctx, c, name); err != nil {
+			return nil, err
+		}
+	}
 	src, err := getTrainJob(ctx, c, name)
 	if err != nil {
 		return nil, err
@@ -236,6 +267,29 @@ func (a *App) RerunJob(name, newName string) (*Job, error) {
 		return nil, err
 	}
 	return toJob(ctx, c, tj)
+}
+
+// freeRerunName returns name with the lowest "-rN" suffix (N from 2) that no
+// TrainJob in the namespace holds, keeping the result within the name limit.
+func freeRerunName(ctx context.Context, c *Connection, name string) (string, error) {
+	items, err := listTrainJobs(ctx, c)
+	if err != nil {
+		return "", err
+	}
+	taken := make(map[string]bool, len(items))
+	for i := range items {
+		taken[items[i].Name] = true
+	}
+	for n := 2; ; n++ {
+		suffix := "-r" + strconv.Itoa(n)
+		base := name
+		if room := training.MaxNameLength - len(suffix); len(base) > room {
+			base = base[:room]
+		}
+		if cand := base + suffix; !taken[cand] {
+			return cand, nil
+		}
+	}
 }
 
 // rerunForm is the form of a new job copied from src. It keeps src's job
@@ -278,8 +332,41 @@ func (a *App) Logs(name string, worker int32, tailLines int64) (string, error) {
 		return "", err
 	}
 	defer func() { _ = rc.Close() }()
-	b, err := io.ReadAll(io.LimitReader(rc, 4<<20))
-	return string(b), err
+	return readTail(rc, logTailLimit)
+}
+
+// logTailLimit bounds the log text sent to the GUI. tailLines bounds the lines,
+// not their length, so a long log is cut to its newest output.
+const logTailLimit = 4 << 20
+
+// readTail reads r to its end and keeps the last limit bytes. When it cuts,
+// the partial line it starts with is dropped.
+func readTail(r io.Reader, limit int) (string, error) {
+	var buf []byte
+	chunk := make([]byte, 32<<10)
+	cut := false
+	for {
+		n, err := r.Read(chunk)
+		buf = append(buf, chunk[:n]...)
+		if len(buf) > 2*limit {
+			buf = append([]byte(nil), buf[len(buf)-limit:]...)
+			cut = true
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return "", err
+		}
+	}
+	if len(buf) > limit {
+		buf = buf[len(buf)-limit:]
+		cut = true
+	}
+	if i := bytes.IndexByte(buf, '\n'); cut && i >= 0 {
+		buf = buf[i+1:]
+	}
+	return string(buf), nil
 }
 
 func (a *App) mutateJob(c *Connection, name string, fn func(*kf.TrainJob)) (*Job, error) {
@@ -324,6 +411,17 @@ func (a *App) renderTrainJob(ctx context.Context, c *Connection, f training.Form
 	if f.Workers < 1 {
 		f.Workers = 1
 	}
+	// A job started from a template the namespace no longer has would wait forever on its runtime.
+	if f.Template != "" {
+		rt := &unstructured.Unstructured{}
+		rt.SetGroupVersionKind(kf.TrainingRuntimeGVK)
+		if err := c.k8s.Get(ctx, client.ObjectKey{Namespace: c.namespace(), Name: f.Template}, rt); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil, fmt.Errorf("template %q not found", f.Template)
+			}
+			return nil, err
+		}
+	}
 	it := &v1.InstanceType{}
 	if err := c.k8s.Get(ctx, client.ObjectKey{Name: f.InstanceType}, it); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -356,13 +454,67 @@ func (a *App) renderTrainJob(ctx context.Context, c *Connection, f training.Form
 	})
 }
 
-// toJob derives the view model: phase from conditions and pods, form fields
-// from the trainer overrides and the forgeai runtime patch.
+// jobIndex holds what toJob reads besides the TrainJob: the pods of every job
+// in the namespace and the instance types. A list loads it once, instead of
+// once per job.
+type jobIndex struct {
+	pods          map[string][]corev1.Pod // by job set name
+	instanceTypes map[string]*v1.InstanceType
+	// names holds the TrainJobs of the listing; nil when the listing was not read.
+	names map[string]bool
+}
+
+// trainJobNames returns the names of the listed TrainJobs.
+func trainJobNames(items []kf.TrainJob) map[string]bool {
+	names := make(map[string]bool, len(items))
+	for i := range items {
+		names[items[i].Name] = true
+	}
+	return names
+}
+
+func loadJobIndex(ctx context.Context, c *Connection) (*jobIndex, error) {
+	pods := &corev1.PodList{}
+	if err := c.k8s.List(ctx, pods, client.InNamespace(c.namespace()),
+		client.HasLabels{kf.LabelJobSetName}); err != nil {
+		return nil, err
+	}
+	ix := &jobIndex{pods: map[string][]corev1.Pod{}, instanceTypes: map[string]*v1.InstanceType{}}
+	for _, p := range pods.Items {
+		ix.pods[p.Labels[kf.LabelJobSetName]] = append(ix.pods[p.Labels[kf.LabelJobSetName]], p)
+	}
+	// Instance types only add the GPU and CPU of the job view. A user who cannot
+	// list them still sees the jobs, without those details.
+	its := &v1.InstanceTypeList{}
+	if err := c.k8s.List(ctx, its); err == nil {
+		for i := range its.Items {
+			ix.instanceTypes[its.Items[i].Name] = &its.Items[i]
+		}
+	}
+	return ix, nil
+}
+
+// toJob derives the view model of one job. Lists use a jobIndex loaded once.
 func toJob(ctx context.Context, c *Connection, tj *kf.TrainJob) (*Job, error) {
-	pods, err := jobPods(ctx, c, tj.Name)
+	ix, err := loadJobIndex(ctx, c)
 	if err != nil {
 		return nil, err
 	}
+	return ix.job(tj), nil
+}
+
+// job derives the view model: phase from conditions and pods, form fields
+// from the trainer overrides and the forgeai runtime patch.
+func (ix *jobIndex) job(tj *kf.TrainJob) *Job {
+	// A retry that was deleted no longer supersedes its job: the job's own
+	// failure is what the user acts on, not a link to a retry that is gone.
+	if ix.names != nil && tj.Annotations[naming.AnnotationRetriedAs] != "" && !ix.names[tj.Annotations[naming.AnnotationRetriedAs]] {
+		cp := *tj
+		cp.Annotations = maps.Clone(tj.Annotations)
+		delete(cp.Annotations, naming.AnnotationRetriedAs)
+		tj = &cp
+	}
+	pods := slices.Clone(ix.pods[tj.Name])
 	phase, msg := training.JobPhase(tj, pods)
 	out := &Job{
 		Name:       tj.Name,
@@ -413,6 +565,10 @@ func toJob(ctx context.Context, c *Connection, tj *kf.TrainJob) (*Job, error) {
 		}
 		out.Volumes = slices.Sorted(maps.Keys(claims))
 	}
+	// The same parse a rerun uses, so a template saved from the job keeps the mount paths.
+	if f, err := training.TrainJobForm(tj); err == nil {
+		out.Mounts = f.Volumes
+	}
 	slices.SortStableFunc(pods, func(a, b corev1.Pod) int {
 		return training.WorkerIndex(&a) - training.WorkerIndex(&b)
 	})
@@ -421,33 +577,18 @@ func toJob(ctx context.Context, c *Connection, tj *kf.TrainJob) (*Job, error) {
 		p := &pods[i]
 		out.WorkerPods = append(out.WorkerPods, Worker{
 			Index: int32(training.WorkerIndex(p)), PodName: p.Name, NodeName: p.Spec.NodeName,
-			Phase: string(p.Status.Phase), Message: podMessage(p),
+			Phase: string(p.Status.Phase), Message: training.PodMessage(p),
 		})
-		if p.Status.Phase == corev1.PodRunning && p.DeletionTimestamp.IsZero() {
+		if training.Running(p) {
 			out.Ready++
 		}
 	}
-	if it, err := lookupInstanceType(ctx, c, out.Instance); err == nil && it != nil {
+	if it := ix.instanceTypes[out.Instance]; it != nil {
 		out.GPUClass = it.Spec.GPU.Class
 		out.GPUCount = it.Spec.GPU.Count * out.Workers
 		out.CPU = it.Spec.CPU.String()
 	}
-	return out, nil
-}
-
-// podMessage explains a pod that is not running.
-func podMessage(p *corev1.Pod) string {
-	for _, c := range p.Status.Conditions {
-		if c.Type == corev1.PodScheduled && c.Status == corev1.ConditionFalse {
-			return strings.TrimSuffix(c.Reason+": "+c.Message, ": ")
-		}
-	}
-	for _, cs := range p.Status.ContainerStatuses {
-		if w := cs.State.Waiting; w != nil && w.Reason != "ContainerCreating" {
-			return strings.TrimSuffix(w.Reason+": "+w.Message, ": ")
-		}
-	}
-	return ""
+	return out
 }
 
 func groupOf(tj *kf.TrainJob) string {

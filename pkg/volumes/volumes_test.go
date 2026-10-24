@@ -8,14 +8,17 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	"github.com/wutz/forgeai/pkg/kf"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
+	"github.com/wutz/forgeai/pkg/training"
 )
 
 func TestLifecycle(t *testing.T) {
@@ -129,6 +132,7 @@ func TestRetentionUsesProjectOverride(t *testing.T) {
 	k8s := fake.NewClientBuilder().WithScheme(s).WithObjects(
 		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "forge-a", Labels: map[string]string{naming.LabelProject: "alpha"}}},
 		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "forge-b", Labels: map[string]string{naming.LabelProject: "beta"}}},
+		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "forge-c"}},
 		&v1.Project{ObjectMeta: metav1.ObjectMeta{Name: "alpha"}, Spec: v1.ProjectSpec{
 			TrashRetention: &metav1.Duration{Duration: time.Hour}}},
 		&v1.Project{ObjectMeta: metav1.ObjectMeta{Name: "beta"}},
@@ -142,6 +146,7 @@ func TestRetentionUsesProjectOverride(t *testing.T) {
 		{"project override", "forge-a", time.Hour},
 		{"project without override", "forge-b", platformDefault},
 		{"unknown namespace", "missing", platformDefault},
+		{"namespace without project label", "forge-c", platformDefault},
 	} {
 		got, err := Retention(ctx, k8s, tc.ns, platformDefault)
 		if err != nil || got != tc.want {
@@ -237,5 +242,122 @@ func TestMountable(t *testing.T) {
 		if tc.want != nil && !errors.Is(err, tc.want) {
 			t.Errorf("%s: got %v, want %v", tc.name, err, tc.want)
 		}
+	}
+}
+
+// trainJob returns a TrainJob mounting the named volume, as the GUI renders it,
+// stored the way the cluster client reads it.
+func trainJob(t *testing.T, name, volume string, conditions ...metav1.Condition) *unstructured.Unstructured {
+	t.Helper()
+	cfg, err := platform.Parse([]byte("storageTypes: {shared: {storageClass: sc}}\ndefaultStorageType: shared"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	form := training.Form{
+		Name: name, Image: "img:1", InstanceType: "cpu.small", Workers: 1,
+		Volumes: []training.VolumeMount{{Volume: volume, MountPath: "/data"}},
+	}
+	it := &v1.InstanceType{ObjectMeta: metav1.ObjectMeta{Name: "cpu.small"}}
+	tj, err := training.TrainJob(&form, training.Context{Namespace: "forge-a", InstanceType: it, Config: cfg})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(conditions) > 0 {
+		tj.Status = &kf.TrainJobStatus{Conditions: conditions}
+	}
+	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(tj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := &unstructured.Unstructured{Object: obj}
+	u.SetGroupVersionKind(kf.TrainJobGVK)
+	return u
+}
+
+// An unfinished TrainJob holds the volumes it mounts, queued or running; a
+// finished one releases them.
+func TestTrashWaitsForUnfinishedJobs(t *testing.T) {
+	ctx := context.Background()
+	cfg, _ := platform.Parse([]byte("storageTypes: {shared: {storageClass: sc}}\ndefaultStorageType: shared"))
+	suspended := metav1.Condition{Type: kf.ConditionSuspended, Status: metav1.ConditionTrue, Reason: "Suspended"}
+	complete := metav1.Condition{Type: kf.ConditionComplete, Status: metav1.ConditionTrue, Reason: "Completed"}
+	failed := metav1.Condition{Type: kf.ConditionFailed, Status: metav1.ConditionTrue, Reason: "Failed"}
+
+	for _, tc := range []struct {
+		name    string
+		job     *unstructured.Unstructured
+		blocked bool
+	}{
+		{"queued", trainJob(t, "queued", "data", suspended), true},
+		{"pending", trainJob(t, "pending", "data"), true},
+		{"succeeded", trainJob(t, "done", "data", complete), false},
+		{"failed", trainJob(t, "broken", "data", failed), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			k8s := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+			c := &Client{K8s: k8s, Namespace: "forge-a"}
+			if _, err := c.Create(ctx, cfg, "data", "", 10); err != nil {
+				t.Fatal(err)
+			}
+			if err := k8s.Create(ctx, tc.job); err != nil {
+				t.Fatal(err)
+			}
+			live, err := c.List(ctx, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := live[0].Users; (len(got) > 0) != tc.blocked {
+				t.Fatalf("Users = %v, blocked want %v", got, tc.blocked)
+			}
+			_, err = c.Trash(ctx, "data", time.Hour)
+			if tc.blocked && !errors.Is(err, ErrInUse) {
+				t.Fatalf("Trash = %v, want ErrInUse", err)
+			}
+			if !tc.blocked && err != nil {
+				t.Fatalf("Trash = %v, a finished job must not block it", err)
+			}
+		})
+	}
+}
+
+// TestResetExpiry checks that the default purge time is retention after the
+// volume was trashed, under the retention in force now, and that it is refused
+// once that time has passed.
+func TestResetExpiry(t *testing.T) {
+	ctx := context.Background()
+	k8s := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+	now := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	c := &Client{K8s: k8s, Namespace: "forge-a", Now: func() time.Time { return now }}
+	cfg, _ := platform.Parse([]byte("storageTypes: {shared: {storageClass: sc}}\ndefaultStorageType: shared"))
+	if _, err := c.Create(ctx, cfg, "data", "", 10); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.ResetExpiry(ctx, "data", time.Hour); err == nil {
+		t.Fatal("reset must require the trash")
+	}
+	if _, err := c.Trash(ctx, "data", 48*time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.SetExpiry(ctx, "data", now.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+
+	// The project now keeps trash for 7 days: the default counts from the trash time.
+	v, err := c.ResetExpiry(ctx, "data", 7*24*time.Hour)
+	if err != nil || v.ExpireAt != "2026-10-08T00:00:00Z" {
+		t.Fatalf("reset %+v %v", v, err)
+	}
+	if v.TrashedAt != "2026-10-01T00:00:00Z" {
+		t.Errorf("trashed-at changed: %q", v.TrashedAt)
+	}
+
+	// A default that has already passed is refused, and the purge time is kept.
+	now = time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC)
+	if _, err := c.ResetExpiry(ctx, "data", 7*24*time.Hour); !errors.Is(err, ErrPastExpiry) {
+		t.Fatalf("reset past its default: %v", err)
+	}
+	live, _ := c.List(ctx, true)
+	if len(live) != 1 || live[0].ExpireAt != "2026-10-08T00:00:00Z" {
+		t.Fatalf("expiry changed after refusal: %+v", live)
 	}
 }

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"k8s.io/client-go/tools/remotecommand"
@@ -46,5 +47,32 @@ func TestSizeQueueKeepsLatest(t *testing.T) {
 func TestClampSize(t *testing.T) {
 	if clampSize(0) != 1 || clampSize(-5) != 1 || clampSize(100) != 100 || clampSize(1<<20) != 65535 {
 		t.Fatal("clampSize out of range")
+	}
+}
+
+// TestEventWriterSequencesChunks checks that each emitted chunk gets the next
+// sequence number, that a split UTF-8 character is held back until it is whole,
+// and that the exit event follows the last chunk.
+func TestEventWriterSequencesChunks(t *testing.T) {
+	var got []sandboxOutput
+	a := &App{emit: func(_ context.Context, _ string, data ...interface{}) {
+		if out, ok := data[0].(sandboxOutput); ok {
+			got = append(got, out)
+		}
+	}}
+	w := &eventWriter{app: a, ctx: context.Background(), event: "sandbox-terminal:test"}
+
+	for _, p := range []string{"a", "\xc3", "\xa9", "bc"} {
+		if _, err := w.Write([]byte(p)); err != nil {
+			t.Fatalf("Write(%q): %v", p, err)
+		}
+	}
+
+	want := []sandboxOutput{{Seq: 1, Data: "a"}, {Seq: 2, Data: "é"}, {Seq: 3, Data: "bc"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("chunks = %+v, want %+v", got, want)
+	}
+	if next := w.nextSeq(); next != 4 {
+		t.Fatalf("nextSeq() = %d, want 4", next)
 	}
 }

@@ -1,17 +1,18 @@
 import {useEffect, useState} from 'react'
 import {CreateSandboxTemplate, UpdateSandboxTemplate, SandboxOptions} from '../wailsjs/go/app/App'
 import {app, sandbox} from '../wailsjs/go/models'
-import {envMap, envToLines, linesToEnv, fmtDate, errText, generateName} from './util'
-import {Dialog, Empty, useConfirm} from './ui'
+import {envErrors, envMap, envToLines, linesToEnv, fmtDate, errText, generateName, NAME_PATTERN, SANDBOX_NAME_MAX} from './util'
+import {CancelButton, Dialog, Empty, HintButton, Spinner, useConfirm} from './ui'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
 
 // SandboxTemplateTable lists SandboxTemplates (agent blueprints new sandboxes
 // start from) inside the Templates page.
-export function SandboxTemplateTable({items, onEdit, onDelete}: {
-  items: app.SandboxTemplate[], onEdit: (t: app.SandboxTemplate) => void, onDelete: (name: string) => void
+export function SandboxTemplateTable({items, failed, onEdit, onDelete}: {
+  items: app.SandboxTemplate[] | null, failed: boolean, onEdit: (t: app.SandboxTemplate) => void, onDelete: (name: string) => void
 }) {
   const confirm = useConfirm()
+  if (!items) return failed ? null : <Spinner label={t('common.loading')}/>
   if (items.length === 0) {
     return (
       <Empty icon="layers" title={t('sandboxTemplates.emptyTitle')}>
@@ -29,16 +30,18 @@ export function SandboxTemplateTable({items, onEdit, onDelete}: {
       <tbody>
       {items.map(tpl => (
         <tr key={tpl.name}>
-          <td className="mono">
+          <td data-label={t('common.name')} className="mono">
             <span className="cell-main">{tpl.name}</span>
             {tpl.description && <span className="cell-sub">{tpl.description}</span>}
+            {tpl.error && <span className="cell-sub hint-error">{t('sandboxTemplates.unreadable', {error: tpl.error})}</span>}
           </td>
-          <td className="mono trunc" title={tpl.form?.image}>{tpl.form?.image || '—'}</td>
-          <td className="mono">{tpl.form?.runtimeClass || 'runc'}</td>
-          <td className="muted">{fmtDate(tpl.created)}</td>
+          <td data-label={t('common.image')} className="mono trunc" title={tpl.form?.image}>{tpl.form?.image || '—'}</td>
+          <td data-label={t('sandboxTemplates.colIsolation')} className="mono">{tpl.form?.runtimeClass || t('sandboxes.runcNode')}</td>
+          <td data-label={t('common.created')} className="muted">{fmtDate(tpl.created)}</td>
           <td>
             <div className="actions">
-              <button className="btn btn-sm" onClick={() => onEdit(tpl)}>{t('common.edit')}</button>
+              <HintButton className="btn btn-sm" disabled={!!tpl.error} reason={t('templates.unreadableHint')}
+                          onClick={() => onEdit(tpl)}>{t('common.edit')}</HintButton>
               <button className="btn btn-sm btn-danger" onClick={() => confirm.ask({
                 title: t('sandboxTemplates.deleteTitle', {name: tpl.name}),
                 message: t('sandboxTemplates.deleteMessage'),
@@ -60,8 +63,8 @@ export function SandboxTemplateTable({items, onEdit, onDelete}: {
 // SandboxTemplateDialog creates a sandbox template, or edits the existing one
 // of that name when existing is set. initial prefills the form (edit, or
 // save-as-template from a sandbox); without it the platform defaults apply.
-export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
-  initial?: sandbox.TemplateForm, existing?: string, onClose: () => void, onSaved: (name: string) => void
+export function SandboxTemplateDialog({initial, existing, version, onClose, onSaved}: {
+  initial?: sandbox.TemplateForm, existing?: string, version?: string, onClose: () => void, onSaved: (name: string) => void
 }) {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -81,7 +84,7 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
       setOpts(o)
       if (initial) return
       setF(prev => sandbox.TemplateForm.createFrom({
-        ...prev, image: o.defaultImage, runtimeClass: o.defaultRuntimeClass,
+        ...prev, image: prev.image || o.defaultImage, runtimeClass: prev.runtimeClass || o.defaultRuntimeClass,
       }))
     }).catch(e => setError(errText(e)))
   }, [])
@@ -89,13 +92,25 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
   const set = <K extends keyof sandbox.TemplateForm>(k: K, v: sandbox.TemplateForm[K]) =>
     setF(prev => sandbox.TemplateForm.createFrom({...prev, [k]: v}))
 
+  const envBad = envErrors(envText)
+  // An edit keeps its name (the field is disabled), so only a new name is checked.
+  const nameOK = !!existing || (NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= SANDBOX_NAME_MAX)
+  // blocker says why Save is off. A bad name or env line already has a hint
+  // under its field, so the footer only names the blockers that have none.
+  const blocker = !f.name ? t('common.nameRequired')
+    : !nameOK ? t('common.nameInvalid', {max: SANDBOX_NAME_MAX})
+    : !f.image ? t('common.imageRequired')
+    : envBad.length ? t('common.envInvalid', {lines: envBad.join(', ')}) : ''
+  const hasFieldHint = (!nameOK && (f.name ?? '') !== '') || envBad.length > 0
+
   const save = () => {
+    if (blocker) return
     setBusy(true)
     const payload = sandbox.TemplateForm.createFrom({
       ...f,
       env: Object.entries(linesToEnv(envText)).map(([name, value]) => ({name, value})),
     })
-    const req = existing ? UpdateSandboxTemplate(existing, payload) : CreateSandboxTemplate(payload)
+    const req = existing ? UpdateSandboxTemplate(existing, version ?? '', payload) : CreateSandboxTemplate(payload)
     req.then(() => onSaved(payload.name)).catch(e => {
       setError(errText(e)); setBusy(false)
     })
@@ -106,20 +121,23 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
             subtitle={existing
               ? t('sandboxTemplates.editSubtitle')
               : t('sandboxTemplates.newSubtitle')}
-            onClose={onClose} footer={<>
-              <button className="btn" onClick={onClose}>{t('common.cancel')}</button>
-              <button type="submit" form="sandbox-template-form" className={existing ? 'btn btn-primary' : 'btn'} disabled={busy || !f.name || !f.image}>
+            onClose={onClose} busy={busy} footer={<>
+              {blocker && !busy && !hasFieldHint && <span className="hint hint-error" role="status">{blocker}</span>}
+              <CancelButton disabled={busy}/>
+              <button type="submit" form="sandbox-template-form" className={existing ? 'btn btn-primary' : 'btn'} disabled={busy || !!blocker}>
                 {busy ? t('templates.saving') : t('templates.saveTemplate')}
               </button>
             </>}>
       <form id="sandbox-template-form" className="dialog-form" onSubmit={e => { e.preventDefault(); save() }}>
-        {error && <div className="banner banner-error">{error}</div>}
+        {error && <div className="banner banner-error" role="alert">{error}</div>}
         <div className="row">
           <div className="field">
             <label htmlFor="st-name">{t('common.name')}</label>
             <input id="st-name" className="input mono" value={f.name} disabled={!!existing}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                   onChange={e => set('name', e.target.value)} placeholder="agent" required/>
+                   onChange={e => set('name', e.target.value)} placeholder="agent" required
+                   maxLength={existing ? undefined : SANDBOX_NAME_MAX} aria-invalid={!nameOK}/>
+            {!nameOK && (f.name ?? '') !== '' && <span className="hint hint-error">{t('common.nameInvalid', {max: SANDBOX_NAME_MAX})}</span>}
           </div>
           <div className="field">
             <label htmlFor="st-desc">{t('templates.description')}</label>
@@ -140,6 +158,9 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
                     onChange={e => set('runtimeClass', e.target.value)}>
               <option value="">{t('sandboxTemplates.runcNodeRuntime')}</option>
               {(opts?.runtimeClasses || []).map(r => <option key={r} value={r}>{r}</option>)}
+              {/* A stored class the platform no longer offers stays selectable, so the saved value is what the form shows. */}
+              {f.runtimeClass && !(opts?.runtimeClasses || []).includes(f.runtimeClass) &&
+                <option value={f.runtimeClass}>{t('templates.typeUnavailable', {name: f.runtimeClass})}</option>}
             </select>
           </div>
         </div>
@@ -155,7 +176,11 @@ export function SandboxTemplateDialog({initial, existing, onClose, onSaved}: {
           <label htmlFor="st-env">{t('templates.environment')}</label>
           <textarea id="st-env" className="textarea" rows={3} value={envText}
                     autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                    onChange={e => setEnvText(e.target.value)} placeholder="KEY=value"/>
+                    onChange={e => setEnvText(e.target.value)} placeholder="KEY=value"
+                    aria-invalid={envBad.length > 0}/>
+          {envBad.length > 0 && <span className="hint hint-error">
+            {t('common.envInvalid', {lines: envBad.join(', ')})}
+          </span>}
         </div>
       </form>
     </Dialog>

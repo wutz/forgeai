@@ -3,7 +3,6 @@ package app
 import (
 	"context"
 	"fmt"
-	"io"
 	"slices"
 	"strings"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/wutz/forgeai/pkg/naming"
@@ -25,6 +25,7 @@ type Sandbox struct {
 	Name         string            `json:"name"`
 	Phase        string            `json:"phase"`
 	Message      string            `json:"message,omitempty"`
+	Reason       string            `json:"reason,omitempty"`
 	Image        string            `json:"image"`
 	Command      string            `json:"command,omitempty"`
 	Env          map[string]string `json:"env"`
@@ -36,15 +37,22 @@ type Sandbox struct {
 	NodeName     string            `json:"nodeName,omitempty"`
 	PodName      string            `json:"podName,omitempty"`
 	PodPhase     string            `json:"podPhase,omitempty"`
-	CPU          string            `json:"cpu,omitempty"`
-	Memory       string            `json:"memory,omitempty"`
-	GPU          int64             `json:"gpu,omitempty"`
-	Volumes      []string          `json:"volumes,omitempty"`
-	Stopped      bool              `json:"stopped"`
-	IdleSince    string            `json:"idleSince,omitempty"`
-	ShutdownTime string            `json:"shutdownTime,omitempty"`
-	Created      string            `json:"created"`
-	Age          string            `json:"age"`
+	// ContainerRunning is set when the sandbox container runs; ContainerReason
+	// says why it does not otherwise (CrashLoopBackOff, ImagePullBackOff, ...).
+	ContainerRunning bool   `json:"containerRunning"`
+	ContainerReason  string `json:"containerReason,omitempty"`
+	// PodUnknown is set when the pod could not be read this time; the container
+	// state above is then not known, not stopped.
+	PodUnknown   bool     `json:"podUnknown,omitempty"`
+	CPU          string   `json:"cpu,omitempty"`
+	Memory       string   `json:"memory,omitempty"`
+	GPU          int64    `json:"gpu,omitempty"`
+	Volumes      []string `json:"volumes,omitempty"`
+	Stopped      bool     `json:"stopped"`
+	IdleSince    string   `json:"idleSince,omitempty"`
+	ShutdownTime string   `json:"shutdownTime,omitempty"`
+	Created      string   `json:"created"`
+	Age          string   `json:"age"`
 }
 
 // SandboxOptions are the platform defaults offered by the create dialog.
@@ -68,9 +76,10 @@ func (a *App) ListSandboxes() ([]*Sandbox, error) {
 	if err != nil {
 		return nil, err
 	}
+	pods := listSandboxPods(ctx, c)
 	out := make([]*Sandbox, 0, len(items))
 	for i := range items {
-		out = append(out, toSandbox(ctx, c, items[i]))
+		out = append(out, toSandbox(items[i], pods))
 	}
 	return out, nil
 }
@@ -87,7 +96,7 @@ func (a *App) GetSandbox(name string) (*Sandbox, error) {
 	if err != nil {
 		return nil, err
 	}
-	return toSandbox(ctx, c, u), nil
+	return toSandbox(u, sandboxPodOf(ctx, c)), nil
 }
 
 // SandboxOptions returns the platform settings the create dialog needs.
@@ -122,6 +131,24 @@ func (a *App) CreateSandbox(f sandbox.Form) (*Sandbox, error) {
 	}
 	ctx, cancel := a.call()
 	defer cancel()
+	// A deleted sandbox's pod can outlive its object while it shuts down. A new
+	// sandbox of the same name would then fail, since the controller finds the
+	// pod owned by the old one, so the create waits for the pod to go. A live
+	// sandbox of the name is a clash, not a shutdown.
+	if f.Name != "" {
+		existing := &unstructured.Unstructured{}
+		existing.SetGroupVersionKind(sandbox.SandboxGVK)
+		if err := c.k8s.Get(ctx, client.ObjectKey{Namespace: c.namespace(), Name: f.Name}, existing); err == nil {
+			return nil, fmt.Errorf("sandbox %s already exists", f.Name)
+		} else if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+		if err := c.k8s.Get(ctx, client.ObjectKey{Namespace: c.namespace(), Name: f.Name}, &corev1.Pod{}); err == nil {
+			return nil, fmt.Errorf("sandbox %s is still shutting down; try again once its pod is gone", f.Name)
+		} else if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+	}
 	cfg, err := platform.Load(ctx, c.k8s, c.namespace())
 	if err != nil {
 		return nil, err
@@ -140,9 +167,13 @@ func (a *App) CreateSandbox(f sandbox.Form) (*Sandbox, error) {
 	if err := volumesClient(c).Mountable(ctx, names, 1); err != nil {
 		return nil, err
 	}
+	regSecret, err := registrySecretName(ctx, c)
+	if err != nil {
+		return nil, err
+	}
 	u, err := sandbox.Render(&f, sandbox.Context{
 		Namespace: c.namespace(), Project: c.Info.Project, InstanceType: it, Platform: cfg,
-		RegistrySecret: registrySecretName(ctx, c),
+		RegistrySecret: regSecret,
 	})
 	if err != nil {
 		return nil, err
@@ -150,7 +181,7 @@ func (a *App) CreateSandbox(f sandbox.Form) (*Sandbox, error) {
 	if err := c.k8s.Create(ctx, u); err != nil {
 		return nil, err
 	}
-	return toSandbox(ctx, c, u), nil
+	return toSandbox(u, sandboxPodOf(ctx, c)), nil
 }
 
 // StopSandbox suspends a sandbox: its pod is deleted, the object and its
@@ -166,6 +197,9 @@ func (a *App) StopSandbox(name string) (*Sandbox, error) {
 func (a *App) StartSandbox(name string) (*Sandbox, error) {
 	return a.mutateSandbox(name, func(sb *sandbox.Sandbox) {
 		sb.Spec.OperatingMode = sandbox.OperatingRunning
+		// An expired sandbox would expire again at once; starting it is the user's
+		// choice to run on, so its shutdown time is cleared.
+		sandbox.ReopenElapsed(sb, time.Now())
 		delete(sb.Annotations, naming.AnnotationStopped)
 		delete(sb.Annotations, naming.AnnotationIdleSince)
 		setAnnotation(sb, naming.AnnotationLastActive, time.Now().UTC().Format(time.RFC3339))
@@ -232,8 +266,7 @@ func (a *App) SandboxLogs(name string, tailLines int64) (string, error) {
 		return "", err
 	}
 	defer func() { _ = rc.Close() }()
-	b, err := io.ReadAll(io.LimitReader(rc, 4<<20))
-	return string(b), err
+	return readTail(rc, logTailLimit)
 }
 
 // SandboxTemplates lists the SandboxTemplates of the project, for the GUI.
@@ -256,6 +289,7 @@ func (a *App) SandboxTemplates() ([]SandboxTemplate, error) {
 	for i := range list.Items {
 		t := &sandbox.SandboxTemplate{}
 		if err := sandbox.FromUnstructured(list.Items[i].Object, t); err != nil {
+			out = append(out, SandboxTemplate{Name: list.Items[i].GetName(), Error: err.Error()})
 			continue
 		}
 		out = append(out, toSandboxTemplate(t))
@@ -282,6 +316,11 @@ func (a *App) CreateSandboxTemplate(f sandbox.TemplateForm) (*SandboxTemplate, e
 	if err := c.k8s.Create(ctx, u); err != nil {
 		return nil, err
 	}
+	// The controller updates a new SandboxTemplate right after it is created, so
+	// the version Create returned is already stale: read the stored object.
+	if err := c.k8s.Get(ctx, client.ObjectKeyFromObject(u), u); err != nil {
+		return nil, err
+	}
 	t := &sandbox.SandboxTemplate{}
 	if err := sandbox.FromUnstructured(u.Object, t); err != nil {
 		return nil, err
@@ -293,7 +332,7 @@ func (a *App) CreateSandboxTemplate(f sandbox.TemplateForm) (*SandboxTemplate, e
 // UpdateSandboxTemplate replaces the form of an existing SandboxTemplate. The
 // name is the template's identity and does not change. Sandboxes already
 // created from it are not affected.
-func (a *App) UpdateSandboxTemplate(name string, f sandbox.TemplateForm) (*SandboxTemplate, error) {
+func (a *App) UpdateSandboxTemplate(name, resourceVersion string, f sandbox.TemplateForm) (*SandboxTemplate, error) {
 	c, err := a.current()
 	if err != nil {
 		return nil, err
@@ -319,14 +358,29 @@ func (a *App) UpdateSandboxTemplate(name string, f sandbox.TemplateForm) (*Sandb
 	if err != nil {
 		return nil, err
 	}
-	// The resource version makes the update fail if someone changed the
-	// template since it was loaded into the form.
-	u.SetResourceVersion(cur.GetResourceVersion())
-	if err := c.k8s.Update(ctx, u); err != nil {
+	// The stored object keeps its metadata (annotations, owner references and
+	// labels set by others); the form replaces the spec and the labels it
+	// renders. Updating against the version the form was loaded at makes a
+	// concurrent change fail with a conflict, instead of being overwritten.
+	if resourceVersion == "" {
+		return nil, fmt.Errorf("sandbox template %s has no loaded version to update from; reload it and try again", name)
+	}
+	upd := cur.DeepCopy()
+	upd.SetResourceVersion(resourceVersion)
+	upd.Object["spec"] = u.Object["spec"]
+	labels := upd.GetLabels()
+	if labels == nil {
+		labels = map[string]string{}
+	}
+	for k, v := range u.GetLabels() {
+		labels[k] = v
+	}
+	upd.SetLabels(labels)
+	if err := c.k8s.Update(ctx, upd); err != nil {
 		return nil, err
 	}
 	t := &sandbox.SandboxTemplate{}
-	if err := sandbox.FromUnstructured(u.Object, t); err != nil {
+	if err := sandbox.FromUnstructured(upd.Object, t); err != nil {
 		return nil, err
 	}
 	out := toSandboxTemplate(t)
@@ -346,6 +400,15 @@ func (a *App) DeleteSandboxTemplate(name string) error {
 	u.SetGroupVersionKind(sandbox.SandboxTemplateGVK)
 	u.SetNamespace(c.namespace())
 	u.SetName(name)
+	if err := c.k8s.Get(ctx, client.ObjectKeyFromObject(u), u); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	if u.GetLabels()[naming.LabelManagedBy] != naming.ManagedBy {
+		return fmt.Errorf("sandbox template %s was not created by forgeai and cannot be deleted here", name)
+	}
 	err = c.k8s.Delete(ctx, u)
 	if apierrors.IsNotFound(err) {
 		return nil
@@ -355,10 +418,11 @@ func (a *App) DeleteSandboxTemplate(name string) error {
 
 func toSandboxTemplate(t *sandbox.SandboxTemplate) SandboxTemplate {
 	st := SandboxTemplate{
-		Name:        t.Name,
-		Description: t.Annotations[naming.AnnotationDescription],
-		Created:     t.CreationTimestamp.UTC().Format(time.RFC3339),
-		Form:        sandbox.TemplateFormOf(t),
+		Name:            t.Name,
+		Description:     t.Annotations[naming.AnnotationDescription],
+		Created:         t.CreationTimestamp.UTC().Format(time.RFC3339),
+		Form:            sandbox.TemplateFormOf(t),
+		ResourceVersion: t.ResourceVersion,
 	}
 	for _, ctr := range t.Spec.PodTemplate.Spec.Containers {
 		st.Images = append(st.Images, ctr.Image)
@@ -368,15 +432,32 @@ func toSandboxTemplate(t *sandbox.SandboxTemplate) SandboxTemplate {
 
 // SandboxTemplate is a SandboxTemplate as listed in the GUI.
 type SandboxTemplate struct {
-	Name        string                `json:"name"`
-	Description string                `json:"description,omitempty"`
-	Images      []string              `json:"images,omitempty"`
-	Created     string                `json:"created"`
-	Form        *sandbox.TemplateForm `json:"form"`
+	Name            string                `json:"name"`
+	Description     string                `json:"description,omitempty"`
+	Images          []string              `json:"images,omitempty"`
+	Created         string                `json:"created"`
+	Form            *sandbox.TemplateForm `json:"form"`
+	ResourceVersion string                `json:"resourceVersion,omitempty"`
+	// Error is set for a template the app cannot read; it is listed so it can
+	// still be deleted.
+	Error string `json:"error,omitempty"`
 }
 
-// mutateSandbox reads, changes and updates a sandbox.
+// mutateSandbox reads, changes and updates a sandbox. The heartbeat writes the
+// same object, so an update can meet a conflict; the change is then applied to
+// the object as it is now.
 func (a *App) mutateSandbox(name string, fn func(*sandbox.Sandbox)) (*Sandbox, error) {
+	var out *Sandbox
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var err error
+		out, err = a.mutateSandboxOnce(name, fn)
+		return err
+	})
+	return out, err
+}
+
+// mutateSandboxOnce is one read-change-update attempt of mutateSandbox.
+func (a *App) mutateSandboxOnce(name string, fn func(*sandbox.Sandbox)) (*Sandbox, error) {
 	c, err := a.current()
 	if err != nil {
 		return nil, err
@@ -394,16 +475,21 @@ func (a *App) mutateSandbox(name string, fn func(*sandbox.Sandbox)) (*Sandbox, e
 	if sb.Annotations == nil {
 		sb.Annotations = map[string]string{}
 	}
+	mode := sb.Spec.OperatingMode
 	fn(sb)
-	out, err := sandbox.ToUnstructured(sb)
-	if err != nil {
-		return nil, err
+	// Only the annotations and the operating mode are written back. A typed
+	// round trip would drop the fields the Go model does not carry.
+	out := u.DeepCopy()
+	out.SetAnnotations(sb.Annotations)
+	if sb.Spec.OperatingMode != mode {
+		if err := unstructured.SetNestedField(out.Object, string(sb.Spec.OperatingMode), "spec", "operatingMode"); err != nil {
+			return nil, err
+		}
 	}
-	out.SetResourceVersion(u.GetResourceVersion())
 	if err := c.k8s.Update(ctx, out); err != nil {
 		return nil, err
 	}
-	return toSandbox(ctx, c, out), nil
+	return toSandbox(out, sandboxPodOf(ctx, c)), nil
 }
 
 func listSandboxes(ctx context.Context, c *Connection) ([]*unstructured.Unstructured, error) {
@@ -435,8 +521,37 @@ func getSandbox(ctx context.Context, c *Connection, name string) (*unstructured.
 	return u, nil
 }
 
+// podLookup returns the pod named name: nil when there is none, and unknown when
+// the pod could not be read at all.
+type podLookup func(name string) (pod *corev1.Pod, unknown bool)
+
+// sandboxPodOf reads one pod with a GET; a single sandbox read needs no list.
+func sandboxPodOf(ctx context.Context, c *Connection) podLookup {
+	return func(name string) (*corev1.Pod, bool) {
+		pod := &corev1.Pod{}
+		if err := c.k8s.Get(ctx, types.NamespacedName{Namespace: c.namespace(), Name: name}, pod); err != nil {
+			return nil, !apierrors.IsNotFound(err)
+		}
+		return pod, false
+	}
+}
+
+// listSandboxPods lists the namespace's pods once, so a poll of the whole list
+// costs one read rather than one per sandbox.
+func listSandboxPods(ctx context.Context, c *Connection) podLookup {
+	list := &corev1.PodList{}
+	if err := c.k8s.List(ctx, list, client.InNamespace(c.namespace())); err != nil {
+		return func(string) (*corev1.Pod, bool) { return nil, true }
+	}
+	byName := make(map[string]*corev1.Pod, len(list.Items))
+	for i := range list.Items {
+		byName[list.Items[i].Name] = &list.Items[i]
+	}
+	return func(name string) (*corev1.Pod, bool) { return byName[name], false }
+}
+
 // toSandbox derives the view model from the sandbox and its pod.
-func toSandbox(ctx context.Context, c *Connection, u *unstructured.Unstructured) *Sandbox {
+func toSandbox(u *unstructured.Unstructured, pods podLookup) *Sandbox {
 	sb := &sandbox.Sandbox{}
 	if err := sandbox.FromUnstructured(u.Object, sb); err != nil {
 		return &Sandbox{Name: u.GetName(), Phase: string(sandbox.PhaseFailed), Message: err.Error()}
@@ -446,6 +561,7 @@ func toSandbox(ctx context.Context, c *Connection, u *unstructured.Unstructured)
 		Name:         sb.Name,
 		Phase:        string(phase),
 		Message:      sandbox.TrimMessages(msg),
+		Reason:       sandbox.PhaseReason(sb),
 		InstanceType: sb.Labels[naming.LabelInstanceType],
 		RuntimeClass: ptr(sb.Spec.PodTemplate.Spec.RuntimeClassName),
 		Service:      sb.Spec.Service != nil && *sb.Spec.Service,
@@ -480,15 +596,41 @@ func toSandbox(ctx context.Context, c *Connection, u *unstructured.Unstructured)
 		out.CPU, out.Memory = cpu.String(), mem.String()
 	}
 	out.GPU = sandbox.GPU(sb)
-	pod := &corev1.Pod{}
-	name := sandbox.PodName(sb)
-	if err := c.k8s.Get(ctx, types.NamespacedName{Namespace: c.namespace(), Name: name}, pod); err == nil {
+	// A suspended or expired sandbox has no pod, so its read skips the pod lookup.
+	var pod *corev1.Pod
+	var unknown bool
+	if phase != sandbox.PhaseStopped && phase != sandbox.PhaseExpired {
+		pod, unknown = pods(sandbox.PodName(sb))
+	}
+	out.PodUnknown = unknown
+	if pod != nil {
 		out.PodName, out.PodPhase = pod.Name, string(pod.Status.Phase)
+		out.ContainerRunning, out.ContainerReason = sandboxContainerState(pod)
 		if out.NodeName == "" {
 			out.NodeName = pod.Spec.NodeName
 		}
 	}
 	return out
+}
+
+// sandboxContainerState reports whether the sandbox container runs. A pod can
+// stay Running while its container crash-loops, so the pod phase is not
+// enough; when the container does not run, the reason says why it waits.
+func sandboxContainerState(pod *corev1.Pod) (bool, string) {
+	for _, st := range pod.Status.ContainerStatuses {
+		if st.Name != sandbox.ContainerName {
+			continue
+		}
+		switch {
+		case st.State.Running != nil:
+			return true, ""
+		case st.State.Waiting != nil:
+			return false, st.State.Waiting.Reason
+		case st.State.Terminated != nil:
+			return false, st.State.Terminated.Reason
+		}
+	}
+	return false, ""
 }
 
 func ptr[T any](p *T) T {
@@ -501,11 +643,16 @@ func ptr[T any](p *T) T {
 
 // registrySecretName is the pull secret of the project, or "" when the
 // registry is not set up.
-func registrySecretName(ctx context.Context, c *Connection) string {
+func registrySecretName(ctx context.Context, c *Connection) (string, error) {
 	sec := &corev1.Secret{}
 	key := client.ObjectKey{Namespace: c.namespace(), Name: naming.RegistrySecretName}
 	if err := c.k8s.Get(ctx, key, sec); err != nil {
-		return ""
+		// A missing secret means no pull secret; any other failure must not
+		// quietly create a sandbox that cannot pull its private images.
+		if apierrors.IsNotFound(err) {
+			return "", nil
+		}
+		return "", err
 	}
-	return naming.RegistrySecretName
+	return naming.RegistrySecretName, nil
 }

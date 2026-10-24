@@ -86,17 +86,24 @@ func TestFileProxyRefusesForeignOriginAndHost(t *testing.T) {
 	cases := []struct {
 		name   string
 		host   string
+		method string
 		origin string
 		want   int
 	}{
 		{name: "own origin", origin: origin, want: http.StatusOK},
 		{name: "no origin", want: http.StatusOK},
+		{name: "no origin upload", method: http.MethodPost, want: http.StatusForbidden},
+		{name: "own origin upload", method: http.MethodPost, origin: origin, want: http.StatusOK},
 		{name: "page in another origin", origin: "http://evil.example", want: http.StatusForbidden},
 		{name: "rebound host name", host: "evil.example", want: http.StatusForbidden},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			req, err := http.NewRequest(http.MethodGet, origin+"/", nil)
+			method := c.method
+			if method == "" {
+				method = http.MethodGet
+			}
+			req, err := http.NewRequest(method, origin+"/", nil)
 			if err != nil {
 				t.Fatal(err)
 			}

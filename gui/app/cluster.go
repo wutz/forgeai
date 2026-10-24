@@ -50,14 +50,17 @@ func (a *App) ListInstanceTypes() ([]InstanceType, error) {
 	return out, nil
 }
 
-// pvcRequests is the ResourceQuota name counting volume claims.
-const pvcRequests = "requests.persistentvolumeclaims"
+// pvcRequests is the ResourceQuota name counting volume claims. The operator
+// writes it under the bare name, so the constant comes from the same API key.
+var pvcRequests = string(corev1.ResourcePersistentVolumeClaims)
 
 // QuotaUsage is what the project may consume and currently runs.
 type QuotaUsage struct {
-	// gpuClasses holds the quota and use of each GPU class.
+	// GPUQuota is the project's GPU limit across all classes; 0 when unset.
+	GPUQuota int32 `json:"gpuQuota"`
+	// GPUClasses holds the current GPU use of each class.
 	GPUClasses []GPUUsage `json:"gpuClasses"`
-	// Storage allocated by volumes vs the limit.
+	// Storage allocated by volumes vs the limit. An empty limit is unlimited.
 	Storage     string `json:"storage"`
 	StorageUsed string `json:"storageUsed"`
 	Volumes     int64  `json:"volumes"`
@@ -66,10 +69,9 @@ type QuotaUsage struct {
 	PodMax      int64  `json:"podMax"`
 }
 
-// GPUUsage is the quota of one GPU class and its current use.
+// GPUUsage is the current use of one GPU class.
 type GPUUsage struct {
 	Class string `json:"class"`
-	Quota int32  `json:"quota"`
 	Used  int32  `json:"used"`
 	Pods  int    `json:"pods"`
 }
@@ -91,11 +93,12 @@ func (a *App) Quota() (*QuotaUsage, error) {
 	hard, used := rq.Status.Hard, rq.Status.Used
 	out := &QuotaUsage{
 		StorageUsed: quantityString(used, corev1.ResourceRequestsStorage, "0"),
-		Storage:     quantityString(hard, corev1.ResourceRequestsStorage, "unlimited"),
+		Storage:     quantityString(hard, corev1.ResourceRequestsStorage, ""),
 		Volumes:     quantityValue(used, pvcRequests),
 		VolumeMax:   quantityValue(hard, pvcRequests),
 		Pods:        quantityValue(used, string(corev1.ResourcePods)),
 		PodMax:      quantityValue(hard, string(corev1.ResourcePods)),
+		GPUQuota:    quantityValue32(hard, "requests."+string(instancetype.ResourceGPU)),
 	}
 
 	// GPU use per class from the pods of the project namespace.
@@ -103,7 +106,7 @@ func (a *App) Quota() (*QuotaUsage, error) {
 	if err := c.k8s.List(ctx, pods, client.InNamespace(c.namespace())); err != nil {
 		return nil, err
 	}
-	gpuUsed := map[string]int32{}
+	usage := map[string]GPUUsage{}
 	for i := range pods.Items {
 		pod := &pods.Items[i]
 		if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodPending {
@@ -119,29 +122,33 @@ func (a *App) Quota() (*QuotaUsage, error) {
 		if gpus == 0 {
 			continue
 		}
-		class := naming.GPUClass(pod.Spec.NodeSelector[naming.LabelGPUProduct])
-		gpuUsed[class] += gpus
+		class := gpuUsageClass(pod.Spec.NodeSelector[naming.LabelGPUProduct])
+		u := usage[class]
+		u.Class, u.Used, u.Pods = class, u.Used+gpus, u.Pods+1
+		usage[class] = u
 	}
-	// InstanceType status has the free counts per class; the pod scan gives
-	// the current use.
-	classes := map[string]GPUUsage{}
-	for class, n := range gpuUsed {
-		u := classes[class]
-		u.Class, u.Used = class, n
-		classes[class] = u
+	// Sorted by class so the list keeps its order between polls.
+	for _, class := range slices.Sorted(maps.Keys(usage)) {
+		out.GPUClasses = append(out.GPUClasses, usage[class])
 	}
-	for _, g := range slices.Sorted(maps.Keys(classes)) {
-		out.GPUClasses = append(out.GPUClasses, classes[g])
-	}
-	gpus := quantityValue32(used, "requests."+string(instancetype.ResourceGPU))
-	if len(out.GPUClasses) == 0 && gpus > 0 {
-		out.GPUClasses = append(out.GPUClasses, GPUUsage{Class: "*", Quota: gpus})
-	} else {
-		for i := range out.GPUClasses {
-			out.GPUClasses[i].Quota = gpus
-		}
+	// Without a running pod to attribute, the quota's use is shown unclassed.
+	if n := quantityValue32(used, "requests."+string(instancetype.ResourceGPU)); len(out.GPUClasses) == 0 && n > 0 {
+		out.GPUClasses = append(out.GPUClasses, GPUUsage{Class: "*", Used: n})
 	}
 	return out, nil
+}
+
+// unclassedGPU is the class of GPUs whose pod names no product, so the class
+// is not known. Resources shows it as unclassed use.
+const unclassedGPU = "*"
+
+// gpuUsageClass is the class a pod's GPUs count against, from the product
+// label on its node selector. A pod without one is unclassed, not a class "".
+func gpuUsageClass(product string) string {
+	if class := naming.GPUClass(product); class != "" {
+		return class
+	}
+	return unclassedGPU
 }
 
 func quantityString(list corev1.ResourceList, name corev1.ResourceName, zero string) string {

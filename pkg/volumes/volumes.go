@@ -14,14 +14,18 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	"github.com/wutz/forgeai/pkg/kf"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
+	"github.com/wutz/forgeai/pkg/training"
 )
 
 var (
@@ -95,8 +99,14 @@ func Retention(ctx context.Context, c client.Reader, ns string, platformDefault 
 	if err := c.Get(ctx, types.NamespacedName{Name: ns}, nsObj); err != nil {
 		return platformDefault, client.IgnoreNotFound(err)
 	}
+	// A namespace without a project label has no project to ask: that is the
+	// platform default, not a lookup of a project with an empty name.
+	name := nsObj.Labels[naming.LabelProject]
+	if name == "" {
+		return platformDefault, nil
+	}
 	p := &v1.Project{}
-	if err := c.Get(ctx, types.NamespacedName{Name: nsObj.Labels[naming.LabelProject]}, p); err != nil {
+	if err := c.Get(ctx, types.NamespacedName{Name: name}, p); err != nil {
 		return platformDefault, client.IgnoreNotFound(err)
 	}
 	if p.Spec.TrashRetention != nil {
@@ -137,6 +147,21 @@ func toVolume(pvc *corev1.PersistentVolumeClaim, users []string) Volume {
 	return v
 }
 
+// maxSizeGiB bounds a volume size: larger sizes overflow the byte count
+// (sizeGiB<<30) that a claim is sized with.
+const maxSizeGiB = 1 << 20
+
+// checkSize rejects a size outside 1 GiB..maxSizeGiB.
+func checkSize(sizeGiB int64) error {
+	if sizeGiB < 1 {
+		return fmt.Errorf("size must be at least 1 GiB")
+	}
+	if sizeGiB > maxSizeGiB {
+		return fmt.Errorf("size must be at most %d GiB (1 PiB)", maxSizeGiB)
+	}
+	return nil
+}
+
 // Create creates a volume of the given type and size.
 func (c *Client) Create(
 	ctx context.Context, cfg *platform.Config, name, volType string, sizeGiB int64,
@@ -144,8 +169,8 @@ func (c *Client) Create(
 	if !nameRE.MatchString(name) || len(name) > 50 {
 		return nil, fmt.Errorf("invalid volume name %q: lowercase alphanumeric or '-', at most 50 characters", name)
 	}
-	if sizeGiB < 1 {
-		return nil, fmt.Errorf("size must be at least 1 GiB")
+	if err := checkSize(sizeGiB); err != nil {
+		return nil, err
 	}
 	volType, st, err := cfg.StorageType(volType)
 	if err != nil {
@@ -235,9 +260,9 @@ func Users(pods []corev1.Pod) map[string][]string {
 	return out
 }
 
-// users maps PVC names to the active pods that block them. File server pods
-// do not count: the file server drops trashed volumes when it reconciles, and
-// its Recreate rollout stops the pod that mounted them.
+// users maps PVC names to the active pods and unfinished jobs that block them.
+// File server pods do not count: the file server drops trashed volumes when it
+// reconciles, and its Recreate rollout stops the pod that mounted them.
 func (c *Client) users(ctx context.Context) (map[string][]string, error) {
 	pods := &corev1.PodList{}
 	if err := c.K8s.List(ctx, pods, client.InNamespace(c.Namespace)); err != nil {
@@ -249,7 +274,48 @@ func (c *Client) users(ctx context.Context) (map[string][]string, error) {
 			others = append(others, p)
 		}
 	}
-	return Users(others), nil
+	out := Users(others)
+	jobs, err := c.jobUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for pvc, names := range jobs {
+		out[pvc] = append(out[pvc], names...)
+	}
+	return out, nil
+}
+
+// jobUsers maps PVC names to the unfinished jobs that mount them. A queued job has
+// no pods yet, but it mounts its volumes once admitted, and a stopped job resumes
+// where it left off, so both hold their volumes. A job that cannot be read is
+// skipped: it cannot show the mounts it holds.
+func (c *Client) jobUsers(ctx context.Context) (map[string][]string, error) {
+	list := &unstructured.UnstructuredList{}
+	list.SetGroupVersionKind(kf.TrainJobGVK.GroupVersion().WithKind("TrainJobList"))
+	if err := c.K8s.List(ctx, list, client.InNamespace(c.Namespace)); err != nil {
+		if meta.IsNoMatchError(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	out := map[string][]string{}
+	for i := range list.Items {
+		tj := &kf.TrainJob{}
+		if err := kf.FromUnstructured(list.Items[i].Object, tj); err != nil {
+			continue
+		}
+		if phase, _ := training.JobPhase(tj, nil); phase == training.PhaseSucceeded || phase == training.PhaseFailed {
+			continue
+		}
+		f, err := training.TrainJobForm(tj)
+		if err != nil {
+			continue
+		}
+		for _, m := range f.Volumes {
+			out[m.Volume] = append(out[m.Volume], tj.Name)
+		}
+	}
+	return out, nil
 }
 
 // List returns the volumes of the namespace; trash selects trashed or live volumes.
@@ -287,6 +353,9 @@ func (c *Client) Resize(ctx context.Context, name string, sizeGiB int64) (*Volum
 	}
 	if pvc.Status.Phase != corev1.ClaimBound {
 		return nil, fmt.Errorf("%w: %s is still being provisioned, grow it once it is Bound", ErrNotReady, name)
+	}
+	if err := checkSize(sizeGiB); err != nil {
+		return nil, err
 	}
 	cur := pvc.Spec.Resources.Requests[corev1.ResourceStorage]
 	if sizeGiB<<30 < cur.Value() {
@@ -349,6 +418,35 @@ func (c *Client) SetExpiry(ctx context.Context, name string, at time.Time) (*Vol
 	}
 	if !InTrash(pvc) {
 		return nil, fmt.Errorf("volume %s is not in the trash", name)
+	}
+	patch := client.MergeFrom(pvc.DeepCopy())
+	pvc.Annotations[naming.AnnotationExpireAt] = at.UTC().Format(time.RFC3339)
+	if err := c.K8s.Patch(ctx, pvc, patch); err != nil {
+		return nil, err
+	}
+	v := toVolume(pvc, nil)
+	return &v, nil
+}
+
+// ResetExpiry puts a trashed volume's purge time back to the default: retention
+// after it was trashed, under the retention its project has now. A volume with
+// no trash time counts from now, as the controller does for one labelled by hand.
+func (c *Client) ResetExpiry(ctx context.Context, name string, retention time.Duration) (*Volume, error) {
+	pvc, err := c.get(ctx, name)
+	if err != nil {
+		return nil, err
+	}
+	if !InTrash(pvc) {
+		return nil, fmt.Errorf("volume %s is not in the trash", name)
+	}
+	now := c.now()
+	base := now
+	if trashedAt, err := time.Parse(time.RFC3339, pvc.Annotations[naming.AnnotationTrashedAt]); err == nil {
+		base = trashedAt
+	}
+	at := base.Add(retention)
+	if !at.After(now) {
+		return nil, ErrPastExpiry
 	}
 	patch := client.MergeFrom(pvc.DeepCopy())
 	pvc.Annotations[naming.AnnotationExpireAt] = at.UTC().Format(time.RFC3339)

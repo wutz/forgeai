@@ -28,6 +28,8 @@ export function DeleteImage(arg1:string,arg2:string):Promise<void>;
 
 export function DeleteImageRepo(arg1:string):Promise<void>;
 
+export function DeleteImageTag(arg1:string,arg2:string,arg3:string):Promise<void>;
+
 export function DeleteJob(arg1:string):Promise<void>;
 
 export function DeleteProject(arg1:string):Promise<void>;
@@ -47,8 +49,6 @@ export function GetJob(arg1:string):Promise<app.Job>;
 export function GetProject(arg1:string):Promise<app.Project>;
 
 export function GetSandbox(arg1:string):Promise<app.Sandbox>;
-
-export function Heartbeat():Promise<void>;
 
 export function InstallDependency(arg1:string):Promise<void>;
 
@@ -70,8 +70,6 @@ export function ListTemplates():Promise<Array<app.Template>>;
 
 export function ListVolumes(arg1:boolean):Promise<Array<volumes.Volume>>;
 
-export function Logout():Promise<void>;
-
 export function Logs(arg1:string,arg2:number,arg3:number):Promise<string>;
 
 export function MemberKubeconfig(arg1:string,arg2:string):Promise<string>;
@@ -87,6 +85,8 @@ export function Quota():Promise<app.QuotaUsage>;
 export function Registry():Promise<app.Registry>;
 
 export function RerunJob(arg1:string,arg2:string):Promise<app.Job>;
+
+export function ResetVolumeExpiry(arg1:string):Promise<volumes.Volume>;
 
 export function ResizeSandboxTerminal(arg1:string,arg2:number,arg3:number):Promise<void>;
 
@@ -118,6 +118,6 @@ export function TemplateNames():Promise<Array<string>>;
 
 export function TrashVolume(arg1:string):Promise<volumes.Volume>;
 
-export function UpdateSandboxTemplate(arg1:string,arg2:sandbox.TemplateForm):Promise<app.SandboxTemplate>;
+export function UpdateSandboxTemplate(arg1:string,arg2:string,arg3:sandbox.TemplateForm):Promise<app.SandboxTemplate>;
 
-export function UpdateTemplate(arg1:string,arg2:training.Form):Promise<app.Template>;
+export function UpdateTemplate(arg1:string,arg2:string,arg3:training.Form):Promise<app.Template>;

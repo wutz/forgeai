@@ -1,11 +1,15 @@
 package app
 
 import (
+	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,6 +34,9 @@ type Project struct {
 	Ready          bool            `json:"ready"`
 	Registry       string          `json:"registry"`
 	Created        string          `json:"created"`
+	// ResourceVersion is the version the form was read at; a save over a newer
+	// version is refused so a concurrent change is not overwritten.
+	ResourceVersion string `json:"resourceVersion,omitempty"`
 }
 
 // ProjectQuota is the quota form of a project. GPU classes map class->count.
@@ -89,6 +96,9 @@ func (a *App) GetProject(name string) (*Project, error) {
 }
 
 // SaveProject creates or updates a project from the admin form.
+// errProjectChanged is returned when the project was changed after the form read it.
+var errProjectChanged = errors.New("the project changed while you were editing it; reload it and save again")
+
 func (a *App) SaveProject(f Project) error {
 	c, err := a.current()
 	if err != nil {
@@ -100,8 +110,16 @@ func (a *App) SaveProject(f Project) error {
 	p := &v1.Project{}
 	create := false
 	if err := c.k8s.Get(ctx, client.ObjectKey{Name: f.Name}, p); err != nil {
+		// Only a missing project is created: a forbidden or failed read must
+		// not turn into a create that then fails, or worse, succeeds.
+		if !apierrors.IsNotFound(err) {
+			return err
+		}
 		p = &v1.Project{ObjectMeta: metav1.ObjectMeta{Name: f.Name}}
 		create = true
+	}
+	if !create && f.ResourceVersion != "" && f.ResourceVersion != p.ResourceVersion {
+		return errProjectChanged
 	}
 	p.Spec.DisplayName = f.DisplayName
 	p.Spec.Network = v1.ProjectNetwork{
@@ -140,25 +158,31 @@ func (a *App) SaveProject(f Project) error {
 // field is unset, so the platform default applies (or unlimited for the
 // registry); clearing a limit in the form clears it on the Project.
 func applyProjectQuota(q *v1.ProjectQuota, f ProjectQuota) error {
+	// Sorted by class: map order would reorder the Project's list on every save.
 	q.GPUs = q.GPUs[:0]
-	for class, count := range f.GPUs {
-		q.GPUs = append(q.GPUs, v1.GPUQuota{Class: class, Count: count})
+	for _, class := range slices.Sorted(maps.Keys(f.GPUs)) {
+		q.GPUs = append(q.GPUs, v1.GPUQuota{Class: class, Count: f.GPUs[class]})
 	}
 	q.Storage, q.RegistryStorage, q.Volumes, q.Pods = nil, nil, nil, nil
 	for _, field := range []struct {
-		s   string
-		set func(resource.Quantity)
+		name string
+		s    string
+		set  func(resource.Quantity)
 	}{
-		{f.Storage, func(v resource.Quantity) { q.Storage = &v }},
-		{f.RegistryStorage, func(v resource.Quantity) { q.RegistryStorage = &v }},
+		{"storage", f.Storage, func(v resource.Quantity) { q.Storage = &v }},
+		{"registry storage", f.RegistryStorage, func(v resource.Quantity) { q.RegistryStorage = &v }},
 	} {
 		if field.s != "" {
 			v, err := resource.ParseQuantity(field.s)
 			if err != nil {
-				return err
+				// Name the field: the parser's message alone does not say which quota is wrong.
+				return fmt.Errorf("%s %q: %w", field.name, field.s, err)
 			}
 			field.set(v)
 		}
+	}
+	if f.Volumes < 0 || f.Pods < 0 {
+		return fmt.Errorf("volumes and pods cannot be negative; 0 means no limit")
 	}
 	if f.Volumes > 0 {
 		q.Volumes = &f.Volumes
@@ -237,17 +261,21 @@ func toProject(p *v1.Project) Project {
 		Network: ProjectNetwork{
 			Isolation: string(p.Spec.Network.Isolation), DenyInternet: p.Spec.Network.DenyInternet,
 		},
-		DeletionPolicy: string(p.Spec.DeletionPolicy),
-		Ready:          meta.IsStatusConditionTrue(p.Status.Conditions, v1.ConditionReady),
-		Registry:       p.Status.Registry.URL,
-		Created:        p.CreationTimestamp.UTC().Format(time.RFC3339),
-		Quota:          ProjectQuota{GPUs: map[string]int32{}},
+		DeletionPolicy:  string(p.Spec.DeletionPolicy),
+		Ready:           meta.IsStatusConditionTrue(p.Status.Conditions, v1.ConditionReady),
+		Registry:        p.Status.Registry.URL,
+		Created:         p.CreationTimestamp.UTC().Format(time.RFC3339),
+		ResourceVersion: p.ResourceVersion,
+		Quota:           ProjectQuota{GPUs: map[string]int32{}},
 	}
 	for _, g := range p.Spec.Quota.GPUs {
 		out.Quota.GPUs[g.Class] = g.Count
 	}
 	if p.Spec.Quota.Storage != nil {
 		out.Quota.Storage = p.Spec.Quota.Storage.String()
+	}
+	if p.Spec.Quota.RegistryStorage != nil {
+		out.Quota.RegistryStorage = p.Spec.Quota.RegistryStorage.String()
 	}
 	if p.Spec.Quota.Volumes != nil {
 		out.Quota.Volumes = *p.Spec.Quota.Volumes

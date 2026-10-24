@@ -26,6 +26,10 @@ export function Contexts() {
   return window['go']['app']['App']['Contexts']();
 }
 
+export function CreateInferenceService(arg1) {
+  return window['go']['app']['App']['CreateInferenceService'](arg1);
+}
+
 export function CreateJob(arg1) {
   return window['go']['app']['App']['CreateJob'](arg1);
 }
@@ -58,6 +62,10 @@ export function DeleteImageTag(arg1, arg2, arg3) {
   return window['go']['app']['App']['DeleteImageTag'](arg1, arg2, arg3);
 }
 
+export function DeleteInferenceService(arg1) {
+  return window['go']['app']['App']['DeleteInferenceService'](arg1);
+}
+
 export function DeleteJob(arg1) {
   return window['go']['app']['App']['DeleteJob'](arg1);
 }
@@ -86,6 +94,10 @@ export function Files() {
   return window['go']['app']['App']['Files']();
 }
 
+export function GetInferenceService(arg1) {
+  return window['go']['app']['App']['GetInferenceService'](arg1);
+}
+
 export function GetJob(arg1) {
   return window['go']['app']['App']['GetJob'](arg1);
 }
@@ -96,6 +108,10 @@ export function GetProject(arg1) {
 
 export function GetSandbox(arg1) {
   return window['go']['app']['App']['GetSandbox'](arg1);
+}
+
+export function InferenceAPIKey(arg1) {
+  return window['go']['app']['App']['InferenceAPIKey'](arg1);
 }
 
 export function InstallDependency(arg1) {
@@ -116,6 +132,10 @@ export function ListDependencies() {
 
 export function ListImages() {
   return window['go']['app']['App']['ListImages']();
+}
+
+export function ListInferenceServices() {
+  return window['go']['app']['App']['ListInferenceServices']();
 }
 
 export function ListInstanceTypes() {
@@ -214,12 +234,20 @@ export function SetVolumeExpiry(arg1, arg2) {
   return window['go']['app']['App']['SetVolumeExpiry'](arg1, arg2);
 }
 
+export function StartInferenceService(arg1) {
+  return window['go']['app']['App']['StartInferenceService'](arg1);
+}
+
 export function StartJob(arg1) {
   return window['go']['app']['App']['StartJob'](arg1);
 }
 
 export function StartSandbox(arg1) {
   return window['go']['app']['App']['StartSandbox'](arg1);
+}
+
+export function StopInferenceService(arg1) {
+  return window['go']['app']['App']['StopInferenceService'](arg1);
 }
 
 export function StopJob(arg1) {

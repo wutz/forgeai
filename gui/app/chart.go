@@ -30,7 +30,7 @@ import (
 // image tag, so a release bumps both together.
 const (
 	forgeaiChart        = "oci://ghcr.io/wutz/charts/forgeai"
-	forgeaiChartVersion = "0.3.1"
+	forgeaiChartVersion = "0.4.0"
 	forgeaiRelease      = "forgeai"
 )
 

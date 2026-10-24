@@ -1,5 +1,29 @@
 export namespace app {
 	
+	export class CatalogTemplate {
+	    name: string;
+	    kind: string;
+	    displayName: string;
+	    description?: string;
+	    version: string;
+	    image?: string;
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CatalogTemplate(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.version = source["version"];
+	        this.image = source["image"];
+	        this.error = source["error"];
+	    }
+	}
 	export class ConnInfo {
 	    context: string;
 	    server: string;
@@ -43,11 +67,11 @@ export namespace app {
 	    messageKey?: string;
 	    messageArgs?: Record<string, string>;
 	    installable: boolean;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Dependency(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.name = source["name"];
@@ -621,7 +645,7 @@ export namespace app {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.gpuQuota = source["gpuQuota"];
-        this.gpuClasses = this.convertValues(source["gpuClasses"], GPUUsage);
+	        this.gpuClasses = this.convertValues(source["gpuClasses"], GPUUsage);
 	        this.storage = source["storage"];
 	        this.storageUsed = source["storageUsed"];
 	        this.volumes = source["volumes"];

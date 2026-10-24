@@ -1,0 +1,12 @@
+apiVersion: templates.forgeai.wutz.dev/v1alpha1
+kind: SandboxTemplate
+metadata:
+  name: cuda-devbox
+spec:
+  displayName: CUDA devbox
+  description: CUDA 13 development image for interactive GPU work. Idle until you open a shell from the GUI terminal.
+  version: 1.0.0
+  image: nvidia/cuda:13.0.2-devel-ubuntu22.04
+  command: |
+    set -euo pipefail
+    exec sleep infinity

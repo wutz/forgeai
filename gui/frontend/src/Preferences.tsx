@@ -2,6 +2,7 @@ import {FocusEvent as ReactFocusEvent, KeyboardEvent as ReactKeyboardEvent, useC
 import {LocaleChoice, getLocaleChoice, setLocaleChoice, subscribeLocale, t} from './i18n'
 import {ThemeChoice, getThemeChoice, setThemeChoice, subscribeTheme} from './theme'
 import {Icon, IconName} from './ui'
+import {Update, VersionMenu} from './Update'
 
 type Option<T extends string> = {value: T, label: string, icon?: IconName}
 
@@ -93,10 +94,11 @@ function PrefMenu<T extends string>({title, value, options, onChange}: {
   )
 }
 
-// Preferences is the theme and language menus at the foot of the sidebar. Each
-// is one button showing the current choice; "Auto" (follow the system) is the
-// default for both, and the choice is saved.
-export function Preferences() {
+// Preferences is the theme and language menus at the foot of the sidebar, and
+// the version menu after them. Each preference is one button showing the
+// current choice; "Auto" (follow the system) is the default for both, and the
+// choice is saved.
+export function Preferences({update}: {update: Update}) {
   const theme = useSyncExternalStore(subscribeTheme, getThemeChoice)
   const language = useSyncExternalStore(subscribeLocale, getLocaleChoice)
 
@@ -115,6 +117,7 @@ export function Preferences() {
     <div className="sidebar-prefs">
       <PrefMenu title={t('prefs.themeGroup')} value={theme} options={themes} onChange={setThemeChoice}/>
       <PrefMenu title={t('prefs.langGroup')} value={language} options={languages} onChange={setLocaleChoice}/>
+      <VersionMenu update={update}/>
     </div>
   )
 }

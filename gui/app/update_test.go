@@ -217,6 +217,13 @@ func TestCheckUpdateDevBuildSkipsNetwork(t *testing.T) {
 	}
 }
 
+func TestAppVersion(t *testing.T) {
+	useVersion(t, "0.3.1")
+	if got := (&App{}).AppVersion(); got != "0.3.1" {
+		t.Errorf("AppVersion = %q, want 0.3.1", got)
+	}
+}
+
 // tarballWith returns a gzipped tarball holding one file named name.
 func tarballWith(t *testing.T, name string, data []byte) []byte {
 	t.Helper()

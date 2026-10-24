@@ -37,6 +37,8 @@ export const en = {
   'update.installing': 'Installing…',
   'update.restarting': 'Restarting…',
   'update.failed': 'Update failed: {error}',
+  'version.menu': 'Version',
+  'version.upToDate': 'You have the latest version.',
 }
 
 export const zh: Record<keyof typeof en, string> = {
@@ -78,4 +80,6 @@ export const zh: Record<keyof typeof en, string> = {
   'update.installing': '安装中…',
   'update.restarting': '重启中…',
   'update.failed': '更新失败：{error}',
+  'version.menu': '版本',
+  'version.upToDate': '已是最新版本',
 }

@@ -103,6 +103,10 @@ func (r *githubRelease) assetURL(name string) (string, bool) {
 	return "", false
 }
 
+// AppVersion is the version of the running build, as shown in the sidebar menu.
+// A development build reports devVersion.
+func (a *App) AppVersion() string { return Version }
+
 // CheckUpdate reports whether a GUI release newer than this build is published.
 // A development build never reports one.
 func (a *App) CheckUpdate() (UpdateInfo, error) {

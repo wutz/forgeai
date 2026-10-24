@@ -6,6 +6,8 @@ import {sandbox} from '../models';
 import {volumes} from '../models';
 import {time} from '../models';
 
+export function AppVersion():Promise<string>;
+
 export function CheckUpdate():Promise<app.UpdateInfo>;
 
 export function CloseSandboxTerminal(arg1:string):Promise<void>;

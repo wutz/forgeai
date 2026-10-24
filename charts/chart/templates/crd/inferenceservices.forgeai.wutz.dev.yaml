@@ -97,6 +97,14 @@ spec:
                 minLength: 3
                 pattern: ^[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*$
                 type: string
+              nodeSelector:
+                additionalProperties:
+                  type: string
+                description: |-
+                  nodeSelector pins the model server pods to nodes with these labels, on top
+                  of the GPU product of instanceType. It is the way to avoid a node whose
+                  GPU is free but whose runtime is broken.
+                type: object
               replicas:
                 default: 1
                 description: |-

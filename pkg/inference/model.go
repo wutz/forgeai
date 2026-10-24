@@ -2,6 +2,7 @@ package inference
 
 import (
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 
@@ -211,7 +212,7 @@ func modelDeployment(
 						},
 					}},
 					Volumes:      volumes,
-					NodeSelector: it.Spec.NodeSelector,
+					NodeSelector: nodeSelector(svc, it),
 					Tolerations: []corev1.Toleration{{
 						Key: string(instancetype.ResourceGPU), Operator: corev1.TolerationOpExists, Effect: corev1.TaintEffectNoSchedule,
 					}},
@@ -220,6 +221,21 @@ func modelDeployment(
 			},
 		},
 	}
+}
+
+// nodeSelector places the model server pods: the labels of the InstanceType,
+// which pick the GPU product, and on top of them the ones the service asks for,
+// which can tell two nodes of the same product apart.
+func nodeSelector(svc *v1.InferenceService, it *v1.InstanceType) map[string]string {
+	sel := maps.Clone(it.Spec.NodeSelector)
+	if len(svc.Spec.NodeSelector) == 0 {
+		return sel
+	}
+	if sel == nil {
+		sel = map[string]string{}
+	}
+	maps.Copy(sel, svc.Spec.NodeSelector)
+	return sel
 }
 
 // startupFailureThreshold is how many startup probes of startupPeriodSeconds

@@ -235,6 +235,7 @@ export namespace app {
 	    replicas: number;
 	    args: string[];
 	    huggingFaceSecret: string;
+	    nodeSelector: Record<string, string>;
 	
 	    static createFrom(source: any = {}) {
 	        return new InferenceForm(source);
@@ -249,6 +250,7 @@ export namespace app {
 	        this.replicas = source["replicas"];
 	        this.args = source["args"];
 	        this.huggingFaceSecret = source["huggingFaceSecret"];
+	        this.nodeSelector = source["nodeSelector"];
 	    }
 	}
 	export class InferenceService {
@@ -262,6 +264,7 @@ export namespace app {
 	    apiKeySecret?: string;
 	    args?: string[];
 	    huggingFaceSecret?: string;
+	    nodeSelector?: Record<string, string>;
 	    reason: string;
 	    message?: string;
 	    ready: boolean;
@@ -285,6 +288,7 @@ export namespace app {
 	        this.apiKeySecret = source["apiKeySecret"];
 	        this.args = source["args"];
 	        this.huggingFaceSecret = source["huggingFaceSecret"];
+	        this.nodeSelector = source["nodeSelector"];
 	        this.reason = source["reason"];
 	        this.message = source["message"];
 	        this.ready = source["ready"];
@@ -906,17 +910,17 @@ export namespace app {
 		    return a;
 		}
 	}
-
+	
 	export class UpdateInfo {
 	    current: string;
 	    latest: string;
 	    available: boolean;
 	    url: string;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new UpdateInfo(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.current = source["current"];

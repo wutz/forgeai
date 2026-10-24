@@ -36,6 +36,8 @@ type InferenceService struct {
 	APIKeySecret      string   `json:"apiKeySecret,omitempty"`
 	Args              []string `json:"args,omitempty"`
 	HuggingFaceSecret string   `json:"huggingFaceSecret,omitempty"`
+	// NodeSelector pins the model servers to nodes with these labels.
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 	// Reason and Message are the Ready condition: Ready, Starting, Stopped or a failure.
 	Reason  string `json:"reason"`
 	Message string `json:"message,omitempty"`
@@ -55,6 +57,9 @@ type InferenceForm struct {
 	Replicas          int32    `json:"replicas"`
 	Args              []string `json:"args"`
 	HuggingFaceSecret string   `json:"huggingFaceSecret"`
+	// NodeSelector pins the model servers to nodes with these labels, on top of
+	// the GPU product of the instance type.
+	NodeSelector map[string]string `json:"nodeSelector"`
 }
 
 // ListInferenceServices lists the InferenceServices of the project, newest first.
@@ -259,6 +264,14 @@ func checkInferenceForm(f InferenceForm, namespace string) error {
 			return fmt.Errorf("huggingFaceSecret %q: %s", f.HuggingFaceSecret, strings.Join(errs, "; "))
 		}
 	}
+	for k, v := range f.NodeSelector {
+		if errs := validation.IsQualifiedName(k); len(errs) > 0 {
+			return fmt.Errorf("node selector key %q: %s", k, strings.Join(errs, "; "))
+		}
+		if errs := validation.IsValidLabelValue(v); len(errs) > 0 {
+			return fmt.Errorf("node selector %s=%q: %s", k, v, strings.Join(errs, "; "))
+		}
+	}
 	return nil
 }
 
@@ -273,6 +286,7 @@ func renderInferenceService(f InferenceForm, namespace string) *v1.InferenceServ
 			Replicas:          f.Replicas,
 			Args:              f.Args,
 			HuggingFaceSecret: f.HuggingFaceSecret,
+			NodeSelector:      f.NodeSelector,
 		},
 	}
 }
@@ -289,6 +303,7 @@ func toInferenceService(svc *v1.InferenceService) *InferenceService {
 		APIKeySecret:      svc.Status.APIKeySecret,
 		Args:              svc.Spec.Args,
 		HuggingFaceSecret: svc.Spec.HuggingFaceSecret,
+		NodeSelector:      svc.Spec.NodeSelector,
 		Stopped:           svc.Annotations[naming.AnnotationStopped] == naming.LiteralTrue,
 		Created:           svc.CreationTimestamp.UTC().Format(time.RFC3339),
 		Age:               shortDur(time.Since(svc.CreationTimestamp.Time)),

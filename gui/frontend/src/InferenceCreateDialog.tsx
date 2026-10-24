@@ -8,6 +8,19 @@ import {t} from './i18n'
 // MODEL_PATTERN is the Hugging Face repository form the backend accepts.
 const MODEL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9][A-Za-z0-9._-]*$/
 
+// parseSelector turns "key=value, key=value" into a node selector. A pair that
+// is not key=value leaves the selector null, so the field is marked and Create
+// stays disabled rather than sending a selector the backend would refuse.
+function parseSelector(text: string): Record<string, string> | null {
+  const out: Record<string, string> = {}
+  for (const pair of text.split(/[,\n]/).map(p => p.trim()).filter(Boolean)) {
+    const i = pair.indexOf('=')
+    if (i <= 0 || i === pair.length - 1) return null
+    out[pair.slice(0, i).trim()] = pair.slice(i + 1).trim()
+  }
+  return out
+}
+
 // InferenceCreateDialog is the "New inference service" form: the model, the
 // instance type each replica runs on, the replica count and the vLLM arguments.
 export function InferenceCreateDialog({onClose, onCreated}: {
@@ -24,6 +37,7 @@ export function InferenceCreateDialog({onClose, onCreated}: {
   const [replicas, setReplicas] = useState(1)
   const [argsText, setArgsText] = useState('')
   const [hfSecret, setHfSecret] = useState('')
+  const [selectorText, setSelectorText] = useState('')
 
   useEffect(() => {
     ListInstanceTypes().then(ts => {
@@ -36,12 +50,14 @@ export function InferenceCreateDialog({onClose, onCreated}: {
   const nameOK = NAME_PATTERN.test(name) && name.length <= NAME_MAX
   const modelOK = MODEL_PATTERN.test(model.trim())
   const replicasOK = Number.isInteger(replicas) && replicas >= 1
+  const selector = parseSelector(selectorText)
   // The footer names the blocker that has no field hint of its own, so a disabled
   // Create is never unexplained.
   const blocker = !nameOK ? t('inference.create.blockerName')
     : !modelOK ? t('inference.create.blockerModel')
     : !instance ? t('inference.create.blockerInstance')
     : !replicasOK ? t('inference.create.blockerReplicas')
+    : selector === null ? t('inference.create.blockerSelector')
     : ''
   const canSubmit = !busy && blocker === '' && types !== null
 
@@ -57,6 +73,7 @@ export function InferenceCreateDialog({onClose, onCreated}: {
       replicas,
       args: argsText.split('\n'),
       huggingFaceSecret: hfSecret.trim(),
+      nodeSelector: selector ?? {},
     })).then(s => onCreated(s.name)).catch(e => {
       setError(errText(e))
       setBusy(false)
@@ -106,6 +123,13 @@ export function InferenceCreateDialog({onClose, onCreated}: {
                 ))}
               </select>}
             <span className="hint">{t('inference.create.instanceHint')}</span>
+          </div>
+          <div className="field">
+            <label htmlFor="i-node-selector">{t('inference.create.nodeSelector')}</label>
+            <input id="i-node-selector" className="input mono" value={selectorText} disabled={busy}
+                   placeholder="kubernetes.io/hostname=gn-10-243-145-105"
+                   onChange={e => setSelectorText(e.target.value)} aria-invalid={selector === null}/>
+            <span className="hint">{t('inference.create.nodeSelectorHint')}</span>
           </div>
           <div className="field">
             <label htmlFor="i-replicas">{t('inference.create.replicas')}</label>

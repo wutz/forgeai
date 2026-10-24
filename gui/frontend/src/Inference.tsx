@@ -268,6 +268,9 @@ function InferenceDetail({name, onChanged, onDeleted, onClose}: {
           <dt>{t('inference.replicas')}</dt><dd className="mono">{svc.readyReplicas}/{svc.replicas}</dd>
           {svc.args && svc.args.length > 0 && <><dt>{t('inference.args')}</dt><dd className="mono">{svc.args.join(' ')}</dd></>}
           {svc.huggingFaceSecret && <><dt>{t('inference.hfSecret')}</dt><dd className="mono">{svc.huggingFaceSecret}</dd></>}
+          {svc.nodeSelector && Object.keys(svc.nodeSelector).length > 0 &&
+            <><dt>{t('inference.nodeSelector')}</dt>
+              <dd className="mono">{Object.entries(svc.nodeSelector).map(([k, v]) => `${k}=${v}`).join(', ')}</dd></>}
           <dt>{t('inference.endpoint')}</dt>
           <dd className="mono">
             {endpoint || '—'}

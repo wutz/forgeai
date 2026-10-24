@@ -24,6 +24,7 @@ export const en = {
   'inference.hideKey': 'Hide',
   'inference.keyUnavailable': 'The API key is not ready yet.',
   'inference.args': 'Arguments',
+  'inference.nodeSelector': 'Node selector',
   'inference.hfSecret': 'Hugging Face secret',
   'inference.created': 'Created',
   'inference.example': 'Example request',
@@ -48,6 +49,8 @@ export const en = {
   'inference.create.instance': 'Instance type',
   'inference.create.instanceHint': 'Each replica runs on one instance, and the model uses all of its GPUs.',
   'inference.create.noGPU': 'No instance type with GPUs is available.',
+  'inference.create.nodeSelector': 'Node selector',
+  'inference.create.nodeSelectorHint': 'Optional node labels as key=value, separated by commas. Narrows the nodes of the instance type, e.g. to avoid one whose GPU driver is broken.',
   'inference.create.replicas': 'Replicas',
   'inference.create.args': 'Extra vLLM arguments',
   'inference.create.argsHint': 'Separated by spaces or new lines, e.g. --max-model-len 65536',
@@ -59,6 +62,7 @@ export const en = {
   'inference.create.blockerModel': 'Enter a Hugging Face model as owner/name.',
   'inference.create.blockerInstance': 'Choose an instance type.',
   'inference.create.blockerReplicas': 'Replicas must be at least 1.',
+  'inference.create.blockerSelector': 'Enter the node selector as key=value, separated by commas.',
 }
 
 export const zh: Record<keyof typeof en, string> = {
@@ -85,6 +89,7 @@ export const zh: Record<keyof typeof en, string> = {
   'inference.hideKey': '隐藏',
   'inference.keyUnavailable': 'API 密钥尚未就绪。',
   'inference.args': '参数',
+  'inference.nodeSelector': '节点选择器',
   'inference.hfSecret': 'Hugging Face 密钥',
   'inference.created': '创建时间',
   'inference.example': '调用示例',
@@ -109,6 +114,8 @@ export const zh: Record<keyof typeof en, string> = {
   'inference.create.instance': '实例类型',
   'inference.create.instanceHint': '每个副本运行在一个实例上，模型使用其全部 GPU。',
   'inference.create.noGPU': '没有可用的 GPU 实例类型。',
+  'inference.create.nodeSelector': '节点选择器',
+  'inference.create.nodeSelectorHint': '可选的节点标签，格式为 key=value，多个用逗号分隔。在实例类型的节点中进一步筛选，例如避开 GPU 驱动故障的节点。',
   'inference.create.replicas': '副本数',
   'inference.create.args': '额外 vLLM 参数',
   'inference.create.argsHint': '以空格或换行分隔，例如 --max-model-len 65536',
@@ -120,4 +127,5 @@ export const zh: Record<keyof typeof en, string> = {
   'inference.create.blockerModel': '请输入 owner/name 形式的 Hugging Face 模型。',
   'inference.create.blockerInstance': '请选择实例类型。',
   'inference.create.blockerReplicas': '副本数至少为 1。',
+  'inference.create.blockerSelector': '节点选择器格式应为 key=value，多个用逗号分隔。',
 }

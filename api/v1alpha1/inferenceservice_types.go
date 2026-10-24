@@ -53,6 +53,11 @@ type InferenceServiceSpec struct {
 	// needed for gated models.
 	// +optional
 	HuggingFaceSecret string `json:"huggingFaceSecret,omitempty"`
+	// nodeSelector pins the model server pods to nodes with these labels, on top
+	// of the GPU product of instanceType. It is the way to avoid a node whose
+	// GPU is free but whose runtime is broken.
+	// +optional
+	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 }
 
 // InferenceServiceStatus defines the observed state of InferenceService.

@@ -89,7 +89,8 @@ export function Sandboxes() {
 function SandboxTable({boxes, failed, selected, onSelect}: {
   boxes: app.Sandbox[] | null, failed: boolean, selected: string | null, onSelect: (name: string) => void
 }) {
-  if (!boxes) return <Card>{failed ? null : <Spinner label={t('common.loading')}/>}</Card>
+  // A failed first read leaves nothing to list, so the card is left out under the banner.
+  if (!boxes) return failed ? null : <Card><Spinner label={t('common.loading')}/></Card>
   if (!boxes.length) {
     return <Card><Empty icon="box" title={t('sandboxes.emptyTitle')}>
       {t('sandboxes.emptyHint')}</Empty></Card>

@@ -59,9 +59,10 @@ export function Resources() {
                     detail={quota === null ? '' : quota.storageUsed && quota.storageUsed !== '0' ? t('resources.storageUsed', {used: quota.storageUsed}) : t('resources.nothingUsed')}/>
       </div>
 
-      <Card title={t('resources.instanceTypes')} subtitle={t('resources.instanceTypesSubtitle')}>
+      {/* The card's title would sit over an empty body, so it is left out with the list when the read failed. */}
+      {(types || !error) && <Card title={t('resources.instanceTypes')} subtitle={t('resources.instanceTypesSubtitle')}>
         {!types ? (
-          error ? null : <Spinner label={t('common.loading')}/>
+          <Spinner label={t('common.loading')}/>
         ) : types.length === 0 ? (
           <Empty icon="cpu" title={t('resources.noGpuNodesTitle')}>
             {t('resources.noGpuNodesHint')}
@@ -96,7 +97,7 @@ export function Resources() {
             </tbody>
           </table>
         )}
-      </Card>
+      </Card>}
 
       {quota && (
         <Card title={t('resources.projectQuota')} subtitle={t('resources.projectQuotaSubtitle')}

@@ -68,9 +68,10 @@ export function Admin({onProjectsChanged}: {onProjectsChanged: () => void}) {
       {editing && <ProjectDialog form={editing} onClose={() => setEditing(null)}
                                  onSaved={() => { setEditing(null); onProjectsChanged(); refresh().catch(() => undefined) }}/>}
 
-      <Card>
+      {/* A failed first read leaves no list, so the card is left out rather than drawn empty under the banner. */}
+      {(projects || !error) && <Card>
         {!projects ? (
-          error ? null : <Spinner label={t('common.loading')}/>
+          <Spinner label={t('common.loading')}/>
         ) : projects.length === 0 ? (
           <Empty icon="shield" title={t('admin.noProjects')}>
             {t('admin.noProjectsHint')}
@@ -117,7 +118,7 @@ export function Admin({onProjectsChanged}: {onProjectsChanged: () => void}) {
             </tbody>
           </table>
         )}
-      </Card>
+      </Card>}
     </div>
   )
 }

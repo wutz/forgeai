@@ -100,9 +100,10 @@ export function Volumes() {
       {recycling && <RecycleBinDialog volumes={trash} loadError={trashError} onChanged={refresh} onClose={() => setRecycling(false)}/>}
       {confirm.dialog}
 
-      <Card>
+      {/* A failed first read leaves no list, so the card is left out rather than drawn empty under the banner. */}
+      {(items || !error) && <Card>
         {!items ? (
-          error ? null : <Spinner label={t('common.loading')}/>
+          <Spinner label={t('common.loading')}/>
         ) : items.length === 0 ? (
           <Empty icon="database" title={t('volumes.emptyTitle')}>{t('volumes.emptyHint')}</Empty>
         ) : (
@@ -143,7 +144,7 @@ export function Volumes() {
             </tbody>
           </table>
         )}
-      </Card>
+      </Card>}
     </div>
   )
 }

@@ -125,9 +125,10 @@ export function Dependencies() {
       </div>}
       {confirm.dialog}
 
-      <Card>
+      {/* A failed first read leaves no list to show, so the card is left out rather than drawn empty under the banner. */}
+      {(data || !error) && <Card>
         {!data ? (
-          error ? null : <Spinner label={t('deps.checking')}/>
+          <Spinner label={t('deps.checking')}/>
         ) : (
           <table className="table table-wrap">
             <thead>
@@ -193,7 +194,7 @@ export function Dependencies() {
             </tbody>
           </table>
         )}
-      </Card>
+      </Card>}
     </div>
   )
 }

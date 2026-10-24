@@ -104,19 +104,22 @@ export function Jobs({focus}: {focus?: {name: string} | null}) {
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {creating && <JobCreateDialog onClose={() => setCreating(false)} onCreated={name => {
         setCreating(false)
+        // A new job is queued or running, so a filter that is not All may hide it; the list goes back to All with it open.
+        setFilter('all')
         setSelected(name)
         refresh()
       }}/>}
 
       <div className="list-toolbar">
-        <Segmented options={filterOptions()} value={filter} onChange={chooseFilter} counts={counts}/>
+        {/* Counts are left out until the list is read: zeros would say the cluster has no jobs. */}
+        <Segmented options={filterOptions()} value={filter} onChange={chooseFilter} counts={jobs ? counts : undefined}/>
       </div>
 
       <div className="split" ref={split}>
         <JobTable jobs={shown} failed={!!error} filtered={filter !== 'all'} selected={selected} onSelect={n =>
           setSelected(prev => prev === n ? null : n)}/>
         {/* Keyed by name: a read still in flight for the previous job lands on an unmounted detail. */}
-        {selected && <JobDetail key={selected} name={selected} onDone={refresh} onOpen={n => { setSelected(n); refresh() }}
+        {selected && <JobDetail key={selected} name={selected} onDone={refresh} onOpen={n => { setFilter('all'); setSelected(n); refresh() }}
                                 onDeleted={() => { setSelected(null); refresh() }}
                                 onClose={closeDetail}/>}
       </div>
@@ -127,7 +130,8 @@ export function Jobs({focus}: {focus?: {name: string} | null}) {
 function JobTable({jobs, failed, filtered, selected, onSelect}: {
   jobs: app.Job[] | null, failed: boolean, filtered: boolean, selected: string | null, onSelect: (name: string) => void
 }) {
-  if (!jobs) return <Card>{failed ? null : <Spinner label={t('common.loading')}/>}</Card>
+  // A failed first read leaves nothing to list, so the card is left out under the banner.
+  if (!jobs) return failed ? null : <Card><Spinner label={t('common.loading')}/></Card>
   if (!jobs.length) {
     return <Card>{filtered
       ? <Empty icon="play" title={t('jobs.emptyFiltered')}/>

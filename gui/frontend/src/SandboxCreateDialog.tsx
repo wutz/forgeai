@@ -1,7 +1,7 @@
 import {FormEvent, useEffect, useRef, useState} from 'react'
 import {CatalogSandboxForm, CatalogSources, CreateSandbox, ListInstanceTypes, ListVolumes, SandboxOptions, SandboxTemplates} from '../wailsjs/go/app/App'
 import {app, sandbox, volumes, v1} from '../wailsjs/go/models'
-import {envErrors, envToLines, formatGoDuration, linesToEnv, errText, generateName, NAME_PATTERN, SANDBOX_NAME_MAX} from './util'
+import {envErrors, envToLines, formatGoDuration, linesToEnv, errText, generateName, NAME_PATTERN, SANDBOX_NAME_MAX, SSH_NAME_MAX} from './util'
 import {CancelButton, Dialog} from './ui'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
@@ -24,7 +24,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   const [vols, setVols] = useState<volumes.Volume[] | null>(null)
   const [volsError, setVolsError] = useState('')
   const [f, setF] = useState<sandbox.Form>(sandbox.Form.createFrom({
-    name: generateName('sandbox'), image: '', command: '', env: [], instanceType: '', runtimeClass: '', service: true,
+    name: generateName('sandbox'), image: '', command: '', env: [], instanceType: '', runtimeClass: '', service: true, ssh: false,
     volumes: [], ttl: v1.Duration.createFrom({Duration: 0}),
   }))
   const [envText, setEnvText] = useState('')
@@ -112,8 +112,9 @@ export function SandboxCreateDialog({onClose, onCreated}: {
 
   const envBad = envErrors(envText)
   // The backend rejects a name that does not start with a letter, or is longer
-  // than the sandbox limit; the field says so before Create is pressed.
-  const nameOK = NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= SANDBOX_NAME_MAX
+  // than the sandbox limit (shorter with SSH); the field says so before Create is pressed.
+  const nameMax = f.ssh ? SSH_NAME_MAX : SANDBOX_NAME_MAX
+  const nameOK = NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= nameMax
   // Negative durations are refused by the backend; the fields say so before Create.
   const ttlOK = Number.isFinite(ttlHours) && ttlHours >= 0 && ttlHours <= MAX_TTL_HOURS
   const idleOK = idleMinutes === null || (Number.isFinite(idleMinutes) && idleMinutes >= 0 && idleMinutes <= MAX_TTL_HOURS * 60)
@@ -193,12 +194,12 @@ export function SandboxCreateDialog({onClose, onCreated}: {
             <label htmlFor="s-name">{t('common.name')}</label>
             <input id="s-name" className="input mono" value={f.name}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                   onChange={e => set('name', e.target.value)} maxLength={SANDBOX_NAME_MAX}
+                   onChange={e => set('name', e.target.value)} maxLength={nameMax}
                    aria-invalid={!nameOK}
                    placeholder="agent" required/>
             <span className="hint">{t('sandboxCreate.nameHint')}</span>
             {!nameOK && (f.name ?? '') !== '' && <span className="hint hint-error">
-              {t('common.nameInvalid', {max: SANDBOX_NAME_MAX})}
+              {t('common.nameInvalid', {max: nameMax})}
             </span>}
           </div>
           <div className="field">
@@ -280,6 +281,15 @@ export function SandboxCreateDialog({onClose, onCreated}: {
                 <option value="yes">{t('sandboxCreate.serviceYes')}</option>
                 <option value="no">{t('sandboxCreate.serviceNo')}</option>
               </select>
+            </div>
+            <div className="field">
+              <label htmlFor="s-ssh">{t('sandboxCreate.sshLabel')}</label>
+              <select id="s-ssh" className="select" value={f.ssh ? 'yes' : 'no'}
+                      onChange={e => set('ssh', e.target.value === 'yes')}>
+                <option value="no">{t('sandboxCreate.sshNo')}</option>
+                <option value="yes">{t('sandboxCreate.sshYes')}</option>
+              </select>
+              {f.ssh && <span className="hint">{t('sandboxCreate.sshHint', {max: SSH_NAME_MAX})}</span>}
             </div>
           </div>
         </form>

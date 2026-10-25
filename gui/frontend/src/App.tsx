@@ -1,4 +1,4 @@
-import {Fragment, ReactNode, useContext, useEffect, useRef, useState, useSyncExternalStore} from 'react'
+import {Fragment, ReactNode, useEffect, useRef, useState, useSyncExternalStore} from 'react'
 import {Connect, Contexts, Projects} from '../wailsjs/go/app/App'
 import {Environment} from '../wailsjs/runtime/runtime'
 import {app} from '../wailsjs/go/models'
@@ -6,7 +6,6 @@ import {Overview} from './Overview'
 import {Jobs} from './Jobs'
 import {Inference} from './Inference'
 import {Sandboxes} from './Sandboxes'
-import {Templates} from './Templates'
 import {Volumes} from './Volumes'
 import {FilesView} from './FilesView'
 import {Images} from './Images'
@@ -15,7 +14,7 @@ import {Admin} from './Admin'
 import {Dependencies} from './Dependencies'
 import {Scope} from './Scope'
 import {errText} from './util'
-import {ActiveView, Empty, HeaderSlot, Icon, IconName, Spinner} from './ui'
+import {Empty, HeaderSlot, Icon, IconName, Pane, Spinner} from './ui'
 import {Preferences} from './Preferences'
 import {TemplateSourcesDialog} from './TemplateSourcesDialog'
 import {UpdateButton, useUpdate} from './Update'
@@ -30,7 +29,7 @@ const SIDEBAR = 'forgeai.sidebar'
 const NARROW = '(max-width: 820px)'
 const isNarrow = () => window.matchMedia(NARROW).matches
 
-type Area = 'overview' | 'jobs' | 'sandboxes' | 'inference' | 'templates' | 'volumes' | 'files' | 'images' | 'resources'
+type Area = 'overview' | 'jobs' | 'sandboxes' | 'inference' | 'volumes' | 'files' | 'images' | 'resources'
   | 'admin' | 'dependencies'
 
 type NavItem = {area: Area, label: string, icon: IconName}
@@ -80,19 +79,6 @@ function areaFor(current: Area, info: app.ConnInfo): Area {
   if (current === 'sandboxes' && !info.sandboxes) return 'overview'
   if (current === 'inference' && !info.inference) return 'overview'
   return current
-}
-
-// Pane keeps a view mounted while another area is on screen, so the view keeps
-// its selections, filters and drafts. Only the view on screen owns the header.
-function Pane({on, children}: {on: boolean, children: ReactNode}) {
-  const slot = useContext(HeaderSlot)
-  return (
-    <ActiveView.Provider value={on}>
-      <HeaderSlot.Provider value={on ? slot : null}>
-        <div hidden={!on}>{children}</div>
-      </HeaderSlot.Provider>
-    </ActiveView.Provider>
-  )
 }
 
 export default function App() {
@@ -212,16 +198,16 @@ export default function App() {
 
   // The sidebar groups areas like the reference consoles: workspace, storage,
   // cluster catalogue, then admin. Sandboxes appear only when the connected
-  // cluster runs agents.x-k8s.io.
+  // cluster runs agents.x-k8s.io. Templates are reached from the tab row of
+  // their Sandboxes and Jobs pages.
   const groups: {label: string, items: NavItem[]}[] = conn?.project ? [
     {
       label: t('nav.workspace'),
       items: [
         {area: 'overview', label: t('nav.overview'), icon: 'grid'},
-        {area: 'jobs', label: t('nav.jobs'), icon: 'play'},
         ...(conn.sandboxes ? [{area: 'sandboxes', label: t('nav.sandboxes'), icon: 'box'} as NavItem] : []),
+        {area: 'jobs', label: t('nav.jobs'), icon: 'play'},
         ...(conn.inference ? [{area: 'inference', label: t('nav.inference'), icon: 'bolt'} as NavItem] : []),
-        {area: 'templates', label: t('nav.templates'), icon: 'scroll'},
       ],
     },
     {
@@ -295,7 +281,6 @@ export default function App() {
                 {shown('jobs', <Jobs focus={jobFocus}/>)}
                 {shown('sandboxes', <Sandboxes/>)}
                 {shown('inference', <Inference/>)}
-                {shown('templates', <Templates sandboxes={conn.sandboxes}/>)}
                 {shown('volumes', <Volumes/>)}
                 {shown('files', <FilesView/>)}
                 {shown('images', <Images/>)}

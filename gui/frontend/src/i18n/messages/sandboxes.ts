@@ -3,6 +3,7 @@
 export const en = {
   'sandboxes.title': 'Sandboxes',
   'sandboxes.eyebrow': 'Workspace',
+  'sandboxes.templates': 'Templates',
   'sandboxes.runningCount': '{running} running of {total}',
   'sandboxes.new': 'New sandbox',
   'sandboxes.emptyTitle': 'No sandboxes yet',
@@ -86,6 +87,12 @@ export const en = {
   'sandboxCreate.serviceLabel': 'Service',
   'sandboxCreate.serviceYes': 'Yes (stable DNS name)',
   'sandboxCreate.serviceNo': 'No (pod IP only)',
+  'sandboxCreate.sshLabel': 'SSH',
+  'sandboxCreate.sshNo': 'No',
+  'sandboxCreate.sshYes': 'Yes (key login through the platform gateway)',
+  'sandboxCreate.sshHint': 'Runs sshd beside the agent. Logins need a key that an SSH route authorizes. With SSH the name is at most {max} characters.',
+  'sandboxes.ssh': 'SSH',
+  'sandboxes.sshHint': 'Log in through the platform SSH gateway with a key that an SSH route authorizes. Keys only: passwords are refused.',
 
   'terminal.sessionEnded': 'session ended',
   'terminal.connecting': 'Connecting…',
@@ -101,6 +108,7 @@ export const en = {
 export const zh: Record<keyof typeof en, string> = {
   'sandboxes.title': '沙箱',
   'sandboxes.eyebrow': '工作区',
+  'sandboxes.templates': '模板',
   'sandboxes.runningCount': '运行中 {running} / 共 {total}',
   'sandboxes.new': '新建沙箱',
   'sandboxes.emptyTitle': '暂无沙箱',
@@ -184,6 +192,12 @@ export const zh: Record<keyof typeof en, string> = {
   'sandboxCreate.serviceLabel': '服务',
   'sandboxCreate.serviceYes': '是（稳定的 DNS 名称）',
   'sandboxCreate.serviceNo': '否（仅 Pod IP）',
+  'sandboxCreate.sshLabel': 'SSH',
+  'sandboxCreate.sshNo': '否',
+  'sandboxCreate.sshYes': '是（通过平台网关以密钥登录）',
+  'sandboxCreate.sshHint': '在智能体旁运行 sshd。登录需要 SSH 路由授权的密钥。开启 SSH 时，名称最多 {max} 个字符。',
+  'sandboxes.ssh': 'SSH',
+  'sandboxes.sshHint': '通过平台 SSH 网关登录，需使用 SSH 路由授权的密钥。仅允许密钥登录，拒绝密码。',
 
   'terminal.sessionEnded': '会话已结束',
   'terminal.connecting': '连接中…',

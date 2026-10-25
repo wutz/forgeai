@@ -818,6 +818,8 @@ export namespace app {
 	    runtimeClass?: string;
 	    service: boolean;
 	    serviceFQDN?: string;
+	    ssh?: boolean;
+	    sshEndpoint?: string;
 	    podIPs?: string[];
 	    nodeName?: string;
 	    podName?: string;
@@ -852,6 +854,8 @@ export namespace app {
 	        this.runtimeClass = source["runtimeClass"];
 	        this.service = source["service"];
 	        this.serviceFQDN = source["serviceFQDN"];
+	        this.ssh = source["ssh"];
+	        this.sshEndpoint = source["sshEndpoint"];
 	        this.podIPs = source["podIPs"];
 	        this.nodeName = source["nodeName"];
 	        this.podName = source["podName"];
@@ -1060,6 +1064,7 @@ export namespace sandbox {
 	    instanceType?: string;
 	    runtimeClass?: string;
 	    service?: boolean;
+	    ssh?: boolean;
 	    volumes?: VolumeMount[];
 	    template?: string;
 	    ttl: v1.Duration;
@@ -1078,6 +1083,7 @@ export namespace sandbox {
 	        this.instanceType = source["instanceType"];
 	        this.runtimeClass = source["runtimeClass"];
 	        this.service = source["service"];
+	        this.ssh = source["ssh"];
 	        this.volumes = this.convertValues(source["volumes"], VolumeMount);
 	        this.template = source["template"];
 	        this.ttl = this.convertValues(source["ttl"], v1.Duration);

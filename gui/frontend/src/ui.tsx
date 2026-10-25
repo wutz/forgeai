@@ -17,6 +17,19 @@ export const HeaderSlot = createContext<HTMLElement | null>(null)
 export const ActiveView = createContext(true)
 export const useActive = () => useContext(ActiveView)
 
+// Pane keeps a view mounted while another view is on screen, so the view keeps
+// its selections, filters and drafts. Only the view on screen owns the header.
+export function Pane({on, children}: {on: boolean, children: ReactNode}) {
+  const slot = useContext(HeaderSlot)
+  return (
+    <ActiveView.Provider value={on}>
+      <HeaderSlot.Provider value={on ? slot : null}>
+        <div hidden={!on}>{children}</div>
+      </HeaderSlot.Provider>
+    </ActiveView.Provider>
+  )
+}
+
 // Icon is a 16px stroke icon (Lucide-style paths, 1.75 stroke).
 const ICONS = {
   grid: 'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',
@@ -36,6 +49,7 @@ const ICONS = {
   copy: 'M9 9h11v11H9zM5 15H4V4h11v1',
   close: 'M6 6l12 12M18 6 6 18',
   chevron: 'm9 6 6 6-6 6',
+back: 'M15 18l-6-6 6-6',
   download: 'M12 4v11M7 10l5 5 5-5M5 20h14',
   clock: 'M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z',
   bolt: 'M13 2 4 14h7l-1 8 9-12h-7z',

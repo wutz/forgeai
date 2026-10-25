@@ -6,11 +6,15 @@ import {app} from '../models';
 import {volumes} from '../models';
 import {time} from '../models';
 
+export function AppVersion():Promise<string>;
+
 export function CatalogJobForm(arg1:string):Promise<training.Form>;
 
 export function CatalogSandboxForm(arg1:string):Promise<sandbox.TemplateForm>;
 
 export function CatalogTemplates():Promise<Array<app.CatalogTemplate>>;
+
+export function CheckUpdate():Promise<app.UpdateInfo>;
 
 export function CloseSandboxTerminal(arg1:string):Promise<void>;
 
@@ -57,6 +61,8 @@ export function GetProject(arg1:string):Promise<app.Project>;
 export function GetSandbox(arg1:string):Promise<app.Sandbox>;
 
 export function InstallDependency(arg1:string):Promise<void>;
+
+export function InstallUpdate():Promise<void>;
 
 export function KeepSandboxAwake(arg1:string):Promise<void>;
 

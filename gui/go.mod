@@ -3,6 +3,7 @@ module github.com/wutz/forgeai/gui
 go 1.26.0
 
 require (
+	github.com/go-logr/logr v1.4.4
 	github.com/wailsapp/wails/v2 v2.16.0
 	github.com/wutz/forgeai v0.0.0-00010101000000-000000000000
 	helm.sh/helm/v3 v3.22.1
@@ -40,7 +41,6 @@ require (
 	github.com/fxamacker/cbor/v2 v2.9.1 // indirect
 	github.com/go-errors/errors v1.4.2 // indirect
 	github.com/go-gorp/gorp/v3 v3.1.0 // indirect
-	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v1.0.0 // indirect
 	github.com/go-openapi/jsonreference v1.0.0 // indirect

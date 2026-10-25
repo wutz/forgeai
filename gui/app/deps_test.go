@@ -124,6 +124,7 @@ func TestAssess(t *testing.T) {
 	bundled := Dependency{Name: "kueue", Pinned: "v0.20.2", Installable: true}
 	operator := Dependency{Name: "forgeai", Installable: true, Pinned: forgeaiChartVersion}
 	sandbox := Dependency{Name: "agent-sandbox", Pinned: "v1.0.7", Installable: true}
+	gatewayAPI := Dependency{Name: "gateway-api-inference-extension", Pinned: "v1.6.2", Installable: true}
 	tests := []struct {
 		name      string
 		dep       Dependency
@@ -135,6 +136,11 @@ func TestAssess(t *testing.T) {
 		{"some CRDs", bundled, depHealth{crdsWanted: 2, crdsFound: 1}, "degraded", ""},
 		{"CRDs without the operator", operator, depHealth{crdsWanted: 2, crdsFound: 2}, "degraded", ""},
 		{"CRDs without a labelled deployment", bundled, depHealth{crdsWanted: 2, crdsFound: 2}, "unmanaged", ""},
+		{"CRD-only bundle installed by forgeai", gatewayAPI, depHealth{crdsWanted: 1, crdsFound: 1,
+			crdVersion: "v1.6.2"}, "ready", "v1.6.2"},
+		{"CRD-only bundle at an older version", gatewayAPI, depHealth{crdsWanted: 1, crdsFound: 1,
+			crdVersion: "v1.5.0"}, "outdated", "v1.5.0"},
+		{"CRD-only bundle installed outside forgeai", gatewayAPI, depHealth{crdsWanted: 1, crdsFound: 1}, "unmanaged", ""},
 		{"pinned and available", bundled, depHealth{crdsWanted: 2, crdsFound: 2,
 			deployments: []appsv1.Deployment{testDeployment("v0.20.2", true)}}, "ready", "v0.20.2"},
 		{"older version", bundled, depHealth{crdsWanted: 2, crdsFound: 2,
@@ -426,5 +432,43 @@ func TestForEachConcurrentlyRunsEachIndexAndReturnsFirstError(t *testing.T) {
 	}
 	if err := forEachConcurrently(n, func(int) error { return nil }); err != nil {
 		t.Errorf("no failures: err = %v", err)
+	}
+}
+
+// TestProbeCRDOnlyBundleVersion checks that a CRD-only bundle the GUI installed
+// reads as installed at its pinned version, from the labels its CRDs carry.
+func TestProbeCRDOnlyBundleVersion(t *testing.T) {
+	b, err := bundleByName("gateway-api-inference-extension")
+	if err != nil || b == nil {
+		t.Fatalf("bundleByName = %v, %v; want the bundle", b, err)
+	}
+	var objs []client.Object
+	for _, o := range b.objects {
+		if o.GetKind() != "CustomResourceDefinition" {
+			continue
+		}
+		u := o.DeepCopy()
+		labels := u.GetLabels()
+		if labels == nil {
+			labels = map[string]string{}
+		}
+		labels[depVersionLabel] = b.Version
+		u.SetLabels(labels)
+		objs = append(objs, u)
+	}
+	if len(objs) == 0 {
+		t.Fatal("bundle has no CRDs")
+	}
+	k8s := fake.NewClientBuilder().WithScheme(scheme()).WithObjects(objs...).Build()
+	info, ok := depInfoByName(b.Name)
+	if !ok {
+		t.Fatalf("no catalog entry for %s", b.Name)
+	}
+	dep, err := probeDependency(context.Background(), k8s, info, b, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dep.Status != "ready" || dep.Installed != b.Version {
+		t.Errorf("probe = status %q installed %q, want ready at %q (message %q)", dep.Status, dep.Installed, b.Version, dep.Message)
 	}
 }

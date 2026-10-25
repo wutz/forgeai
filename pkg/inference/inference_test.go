@@ -406,3 +406,18 @@ func containsSeq(args, seq []string) bool {
 	}
 	return false
 }
+
+func TestModelNameAndImageWithoutRegistryOrTag(t *testing.T) {
+	svc := testService()
+	if got, want := ModelName(svc), svc.Name+"-model"; got != want {
+		t.Errorf("model deployment %q, want %q", got, want)
+	}
+	reg, repo, tag := splitImage("ghcr.io/llm-d/router")
+	if reg != "ghcr.io/llm-d" || repo != "router" || tag != "" {
+		t.Errorf("split without a tag %q %q %q", reg, repo, tag)
+	}
+	reg, repo, tag = splitImage("router:v2")
+	if reg != "" || repo != "router" || tag != "v2" {
+		t.Errorf("split of a bare name %q %q %q", reg, repo, tag)
+	}
+}

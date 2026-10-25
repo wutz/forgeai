@@ -88,7 +88,7 @@ func (a *App) ListJobs() ([]*Job, error) {
 	for i := range items {
 		out = append(out, ix.job(&items[i]))
 	}
-	group(out)
+	out = group(out)
 	slices.SortFunc(out, func(a, b *Job) int { return strings.Compare(b.Created, a.Created) })
 	return out, nil
 }
@@ -136,15 +136,16 @@ func (a *App) GetJob(name string) (*Job, error) {
 	return j, nil
 }
 
-// group nests retries (job-group != own name) under their group leader.
-func group(jobs []*Job) {
+// group nests retries (job-group != own name) under their group leader and
+// returns the jobs that stay top-level.
+func group(jobs []*Job) []*Job {
 	leaders := map[string]*Job{}
 	for _, j := range jobs {
 		if j.Group == j.Name {
 			leaders[j.Name] = j
 		}
 	}
-	kept := jobs[:0]
+	kept := make([]*Job, 0, len(jobs))
 	for _, j := range jobs {
 		leader, ok := leaders[j.Group]
 		if ok && j.Group != j.Name {
@@ -157,6 +158,7 @@ func group(jobs []*Job) {
 	for _, j := range kept {
 		slices.SortFunc(j.Retries, func(a, b *Job) int { return strings.Compare(a.Name, b.Name) })
 	}
+	return kept
 }
 
 // CreateJob submits a TrainJob rendered from the form.

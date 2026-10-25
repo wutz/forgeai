@@ -24,6 +24,9 @@ type Files struct {
 	// server is ready and the user may read its password.
 	Address string   `json:"address,omitempty"`
 	Volumes []string `json:"volumes"`
+	// ReadOnly is set when the caller cannot wake the server or read its
+	// credentials: a view member sees the state and no files.
+	ReadOnly bool `json:"readOnly"`
 }
 
 // errConnectionChanged is returned when the connection moved on while Files read the server.
@@ -58,11 +61,20 @@ func (a *App) Files() (*Files, error) {
 				Labels: map[string]string{naming.LabelManagedBy: naming.ManagedBy}},
 		}
 		if err := c.k8s.Create(ctx, fs); err != nil && !isAlreadyExists(err) {
+			// A view member cannot create the server, so there is none to show yet.
+			if apierrors.IsForbidden(err) {
+				return &Files{Phase: string(v1.FileServerIdle), ReadOnly: true}, nil
+			}
 			return nil, err
 		}
 	}
+	// A view member cannot patch the heartbeat: it sees the server without waking it.
+	readOnly := false
 	if err := a.heartbeat(ctx, c); err != nil {
-		return nil, err
+		if !apierrors.IsForbidden(err) {
+			return nil, err
+		}
+		readOnly = true
 	}
 	out := &Files{Phase: "Starting"}
 	fs = &v1.FileServer{}
@@ -77,25 +89,31 @@ func (a *App) Files() (*Files, error) {
 	var target *fileTarget
 	sec := &corev1.Secret{}
 	secKey := client.ObjectKey{Namespace: c.namespace(), Name: naming.FileServerSecretName}
-	if out.Phase == string(v1.FileServerReady) && fs.Status.URL != "" && c.k8s.Get(ctx, secKey, sec) == nil {
-		base, err := url.Parse(fs.Status.URL)
-		if err != nil {
-			return nil, err
-		}
-		// The pod can be Ready before the ingress routes to it; until then the
-		// browser gets 503 and the frame would never recover. Report Starting
-		// until the server answers through the ingress.
-		if !fileServerServing(ctx, base, c.insecure) {
-			out.Phase = string(v1.FileServerStarting)
-		} else {
-			target = &fileTarget{
-				base:     base,
-				user:     string(sec.Data[corev1.BasicAuthUsernameKey]),
-				pass:     string(sec.Data[corev1.BasicAuthPasswordKey]),
-				insecure: c.insecure,
+	if out.Phase == string(v1.FileServerReady) && fs.Status.URL != "" {
+		switch err := c.k8s.Get(ctx, secKey, sec); {
+		case apierrors.IsForbidden(err):
+			readOnly = true
+		case err == nil:
+			base, err := url.Parse(fs.Status.URL)
+			if err != nil {
+				return nil, err
+			}
+			// The pod can be Ready before the ingress routes to it; until then the
+			// browser gets 503 and the frame would never recover. Report Starting
+			// until the server answers through the ingress.
+			if !fileServerServing(ctx, base, c.insecure) {
+				out.Phase = string(v1.FileServerStarting)
+			} else {
+				target = &fileTarget{
+					base:     base,
+					user:     string(sec.Data[corev1.BasicAuthUsernameKey]),
+					pass:     string(sec.Data[corev1.BasicAuthPasswordKey]),
+					insecure: c.insecure,
+				}
 			}
 		}
 	}
+	out.ReadOnly = readOnly
 	// The target is published only while this connection is still the current one:
 	// a Connect or a disconnect during the reads has already reset the proxy.
 	a.mu.RLock()

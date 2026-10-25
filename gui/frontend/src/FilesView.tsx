@@ -28,7 +28,7 @@ export function FilesView() {
         if (stopped) return
         setState(f)
         setError('')
-        timer = window.setTimeout(load, f.phase === 'Ready' ? 15_000 : 3_000)
+        timer = window.setTimeout(load, f.phase === 'Ready' || f.readOnly ? 15_000 : 3_000)
       }).catch(e => {
         if (stopped) return
         setError(errText(e))
@@ -84,7 +84,7 @@ export function FilesView() {
           <iframe src={frame} title={t('files.title')} allow="clipboard-write"
                   sandbox="allow-scripts allow-same-origin allow-forms allow-downloads"/>
         </div>
-      ) : ready ? (
+      ) : ready || state?.readOnly ? (
         <Card>
           <Empty icon="folder" title={t('files.noAccess')}>
             {t('files.noAccessHint')}

@@ -202,6 +202,7 @@ export namespace app {
 	    phase: string;
 	    address?: string;
 	    volumes: string[];
+	    readOnly: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Files(source);
@@ -212,6 +213,7 @@ export namespace app {
 	        this.phase = source["phase"];
 	        this.address = source["address"];
 	        this.volumes = source["volumes"];
+	        this.readOnly = source["readOnly"];
 	    }
 	}
 	export class GPUUsage {

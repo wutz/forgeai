@@ -84,7 +84,7 @@ var (
 		{Group: "admissionregistration.k8s.io", Kind: "MutatingWebhookConfiguration"},
 		{Group: "admissionregistration.k8s.io", Kind: "ValidatingWebhookConfiguration"},
 	}
-	forgeaiCRDs = []string{"projects.forgeai.wutz.dev", "instancetypes.forgeai.wutz.dev", "fileservers.forgeai.wutz.dev"}
+	forgeaiCRDs = []string{"projects.forgeai.wutz.dev", "instancetypes.forgeai.wutz.dev", "fileservers.forgeai.wutz.dev", "inferenceservices.forgeai.wutz.dev"}
 )
 
 // depInfo describes a component on the admin page.
@@ -103,6 +103,7 @@ var depCatalog = []depInfo{
 	{name: "trainer", title: "Kubeflow Trainer v2", description: "TrainJobs and the ClusterTrainingRuntimes, with JobSet"},
 	{name: "kueue", title: "Kueue", description: "GPU quota queues that admit TrainJobs"},
 	{name: "agent-sandbox", title: "agent-sandbox", description: "Sandbox controller and CRDs for the Sandboxes view"},
+	{name: "gateway-api-inference-extension", title: "Gateway API Inference Extension", description: "InferencePool CRD that the llm-d routers of InferenceServices use"},
 	{name: "forgeai", title: "forgeai operator", description: "Projects, instance types and the controllers", chart: true},
 }
 

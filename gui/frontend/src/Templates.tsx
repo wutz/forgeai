@@ -53,7 +53,7 @@ export function Templates({kind}: {kind: Kind}) {
 
   return (
     <>
-      <PageHeader eyebrow={t('templates.eyebrow')} title={t(isSandbox ? 'templates.titleSandbox' : 'templates.titleJob')}
+      <PageHeader eyebrow={t('templates.eyebrow')} title={t(isSandbox ? 'sandboxes.title' : 'jobs.title')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>
                     {isSandbox
                       ? sandboxItems !== null && t('templates.countSandbox', {count: sandboxItems.length})

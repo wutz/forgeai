@@ -3,8 +3,6 @@
 
 export const en = {
   'templates.eyebrow': 'Workspace',
-  'templates.titleSandbox': 'Sandbox templates',
-  'templates.titleJob': 'Job templates',
   'templates.countSandbox': 'Sandbox templates: {count}',
   'templates.countJob': 'Job templates: {count}',
   'templates.newSandbox': 'New sandbox template',
@@ -49,8 +47,6 @@ export const en = {
 
 export const zh: Record<keyof typeof en, string> = {
   'templates.eyebrow': '工作区',
-  'templates.titleSandbox': '沙箱模板',
-  'templates.titleJob': '任务模板',
   'templates.countSandbox': '沙箱模板：{count}',
   'templates.countJob': '任务模板：{count}',
   'templates.newSandbox': '新建沙箱模板',

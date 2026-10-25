@@ -1,0 +1,28 @@
+apiVersion: templates.forgeai.wutz.dev/v1alpha1
+kind: JobTemplate
+metadata:
+  name: nccl-tests
+spec:
+  displayName: NCCL tests
+  description: All-reduce bandwidth and correctness of every GPU on each worker (single node, no MPI). Passes when the log has no NCCL error and every row shows 0 wrong values.
+  version: 1.1.0
+  # The public CoreWeave nccl-tests image, as in scclabs/k8s-in-action
+  # (ai/nccl-tests): CUDA 12.9 runs on the RTX 5090 nodes and the nodes pull it
+  # from ghcr.io. Use the CUDA 13.1 tag (13.1.0-devel-ubuntu22.04-nccl2.29.2-1-2276a5e)
+  # on B200/B300.
+  image: ghcr.io/coreweave/nccl-tests:12.9.1-devel-ubuntu22.04-nccl2.27.6-1-7c12c62
+  # Each worker runs its own single-node test over the GPUs the pod holds, with
+  # the sweep of the reference: 8 B to 8 GB, doubling.
+  command: |
+    set -euo pipefail
+    gpus="$(nvidia-smi -L | wc -l)"
+    echo "nccl-tests on $(hostname): ${gpus} GPUs"
+    nvidia-smi -L
+    exec /opt/nccl_tests/build/all_reduce_perf -b 8 -e 8G -f 2 -g "${gpus}"
+  workers: 1
+  env:
+    # Ring keeps results comparable between runs; WARN keeps the log short.
+    - name: NCCL_ALGO
+      value: Ring
+    - name: NCCL_DEBUG
+      value: WARN

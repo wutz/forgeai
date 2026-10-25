@@ -1,5 +1,5 @@
-import {FormEvent, useEffect, useState} from 'react'
-import {CreateSandbox, ListInstanceTypes, ListVolumes, SandboxOptions, SandboxTemplates} from '../wailsjs/go/app/App'
+import {FormEvent, useEffect, useRef, useState} from 'react'
+import {CatalogSandboxForm, CatalogTemplates, CreateSandbox, ListInstanceTypes, ListVolumes, SandboxOptions, SandboxTemplates} from '../wailsjs/go/app/App'
 import {app, sandbox, volumes, v1} from '../wailsjs/go/models'
 import {envErrors, envToLines, formatGoDuration, linesToEnv, errText, generateName, NAME_PATTERN, SANDBOX_NAME_MAX} from './util'
 import {CancelButton, Dialog} from './ui'
@@ -36,6 +36,11 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   const [templates, setTemplates] = useState<app.SandboxTemplate[]>([])
   // A failed read says so; an empty picker would read as a cluster with no templates.
   const [templatesError, setTemplatesError] = useState('')
+  // catalog holds the sandbox templates of the public template source.
+  const [catalog, setCatalog] = useState<app.CatalogTemplate[]>([])
+  const [catalogError, setCatalogError] = useState('')
+  // pick is the template select's value: "" for none, else "project:<name>" or "catalog:<name>".
+  const [pick, setPick] = useState('')
 
   useEffect(() => {
     SandboxOptions().then(o => {
@@ -48,26 +53,51 @@ export function SandboxCreateDialog({onClose, onCreated}: {
     ListInstanceTypes().then(setTypes).catch(e => setError(errText(e)))
     ListVolumes(false).then(setVols).catch(e => setVolsError(errText(e)))
     SandboxTemplates().then(ts => { setTemplates(ts); setTemplatesError('') }, e => setTemplatesError(errText(e)))
+    CatalogTemplates().then(ts => {
+      setCatalog(ts.filter(c => c.kind === 'Sandbox' && !c.error))
+      setCatalogError('')
+    }, e => setCatalogError(errText(e)))
   }, [])
 
   const set = <K extends keyof sandbox.Form>(k: K, v: sandbox.Form[K]) =>
     setF(prev => sandbox.Form.createFrom({...prev, [k]: v}))
 
-  // useTemplate prefills the agent fields from a SandboxTemplate; the fields
-  // stay editable afterwards.
-  const useTemplate = (name: string) => {
-    const form = templates.find(tpl => tpl.name === name)?.form
-    set('template', name)
-    if (!form) return
-    setF(prev => sandbox.Form.createFrom({
-      ...prev,
-      template: name,
-      image: form.image,
-      command: form.command || '',
-      runtimeClass: form.runtimeClass || '',
-    }))
-    setEnvText(envToLines(Object.fromEntries((form.env || []).map(e => [e.name, e.value]))))
+  // pickSeq numbers the template choices: a reply for an earlier choice is
+  // dropped, so a slow load cannot overwrite the template chosen after it.
+  const pickSeq = useRef(0)
+  // useTemplate prefills the agent fields from a project or catalog
+  // SandboxTemplate; the fields stay editable afterwards.
+  const useTemplate = (value: string) => {
+    const seq = ++pickSeq.current
+    setPick(value)
+    const sep = value.indexOf(':')
+    if (sep < 0) {
+      set('template', '')
+      return
+    }
+    const source = value.slice(0, sep)
+    const name = value.slice(sep + 1)
+    // Only a project template is referenced by name; a catalog template is a prefill.
+    const projectRef = source === 'project' ? name : ''
+    set('template', projectRef)
+    const load: Promise<sandbox.TemplateForm | undefined> = source === 'catalog'
+      ? CatalogSandboxForm(name)
+      : Promise.resolve(templates.find(tpl => tpl.name === name)?.form)
+    load.then(form => {
+      if (seq !== pickSeq.current || !form) return
+      setF(prev => sandbox.Form.createFrom({
+        ...prev,
+        template: projectRef,
+        image: form.image,
+        command: form.command || '',
+        runtimeClass: form.runtimeClass || '',
+      }))
+      setEnvText(envToLines(Object.fromEntries((form.env || []).map(e => [e.name, e.value]))))
+    }).catch(e => {
+      if (seq === pickSeq.current) setError(errText(e))
+    })
   }
+  const pickedCatalog = catalog.find(c => pick === `catalog:${c.name}`)
 
   // Mounts need the project's volumes to check against; without any mounts the
   // form does not wait for them. A sandbox runs on one node.
@@ -124,14 +154,21 @@ export function SandboxCreateDialog({onClose, onCreated}: {
         <form id="sandbox-form" onSubmit={submit} className="dialog-form">
           {error && <div className="banner banner-error" role="alert">{error}</div>}
           {templatesError && <div className="banner banner-warn" role="status">{t('sandboxCreate.templatesUnavailable', {error: templatesError})}</div>}
-          {templates.length > 0 && (
+          {catalogError && <div className="banner banner-warn" role="status">{t('sandboxCreate.catalogUnavailable', {error: catalogError})}</div>}
+          {(templates.length > 0 || catalog.length > 0) && (
             <div className="field">
               <label htmlFor="s-template">{t('sandboxCreate.fromTemplate')}</label>
-              <select id="s-template" className="select mono" value={f.template || ''}
+              <select id="s-template" className="select mono" value={pick}
                       onChange={e => useTemplate(e.target.value)}>
                 <option value="">{t('common.none')}</option>
-                {templates.filter(tpl => !tpl.error).map(tpl => <option key={tpl.name} value={tpl.name}>{tpl.name}</option>)}
+                {templates.some(tpl => !tpl.error) && <optgroup label={t('sandboxCreate.projectTemplates')}>
+                  {templates.filter(tpl => !tpl.error).map(tpl => <option key={tpl.name} value={`project:${tpl.name}`}>{tpl.name}</option>)}
+                </optgroup>}
+                {catalog.length > 0 && <optgroup label={t('sandboxCreate.catalogTemplates')}>
+                  {catalog.map(c => <option key={c.name} value={`catalog:${c.name}`}>{c.displayName}</option>)}
+                </optgroup>}
               </select>
+              {pickedCatalog?.description && <span className="hint">{pickedCatalog.description}</span>}
               <span className="hint">{t('sandboxCreate.templateHint')}</span>
             </div>
           )}

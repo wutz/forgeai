@@ -11,7 +11,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
@@ -233,29 +232,5 @@ func TestSandboxOptionsFromPlatform(t *testing.T) {
 }
 
 func TestDeleteSandboxTemplateOnlyOwnTemplates(t *testing.T) {
-	managed := &unstructured.Unstructured{}
-	managed.SetGroupVersionKind(sandbox.SandboxTemplateGVK)
-	managed.SetNamespace(testNamespace)
-	managed.SetName("ours")
-	managed.SetLabels(map[string]string{naming.LabelManagedBy: naming.ManagedBy})
-
-	foreign := managed.DeepCopy()
-	foreign.SetName("theirs")
-	foreign.SetLabels(nil)
-
-	a := testApp(t, managed, foreign)
-	if err := a.DeleteSandboxTemplate("theirs"); err == nil || !strings.Contains(err.Error(), "not created by forgeai") {
-		t.Errorf("delete of a foreign template = %v, want a refusal", err)
-	}
-	if err := a.DeleteSandboxTemplate("ours"); err != nil {
-		t.Fatal(err)
-	}
-	gone := &unstructured.Unstructured{}
-	gone.SetGroupVersionKind(sandbox.SandboxTemplateGVK)
-	if err := a.conn.k8s.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: "ours"}, gone); !apierrors.IsNotFound(err) {
-		t.Errorf("managed template still there: %v", err)
-	}
-	if err := a.DeleteSandboxTemplate("ours"); err != nil {
-		t.Errorf("delete of a missing template: %v", err)
-	}
+	checkOwnTemplatesOnly(t, sandbox.SandboxTemplateGVK, func(a *App, name string) error { return a.DeleteSandboxTemplate(name) })
 }

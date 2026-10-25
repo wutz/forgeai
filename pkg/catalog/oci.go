@@ -57,7 +57,8 @@ const ociScheme = "oci://"
 func parseOCI(location string) (registry.Reference, error) {
 	ref, err := registry.ParseReference(strings.TrimPrefix(location, ociScheme))
 	if err != nil || ref.Registry == "" || ref.Reference == "" {
-		return registry.Reference{}, fmt.Errorf("template source %q must be oci://registry/repository:tag or oci://registry/repository@sha256:digest", location)
+		return registry.Reference{}, fmt.Errorf(
+			"template source %q must be oci://registry/repository:tag or oci://registry/repository@sha256:digest", location)
 	}
 	return ref, nil
 }
@@ -182,7 +183,7 @@ func fetchBlob(ctx context.Context, repo *remote.Repository, desc ocispec.Descri
 	if err != nil {
 		return nil, err
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 	return content.ReadAll(rc, desc)
 }
 
@@ -193,7 +194,7 @@ func unpackSource(data []byte) (map[string][]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unpack source: %w", err)
 	}
-	defer gz.Close()
+	defer func() { _ = gz.Close() }()
 	budget := &io.LimitedReader{R: gz, N: maxArchiveBytes + 1}
 	tr := tar.NewReader(budget)
 	files := map[string][]byte{}
@@ -247,10 +248,10 @@ func cleanArchiveName(name string) (string, error) {
 // digest, which is the form to share: a tag can be moved, a digest cannot.
 // Only a source that loads without template errors is published.
 func Publish(ctx context.Context, dir, location string) (string, error) {
-	return publish(ctx, dir, location, nil, false)
+	return publish(ctx, dir, location, false)
 }
 
-func publish(ctx context.Context, dir, location string, client *http.Client, plainHTTP bool) (string, error) {
+func publish(ctx context.Context, dir, location string, plainHTTP bool) (string, error) {
 	ref, err := parseOCI(location)
 	if err != nil {
 		return "", err
@@ -259,7 +260,7 @@ func publish(ctx context.Context, dir, location string, client *http.Client, pla
 	if err != nil {
 		return "", err
 	}
-	repo, err := newRepository(ref, client, plainHTTP)
+	repo, err := newRepository(ref, nil, plainHTTP)
 	if err != nil {
 		return "", err
 	}
@@ -273,7 +274,9 @@ func publish(ctx context.Context, dir, location string, client *http.Client, pla
 // pushSource pushes the layer and the manifest of a source, and tags the
 // manifest with reference when it is a tag. A digest reference must be the
 // digest of the manifest.
-func pushSource(ctx context.Context, repo *remote.Repository, reference string, archive []byte) (ocispec.Descriptor, error) {
+func pushSource(
+	ctx context.Context, repo *remote.Repository, reference string, archive []byte,
+) (ocispec.Descriptor, error) {
 	layer := content.NewDescriptorFromBytes(LayerMediaType, archive)
 	layer.Annotations = map[string]string{ocispec.AnnotationTitle: LayerTitle}
 	exists, err := repo.Exists(ctx, layer)

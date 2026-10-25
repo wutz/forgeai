@@ -8,9 +8,11 @@ import (
 	"encoding/json"
 	"io"
 	"log"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -69,7 +71,7 @@ func TestPublishAndLoadOCI(t *testing.T) {
 	host := newTestRegistry(t)
 	fixture := fixtureTemplates(t)
 
-	pinned, err := publish(context.Background(), fixture, "oci://"+host+"/forgeai/templates:v1", nil, true)
+	pinned, err := publish(context.Background(), fixture, "oci://"+host+"/forgeai/templates:v1", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,11 +93,11 @@ func TestPublishAndLoadOCI(t *testing.T) {
 func TestPublishIsReproducible(t *testing.T) {
 	host := newTestRegistry(t)
 	ctx := context.Background()
-	first, err := publish(ctx, fixtureTemplates(t), "oci://"+host+"/forgeai/templates:v1", nil, true)
+	first, err := publish(ctx, fixtureTemplates(t), "oci://"+host+"/forgeai/templates:v1", true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := publish(ctx, fixtureTemplates(t), "oci://"+host+"/forgeai/templates:v2", nil, true)
+	second, err := publish(ctx, fixtureTemplates(t), "oci://"+host+"/forgeai/templates:v2", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +112,7 @@ func TestPublishRefusesBrokenSource(t *testing.T) {
 		"index.yaml":               goodIndex,
 		"jobs/job-a/template.yaml": strings.Replace(goodJob, "name: job-a", "name: job-b", 1),
 	})
-	_, err := publish(context.Background(), broken, "oci://"+host+"/forgeai/broken:v1", nil, true)
+	_, err := publish(context.Background(), broken, "oci://"+host+"/forgeai/broken:v1", true)
 	if err == nil || !strings.Contains(err.Error(), "template job-a") {
 		t.Fatalf("publish of a broken source: err = %v, want the template error", err)
 	}
@@ -204,7 +206,7 @@ func TestOCISourceNeedsSourceArtifact(t *testing.T) {
 func TestPublishNamesTheLayer(t *testing.T) {
 	host := newTestRegistry(t)
 	location := "oci://" + host + "/forgeai/named:v1"
-	if _, err := publish(context.Background(), fixtureTemplates(t), location, nil, true); err != nil {
+	if _, err := publish(context.Background(), fixtureTemplates(t), location, true); err != nil {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
@@ -229,7 +231,7 @@ func TestPublishNamesTheLayer(t *testing.T) {
 // TestOCISourceMissingTag checks the message for a tag the registry does not have.
 func TestOCISourceMissingTag(t *testing.T) {
 	host := newTestRegistry(t)
-	if _, err := publish(context.Background(), fixtureTemplates(t), "oci://"+host+"/forgeai/templates:v1", nil, true); err != nil {
+	if _, err := publish(context.Background(), fixtureTemplates(t), "oci://"+host+"/forgeai/templates:v1", true); err != nil {
 		t.Fatal(err)
 	}
 	src, err := newOCISource("oci://"+host+"/forgeai/templates:v2", nil, true)
@@ -264,6 +266,110 @@ func tarGz(t *testing.T, entries []tar.Header) []byte {
 		if _, err := tw.Write(body); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// TestPublishByDigest pushes a source to the digest it was published as. The
+// digest is the manifest's, so the same reference comes back.
+func TestPublishByDigest(t *testing.T) {
+	host := newTestRegistry(t)
+	ctx := context.Background()
+	pinned, err := publish(ctx, fixtureTemplates(t), "oci://"+host+"/forgeai/templates:v1", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest := pinned[strings.LastIndex(pinned, "@")+1:]
+	again, err := publish(ctx, fixtureTemplates(t), "oci://"+host+"/forgeai/templates@"+digest, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again != pinned {
+		t.Errorf("publish by digest gave %s, want %s", again, pinned)
+	}
+}
+
+func TestPublishNeedsSourceAndLocation(t *testing.T) {
+	host := newTestRegistry(t)
+	ctx := context.Background()
+	if _, err := Publish(ctx, fixtureTemplates(t), "https://example.com/templates:v1"); err == nil || !strings.Contains(err.Error(), "oci://") {
+		t.Errorf("Publish to an https location = %v, want an oci:// refusal", err)
+	}
+	if _, err := publish(ctx, fixtureTemplates(t), "oci://"+host+"/forgeai/templates", true); err == nil {
+		t.Error("publish without a tag or digest succeeded")
+	}
+	if _, err := publish(ctx, t.TempDir(), "oci://"+host+"/forgeai/empty:v1", true); err == nil || !strings.Contains(err.Error(), "read template index") {
+		t.Errorf("publish of an empty directory = %v, want the index error", err)
+	}
+}
+
+// TestOCISourceNeedsLogin reads from a registry that asks for a login the
+// Docker configuration does not hold, and expects the hint on docker login.
+func TestOCISourceNeedsLogin(t *testing.T) {
+	t.Setenv("DOCKER_CONFIG", t.TempDir())
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("WWW-Authenticate", `Basic realm="registry"`)
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+	host := strings.TrimPrefix(srv.URL, "http://")
+	src, err := newOCISource("oci://"+host+"/forgeai/templates:v1", nil, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Load(context.Background(), src)
+	if err == nil || !strings.Contains(err.Error(), "docker login "+host) {
+		t.Errorf("Load without a login = %v, want the docker login hint", err)
+	}
+}
+
+// TestUnpackSourceRejectsMalformedArchives covers the archives a published
+// artifact could carry that are not a source.
+func TestUnpackSourceRejectsMalformedArchives(t *testing.T) {
+	many := make([]tar.Header, 0, maxArchiveFiles+1)
+	for i := range maxArchiveFiles + 1 {
+		many = append(many, tar.Header{Name: "f" + strconv.Itoa(i) + ".yaml", Typeflag: tar.TypeReg})
+	}
+	cases := []struct {
+		name string
+		data []byte
+		want string
+	}{
+		{name: "not gzip", data: []byte("plain text"), want: "unpack source"},
+		{name: "file listed twice", data: tarGz(t, []tar.Header{
+			{Name: IndexPath, Typeflag: tar.TypeReg}, {Name: IndexPath, Typeflag: tar.TypeReg},
+		}), want: "listed twice"},
+		{name: "too many files", data: tarGz(t, many), want: "more than"},
+		{name: "too many bytes", data: oversizedArchive(t), want: "unpack source"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := unpackSource(tc.data)
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Errorf("unpackSource = %v, want an error containing %q", err, tc.want)
+			}
+		})
+	}
+}
+
+// oversizedArchive is a gzipped tar whose one file is larger than a source may be.
+func oversizedArchive(t *testing.T) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	body := make([]byte, maxArchiveBytes+1)
+	if err := tw.WriteHeader(&tar.Header{Name: IndexPath, Typeflag: tar.TypeReg, Mode: 0o644, Size: int64(len(body))}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write(body); err != nil {
+		t.Fatal(err)
 	}
 	if err := tw.Close(); err != nil {
 		t.Fatal(err)

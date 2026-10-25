@@ -493,14 +493,23 @@ func (a *App) mutateSandboxOnce(name string, fn func(*sandbox.Sandbox)) (*Sandbo
 	if sb.Annotations == nil {
 		sb.Annotations = map[string]string{}
 	}
-	mode := sb.Spec.OperatingMode
+	mode, shutdown := sb.Spec.OperatingMode, sb.Spec.ShutdownTime
 	fn(sb)
-	// Only the annotations and the operating mode are written back. A typed
-	// round trip would drop the fields the Go model does not carry.
+	// Only the annotations, the operating mode and the shutdown time are written
+	// back. A typed round trip would drop the fields the Go model does not carry.
 	out := u.DeepCopy()
 	out.SetAnnotations(sb.Annotations)
 	if sb.Spec.OperatingMode != mode {
-		if err := unstructured.SetNestedField(out.Object, string(sb.Spec.OperatingMode), "spec", "operatingMode"); err != nil {
+		if err := unstructured.SetNestedField(out.Object,
+			string(sb.Spec.OperatingMode), "spec", "operatingMode"); err != nil {
+			return nil, err
+		}
+	}
+	if !sb.Spec.ShutdownTime.Equal(shutdown) {
+		if sb.Spec.ShutdownTime == nil {
+			unstructured.RemoveNestedField(out.Object, "spec", "shutdownTime")
+		} else if err := unstructured.SetNestedField(out.Object,
+			sb.Spec.ShutdownTime.UTC().Format(time.RFC3339), "spec", "shutdownTime"); err != nil {
 			return nil, err
 		}
 	}

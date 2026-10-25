@@ -6,16 +6,20 @@ export function AppVersion() {
   return window['go']['app']['App']['AppVersion']();
 }
 
-export function CatalogJobForm(arg1) {
-  return window['go']['app']['App']['CatalogJobForm'](arg1);
+export function CatalogJobForm(arg1, arg2) {
+  return window['go']['app']['App']['CatalogJobForm'](arg1, arg2);
 }
 
-export function CatalogSandboxForm(arg1) {
-  return window['go']['app']['App']['CatalogSandboxForm'](arg1);
+export function CatalogSandboxForm(arg1, arg2) {
+  return window['go']['app']['App']['CatalogSandboxForm'](arg1, arg2);
 }
 
-export function CatalogTemplates() {
-  return window['go']['app']['App']['CatalogTemplates']();
+export function CatalogSources(arg1) {
+  return window['go']['app']['App']['CatalogSources'](arg1);
+}
+
+export function CheckCatalogSource(arg1) {
+  return window['go']['app']['App']['CheckCatalogSource'](arg1);
 }
 
 export function CheckUpdate() {

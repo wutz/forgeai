@@ -11,10 +11,11 @@ import (
 	"testing"
 )
 
-// repoTemplates is the public source in this repository.
-func repoTemplates(t *testing.T) string {
+// fixtureTemplates is a copy of the public source, wutz/forgeai-templates, so
+// the tests run without the network. Update it with the public source.
+func fixtureTemplates(t *testing.T) string {
 	t.Helper()
-	root, err := filepath.Abs("../../templates")
+	root, err := filepath.Abs("testdata/templates")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,11 +51,44 @@ func load(t *testing.T, root string) *Catalog {
 	return c
 }
 
-// TestRepoTemplates checks the templates shipped in this repository: every
-// template loads, and every template file is listed in the index.
-func TestRepoTemplates(t *testing.T) {
-	root := repoTemplates(t)
-	c := load(t, root)
+// TestFixtureTemplates checks the public templates: every template loads, and
+// every template file is listed in the index.
+func TestFixtureTemplates(t *testing.T) {
+	root := fixtureTemplates(t)
+	checkSource(t, root, load(t, root))
+}
+
+// TestTemplateSource runs the same checks on the source named by
+// FORGEAI_TEMPLATE_SOURCE, such as a checkout of wutz/forgeai-templates:
+//
+//	FORGEAI_TEMPLATE_SOURCE=file:///path/to/forgeai-templates GOWORK=off go test ./pkg/catalog -run TestTemplateSource
+//
+// It is skipped when the variable is unset.
+func TestTemplateSource(t *testing.T) {
+	loc := os.Getenv("FORGEAI_TEMPLATE_SOURCE")
+	if loc == "" {
+		t.Skip("FORGEAI_TEMPLATE_SOURCE is not set")
+	}
+	src, err := Open(loc, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := Load(context.Background(), src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Only a directory can be walked for unlisted files; an https source is checked by its templates alone.
+	root := ""
+	if strings.HasPrefix(loc, "file://") {
+		root = strings.TrimPrefix(loc, "file://")
+	}
+	checkSource(t, root, c)
+}
+
+// checkSource checks a loaded source: every template loads, both kinds are
+// present, and, when root is a directory, every template file is listed in the index.
+func checkSource(t *testing.T, root string, c *Catalog) {
+	t.Helper()
 	if c.DisplayName == "" {
 		t.Error("index has no displayName")
 	}
@@ -74,6 +108,9 @@ func TestRepoTemplates(t *testing.T) {
 	}
 	if jobs == 0 || sandboxes == 0 {
 		t.Errorf("want job and sandbox templates, got %d jobs and %d sandboxes", jobs, sandboxes)
+	}
+	if root == "" {
+		return
 	}
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || filepath.Base(p) != "template.yaml" {
@@ -96,7 +133,7 @@ func TestRepoTemplates(t *testing.T) {
 // TestNCCLTemplateForm checks the job form the nccl-tests template prefills:
 // the instance type and name stay with the user.
 func TestNCCLTemplateForm(t *testing.T) {
-	c := load(t, repoTemplates(t))
+	c := load(t, fixtureTemplates(t))
 	var found *Template
 	for i := range c.Templates {
 		if c.Templates[i].Name == "nccl-tests" {
@@ -265,7 +302,7 @@ spec:
 }
 
 func TestOpenHTTPSource(t *testing.T) {
-	srv := httptest.NewServer(http.FileServer(http.Dir(repoTemplates(t))))
+	srv := httptest.NewServer(http.FileServer(http.Dir(fixtureTemplates(t))))
 	defer srv.Close()
 	src, err := Open(srv.URL+"/", nil)
 	if err != nil {

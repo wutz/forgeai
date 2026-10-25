@@ -4,7 +4,7 @@
 // retries for jobs; agent blueprint for sandboxes). Nothing is applied to a
 // cluster from the source: the user reviews the prefilled form and submits it.
 //
-// The source layout is documented in templates/README.md.
+// The source layout is documented in the README of wutz/forgeai-templates.
 package catalog
 
 import (
@@ -32,9 +32,9 @@ const (
 	IndexKind = "TemplateIndex"
 	// IndexPath is the index file, relative to the source root.
 	IndexPath = "index.yaml"
-	// DefaultSource is the public template source: the templates directory of
-	// the forgeai repository on its default branch.
-	DefaultSource = "https://raw.githubusercontent.com/wutz/forgeai/main/templates"
+	// DefaultSource is the public template source: the wutz/forgeai-templates
+	// repository on its default branch.
+	DefaultSource = "https://raw.githubusercontent.com/wutz/forgeai-templates/main"
 
 	// maxFileBytes bounds one fetched file; templates are a few kilobytes.
 	maxFileBytes = 1 << 20

@@ -8,11 +8,13 @@ import {time} from '../models';
 
 export function AppVersion():Promise<string>;
 
-export function CatalogJobForm(arg1:string):Promise<training.Form>;
+export function CatalogJobForm(arg1:string,arg2:string):Promise<training.Form>;
 
-export function CatalogSandboxForm(arg1:string):Promise<sandbox.TemplateForm>;
+export function CatalogSandboxForm(arg1:string,arg2:string):Promise<sandbox.TemplateForm>;
 
-export function CatalogTemplates():Promise<Array<app.CatalogTemplate>>;
+export function CatalogSources(arg1:Array<string>):Promise<Array<app.CatalogSource>>;
+
+export function CheckCatalogSource(arg1:string):Promise<app.CatalogSource>;
 
 export function CheckUpdate():Promise<app.UpdateInfo>;
 

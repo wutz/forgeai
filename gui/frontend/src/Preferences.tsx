@@ -94,11 +94,11 @@ function PrefMenu<T extends string>({title, value, options, onChange}: {
   )
 }
 
-// Preferences is the theme and language menus at the foot of the sidebar, and
-// the version menu after them. Each preference is one button showing the
-// current choice; "Auto" (follow the system) is the default for both, and the
-// choice is saved.
-export function Preferences({update}: {update: Update}) {
+// Preferences is the theme and language menus at the foot of the sidebar, the
+// template sources button, and the version menu after them. Each preference is
+// one button showing the current choice; "Auto" (follow the system) is the
+// default for both, and the choice is saved.
+export function Preferences({update, onManageSources}: {update: Update, onManageSources: () => void}) {
   const theme = useSyncExternalStore(subscribeTheme, getThemeChoice)
   const language = useSyncExternalStore(subscribeLocale, getLocaleChoice)
 
@@ -117,6 +117,10 @@ export function Preferences({update}: {update: Update}) {
     <div className="sidebar-prefs">
       <PrefMenu title={t('prefs.themeGroup')} value={theme} options={themes} onChange={setThemeChoice}/>
       <PrefMenu title={t('prefs.langGroup')} value={language} options={languages} onChange={setLocaleChoice}/>
+      <button className="pref-trigger" title={t('templateSources.sidebarButton')}
+              aria-label={t('templateSources.sidebarButton')} onClick={onManageSources}>
+        <Icon name="layers" size={14}/>
+      </button>
       <VersionMenu update={update}/>
     </div>
   )

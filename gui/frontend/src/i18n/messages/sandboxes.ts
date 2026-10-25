@@ -3,6 +3,7 @@
 export const en = {
   'sandboxes.title': 'Sandboxes',
   'sandboxes.eyebrow': 'Workspace',
+  'sandboxes.templates': 'Templates',
   'sandboxes.runningCount': '{running} running of {total}',
   'sandboxes.new': 'New sandbox',
   'sandboxes.emptyTitle': 'No sandboxes yet',
@@ -92,6 +93,12 @@ export const en = {
   'sandboxCreate.gatewayHint': 'Empty keeps the sandbox inside the cluster. The gateway does not authenticate, so anyone with the URL can reach this port.',
   'sandboxCreate.gatewayPortRange': 'Enter a port from 1 to 65535, or leave it empty.',
   'sandboxCreate.gatewayUnavailable': 'The platform has no gateway, so the sandbox cannot be published.',
+  'sandboxCreate.sshLabel': 'SSH',
+  'sandboxCreate.sshNo': 'No',
+  'sandboxCreate.sshYes': 'Yes (key login through the platform gateway)',
+  'sandboxCreate.sshHint': 'Runs sshd beside the agent. Logins need a key that an SSH route authorizes. With SSH the name is at most {max} characters.',
+  'sandboxes.ssh': 'SSH',
+  'sandboxes.sshHint': 'Log in through the platform SSH gateway with a key that an SSH route authorizes. Keys only: passwords are refused.',
 
   'terminal.sessionEnded': 'session ended',
   'terminal.connecting': 'Connecting…',
@@ -107,6 +114,7 @@ export const en = {
 export const zh: Record<keyof typeof en, string> = {
   'sandboxes.title': '沙箱',
   'sandboxes.eyebrow': '工作区',
+  'sandboxes.templates': '模板',
   'sandboxes.runningCount': '运行中 {running} / 共 {total}',
   'sandboxes.new': '新建沙箱',
   'sandboxes.emptyTitle': '暂无沙箱',
@@ -196,6 +204,12 @@ export const zh: Record<keyof typeof en, string> = {
   'sandboxCreate.gatewayHint': '留空则沙箱仅在集群内可访问。网关不做身份验证，拿到地址的任何人都能访问此端口。',
   'sandboxCreate.gatewayPortRange': '请填写 1 到 65535 之间的端口，或留空。',
   'sandboxCreate.gatewayUnavailable': '平台未配置网关，因此无法发布此沙箱。',
+  'sandboxCreate.sshLabel': 'SSH',
+  'sandboxCreate.sshNo': '否',
+  'sandboxCreate.sshYes': '是（通过平台网关以密钥登录）',
+  'sandboxCreate.sshHint': '在智能体旁运行 sshd。登录需要 SSH 路由授权的密钥。开启 SSH 时，名称最多 {max} 个字符。',
+  'sandboxes.ssh': 'SSH',
+  'sandboxes.sshHint': '通过平台 SSH 网关登录，需使用 SSH 路由授权的密钥。仅允许密钥登录，拒绝密码。',
 
   'terminal.sessionEnded': '会话已结束',
   'terminal.connecting': '连接中…',

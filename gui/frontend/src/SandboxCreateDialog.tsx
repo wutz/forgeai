@@ -1,11 +1,12 @@
 import {FormEvent, useEffect, useRef, useState} from 'react'
-import {CatalogSandboxForm, CatalogTemplates, Config, CreateSandbox, ListInstanceTypes, ListVolumes, SandboxOptions, SandboxTemplates} from '../wailsjs/go/app/App'
+import {CatalogSandboxForm, CatalogSources, Config, CreateSandbox, ListInstanceTypes, ListVolumes, SandboxOptions, SandboxTemplates} from '../wailsjs/go/app/App'
 import {app, sandbox, volumes, v1} from '../wailsjs/go/models'
-import {envErrors, envToLines, formatGoDuration, linesToEnv, errText, generateName, NAME_PATTERN, SANDBOX_NAME_MAX} from './util'
+import {envErrors, envToLines, formatGoDuration, linesToEnv, errText, generateName, NAME_PATTERN, SANDBOX_NAME_MAX, SSH_NAME_MAX} from './util'
 import {CancelButton, Dialog} from './ui'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
 import {Mount, VolumeMountsField, mountProblems} from './VolumeMounts'
+import {catalogGroups, catalogPick, loadTemplateSources, parseCatalogPick, pickedCatalogTemplate} from './templateSources'
 
 // MAX_TTL_HOURS caps the auto-stop and idle timeouts at one year; the backend refuses more.
 const MAX_TTL_HOURS = 24 * 365
@@ -23,7 +24,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   const [vols, setVols] = useState<volumes.Volume[] | null>(null)
   const [volsError, setVolsError] = useState('')
   const [f, setF] = useState<sandbox.Form>(sandbox.Form.createFrom({
-    name: generateName('sandbox'), image: '', command: '', env: [], instanceType: '', runtimeClass: '', service: true,
+    name: generateName('sandbox'), image: '', command: '', env: [], instanceType: '', runtimeClass: '', service: true, ssh: false,
     volumes: [], ttl: v1.Duration.createFrom({Duration: 0}),
   }))
   const [envText, setEnvText] = useState('')
@@ -41,10 +42,10 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   const [templates, setTemplates] = useState<app.SandboxTemplate[]>([])
   // A failed read says so; an empty picker would read as a cluster with no templates.
   const [templatesError, setTemplatesError] = useState('')
-  // catalog holds the sandbox templates of the public template source.
-  const [catalog, setCatalog] = useState<app.CatalogTemplate[]>([])
+  // sources holds the template sources: the platform's, and the ones the user added.
+  const [sources, setSources] = useState<app.CatalogSource[]>([])
   const [catalogError, setCatalogError] = useState('')
-  // pick is the template select's value: "" for none, else "project:<name>" or "catalog:<name>".
+  // pick is the template select's value: "" for none, "project:<name>", or a catalogPick value.
   const [pick, setPick] = useState('')
 
   useEffect(() => {
@@ -59,8 +60,8 @@ export function SandboxCreateDialog({onClose, onCreated}: {
     ListVolumes(false).then(setVols).catch(e => setVolsError(errText(e)))
     Config().then(c => setGatewayOn(!!c.gateway?.name), () => {})
     SandboxTemplates().then(ts => { setTemplates(ts); setTemplatesError('') }, e => setTemplatesError(errText(e)))
-    CatalogTemplates().then(ts => {
-      setCatalog(ts.filter(c => c.kind === 'Sandbox' && !c.error))
+    CatalogSources(loadTemplateSources()).then(s => {
+      setSources(s)
       setCatalogError('')
     }, e => setCatalogError(errText(e)))
   }, [])
@@ -81,14 +82,18 @@ export function SandboxCreateDialog({onClose, onCreated}: {
       set('template', '')
       return
     }
-    const source = value.slice(0, sep)
+    const kind = value.slice(0, sep)
     const name = value.slice(sep + 1)
     // Only a project template is referenced by name; a catalog template is a prefill.
-    const projectRef = source === 'project' ? name : ''
+    const projectRef = kind === 'project' ? name : ''
     set('template', projectRef)
-    const load: Promise<sandbox.TemplateForm | undefined> = source === 'catalog'
-      ? CatalogSandboxForm(name)
-      : Promise.resolve(templates.find(tpl => tpl.name === name)?.form)
+    let load: Promise<sandbox.TemplateForm | undefined>
+    if (kind === 'catalog') {
+      const [source, template] = parseCatalogPick(value)
+      load = CatalogSandboxForm(source, template)
+    } else {
+      load = Promise.resolve(templates.find(tpl => tpl.name === name)?.form)
+    }
     load.then(form => {
       if (seq !== pickSeq.current || !form) return
       setF(prev => sandbox.Form.createFrom({
@@ -103,7 +108,8 @@ export function SandboxCreateDialog({onClose, onCreated}: {
       if (seq === pickSeq.current) setError(errText(e))
     })
   }
-  const pickedCatalog = catalog.find(c => pick === `catalog:${c.name}`)
+  const groups = catalogGroups(sources, 'Sandbox')
+  const picked = pickedCatalogTemplate(groups, pick)
 
   // Mounts need the project's volumes to check against; without any mounts the
   // form does not wait for them. A sandbox runs on one node.
@@ -112,8 +118,9 @@ export function SandboxCreateDialog({onClose, onCreated}: {
 
   const envBad = envErrors(envText)
   // The backend rejects a name that does not start with a letter, or is longer
-  // than the sandbox limit; the field says so before Create is pressed.
-  const nameOK = NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= SANDBOX_NAME_MAX
+  // than the sandbox limit (shorter with SSH); the field says so before Create is pressed.
+  const nameMax = f.ssh ? SSH_NAME_MAX : SANDBOX_NAME_MAX
+  const nameOK = NAME_PATTERN.test(f.name ?? '') && (f.name ?? '').length <= nameMax
   // Negative durations are refused by the backend; the fields say so before Create.
   const ttlOK = Number.isFinite(ttlHours) && ttlHours >= 0 && ttlHours <= MAX_TTL_HOURS
   const idleOK = idleMinutes === null || (Number.isFinite(idleMinutes) && idleMinutes >= 0 && idleMinutes <= MAX_TTL_HOURS * 60)
@@ -165,7 +172,10 @@ export function SandboxCreateDialog({onClose, onCreated}: {
           {error && <div className="banner banner-error" role="alert">{error}</div>}
           {templatesError && <div className="banner banner-warn" role="status">{t('sandboxCreate.templatesUnavailable', {error: templatesError})}</div>}
           {catalogError && <div className="banner banner-warn" role="status">{t('sandboxCreate.catalogUnavailable', {error: catalogError})}</div>}
-          {(templates.length > 0 || catalog.length > 0) && (
+          {sources.filter(s => s.error).map(s => <div key={s.location} className="banner banner-warn" role="status">
+            {t('sandboxCreate.catalogUnavailable', {error: `${s.platform ? '' : `${s.location}: `}${s.error}`})}
+          </div>)}
+          {(templates.length > 0 || groups.length > 0) && (
             <div className="field">
               <label htmlFor="s-template">{t('sandboxCreate.fromTemplate')}</label>
               <select id="s-template" className="select mono" value={pick}
@@ -174,12 +184,19 @@ export function SandboxCreateDialog({onClose, onCreated}: {
                 {templates.some(tpl => !tpl.error) && <optgroup label={t('sandboxCreate.projectTemplates')}>
                   {templates.filter(tpl => !tpl.error).map(tpl => <option key={tpl.name} value={`project:${tpl.name}`}>{tpl.name}</option>)}
                 </optgroup>}
-                {catalog.length > 0 && <optgroup label={t('sandboxCreate.catalogTemplates')}>
-                  {catalog.map(c => <option key={c.name} value={`catalog:${c.name}`}>{c.displayName}</option>)}
-                </optgroup>}
+                {groups.map(g => <optgroup key={g.source.location}
+                                          label={g.source.platform ? t('sandboxCreate.catalogTemplates') : g.source.displayName || g.source.location}>
+                  {g.templates.map(c => <option key={catalogPick(g.source.location, c.name)} value={catalogPick(g.source.location, c.name)}>
+                    {c.displayName}
+                  </option>)}
+                </optgroup>)}
               </select>
-              {pickedCatalog?.description && <span className="hint">{pickedCatalog.description}</span>}
+              {picked?.template.description && <span className="hint">{picked.template.description}</span>}
+              {picked && !picked.source.platform && <div className="banner banner-warn" role="status">
+                {t('templateSources.untrusted', {source: picked.source.location})}
+              </div>}
               <span className="hint">{t('sandboxCreate.templateHint')}</span>
+              <span className="hint">{t('templateSources.manageHint')}</span>
             </div>
           )}
 
@@ -187,12 +204,12 @@ export function SandboxCreateDialog({onClose, onCreated}: {
             <label htmlFor="s-name">{t('common.name')}</label>
             <input id="s-name" className="input mono" value={f.name}
                    autoCapitalize="none" autoCorrect="off" spellCheck={false}
-                   onChange={e => set('name', e.target.value)} maxLength={SANDBOX_NAME_MAX}
+                   onChange={e => set('name', e.target.value)} maxLength={nameMax}
                    aria-invalid={!nameOK}
                    placeholder="agent" required/>
             <span className="hint">{t('sandboxCreate.nameHint')}</span>
             {!nameOK && (f.name ?? '') !== '' && <span className="hint hint-error">
-              {t('common.nameInvalid', {max: SANDBOX_NAME_MAX})}
+              {t('common.nameInvalid', {max: nameMax})}
             </span>}
           </div>
           <div className="field">
@@ -282,6 +299,13 @@ export function SandboxCreateDialog({onClose, onCreated}: {
                      onChange={e => setGatewayText(e.target.value)}/>
               <span className="hint">{gatewayOn ? t('sandboxCreate.gatewayHint') : t('sandboxCreate.gatewayUnavailable')}</span>
               {!gatewayOK && <span className="hint hint-error">{t('sandboxCreate.gatewayPortRange')}</span>}
+              <label htmlFor="s-ssh">{t('sandboxCreate.sshLabel')}</label>
+              <select id="s-ssh" className="select" value={f.ssh ? 'yes' : 'no'}
+                      onChange={e => set('ssh', e.target.value === 'yes')}>
+                <option value="no">{t('sandboxCreate.sshNo')}</option>
+                <option value="yes">{t('sandboxCreate.sshYes')}</option>
+              </select>
+              {f.ssh && <span className="hint">{t('sandboxCreate.sshHint', {max: SSH_NAME_MAX})}</span>}
             </div>
           </div>
         </form>

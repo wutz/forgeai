@@ -92,6 +92,12 @@ func (r *SandboxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	orig := u.DeepCopy()
 
+	if sb.Labels[naming.LabelSSH] == naming.LiteralTrue {
+		if err := r.ensureSSH(ctx, u); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	// The stop annotation is what the GUI, the CLI and the docs all use; it
 	// maps onto spec.operatingMode, which is what the sandbox controller reads.
 	wantStopped := sb.Annotations[naming.AnnotationStopped] == naming.LiteralTrue
@@ -254,14 +260,16 @@ func (r *SandboxReconciler) apply(ctx context.Context, orig *unstructured.Unstru
 	return r.Patch(ctx, u, client.MergeFrom(orig))
 }
 
-// SetupWithManager watches project sandboxes and their pods (a restarted pod
-// resets the idle clock).
+// SetupWithManager watches project sandboxes, their pods (a restarted pod
+// resets the idle clock) and the SSH Service and Secret they own.
 func (r *SandboxReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	u := &unstructured.Unstructured{}
 	u.SetGroupVersionKind(sandbox.SandboxGVK)
 	b := ctrl.NewControllerManagedBy(mgr).
 		Named("sandbox").
 		For(u, builder.WithPredicates(projectSandbox())).
+		Owns(&corev1.Service{}, builder.WithPredicates(projectSandbox())).
+		Owns(&corev1.Secret{}, builder.WithPredicates(projectSandbox())).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(func(_ context.Context, o client.Object) []reconcile.Request {
 			return []reconcile.Request{{NamespacedName: types.NamespacedName{
 				Namespace: o.GetNamespace(), Name: sandboxOfPod(o),

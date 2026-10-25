@@ -168,6 +168,8 @@ const k8sNameAlphabet = 'bcdfghjklmnpqrstvwxz2456789'
 export const NAME_PATTERN = /^[a-z]([-a-z0-9]*[a-z0-9])?$/
 export const NAME_MAX = 50
 export const SANDBOX_NAME_MAX = 63
+// SSH_NAME_MAX is the longest sandbox name with SSH on: its SSH Service is "<name>-ssh".
+export const SSH_NAME_MAX = SANDBOX_NAME_MAX - '-ssh'.length
 
 // MAX_RETRIES is the most retries a job may ask for; the backend enforces the same bound.
 export const MAX_RETRIES = 20

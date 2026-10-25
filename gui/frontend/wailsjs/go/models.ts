@@ -24,6 +24,45 @@ export namespace app {
 	        this.error = source["error"];
 	    }
 	}
+	export class CatalogSource {
+	    location: string;
+	    displayName?: string;
+	    platform: boolean;
+	    error?: string;
+	    templates: CatalogTemplate[];
+	
+	    static createFrom(source: any = {}) {
+	        return new CatalogSource(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.location = source["location"];
+	        this.displayName = source["displayName"];
+	        this.platform = source["platform"];
+	        this.error = source["error"];
+	        this.templates = this.convertValues(source["templates"], CatalogTemplate);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class ConnInfo {
 	    context: string;
 	    server: string;
@@ -783,6 +822,8 @@ export namespace app {
 	    serviceFQDN?: string;
 	    gatewayPort?: number;
 	    gatewayURL?: string;
+	    ssh?: boolean;
+	    sshEndpoint?: string;
 	    podIPs?: string[];
 	    nodeName?: string;
 	    podName?: string;
@@ -819,6 +860,8 @@ export namespace app {
 	        this.serviceFQDN = source["serviceFQDN"];
 	        this.gatewayPort = source["gatewayPort"];
 	        this.gatewayURL = source["gatewayURL"];
+	        this.ssh = source["ssh"];
+	        this.sshEndpoint = source["sshEndpoint"];
 	        this.podIPs = source["podIPs"];
 	        this.nodeName = source["nodeName"];
 	        this.podName = source["podName"];
@@ -1047,6 +1090,7 @@ export namespace sandbox {
 	    instanceType?: string;
 	    runtimeClass?: string;
 	    service?: boolean;
+	    ssh?: boolean;
 	    volumes?: VolumeMount[];
 	    template?: string;
 	    ttl: v1.Duration;
@@ -1066,6 +1110,7 @@ export namespace sandbox {
 	        this.instanceType = source["instanceType"];
 	        this.runtimeClass = source["runtimeClass"];
 	        this.service = source["service"];
+	        this.ssh = source["ssh"];
 	        this.volumes = this.convertValues(source["volumes"], VolumeMount);
 	        this.template = source["template"];
 	        this.ttl = this.convertValues(source["ttl"], v1.Duration);

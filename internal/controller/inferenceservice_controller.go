@@ -158,6 +158,15 @@ func (r *InferenceServiceReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	case replicas > 0 && model.Status.ReadyReplicas >= replicas && epp.Status.ReadyReplicas > 0:
 		status, reason, msg = metav1.ConditionTrue, inferenceReady, fmt.Sprintf("%d model servers ready", replicas)
 	}
+	// A Deployment that cannot create its pods, such as one the project quota
+	// refuses, stays Starting; the refusal is the reason the user needs to see.
+	if reason == inferenceStarting {
+		for _, d := range []*appsv1.Deployment{model, epp} {
+			if f := replicaFailure(d); f != "" {
+				msg += "; " + f
+			}
+		}
+	}
 	meta.SetStatusCondition(&svc.Status.Conditions, metav1.Condition{
 		Type: inferenceReady, Status: status, Reason: reason, Message: msg, ObservedGeneration: svc.Generation,
 	})
@@ -165,6 +174,17 @@ func (r *InferenceServiceReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		log.Info("InferenceService changed state", "reason", reason, "readyReplicas", svc.Status.ReadyReplicas)
 	}
 	return ctrl.Result{}, r.Status().Patch(ctx, svc, client.MergeFrom(orig))
+}
+
+// replicaFailure is the message of a Deployment's ReplicaFailure condition, the
+// reason its pods cannot be created. It is empty when the Deployment has none.
+func replicaFailure(d *appsv1.Deployment) string {
+	for _, c := range d.Status.Conditions {
+		if c.Type == appsv1.DeploymentReplicaFailure && c.Status == corev1.ConditionTrue {
+			return c.Message
+		}
+	}
+	return ""
 }
 
 // setReady records a failed Ready condition and patches the status.

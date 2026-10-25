@@ -29,10 +29,12 @@ const SIDEBAR = 'forgeai.sidebar'
 const NARROW = '(max-width: 820px)'
 const isNarrow = () => window.matchMedia(NARROW).matches
 
-type Area = 'overview' | 'jobs' | 'sandboxes' | 'inference' | 'templates' | 'volumes' | 'files' | 'images' | 'resources'
-  | 'admin' | 'dependencies'
+type Area = 'overview' | 'jobs' | 'sandboxes' | 'inference' | 'sandboxTemplates' | 'jobTemplates' | 'volumes' | 'files'
+  | 'images' | 'resources' | 'admin' | 'dependencies'
 
-type NavItem = {area: Area, label: string, icon: IconName}
+// A nested item is a list under the item above it (Sandbox templates under
+// Sandboxes); it is indented and has no icon of its own.
+type NavItem = {area: Area, label: string, icon?: IconName, nested?: boolean}
 
 // readJSON reads a JSON value from localStorage. A damaged entry counts as
 // absent, so it cannot stop the connection that reads it.
@@ -78,6 +80,7 @@ function areaFor(current: Area, info: app.ConnInfo): Area {
   if (current === 'admin' || current === 'dependencies') return 'overview'
   if (current === 'sandboxes' && !info.sandboxes) return 'overview'
   if (current === 'inference' && !info.inference) return 'overview'
+  if (current === 'sandboxTemplates' && !info.sandboxes) return 'overview'
   return current
 }
 
@@ -209,15 +212,19 @@ export default function App() {
 
   // The sidebar groups areas like the reference consoles: workspace, storage,
   // cluster catalogue, then admin. Sandboxes appear only when the connected
-  // cluster runs agents.x-k8s.io.
+  // cluster runs agents.x-k8s.io. Each template list sits under the area it
+  // belongs to: sandbox templates under Sandboxes, job templates under Jobs.
   const groups: {label: string, items: NavItem[]}[] = conn?.project ? [
     {
       label: t('nav.workspace'),
       items: [
         {area: 'overview', label: t('nav.overview'), icon: 'grid'},
+        ...(conn.sandboxes ? [
+          {area: 'sandboxes', label: t('nav.sandboxes'), icon: 'box'} as NavItem,
+          {area: 'sandboxTemplates', label: t('nav.sandboxTemplates'), nested: true} as NavItem,
+        ] : []),
         {area: 'jobs', label: t('nav.jobs'), icon: 'play'},
-        ...(conn.sandboxes ? [{area: 'sandboxes', label: t('nav.sandboxes'), icon: 'box'} as NavItem] : []),
-        {area: 'templates', label: t('nav.templates'), icon: 'scroll'},
+        {area: 'jobTemplates', label: t('nav.jobTemplates'), nested: true},
         ...(conn.inference ? [{area: 'inference', label: t('nav.inference'), icon: 'bolt'} as NavItem] : []),
       ],
     },
@@ -263,7 +270,7 @@ export default function App() {
               <div className="nav-group" key={g.label}>
                 <div className="nav-label">{g.label}</div>
                 {g.items.map(item => (
-                  <button key={item.area} className={`nav-item ${area === item.area ? 'active' : ''}`}
+                  <button key={item.area} className={`nav-item ${item.nested ? 'nested' : ''} ${area === item.area ? 'active' : ''}`}
                           onClick={() => {
                             setArea(item.area)
                             // On a narrow window the rail is an overlay; picking a page dismisses it.
@@ -271,7 +278,7 @@ export default function App() {
                           }}
                           title={collapsed ? item.label : undefined}
                           aria-label={item.label} aria-current={area === item.area ? 'page' : undefined}>
-                    <Icon name={item.icon}/><span>{item.label}</span>
+                    {item.icon && <Icon name={item.icon}/>}<span>{item.label}</span>
                   </button>
                 ))}
               </div>
@@ -290,8 +297,9 @@ export default function App() {
                 {shown('overview', <Overview onOpen={setArea} onOpenJob={name => { setJobFocus({name}); setArea('jobs') }}/>)}
                 {shown('jobs', <Jobs focus={jobFocus}/>)}
                 {shown('sandboxes', <Sandboxes/>)}
+                {conn.sandboxes && shown('sandboxTemplates', <Templates kind="sandbox"/>)}
+                {shown('jobTemplates', <Templates kind="job"/>)}
                 {shown('inference', <Inference/>)}
-                {shown('templates', <Templates sandboxes={conn.sandboxes}/>)}
                 {shown('volumes', <Volumes/>)}
                 {shown('files', <FilesView/>)}
                 {shown('images', <Images/>)}

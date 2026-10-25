@@ -166,6 +166,10 @@ a { color: inherit; text-decoration: none; }
 /* On the darker chrome the default light hover wash would read as a lift;
    hover steps down instead, so only the active row is lighter. */
 .sidebar .nav-item:not(.active):hover { background: var(--hover-wash); }
+/* A nested item is a list under the area above it: a shorter, indented label
+   with no icon, a step quieter than its parent until it is the active page. */
+.sidebar .nav-item.nested { height: 28px; padding-left: 34px; font-size: 13px; color: var(--mute); }
+.sidebar .nav-item.nested.active { color: var(--ink); }
 .header .icon-btn:hover { background: var(--hover-wash); color: var(--ink); }
 /* Scope: the cluster and project pickers at the top of the sidebar, one compact
    row each: a small mono label beside a 28px select. */

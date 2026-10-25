@@ -2,47 +2,39 @@ import {useEffect, useState} from 'react'
 import {ListTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, DeleteSandboxTemplate, SandboxTemplates as ListSandboxTemplates, ListInstanceTypes} from '../wailsjs/go/app/App'
 import {app, sandbox, training} from '../wailsjs/go/models'
 import {envErrors, envToLines, linesToEnv, everyWhileVisible, fmtDate, errText, generateName, MAX_RETRIES, NAME_MAX, NAME_PATTERN} from './util'
-import {Card, CancelButton, Dialog, Empty, HintButton, Icon, PageHeader, RefreshButton, Segmented, Spinner, useActive, useConfirm} from './ui'
+import {Card, CancelButton, Dialog, Empty, HintButton, Icon, PageHeader, RefreshButton, Spinner, useActive, useConfirm} from './ui'
 import {SandboxTemplateDialog, SandboxTemplateTable} from './SandboxTemplates'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
 
 type Kind = 'sandbox' | 'job'
 
-// kindOptions is built per render so the labels follow the language.
-const kindOptions = (): {value: Kind, label: string}[] => [
-  {value: 'sandbox', label: t('templates.kindSandbox')},
-  {value: 'job', label: t('templates.kindJob')},
-]
-
 const byName = <T extends {name: string}>(items: T[]) =>
   [...items].sort((a, b) => a.name.localeCompare(b.name))
 
-// Templates holds both kinds in one page: sandbox templates (agent blueprints
-// new sandboxes start from) and job templates (namespaced TrainingRuntimes
-// that prefill the job form). Each kind is sorted by name.
-export function Templates({sandboxes}: {sandboxes: boolean}) {
-  const [kind, setKind] = useState<Kind>(sandboxes ? 'sandbox' : 'job')
+// Templates is one kind's page, opened from its sidebar entry: sandbox templates
+// (agent blueprints new sandboxes start from) under Sandboxes, and job templates
+// (namespaced TrainingRuntimes that prefill the job form) under Jobs. Each list is sorted by name.
+export function Templates({kind}: {kind: Kind}) {
   // The lists are null until the first read, so a failed first read is not shown as an empty list.
   const [sandboxItems, setSandboxItems] = useState<app.SandboxTemplate[] | null>(null)
   const [jobItems, setJobItems] = useState<app.Template[] | null>(null)
-  // Each kind reads and fails on its own: a sandbox template read that is refused
-  // must not hide the job templates, and the other way round.
   const [sandboxError, setSandboxError] = useState('')
   const [jobError, setJobError] = useState('')
   const [sandboxDialog, setSandboxDialog] = useState<SandboxDialogState | null>(null)
   const [jobDialog, setJobDialog] = useState<JobDialogState | null>(null)
   const active = useActive()
-  const isSandbox = sandboxes && kind === 'sandbox'
+  const isSandbox = kind === 'sandbox'
   const error = isSandbox ? sandboxError : jobError
 
-  // A refused read is shown in its kind's banner and rejects, so the header's refresh
+  // A refused read is shown in the page's banner and rejects, so the header's refresh
   // button reports it too.
-  const refreshSandbox = () => !sandboxes ? Promise.resolve() : ListSandboxTemplates()
+  const refreshSandbox = () => ListSandboxTemplates()
     .then(s => { setSandboxItems(byName(s)); setSandboxError('') }, e => { setSandboxError(errText(e)); throw e })
   const refreshJob = () => ListTemplates()
     .then(j => { setJobItems(byName(j)); setJobError('') }, e => { setJobError(errText(e)); throw e })
-  const refresh = () => Promise.all([refreshSandbox(), refreshJob()])
+  // Only the kind on screen is read; the other kind has its own page.
+  const refresh = isSandbox ? refreshSandbox : refreshJob
   // reload is for the callers with no place to show a rejection; the failure is already in the page.
   const reload = () => refresh().catch(() => undefined)
   // The lists poll like the other views, so a template saved elsewhere shows without leaving the page.
@@ -60,7 +52,7 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
 
   return (
     <div className="page">
-      <PageHeader eyebrow={t('templates.eyebrow')} title={t('templates.title')}
+      <PageHeader eyebrow={t('templates.eyebrow')} title={t(isSandbox ? 'templates.titleSandbox' : 'templates.titleJob')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>
                     {isSandbox
                       ? sandboxItems !== null && t('templates.countSandbox', {count: sandboxItems.length})
@@ -90,13 +82,6 @@ export function Templates({sandboxes}: {sandboxes: boolean}) {
                                     onClose={() => { setJobDialog(null); reload() }} onSaved={() => {
         setJobDialog(null); reload()
       }}/>}
-
-      {sandboxes && (
-        <div className="list-toolbar">
-          <Segmented options={kindOptions()} value={kind} onChange={setKind}
-                     counts={{sandbox: sandboxItems?.length, job: jobItems?.length}}/>
-        </div>
-      )}
 
       {/* A failed first read leaves no list, so the card is left out rather than drawn empty under the banner. */}
       {((isSandbox ? sandboxItems : jobItems) || !error) && <Card>

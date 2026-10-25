@@ -335,6 +335,8 @@ function SandboxDetail({name, onDone, onDeleted, onClose}: {
                 {box.gpu ? ` · ${box.gpu} GPU` : ''}</dd>
               <dt>{t('sandboxes.volumes')}</dt><dd className="mono">{box.volumes?.join(', ') || '—'}</dd>
               {box.serviceFQDN && <><dt>{t('sandboxes.service')}</dt><dd className="mono">{box.serviceFQDN}</dd></>}
+              {box.ssh && <><dt>{t('sandboxes.ssh')}</dt><dd className="mono">{box.sshEndpoint}
+                <div className="cell-sub">{t('sandboxes.sshHint')}</div></dd></>}
               {box.podIPs && box.podIPs.length > 0 && <><dt>{t('sandboxes.podIps')}</dt><dd className="mono">{box.podIPs.join(', ')}</dd></>}
               {box.nodeName && <><dt>{t('sandboxes.node')}</dt><dd className="mono">{box.nodeName}</dd></>}
               <dt>{t('sandboxes.pod')}</dt><dd className="mono">{box.podName || '—'}{box.podPhase ? ` · ${box.podPhase}` : ''}</dd>

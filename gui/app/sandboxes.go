@@ -33,10 +33,14 @@ type Sandbox struct {
 	RuntimeClass string            `json:"runtimeClass,omitempty"`
 	Service      bool              `json:"service"`
 	ServiceFQDN  string            `json:"serviceFQDN,omitempty"`
-	PodIPs       []string          `json:"podIPs,omitempty"`
-	NodeName     string            `json:"nodeName,omitempty"`
-	PodName      string            `json:"podName,omitempty"`
-	PodPhase     string            `json:"podPhase,omitempty"`
+	// SSH is set when the sandbox has an sshd sidecar; SSHEndpoint is the
+	// in-cluster address of its SSH Service.
+	SSH         bool     `json:"ssh,omitempty"`
+	SSHEndpoint string   `json:"sshEndpoint,omitempty"`
+	PodIPs      []string `json:"podIPs,omitempty"`
+	NodeName    string   `json:"nodeName,omitempty"`
+	PodName     string   `json:"podName,omitempty"`
+	PodPhase    string   `json:"podPhase,omitempty"`
 	// ContainerRunning is set when the sandbox container runs; ContainerReason
 	// says why it does not otherwise (CrashLoopBackOff, ImagePullBackOff, ...).
 	ContainerRunning bool   `json:"containerRunning"`
@@ -576,6 +580,10 @@ func toSandbox(u *unstructured.Unstructured, pods podLookup) *Sandbox {
 	}
 	if sb.Spec.ShutdownTime != nil && !sb.Spec.ShutdownTime.IsZero() {
 		out.ShutdownTime = sb.Spec.ShutdownTime.UTC().Format(time.RFC3339)
+	}
+	if sb.Labels[naming.LabelSSH] == naming.LiteralTrue {
+		out.SSH = true
+		out.SSHEndpoint = fmt.Sprintf("%s.%s.svc:%d", naming.SSHServiceName(sb.Name), u.GetNamespace(), sandbox.SSHPort)
 	}
 	for _, ctr := range sb.Spec.PodTemplate.Spec.Containers {
 		if ctr.Name != sandbox.ContainerName {

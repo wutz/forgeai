@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Refreshes the cluster dependency manifests embedded in the GUI (gui/app/deps).
 #
-# Kueue and agent-sandbox publish their install manifests as release assets;
+# Kueue, agent-sandbox and the Gateway API Inference Extension publish their
+# install manifests as release assets;
 # each is checked against the sha256 pinned here before it is copied in.
 # Kubeflow Trainer has no such asset, so its manifests (Trainer with its JobSet,
 # and the built-in ClusterTrainingRuntimes) are rendered from the tag with
@@ -22,6 +23,8 @@ KUEUE_VERSION=v0.20.2
 KUEUE_SHA256=1ab14ecd590575ac57f50fa4cbcf529766bc2c32ba974bda1614381281ec52b4
 SANDBOX_VERSION=v1.0.7
 SANDBOX_SHA256=136c10c9347cb5a6740b351444cae82f404e883c3f520272257ba785f2af0da8
+GAIE_VERSION=v1.6.2
+GAIE_SHA256=f410dfca474608c02903087b47f1ac081706dfb6dfe7f83d00a7cc7e00c4ad0d
 
 # fetch URL SHA256 FILE downloads a release asset and checks its digest.
 fetch() {
@@ -46,6 +49,9 @@ fetch "https://github.com/kubernetes-sigs/kueue/releases/download/$KUEUE_VERSION
   "$KUEUE_SHA256" "$dir/kueue.yaml"
 fetch "https://github.com/kubernetes-sigs/agent-sandbox/releases/download/$SANDBOX_VERSION/sandbox-with-extensions.yaml" \
   "$SANDBOX_SHA256" "$dir/agent-sandbox.yaml"
+# The InferencePool CRD the llm-d routers of InferenceServices need.
+fetch "https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/$GAIE_VERSION/v1-manifests.yaml" \
+  "$GAIE_SHA256" "$dir/gateway-api-inference-extension.yaml"
 
 # The order is the install order.
 cat > "$dir/manifest.json" <<EOF
@@ -71,6 +77,13 @@ cat > "$dir/manifest.json" <<EOF
       "source": "https://github.com/kubernetes-sigs/agent-sandbox/releases/tag/$SANDBOX_VERSION",
       "file": "agent-sandbox.yaml",
       "sha256": "$(sha "$dir/agent-sandbox.yaml")"
+    },
+    {
+      "name": "gateway-api-inference-extension",
+      "version": "$GAIE_VERSION",
+      "source": "https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/tag/$GAIE_VERSION",
+      "file": "gateway-api-inference-extension.yaml",
+      "sha256": "$(sha "$dir/gateway-api-inference-extension.yaml")"
     }
   ]
 }

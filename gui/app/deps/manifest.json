@@ -20,6 +20,13 @@
       "source": "https://github.com/kubernetes-sigs/agent-sandbox/releases/tag/v1.0.7",
       "file": "agent-sandbox.yaml",
       "sha256": "136c10c9347cb5a6740b351444cae82f404e883c3f520272257ba785f2af0da8"
+    },
+    {
+      "name": "gateway-api-inference-extension",
+      "version": "v1.6.2",
+      "source": "https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/tag/v1.6.2",
+      "file": "gateway-api-inference-extension.yaml",
+      "sha256": "f410dfca474608c02903087b47f1ac081706dfb6dfe7f83d00a7cc7e00c4ad0d"
     }
   ]
 }

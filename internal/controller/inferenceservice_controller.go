@@ -49,6 +49,7 @@ const (
 	inferenceStarting        = "Starting"
 	inferenceStopped         = "Stopped"
 	inferenceInstanceMissing = "InstanceTypeNotFound"
+	inferenceNoGPU           = "InstanceTypeWithoutGPU"
 	inferenceApplyFailed     = "ApplyFailed"
 	// inferenceRetry is how often a missing InstanceType is looked up again.
 	inferenceRetry = time.Minute
@@ -99,6 +100,14 @@ func (r *InferenceServiceReconciler) Reconcile(ctx context.Context, req ctrl.Req
 		}
 		if err := r.setReady(ctx, svc, orig, metav1.ConditionFalse, inferenceInstanceMissing,
 			fmt.Sprintf("InstanceType %q does not exist", svc.Spec.InstanceType)); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{RequeueAfter: inferenceRetry}, nil
+	}
+	// The GUI refuses a CPU-only InstanceType; a manifest can still name one.
+	if it.Spec.GPU.Count < 1 {
+		if err := r.setReady(ctx, svc, orig, metav1.ConditionFalse, inferenceNoGPU,
+			fmt.Sprintf("InstanceType %q has no GPU", svc.Spec.InstanceType)); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{RequeueAfter: inferenceRetry}, nil

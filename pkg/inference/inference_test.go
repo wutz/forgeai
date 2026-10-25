@@ -197,7 +197,7 @@ func TestObjectsServeModelWithTensorParallelGPUs(t *testing.T) {
 		t.Errorf("HF_HUB_DISABLE_XET %+v, want Xet off when downloading through a mirror", env)
 	}
 	spec := model.Spec.Template.Spec
-	if p := spec.Containers[0].StartupProbe; p == nil || p.FailureThreshold*int32(p.PeriodSeconds) < 7200 {
+	if p := spec.Containers[0].StartupProbe; p == nil || p.FailureThreshold*p.PeriodSeconds < 7200 {
 		t.Errorf("startup probe %+v, want the configured two hours for a cold start", p)
 	}
 	if spec.NodeSelector[naming.LabelGPUProduct] != "NVIDIA-GeForce-RTX-5090" {
@@ -272,6 +272,40 @@ func TestObjectsMountWeightsCache(t *testing.T) {
 	pvc := model.Spec.Template.Spec.Volumes[1]
 	if pvc.PersistentVolumeClaim == nil || pvc.PersistentVolumeClaim.ClaimName != "qwen-hf-cache" {
 		t.Errorf("hf-cache volume %+v, want the cache claim", pvc.VolumeSource)
+	}
+}
+
+func TestCacheClaimWithoutStorageClassUsesDefault(t *testing.T) {
+	cfg := testConfig()
+	cfg.Inference.Cache.Size = resource.MustParse("200Gi")
+	claim := CacheClaim(testService(), cfg)
+	if claim == nil {
+		t.Fatal("no claim for a cache with a size")
+	}
+	// A set but empty class would never bind; nil leaves it to the default.
+	if claim.Spec.StorageClassName != nil {
+		t.Errorf("storage class %q, want the default (nil)", *claim.Spec.StorageClassName)
+	}
+	if got := claim.Spec.Resources.Requests.Storage().String(); got != "200Gi" {
+		t.Errorf("size %s, want 200Gi", got)
+	}
+}
+
+func TestStartupFailureThreshold(t *testing.T) {
+	for _, tc := range []struct {
+		timeout time.Duration
+		want    int32
+	}{
+		{2 * time.Hour, 720},
+		{startupPeriodSeconds * time.Second, 1},
+		{time.Second, 1},
+		{0, 1},
+	} {
+		cfg := testConfig()
+		cfg.Inference.StartupTimeout = metav1.Duration{Duration: tc.timeout}
+		if got := startupFailureThreshold(cfg); got != tc.want {
+			t.Errorf("timeout %s: threshold %d, want %d", tc.timeout, got, tc.want)
+		}
 	}
 }
 

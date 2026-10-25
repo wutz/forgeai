@@ -72,7 +72,17 @@ func CacheClaim(svc *v1.InferenceService, cfg *platform.Config) *corev1.Persiste
 	if !cache.Enabled() {
 		return nil
 	}
-	cls := cache.StorageClass
+	spec := corev1.PersistentVolumeClaimSpec{
+		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
+		Resources: corev1.VolumeResourceRequirements{
+			Requests: corev1.ResourceList{corev1.ResourceStorage: cache.Size},
+		},
+	}
+	// A nil class asks for the default StorageClass; an empty one would ask for
+	// a class nothing provisions, and the claim would never bind.
+	if cache.StorageClass != "" {
+		spec.StorageClassName = new(cache.StorageClass)
+	}
 	return &corev1.PersistentVolumeClaim{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "PersistentVolumeClaim"},
 		ObjectMeta: metav1.ObjectMeta{Name: CacheClaimName(svc), Namespace: svc.Namespace,
@@ -80,13 +90,7 @@ func CacheClaim(svc *v1.InferenceService, cfg *platform.Config) *corev1.Persiste
 				naming.LabelManagedBy: naming.ManagedBy, naming.LabelComponent: naming.ComponentInference,
 				naming.LabelInference: svc.Name,
 			}},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes:      []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany},
-			StorageClassName: &cls,
-			Resources: corev1.VolumeResourceRequirements{
-				Requests: corev1.ResourceList{corev1.ResourceStorage: cache.Size},
-			},
-		},
+		Spec: spec,
 	}
 }
 

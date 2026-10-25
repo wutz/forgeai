@@ -580,6 +580,7 @@ export namespace app {
 	    apiServer: string;
 	    namespacePrefix: string;
 	    ingress: platform.Ingress;
+	    gateway: platform.Gateway;
 	    registry: RegistryInfo;
 	    storageTypes: Record<string, StorageTypeInfo>;
 	    defaultStorageType: string;
@@ -596,6 +597,7 @@ export namespace app {
 	        this.apiServer = source["apiServer"];
 	        this.namespacePrefix = source["namespacePrefix"];
 	        this.ingress = this.convertValues(source["ingress"], platform.Ingress);
+	        this.gateway = this.convertValues(source["gateway"], platform.Gateway);
 	        this.registry = this.convertValues(source["registry"], RegistryInfo);
 	        this.storageTypes = this.convertValues(source["storageTypes"], StorageTypeInfo, true);
 	        this.defaultStorageType = source["defaultStorageType"];
@@ -818,6 +820,8 @@ export namespace app {
 	    runtimeClass?: string;
 	    service: boolean;
 	    serviceFQDN?: string;
+	    gatewayPort?: number;
+	    gatewayURL?: string;
 	    ssh?: boolean;
 	    sshEndpoint?: string;
 	    podIPs?: string[];
@@ -854,6 +858,8 @@ export namespace app {
 	        this.runtimeClass = source["runtimeClass"];
 	        this.service = source["service"];
 	        this.serviceFQDN = source["serviceFQDN"];
+	        this.gatewayPort = source["gatewayPort"];
+	        this.gatewayURL = source["gatewayURL"];
 	        this.ssh = source["ssh"];
 	        this.sshEndpoint = source["sshEndpoint"];
 	        this.podIPs = source["podIPs"];
@@ -1001,6 +1007,26 @@ export namespace app {
 
 export namespace platform {
 	
+	export class Gateway {
+	    name?: string;
+	    namespace?: string;
+	    sectionName?: string;
+	    scheme?: string;
+	    port?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new Gateway(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.namespace = source["namespace"];
+	        this.sectionName = source["sectionName"];
+	        this.scheme = source["scheme"];
+	        this.port = source["port"];
+	    }
+	}
 	export class Ingress {
 	    className?: string;
 	    domain?: string;
@@ -1069,6 +1095,7 @@ export namespace sandbox {
 	    template?: string;
 	    ttl: v1.Duration;
 	    idleTimeout?: v1.Duration;
+	    gatewayPort?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Form(source);
@@ -1088,6 +1115,7 @@ export namespace sandbox {
 	        this.template = source["template"];
 	        this.ttl = this.convertValues(source["ttl"], v1.Duration);
 	        this.idleTimeout = this.convertValues(source["idleTimeout"], v1.Duration);
+	        this.gatewayPort = source["gatewayPort"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

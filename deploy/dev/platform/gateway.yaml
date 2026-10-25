@@ -1,0 +1,24 @@
+# The Gateway that publishes sandbox ports (see gateway in config.yaml). Routes
+# from the project namespaces attach to its listener. It sits in llmapi because
+# that namespace's agentgateway controller may write proxy objects only there;
+# a Gateway in forgeai-system is Accepted but never Programmed. The listener is
+# in-cluster only: 7443 and 8080 on the shared MetalLB address belong to
+# ingress-nginx.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: forgeai-sandbox
+  namespace: llmapi
+spec:
+  gatewayClassName: agentgateway
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 8081
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchExpressions:
+          - key: forgeai.wutz.dev/project
+            operator: Exists

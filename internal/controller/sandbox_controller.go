@@ -18,9 +18,12 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -37,13 +40,19 @@ import (
 )
 
 // SandboxReconciler adds what the agent-sandbox controller lacks for forgeai
-// projects: the stop/start annotation shared with TrainJobs and the idle
-// policy of the platform. A stopped or idle Sandbox is suspended: its pod is
-// deleted but the object and its volumes are kept, so it can be resumed.
+// projects: the stop/start annotation shared with TrainJobs, the idle policy of
+// the platform and the publication of sandbox ports through the Gateway API. A
+// stopped or idle Sandbox is suspended: its pod is deleted but the object and
+// its volumes are kept, so it can be resumed.
 type SandboxReconciler struct {
 	client.Client
-	Config *platform.Loader
-	Now    func() time.Time
+	// APIReader reads past the cache, to see Services the cache does not hold.
+	APIReader client.Reader
+	Config    *platform.Loader
+	// Gateway is set when the Gateway API HTTPRoute CRD is installed; without
+	// it sandboxes are not published through the gateway.
+	Gateway bool
+	Now     func() time.Time
 }
 
 func (r *SandboxReconciler) now() time.Time {
@@ -56,10 +65,12 @@ func (r *SandboxReconciler) now() time.Time {
 // +kubebuilder:rbac:groups=agents.x-k8s.io,resources=sandboxes,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups=agents.x-k8s.io,resources=sandboxes/status,verbs=get
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes,verbs=get;list;watch;create;update;patch;delete
 
-// Reconcile applies the stop annotation and the idle policy. It never
-// resumes a sandbox: a suspended sandbox stays suspended until its user
-// starts it.
+// Reconcile publishes the sandbox through the gateway if it asks for it, then
+// applies the stop annotation and the idle policy. It never resumes a
+// sandbox: a suspended sandbox stays suspended until its user starts it.
 func (r *SandboxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 	u := &unstructured.Unstructured{}
@@ -73,6 +84,11 @@ func (r *SandboxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	sb := &sandbox.Sandbox{}
 	if err := sandbox.FromUnstructured(u.Object, sb); err != nil {
 		return ctrl.Result{}, err
+	}
+	if r.Gateway {
+		if err := r.reconcileGateway(ctx, sb); err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 	orig := u.DeepCopy()
 
@@ -136,6 +152,87 @@ func (r *SandboxReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	return ctrl.Result{RequeueAfter: max(timeout-idle, time.Second)}, nil
 }
 
+// reconcileGateway publishes a sandbox with a gateway port: a Service selecting
+// its pod on that port and an HTTPRoute for its host name. Clearing the port
+// removes both. The objects follow the pod, so a sandbox without one is left as
+// it is until the pod starts.
+func (r *SandboxReconciler) reconcileGateway(ctx context.Context, sb *sandbox.Sandbox) error {
+	log := logf.FromContext(ctx)
+	port := sandbox.GatewayPortOf(sb)
+	if port == 0 {
+		return r.unpublish(ctx, sb)
+	}
+	cfg, err := r.Config.Get(ctx)
+	if err != nil {
+		return err
+	}
+	if err := sandbox.CheckGateway(sb.Name, sb.Namespace, cfg); err != nil {
+		// A spec error does not heal by retrying; the next edit reconciles again.
+		log.Error(err, "Could not publish sandbox", "sandbox", sb.Name)
+		return nil
+	}
+	pod := &corev1.Pod{}
+	if err := r.Get(ctx, types.NamespacedName{Namespace: sb.Namespace, Name: sandbox.PodName(sb)}, pod); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	// The Service selects the sandbox's pods by its name hash. Without it the
+	// selector would match every pod in the namespace.
+	hash := pod.Labels[sandbox.LabelSandboxNameHash]
+	if hash == "" {
+		log.Info("Pod has no sandbox name hash; sandbox not published", "sandbox", sb.Name)
+		return nil
+	}
+	svc := sandbox.GatewayService(sb, map[string]string{sandbox.LabelSandboxNameHash: hash}, port)
+	if err := r.publish(ctx, sb, svc); err != nil {
+		return err
+	}
+	route := sandbox.GatewayRoute(sb, sandbox.GatewayHost(sb.Name, sb.Namespace, cfg.Ingress), port, cfg.Gateway)
+	return r.publish(ctx, sb, route)
+}
+
+// publish applies obj owned by the sandbox. It refuses to take over an object
+// of the same name that belongs to someone else, such as the Service of another
+// sandbox.
+func (r *SandboxReconciler) publish(ctx context.Context, sb *sandbox.Sandbox, obj client.Object) error {
+	cur := obj.DeepCopyObject().(client.Object)
+	switch err := r.APIReader.Get(ctx, client.ObjectKeyFromObject(obj), cur); {
+	case err == nil:
+		if !metav1.IsControlledBy(cur, sb) {
+			return fmt.Errorf("%T %s exists and is not owned by sandbox %s", obj, obj.GetName(), sb.Name)
+		}
+	case !apierrors.IsNotFound(err):
+		return err
+	}
+	obj.SetOwnerReferences([]metav1.OwnerReference{*metav1.NewControllerRef(sb, sandbox.SandboxGVK)})
+	return apply(ctx, r.Client, obj)
+}
+
+// unpublish removes the gateway objects the sandbox owns. It reads through the
+// cache, so a sandbox that was never published costs no API call.
+func (r *SandboxReconciler) unpublish(ctx context.Context, sb *sandbox.Sandbox) error {
+	route := &unstructured.Unstructured{}
+	route.SetGroupVersionKind(sandbox.HTTPRouteGVK)
+	if err := r.deleteOwned(ctx, sb, sb.Name, route); err != nil {
+		return err
+	}
+	return r.deleteOwned(ctx, sb, sandbox.GatewayServiceName(sb.Name), &corev1.Service{})
+}
+
+// deleteOwned deletes the object of the given name if the sandbox owns it.
+func (r *SandboxReconciler) deleteOwned(ctx context.Context, sb *sandbox.Sandbox, name string, obj client.Object) error {
+	err := r.Get(ctx, types.NamespacedName{Namespace: sb.Namespace, Name: name}, obj)
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !metav1.IsControlledBy(obj, sb) {
+		return nil
+	}
+	return client.IgnoreNotFound(r.Delete(ctx, obj))
+}
+
 // lastActive is the client heartbeat of a sandbox.
 func sandboxLastActive(sb *sandbox.Sandbox) time.Time {
 	t, err := time.Parse(time.RFC3339, sb.Annotations[naming.AnnotationLastActive])
@@ -168,7 +265,7 @@ func (r *SandboxReconciler) apply(ctx context.Context, orig *unstructured.Unstru
 func (r *SandboxReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	u := &unstructured.Unstructured{}
 	u.SetGroupVersionKind(sandbox.SandboxGVK)
-	return ctrl.NewControllerManagedBy(mgr).
+	b := ctrl.NewControllerManagedBy(mgr).
 		Named("sandbox").
 		For(u, builder.WithPredicates(projectSandbox())).
 		Owns(&corev1.Service{}, builder.WithPredicates(projectSandbox())).
@@ -179,8 +276,13 @@ func (r *SandboxReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			}}}
 		}), builder.WithPredicates(predicate.NewPredicateFuncs(func(o client.Object) bool {
 			return o.GetLabels()[naming.LabelProject] != ""
-		}))).
-		Complete(r)
+		})))
+	if r.Gateway {
+		route := &unstructured.Unstructured{}
+		route.SetGroupVersionKind(sandbox.HTTPRouteGVK)
+		b = b.Owns(&corev1.Service{}).Owns(route)
+	}
+	return b.Complete(r)
 }
 
 // sandboxOfPod is the sandbox a pod belongs to: its controller reference, or

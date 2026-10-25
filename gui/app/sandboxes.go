@@ -33,6 +33,12 @@ type Sandbox struct {
 	RuntimeClass string            `json:"runtimeClass,omitempty"`
 	Service      bool              `json:"service"`
 	ServiceFQDN  string            `json:"serviceFQDN,omitempty"`
+	// GatewayPort is the port the sandbox publishes through the platform gateway,
+	// and GatewayURL the address it is reached at. Both are empty for a sandbox
+	// that is not published; GatewayURL is also empty when the platform has no
+	// gateway, since the address cannot be built then.
+	GatewayPort int    `json:"gatewayPort,omitempty"`
+	GatewayURL  string `json:"gatewayURL,omitempty"`
 	// SSH is set when the sandbox has an sshd sidecar; SSHEndpoint is the
 	// in-cluster address of its SSH Service.
 	SSH         bool     `json:"ssh,omitempty"`
@@ -80,10 +86,14 @@ func (a *App) ListSandboxes() ([]*Sandbox, error) {
 	if err != nil {
 		return nil, err
 	}
+	cfg, err := platformFor(ctx, c, items...)
+	if err != nil {
+		return nil, err
+	}
 	pods := listSandboxPods(ctx, c)
 	out := make([]*Sandbox, 0, len(items))
 	for i := range items {
-		out = append(out, toSandbox(items[i], pods))
+		out = append(out, toSandbox(items[i], pods, cfg))
 	}
 	return out, nil
 }
@@ -100,7 +110,11 @@ func (a *App) GetSandbox(name string) (*Sandbox, error) {
 	if err != nil {
 		return nil, err
 	}
-	return toSandbox(u, sandboxPodOf(ctx, c)), nil
+	cfg, err := platformFor(ctx, c, u)
+	if err != nil {
+		return nil, err
+	}
+	return toSandbox(u, sandboxPodOf(ctx, c), cfg), nil
 }
 
 // SandboxOptions returns the platform settings the create dialog needs.
@@ -185,7 +199,7 @@ func (a *App) CreateSandbox(f sandbox.Form) (*Sandbox, error) {
 	if err := c.k8s.Create(ctx, u); err != nil {
 		return nil, err
 	}
-	return toSandbox(u, sandboxPodOf(ctx, c)), nil
+	return toSandbox(u, sandboxPodOf(ctx, c), cfg), nil
 }
 
 // StopSandbox suspends a sandbox: its pod is deleted, the object and its
@@ -493,7 +507,11 @@ func (a *App) mutateSandboxOnce(name string, fn func(*sandbox.Sandbox)) (*Sandbo
 	if err := c.k8s.Update(ctx, out); err != nil {
 		return nil, err
 	}
-	return toSandbox(out, sandboxPodOf(ctx, c)), nil
+	cfg, err := platformFor(ctx, c, out)
+	if err != nil {
+		return nil, err
+	}
+	return toSandbox(out, sandboxPodOf(ctx, c), cfg), nil
 }
 
 func listSandboxes(ctx context.Context, c *Connection) ([]*unstructured.Unstructured, error) {
@@ -554,8 +572,9 @@ func listSandboxPods(ctx context.Context, c *Connection) podLookup {
 	return func(name string) (*corev1.Pod, bool) { return byName[name], false }
 }
 
-// toSandbox derives the view model from the sandbox and its pod.
-func toSandbox(u *unstructured.Unstructured, pods podLookup) *Sandbox {
+// toSandbox derives the view model from the sandbox, its pod and the platform
+// config the sandbox's gateway address is built from.
+func toSandbox(u *unstructured.Unstructured, pods podLookup, cfg *platform.Config) *Sandbox {
 	sb := &sandbox.Sandbox{}
 	if err := sandbox.FromUnstructured(u.Object, sb); err != nil {
 		return &Sandbox{Name: u.GetName(), Phase: string(sandbox.PhaseFailed), Message: err.Error()}
@@ -575,6 +594,8 @@ func toSandbox(u *unstructured.Unstructured, pods podLookup) *Sandbox {
 		Stopped:      sandbox.IsSandboxPaused(sb),
 		IdleSince:    sb.Annotations[naming.AnnotationIdleSince],
 		Env:          map[string]string{},
+		GatewayPort:  sandbox.GatewayPortOf(sb),
+		GatewayURL:   gatewayURL(sb, cfg),
 		Created:      sb.CreationTimestamp.UTC().Format(time.RFC3339),
 		Age:          shortDur(time.Since(sb.CreationTimestamp.Time)),
 	}
@@ -619,6 +640,30 @@ func toSandbox(u *unstructured.Unstructured, pods podLookup) *Sandbox {
 		}
 	}
 	return out
+}
+
+// platformFor loads the platform config the views of these sandboxes are built
+// from. Only a published sandbox has an address to build from it, so when none
+// of them is published nothing is read: the heartbeat that keeps a running
+// sandbox awake does not depend on the platform config.
+func platformFor(ctx context.Context, c *Connection, boxes ...*unstructured.Unstructured) (*platform.Config, error) {
+	for _, u := range boxes {
+		if _, ok := u.GetAnnotations()[naming.AnnotationGatewayPort]; ok {
+			return platform.Load(ctx, c.k8s, c.namespace())
+		}
+	}
+	return &platform.Config{}, nil
+}
+
+// gatewayURL is the address a published sandbox is reached at: its own host
+// under the ingress domain, on the gateway's scheme and port. It is empty when
+// the sandbox is not published, or the platform has no gateway or ingress domain
+// to build the address from.
+func gatewayURL(sb *sandbox.Sandbox, cfg *platform.Config) string {
+	if sandbox.GatewayPortOf(sb) == 0 || !cfg.Gateway.Enabled() || cfg.Ingress.Domain == "" {
+		return ""
+	}
+	return cfg.Gateway.URL(sandbox.GatewayHost(sb.Name, sb.Namespace, cfg.Ingress))
 }
 
 // sandboxContainerState reports whether the sandbox container runs. A pod can

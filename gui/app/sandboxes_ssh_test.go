@@ -7,6 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/wutz/forgeai/pkg/naming"
+	"github.com/wutz/forgeai/pkg/platform"
 	"github.com/wutz/forgeai/pkg/sandbox"
 )
 
@@ -31,7 +32,7 @@ func TestToSandboxReportsSSHEndpoint(t *testing.T) {
 				t.Fatal(err)
 			}
 			unstructured.RemoveNestedField(u.Object, "status")
-			out := toSandbox(u, func(string) (*corev1.Pod, bool) { return nil, false })
+			out := toSandbox(u, func(string) (*corev1.Pod, bool) { return nil, false }, &platform.Config{})
 			if out.SSH != tt.wantSSH || out.SSHEndpoint != tt.wantAddr {
 				t.Errorf("ssh = %v %q, want %v %q", out.SSH, out.SSHEndpoint, tt.wantSSH, tt.wantAddr)
 			}

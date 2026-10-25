@@ -7,6 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -184,7 +185,78 @@ var _ = Describe("Sandbox controller", Ordered, func() {
 			return getSandbox("forever").GetAnnotations()[naming.AnnotationStopped]
 		}, 2*time.Second, interval).ShouldNot(Equal("true"))
 	})
+
+	It("publishes a sandbox port through the gateway", func() {
+		Expect(k8sClient.Create(ctx, renderSandbox(&sandbox.Form{
+			Name: "web", Image: "busybox", Command: "sleep 1d", Service: true, GatewayPort: 8080,
+		}))).To(Succeed())
+		setSandboxStatus("web", "web")
+		Expect((&sandboxPod{name: "web"}).create()).To(Succeed())
+
+		svc := &corev1.Service{}
+		Eventually(get(svc, sandboxNS, "web-gw"), timeout, interval).Should(Succeed())
+		Expect(svc.Spec.Selector).To(HaveKeyWithValue(sandbox.LabelSandboxNameHash, sandboxPodHash("web")))
+		Expect(svc.Spec.Ports).To(HaveLen(1))
+		Expect(svc.Spec.Ports[0].Port).To(Equal(int32(8080)))
+		Expect(metav1.IsControlledBy(svc, getSandbox("web"))).To(BeTrue())
+
+		route := &unstructured.Unstructured{}
+		route.SetGroupVersionKind(sandbox.HTTPRouteGVK)
+		Eventually(get(route, sandboxNS, "web"), timeout, interval).Should(Succeed())
+		hosts, _, _ := unstructured.NestedStringSlice(route.Object, "spec", "hostnames")
+		Expect(hosts).To(Equal([]string{"web-forge-agents.example.com"}))
+		parents, _, _ := unstructured.NestedSlice(route.Object, "spec", "parentRefs")
+		Expect(parents).To(HaveLen(1))
+		backends, _, _ := unstructured.NestedSlice(route.Object, "spec", "rules")
+		Expect(backends).To(HaveLen(1))
+		Expect(route.GetOwnerReferences()).To(HaveLen(1))
+	})
+
+	It("removes the gateway objects when the port is cleared", func() {
+		Eventually(func() error {
+			u := getSandbox("web")
+			unstructured.RemoveNestedField(u.Object, "metadata", "annotations", naming.AnnotationGatewayPort)
+			return k8sClient.Update(ctx, u)
+		}, timeout, interval).Should(Succeed())
+
+		Eventually(func() bool {
+			return apierrors.IsNotFound(get(&corev1.Service{}, sandboxNS, "web-gw")())
+		}, timeout, interval).Should(BeTrue())
+		route := &unstructured.Unstructured{}
+		route.SetGroupVersionKind(sandbox.HTTPRouteGVK)
+		Eventually(func() bool {
+			return apierrors.IsNotFound(get(route, sandboxNS, "web")())
+		}, timeout, interval).Should(BeTrue())
+	})
+
+	It("refuses to take over a gateway Service it does not own", func() {
+		Expect(k8sClient.Create(ctx, &corev1.Service{
+			ObjectMeta: metav1.ObjectMeta{Name: "taken-gw", Namespace: sandboxNS, Labels: map[string]string{
+				naming.LabelManagedBy: naming.ManagedBy,
+			}},
+			Spec: corev1.ServiceSpec{Ports: []corev1.ServicePort{{Name: "http", Port: 80}}},
+		})).To(Succeed())
+		Expect(k8sClient.Create(ctx, renderSandbox(&sandbox.Form{
+			Name: "taken", Image: "busybox", Command: "sleep 1d", Service: true, GatewayPort: 8080,
+		}))).To(Succeed())
+		setSandboxStatus("taken", "taken")
+		Expect((&sandboxPod{name: "taken"}).create()).To(Succeed())
+
+		route := &unstructured.Unstructured{}
+		route.SetGroupVersionKind(sandbox.HTTPRouteGVK)
+		Consistently(func() bool {
+			return apierrors.IsNotFound(get(route, sandboxNS, "taken")())
+		}, 2*time.Second, interval).Should(BeTrue())
+		svc := &corev1.Service{}
+		Expect(get(svc, sandboxNS, "taken-gw")()).To(Succeed())
+		Expect(svc.OwnerReferences).To(BeEmpty())
+		Expect(svc.Spec.Ports[0].Port).To(Equal(int32(80)))
+	})
 })
+
+// sandboxPodHash is the name hash the agent-sandbox controller labels the pods
+// of a sandbox with.
+func sandboxPodHash(name string) string { return "hash-" + name }
 
 // startIdleSandbox marks a sandbox Ready with its pod running.
 func startIdleSandbox(name string) {
@@ -218,8 +290,9 @@ func (p *sandboxPod) create() error {
 	sb := getSandbox(p.name)
 	sb.SetGroupVersionKind(sandbox.SandboxGVK)
 	labels := map[string]any{
-		naming.LabelProject:      sandboxProject,
-		sandbox.LabelSandboxName: p.name,
+		naming.LabelProject:          sandboxProject,
+		sandbox.LabelSandboxName:     p.name,
+		sandbox.LabelSandboxNameHash: sandboxPodHash(p.name),
 	}
 	u := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "v1", "kind": "Pod",

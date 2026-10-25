@@ -290,10 +290,13 @@ func (a *App) closeConnectionState() {
 type PlatformConfig struct {
 	APIServer string `json:"apiServer"`
 	// NamespacePrefix is prepended to a project name to form its namespace.
-	NamespacePrefix string                     `json:"namespacePrefix"`
-	Ingress         platform.Ingress           `json:"ingress"`
-	Registry        RegistryInfo               `json:"registry"`
-	StorageTypes    map[string]StorageTypeInfo `json:"storageTypes"`
+	NamespacePrefix string           `json:"namespacePrefix"`
+	Ingress         platform.Ingress `json:"ingress"`
+	// Gateway publishes sandbox ports; a sandbox's URL is built from its scheme
+	// and port. An empty name means the platform has no gateway.
+	Gateway      platform.Gateway           `json:"gateway"`
+	Registry     RegistryInfo               `json:"registry"`
+	StorageTypes map[string]StorageTypeInfo `json:"storageTypes"`
 	// DefaultStorageType is the type a volume gets when none is named.
 	DefaultStorageType string          `json:"defaultStorageType"`
 	FileServer         FileServerInfo  `json:"fileServer"`
@@ -343,6 +346,7 @@ func (a *App) Config() (PlatformConfig, error) {
 		APIServer:          cfg.APIServer,
 		NamespacePrefix:    cfg.NamespacePrefix,
 		Ingress:            cfg.Ingress,
+		Gateway:            cfg.Gateway,
 		Registry:           RegistryInfo{Enabled: cfg.Registry.Enabled(), URL: cfg.Registry.Domain},
 		StorageTypes:       map[string]StorageTypeInfo{},
 		DefaultStorageType: cfg.DefaultStorageType,

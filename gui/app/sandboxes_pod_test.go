@@ -7,6 +7,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
+	"github.com/wutz/forgeai/pkg/platform"
 	"github.com/wutz/forgeai/pkg/sandbox"
 )
 
@@ -47,7 +48,7 @@ func TestToSandboxSkipsPodOfSuspendedSandbox(t *testing.T) {
 			out := toSandbox(u, func(string) (*corev1.Pod, bool) {
 				lookups++
 				return nil, false
-			})
+			}, &platform.Config{})
 			if (lookups == 1) != tt.wantLookup {
 				t.Errorf("pod lookups = %d, want lookup %v", lookups, tt.wantLookup)
 			}

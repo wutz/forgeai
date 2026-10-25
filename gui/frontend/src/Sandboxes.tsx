@@ -124,7 +124,7 @@ function SandboxTable({boxes, failed, selected, onSelect}: {
               <div className="cell-sub" title={containerNote(b)}>{short(containerNote(b))}</div>}</td>
             {!selected && <td data-label={t('sandboxes.isolation')}>{b.runtimeClass ? <Badge>{b.runtimeClass}</Badge> : <span className="muted">{t('sandboxes.runcNode')}</span>}</td>}
             <td data-label={t('sandboxes.resources')} className="mono">{b.cpu || '—'}/{b.memory || '—'}{b.gpu ? ` · ${b.gpu} GPU` : ''}</td>
-            <td data-label={t('sandboxes.endpoint')} className="mono trunc" title={b.serviceFQDN || b.podIPs?.[0]}>{b.serviceFQDN || b.podIPs?.[0] || '—'}</td>
+            <td data-label={t('sandboxes.endpoint')} className="mono trunc" title={b.gatewayURL || b.serviceFQDN || b.podIPs?.[0]}>{b.gatewayURL || b.serviceFQDN || b.podIPs?.[0] || '—'}</td>
             {!selected && <td data-label={t('sandboxes.age')} className="muted">{b.age}</td>}
           </tr>
         ))}
@@ -335,6 +335,11 @@ function SandboxDetail({name, onDone, onDeleted, onClose}: {
                 {box.gpu ? ` · ${box.gpu} GPU` : ''}</dd>
               <dt>{t('sandboxes.volumes')}</dt><dd className="mono">{box.volumes?.join(', ') || '—'}</dd>
               {box.serviceFQDN && <><dt>{t('sandboxes.service')}</dt><dd className="mono">{box.serviceFQDN}</dd></>}
+              {!!box.gatewayPort && <><dt>{t('sandboxes.publicUrl')}</dt><dd className="mono">
+                {box.gatewayURL
+                  ? <PublicURL url={box.gatewayURL}/>
+                  : t('sandboxes.gatewayUnreachable', {port: box.gatewayPort})}
+              </dd></>}
               {box.podIPs && box.podIPs.length > 0 && <><dt>{t('sandboxes.podIps')}</dt><dd className="mono">{box.podIPs.join(', ')}</dd></>}
               {box.nodeName && <><dt>{t('sandboxes.node')}</dt><dd className="mono">{box.nodeName}</dd></>}
               <dt>{t('sandboxes.pod')}</dt><dd className="mono">{box.podName || '—'}{box.podPhase ? ` · ${box.podPhase}` : ''}</dd>
@@ -386,6 +391,26 @@ function SandboxDetail({name, onDone, onDeleted, onClose}: {
       </div>
     </Card>
   )
+}
+
+// PublicURL is the address a published sandbox is reached at, with a copy button.
+function PublicURL({url}: {url: string}) {
+  const [copied, setCopied] = useState(false)
+  const timer = useRef(0)
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+  const copy = () => {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true)
+      window.clearTimeout(timer.current)
+      timer.current = window.setTimeout(() => setCopied(false), 1500)
+    }, () => {})
+  }
+  return <>
+    {url}
+    <button type="button" className="btn btn-sm btn-ghost" onClick={copy}>
+      <Icon name={copied ? 'check' : 'copy'} size={13}/>{copied ? t('common.copied') : t('common.copy')}
+    </button>
+  </>
 }
 
 function short(msg: string): string {

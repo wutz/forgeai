@@ -16,6 +16,7 @@ import {Scope} from './Scope'
 import {errText} from './util'
 import {ActiveView, Empty, HeaderSlot, Icon, IconName, Spinner} from './ui'
 import {Preferences} from './Preferences'
+import {TemplateSourcesDialog} from './TemplateSourcesDialog'
 import {UpdateButton, useUpdate} from './Update'
 import {getLocale, subscribeLocale, t} from './i18n'
 
@@ -103,6 +104,8 @@ export default function App() {
   const [projects, setProjects] = useState<app.ProjectNamespace[]>([])
   const [conn, setConn] = useState<app.ConnInfo | null>(null)
   const [area, setArea] = useState<Area>('overview')
+  // sourcesOpen shows the template sources dialog, opened from the sidebar.
+  const [sourcesOpen, setSourcesOpen] = useState(false)
   // jobFocus asks the Jobs page to select a job; a new object each time, so the same job can be picked again.
   const [jobFocus, setJobFocus] = useState<{name: string} | null>(null)
   // visited lists the areas opened on this connection. A view mounts on its
@@ -273,8 +276,9 @@ export default function App() {
                 ))}
               </div>
             ))}
-            <Preferences update={update}/>
+            <Preferences update={update} onManageSources={() => setSourcesOpen(true)}/>
           </nav>
+          {sourcesOpen && <TemplateSourcesDialog onClose={() => setSourcesOpen(false)}/>}
           <main className="main">
             {error && <div className="banner banner-error" role="alert">{error}</div>}
             {conn && nothingOpen(conn) ? (

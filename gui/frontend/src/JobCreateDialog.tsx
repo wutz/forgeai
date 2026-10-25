@@ -1,11 +1,12 @@
 import {FormEvent, useEffect, useRef, useState} from 'react'
-import {CatalogJobForm, CatalogTemplates, CreateJob, ListInstanceTypes, ListTemplates, TemplateNames, ListVolumes} from '../wailsjs/go/app/App'
+import {CatalogJobForm, CatalogSources, CreateJob, ListInstanceTypes, ListTemplates, TemplateNames, ListVolumes} from '../wailsjs/go/app/App'
 import {app, training, volumes} from '../wailsjs/go/models'
 import {envErrors, envMap, envToLines, linesToEnv, errText, generateName, MAX_RETRIES, NAME_MAX, NAME_PATTERN} from './util'
 import {t} from './i18n'
 import {CancelButton, Dialog} from './ui'
 import {ImageField} from './ImageField'
 import {Mount, VolumeMountsField, mountProblems} from './VolumeMounts'
+import {catalogGroups, catalogPick, loadTemplateSources, parseCatalogPick, pickedCatalogTemplate} from './templateSources'
 
 // JobCreateDialog is the "New job" form: template prefill, instance type,
 // workers, volumes, env and retry defaults.
@@ -18,10 +19,10 @@ export function JobCreateDialog({onClose, onCreated}: {
   const [templates, setTemplates] = useState<string[]>([])
   // A failed read says so; an empty picker would read as a cluster with no templates.
   const [templatesError, setTemplatesError] = useState('')
-  // catalog holds the job templates of the public template source.
-  const [catalog, setCatalog] = useState<app.CatalogTemplate[]>([])
+  // sources holds the template sources: the platform's, and the ones the user added.
+  const [sources, setSources] = useState<app.CatalogSource[]>([])
   const [catalogError, setCatalogError] = useState('')
-  // pick is the template select's value: "" for none, else "project:<name>" or "catalog:<name>".
+  // pick is the template select's value: "" for none, "project:<name>", or a catalogPick value.
   const [pick, setPick] = useState('')
   // vols is null until the project's volumes load.
   const [vols, setVols] = useState<volumes.Volume[] | null>(null)
@@ -41,8 +42,8 @@ export function JobCreateDialog({onClose, onCreated}: {
       if (ts.length) setF(prev => prev.instanceType ? prev : training.Form.createFrom({...prev, instanceType: ts[0].name}))
     }).catch(e => setError(errText(e)))
     TemplateNames().then(ns => { setTemplates(ns); setTemplatesError('') }, e => setTemplatesError(errText(e)))
-    CatalogTemplates().then(ts => {
-      setCatalog(ts.filter(c => c.kind === 'Job' && !c.error))
+    CatalogSources(loadTemplateSources()).then(s => {
+      setSources(s)
       setCatalogError('')
     }, e => setCatalogError(errText(e)))
     ListVolumes(false).then(setVols).catch(e => setVolsError(errText(e)))
@@ -62,15 +63,19 @@ export function JobCreateDialog({onClose, onCreated}: {
       set('template', '')
       return
     }
-    const source = value.slice(0, sep)
+    const kind = value.slice(0, sep)
     const name = value.slice(sep + 1)
     // Only a project template is referenced by name; a catalog template is a
     // prefill and the job does not point at it.
-    const projectRef = source === 'project' ? name : ''
+    const projectRef = kind === 'project' ? name : ''
     set('template', projectRef)
-    const load: Promise<training.Form | undefined> = source === 'catalog'
-      ? CatalogJobForm(name)
-      : ListTemplates().then(ts => ts.find(x => x.name === name)?.form)
+    let load: Promise<training.Form | undefined>
+    if (kind === 'catalog') {
+      const [source, template] = parseCatalogPick(value)
+      load = CatalogJobForm(source, template)
+    } else {
+      load = ListTemplates().then(ts => ts.find(x => x.name === name)?.form)
+    }
     load.then(form => {
       if (seq !== pickSeq.current || !form) return
       // The template's instance type is kept only when it names one; an empty
@@ -85,7 +90,8 @@ export function JobCreateDialog({onClose, onCreated}: {
       if (seq === pickSeq.current) setError(errText(e))
     })
   }
-  const pickedCatalog = catalog.find(c => pick === `catalog:${c.name}`)
+  const groups = catalogGroups(sources, 'Job')
+  const picked = pickedCatalogTemplate(groups, pick)
 
   // Mounts need the project's volumes to check against; without any mounts the
   // form does not wait for them.
@@ -154,6 +160,9 @@ export function JobCreateDialog({onClose, onCreated}: {
           </div>
           {templatesError && <div className="banner banner-warn" role="status">{t('jobCreate.templatesUnavailable', {error: templatesError})}</div>}
           {catalogError && <div className="banner banner-warn" role="status">{t('jobCreate.catalogUnavailable', {error: catalogError})}</div>}
+          {sources.filter(s => s.error).map(s => <div key={s.location} className="banner banner-warn" role="status">
+            {t('jobCreate.catalogUnavailable', {error: `${s.platform ? '' : `${s.location}: `}${s.error}`})}
+          </div>)}
           <div className="row">
             <div className="field">
               <label htmlFor="j-template">{t('jobCreate.template')}</label>
@@ -163,11 +172,18 @@ export function JobCreateDialog({onClose, onCreated}: {
                 {templates.length > 0 && <optgroup label={t('jobCreate.projectTemplates')}>
                   {templates.map(tpl => <option key={tpl} value={`project:${tpl}`}>{tpl}</option>)}
                 </optgroup>}
-                {catalog.length > 0 && <optgroup label={t('jobCreate.catalogTemplates')}>
-                  {catalog.map(c => <option key={c.name} value={`catalog:${c.name}`}>{c.displayName}</option>)}
-                </optgroup>}
+                {groups.map(g => <optgroup key={g.source.location}
+                                          label={g.source.platform ? t('jobCreate.catalogTemplates') : g.source.displayName || g.source.location}>
+                  {g.templates.map(c => <option key={catalogPick(g.source.location, c.name)} value={catalogPick(g.source.location, c.name)}>
+                    {c.displayName}
+                  </option>)}
+                </optgroup>)}
               </select>
-              {pickedCatalog?.description && <span className="hint">{pickedCatalog.description}</span>}
+              {picked?.template.description && <span className="hint">{picked.template.description}</span>}
+              {picked && !picked.source.platform && <div className="banner banner-warn" role="status">
+                {t('templateSources.untrusted', {source: picked.source.location})}
+              </div>}
+              <span className="hint">{t('templateSources.manageHint')}</span>
             </div>
             <div className="field">
               <label htmlFor="j-instance">{t('jobCreate.instanceType')}</label>

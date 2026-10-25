@@ -1,11 +1,12 @@
 import {FormEvent, useEffect, useRef, useState} from 'react'
-import {CatalogSandboxForm, CatalogTemplates, CreateSandbox, ListInstanceTypes, ListVolumes, SandboxOptions, SandboxTemplates} from '../wailsjs/go/app/App'
+import {CatalogSandboxForm, CatalogSources, CreateSandbox, ListInstanceTypes, ListVolumes, SandboxOptions, SandboxTemplates} from '../wailsjs/go/app/App'
 import {app, sandbox, volumes, v1} from '../wailsjs/go/models'
 import {envErrors, envToLines, formatGoDuration, linesToEnv, errText, generateName, NAME_PATTERN, SANDBOX_NAME_MAX} from './util'
 import {CancelButton, Dialog} from './ui'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
 import {Mount, VolumeMountsField, mountProblems} from './VolumeMounts'
+import {catalogGroups, catalogPick, loadTemplateSources, parseCatalogPick, pickedCatalogTemplate} from './templateSources'
 
 // MAX_TTL_HOURS caps the auto-stop and idle timeouts at one year; the backend refuses more.
 const MAX_TTL_HOURS = 24 * 365
@@ -36,10 +37,10 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   const [templates, setTemplates] = useState<app.SandboxTemplate[]>([])
   // A failed read says so; an empty picker would read as a cluster with no templates.
   const [templatesError, setTemplatesError] = useState('')
-  // catalog holds the sandbox templates of the public template source.
-  const [catalog, setCatalog] = useState<app.CatalogTemplate[]>([])
+  // sources holds the template sources: the platform's, and the ones the user added.
+  const [sources, setSources] = useState<app.CatalogSource[]>([])
   const [catalogError, setCatalogError] = useState('')
-  // pick is the template select's value: "" for none, else "project:<name>" or "catalog:<name>".
+  // pick is the template select's value: "" for none, "project:<name>", or a catalogPick value.
   const [pick, setPick] = useState('')
 
   useEffect(() => {
@@ -53,8 +54,8 @@ export function SandboxCreateDialog({onClose, onCreated}: {
     ListInstanceTypes().then(setTypes).catch(e => setError(errText(e)))
     ListVolumes(false).then(setVols).catch(e => setVolsError(errText(e)))
     SandboxTemplates().then(ts => { setTemplates(ts); setTemplatesError('') }, e => setTemplatesError(errText(e)))
-    CatalogTemplates().then(ts => {
-      setCatalog(ts.filter(c => c.kind === 'Sandbox' && !c.error))
+    CatalogSources(loadTemplateSources()).then(s => {
+      setSources(s)
       setCatalogError('')
     }, e => setCatalogError(errText(e)))
   }, [])
@@ -75,14 +76,18 @@ export function SandboxCreateDialog({onClose, onCreated}: {
       set('template', '')
       return
     }
-    const source = value.slice(0, sep)
+    const kind = value.slice(0, sep)
     const name = value.slice(sep + 1)
     // Only a project template is referenced by name; a catalog template is a prefill.
-    const projectRef = source === 'project' ? name : ''
+    const projectRef = kind === 'project' ? name : ''
     set('template', projectRef)
-    const load: Promise<sandbox.TemplateForm | undefined> = source === 'catalog'
-      ? CatalogSandboxForm(name)
-      : Promise.resolve(templates.find(tpl => tpl.name === name)?.form)
+    let load: Promise<sandbox.TemplateForm | undefined>
+    if (kind === 'catalog') {
+      const [source, template] = parseCatalogPick(value)
+      load = CatalogSandboxForm(source, template)
+    } else {
+      load = Promise.resolve(templates.find(tpl => tpl.name === name)?.form)
+    }
     load.then(form => {
       if (seq !== pickSeq.current || !form) return
       setF(prev => sandbox.Form.createFrom({
@@ -97,7 +102,8 @@ export function SandboxCreateDialog({onClose, onCreated}: {
       if (seq === pickSeq.current) setError(errText(e))
     })
   }
-  const pickedCatalog = catalog.find(c => pick === `catalog:${c.name}`)
+  const groups = catalogGroups(sources, 'Sandbox')
+  const picked = pickedCatalogTemplate(groups, pick)
 
   // Mounts need the project's volumes to check against; without any mounts the
   // form does not wait for them. A sandbox runs on one node.
@@ -155,7 +161,10 @@ export function SandboxCreateDialog({onClose, onCreated}: {
           {error && <div className="banner banner-error" role="alert">{error}</div>}
           {templatesError && <div className="banner banner-warn" role="status">{t('sandboxCreate.templatesUnavailable', {error: templatesError})}</div>}
           {catalogError && <div className="banner banner-warn" role="status">{t('sandboxCreate.catalogUnavailable', {error: catalogError})}</div>}
-          {(templates.length > 0 || catalog.length > 0) && (
+          {sources.filter(s => s.error).map(s => <div key={s.location} className="banner banner-warn" role="status">
+            {t('sandboxCreate.catalogUnavailable', {error: `${s.platform ? '' : `${s.location}: `}${s.error}`})}
+          </div>)}
+          {(templates.length > 0 || groups.length > 0) && (
             <div className="field">
               <label htmlFor="s-template">{t('sandboxCreate.fromTemplate')}</label>
               <select id="s-template" className="select mono" value={pick}
@@ -164,12 +173,19 @@ export function SandboxCreateDialog({onClose, onCreated}: {
                 {templates.some(tpl => !tpl.error) && <optgroup label={t('sandboxCreate.projectTemplates')}>
                   {templates.filter(tpl => !tpl.error).map(tpl => <option key={tpl.name} value={`project:${tpl.name}`}>{tpl.name}</option>)}
                 </optgroup>}
-                {catalog.length > 0 && <optgroup label={t('sandboxCreate.catalogTemplates')}>
-                  {catalog.map(c => <option key={c.name} value={`catalog:${c.name}`}>{c.displayName}</option>)}
-                </optgroup>}
+                {groups.map(g => <optgroup key={g.source.location}
+                                          label={g.source.platform ? t('sandboxCreate.catalogTemplates') : g.source.displayName || g.source.location}>
+                  {g.templates.map(c => <option key={catalogPick(g.source.location, c.name)} value={catalogPick(g.source.location, c.name)}>
+                    {c.displayName}
+                  </option>)}
+                </optgroup>)}
               </select>
-              {pickedCatalog?.description && <span className="hint">{pickedCatalog.description}</span>}
+              {picked?.template.description && <span className="hint">{picked.template.description}</span>}
+              {picked && !picked.source.platform && <div className="banner banner-warn" role="status">
+                {t('templateSources.untrusted', {source: picked.source.location})}
+              </div>}
               <span className="hint">{t('sandboxCreate.templateHint')}</span>
+              <span className="hint">{t('templateSources.manageHint')}</span>
             </div>
           )}
 

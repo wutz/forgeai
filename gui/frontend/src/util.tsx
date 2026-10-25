@@ -9,6 +9,9 @@ const conflictErrors = [/has been modified; please apply your changes/, /the pro
 // they read well in both languages. Other backend text is shown as written.
 const knownErrors: [RegExp, MessageKey][] = [
   [/not connected: select a kubeconfig context/, 'error.notConnected'],
+  // Kubernetes reports a quota refusal as "is forbidden: exceeded quota", so it
+  // is matched first to keep it from reading as a missing permission.
+  [/exceeded quota: /, 'error.quotaExceeded'],
   [/is forbidden: /, 'error.forbidden'],
   ...conflictErrors.map((re): [RegExp, MessageKey] => [re, 'error.conflict']),
   [/volume "[^"]*" already exists \(check the trash\)/, 'volumes.errInTrash'],

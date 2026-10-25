@@ -1,5 +1,5 @@
 import {FormEvent, useEffect, useRef, useState} from 'react'
-import {CatalogSandboxForm, CatalogTemplates, CreateSandbox, ListInstanceTypes, ListVolumes, SandboxOptions, SandboxTemplates} from '../wailsjs/go/app/App'
+import {CatalogSandboxForm, CatalogTemplates, Config, CreateSandbox, ListInstanceTypes, ListVolumes, SandboxOptions, SandboxTemplates} from '../wailsjs/go/app/App'
 import {app, sandbox, volumes, v1} from '../wailsjs/go/models'
 import {envErrors, envToLines, formatGoDuration, linesToEnv, errText, generateName, NAME_PATTERN, SANDBOX_NAME_MAX} from './util'
 import {CancelButton, Dialog} from './ui'
@@ -33,6 +33,11 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   // idleMinutes stays null until typed: null uses the platform's idle timeout,
   // 0 turns the idle policy off for this sandbox.
   const [idleMinutes, setIdleMinutes] = useState<number | null>(null)
+  // gatewayText is the gateway port field: empty leaves the sandbox inside the cluster.
+  const [gatewayText, setGatewayText] = useState('')
+  // gatewayOn is false when the platform has no gateway to publish through; until the
+  // config loads, the field stays open and the backend has the last word.
+  const [gatewayOn, setGatewayOn] = useState(true)
   const [templates, setTemplates] = useState<app.SandboxTemplate[]>([])
   // A failed read says so; an empty picker would read as a cluster with no templates.
   const [templatesError, setTemplatesError] = useState('')
@@ -52,6 +57,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
     }).catch(e => setError(errText(e)))
     ListInstanceTypes().then(setTypes).catch(e => setError(errText(e)))
     ListVolumes(false).then(setVols).catch(e => setVolsError(errText(e)))
+    Config().then(c => setGatewayOn(!!c.gateway?.name), () => {})
     SandboxTemplates().then(ts => { setTemplates(ts); setTemplatesError('') }, e => setTemplatesError(errText(e)))
     CatalogTemplates().then(ts => {
       setCatalog(ts.filter(c => c.kind === 'Sandbox' && !c.error))
@@ -111,6 +117,9 @@ export function SandboxCreateDialog({onClose, onCreated}: {
   // Negative durations are refused by the backend; the fields say so before Create.
   const ttlOK = Number.isFinite(ttlHours) && ttlHours >= 0 && ttlHours <= MAX_TTL_HOURS
   const idleOK = idleMinutes === null || (Number.isFinite(idleMinutes) && idleMinutes >= 0 && idleMinutes <= MAX_TTL_HOURS * 60)
+  // The gateway port is optional; empty is 0, which the backend takes as not published.
+  const gatewayPort = gatewayText.trim() === '' ? 0 : Number(gatewayText)
+  const gatewayOK = gatewayText.trim() === '' || (Number.isInteger(gatewayPort) && gatewayPort >= 1 && gatewayPort <= 65535)
   // The footer names the blocker that has no field hint of its own, so a disabled
   // Create is never unexplained.
   const blocker = !f.name ? t('common.nameRequired')
@@ -120,11 +129,12 @@ export function SandboxCreateDialog({onClose, onCreated}: {
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (!nameOK || !mountsOK || envBad.length || !ttlOK || !idleOK) return
+    if (!nameOK || !mountsOK || envBad.length || !ttlOK || !idleOK || !gatewayOK) return
     setBusy(true)
     const form = sandbox.Form.createFrom({
       ...f,
       image: f.image.trim(),
+      gatewayPort,
       env: Object.entries(linesToEnv(envText)).map(([name, value]) => ({name, value})),
       volumes: mounts.map(m => ({
         volume: m.volume.trim(), mountPath: m.mountPath.trim(), subPath: (m.subPath || '').trim(),
@@ -147,7 +157,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
             onClose={onClose} busy={busy} footer={<>
               {blocker && !busy && <span className="hint hint-error" role="status">{blocker}</span>}
               <CancelButton disabled={busy}/>
-              <button type="submit" form="sandbox-form" className="btn" disabled={busy || !nameOK || !f.image.trim() || !mountsOK || envBad.length > 0 || !ttlOK || !idleOK}>
+              <button type="submit" form="sandbox-form" className="btn" disabled={busy || !nameOK || !f.image.trim() || !mountsOK || envBad.length > 0 || !ttlOK || !idleOK || !gatewayOK}>
                 {busy ? t('sandboxCreate.creating') : t('sandboxCreate.create')}
               </button>
             </>}>
@@ -264,6 +274,14 @@ export function SandboxCreateDialog({onClose, onCreated}: {
                 <option value="yes">{t('sandboxCreate.serviceYes')}</option>
                 <option value="no">{t('sandboxCreate.serviceNo')}</option>
               </select>
+            </div>
+            <div className="field">
+              <label htmlFor="s-gateway">{t('sandboxCreate.gatewayPort')}</label>
+              <input id="s-gateway" className="input" type="number" min={1} max={65535} step={1} value={gatewayText}
+                     disabled={!gatewayOn} aria-invalid={!gatewayOK} placeholder={t('sandboxCreate.off')}
+                     onChange={e => setGatewayText(e.target.value)}/>
+              <span className="hint">{gatewayOn ? t('sandboxCreate.gatewayHint') : t('sandboxCreate.gatewayUnavailable')}</span>
+              {!gatewayOK && <span className="hint hint-error">{t('sandboxCreate.gatewayPortRange')}</span>}
             </div>
           </div>
         </form>

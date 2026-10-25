@@ -76,6 +76,20 @@ func setDeploymentReady(name string, ready int32) {
 	}, timeout, interval).Should(Succeed())
 }
 
+// setDeploymentFailure sets the ReplicaFailure condition of a Deployment's
+// status, as the Deployment controller does when it cannot create a pod.
+func setDeploymentFailure(name, msg string) {
+	Eventually(func() error {
+		d := getDeployment(name)
+		now := metav1.Now()
+		d.Status.Conditions = append(d.Status.Conditions, appsv1.DeploymentCondition{
+			Type: appsv1.DeploymentReplicaFailure, Status: corev1.ConditionTrue, Reason: "FailedCreate",
+			Message: msg, LastUpdateTime: now, LastTransitionTime: now,
+		})
+		return k8sClient.Status().Update(ctx, d)
+	}, timeout, interval).Should(Succeed())
+}
+
 // readyCondition returns the Ready condition of svc, or nil before the
 // reconciler has written one.
 func readyCondition(svc *v1.InferenceService) *metav1.Condition {
@@ -236,5 +250,23 @@ var _ = Describe("InferenceService controller", Ordered, func() {
 
 		err := get(&appsv1.Deployment{}, inferenceNS, inference.ModelName(svc))()
 		Expect(err).To(HaveOccurred())
+	})
+
+	It("reports why a model server cannot start, such as a refused quota", func() {
+		svc := inferenceService("quota")
+		Expect(k8sClient.Create(ctx, svc)).To(Succeed())
+		Eventually(func() *metav1.Condition {
+			return readyCondition(getInferenceService("quota"))
+		}, timeout, interval).ShouldNot(BeNil())
+
+		refusal := `pods "quota-model-0" is forbidden: exceeded quota: forgeai-quota, requested: requests.cpu=4`
+		setDeploymentFailure(inference.ModelName(svc), refusal)
+
+		Eventually(func() string {
+			return readyCondition(getInferenceService("quota")).Message
+		}, timeout, interval).Should(ContainSubstring(refusal))
+		c := readyCondition(getInferenceService("quota"))
+		Expect(c.Status).To(Equal(metav1.ConditionFalse))
+		Expect(c.Reason).To(Equal(inferenceStarting))
 	})
 })

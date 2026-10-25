@@ -129,10 +129,12 @@ function ServiceStatus({service: s}: {service: app.InferenceService}) {
   }
   // The dot reuses the phase colours: ready is running, starting is pending.
   const phase = {stopped: 'suspended', ready: 'running', starting: 'starting', failed: 'failed'}[state]
+  // A failed or starting service shows the controller's reason, which names what keeps its pods from starting.
+  const detail = state === 'failed' || state === 'starting' ? s.message ?? '' : ''
   return (
     <>
       <span className={`status status-${phase}`}><span className="dot" aria-hidden/>{t(labels[state])}</span>
-      {state === 'failed' && s.message && <div className="cell-sub" title={s.message}>{s.message}</div>}
+      {detail && <div className="cell-sub" title={detail}>{/exceeded quota: /.test(detail) ? errText(detail) : detail}</div>}
     </>
   )
 }

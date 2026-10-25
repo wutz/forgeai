@@ -23,24 +23,18 @@ const TRANSITION_TIMEOUT_MS = 120_000
 type Section = 'sandboxes' | 'templates'
 
 // Sandboxes is the view of the project's agent sandboxes (agents.x-k8s.io). The
-// sandbox templates it starts new sandboxes from sit behind the tab row at its top.
+// sandbox templates it starts new sandboxes from open from a button in its top bar.
 export function Sandboxes() {
   const [section, setSection] = useState<Section>('sandboxes')
   return (
     <div className="page">
-      <Tabs idPrefix="sandbox-section" tabs={[
-        {value: 'sandboxes', label: t('sandboxes.tabSandboxes')},
-        {value: 'templates', label: t('sandboxes.tabTemplates')},
-      ]} value={section} onChange={setSection}/>
-      <div {...tabPanelProps('sandbox-section', section)}>
-        <Pane on={section === 'sandboxes'}><SandboxList/></Pane>
-        <Pane on={section === 'templates'}><Templates kind="sandbox"/></Pane>
-      </div>
+      <Pane on={section === 'sandboxes'}><SandboxList onTemplates={() => setSection('templates')}/></Pane>
+      <Pane on={section === 'templates'}><Templates kind="sandbox" onBack={() => setSection('sandboxes')}/></Pane>
     </div>
   )
 }
 
-function SandboxList() {
+function SandboxList({onTemplates}: {onTemplates: () => void}) {
   // boxes is null until the first read, so a failed first read is not shown as an empty list.
   const [boxes, setBoxes] = useState<app.Sandbox[] | null>(null)
   const [error, setError] = useState('')
@@ -86,9 +80,14 @@ function SandboxList() {
                   meta={<span className="muted" style={{fontSize: 12.5}}>
                     {boxes !== null && t('sandboxes.runningCount', {running, total: list.length})}
                   </span>}
-                  actions={<button className="btn" onClick={() => setCreating(true)}>
-                    <Icon name="plus" size={14}/>{t('sandboxes.new')}
-                  </button>}/>
+                  actions={<>
+                    <button className="btn btn-ghost" onClick={onTemplates}>
+                      <Icon name="layers" size={14}/>{t('sandboxes.templates')}
+                    </button>
+                    <button className="btn" onClick={() => setCreating(true)}>
+                      <Icon name="plus" size={14}/>{t('sandboxes.new')}
+                    </button>
+                  </>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {creating && <SandboxCreateDialog onClose={() => setCreating(false)} onCreated={name => {
         setCreating(false)

@@ -2,7 +2,6 @@
 // Shared words live in common.ts; keys here are for this page only.
 
 export const en = {
-  'templates.eyebrow': 'Workspace',
   'templates.countSandbox': 'Sandbox templates: {count}',
   'templates.countJob': 'Job templates: {count}',
   'templates.newSandbox': 'New sandbox template',
@@ -46,7 +45,6 @@ export const en = {
 }
 
 export const zh: Record<keyof typeof en, string> = {
-  'templates.eyebrow': '工作区',
   'templates.countSandbox': '沙箱模板：{count}',
   'templates.countJob': '任务模板：{count}',
   'templates.newSandbox': '新建沙箱模板',

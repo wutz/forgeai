@@ -49,23 +49,17 @@ function retryOnLabel(retryOn: string): string {
 // job form sit behind the tab row at its top.
 export function Jobs({focus}: {focus?: {name: string} | null}) {
   const [section, setSection] = useState<Section>('jobs')
-  // Opening a job from elsewhere (Overview) shows the job list, whichever tab was open.
+  // Opening a job from elsewhere (Overview) shows the job list, whichever view was open.
   useEffect(() => { if (focus) setSection('jobs') }, [focus])
   return (
     <div className="page">
-      <Tabs idPrefix="job-section" tabs={[
-        {value: 'jobs', label: t('jobs.tabJobs')},
-        {value: 'templates', label: t('jobs.tabTemplates')},
-      ]} value={section} onChange={setSection}/>
-      <div {...tabPanelProps('job-section', section)}>
-        <Pane on={section === 'jobs'}><JobList focus={focus}/></Pane>
-        <Pane on={section === 'templates'}><Templates kind="job"/></Pane>
-      </div>
+      <Pane on={section === 'jobs'}><JobList focus={focus} onTemplates={() => setSection('templates')}/></Pane>
+      <Pane on={section === 'templates'}><Templates kind="job" onBack={() => setSection('jobs')}/></Pane>
     </div>
   )
 }
 
-function JobList({focus}: {focus?: {name: string} | null}) {
+function JobList({focus, onTemplates}: {focus?: {name: string} | null, onTemplates: () => void}) {
   // jobs is null until the first read, so a failed first read is not shown as an empty list.
   const [jobs, setJobs] = useState<app.Job[] | null>(null)
   const [error, setError] = useState('')
@@ -120,9 +114,14 @@ function JobList({focus}: {focus?: {name: string} | null}) {
     <>
       <PageHeader eyebrow={t('jobs.eyebrow')} title={t('jobs.title')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>{jobs !== null && t('jobs.total', {count: list.length})}</span>}
-                  actions={<button className="btn" onClick={() => setCreating(true)}>
-                    <Icon name="plus" size={14}/>{t('jobs.newJob')}
-                  </button>}/>
+                  actions={<>
+                    <button className="btn btn-ghost" onClick={onTemplates}>
+                      <Icon name="layers" size={14}/>{t('jobs.templates')}
+                    </button>
+                    <button className="btn" onClick={() => setCreating(true)}>
+                      <Icon name="plus" size={14}/>{t('jobs.newJob')}
+                    </button>
+                  </>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {creating && <JobCreateDialog onClose={() => setCreating(false)} onCreated={name => {
         setCreating(false)

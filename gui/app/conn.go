@@ -196,6 +196,7 @@ func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
 		Context: contextName, Server: rest.Host, Namespace: namespace, Project: project,
 		Admin: admin, ClusterAdmin: clusterAdmin, Forgeai: forgeai,
 		Sandboxes: namespace != "" && sandboxesAvailable(ctx, k8s, namespace),
+		Inference: namespace != "" && inferenceAvailable(ctx, k8s, namespace),
 	}
 	conn := &Connection{Info: info, k8s: k8s, rest: rest, core: core}
 	if cfg, err := platform.Load(ctx, k8s, conn.configNamespace()); err == nil {
@@ -236,6 +237,14 @@ func sandboxesAvailable(ctx context.Context, k8s client.Client, namespace string
 		return false
 	}
 	return true
+}
+
+// inferenceAvailable reports whether the InferenceService CRD is installed and
+// the user may list them in the project namespace; the GUI hides the Inference
+// view when it is not.
+func inferenceAvailable(ctx context.Context, k8s client.Client, namespace string) bool {
+	list := &v1.InferenceServiceList{}
+	return k8s.List(ctx, list, client.InNamespace(namespace), client.Limit(1)) == nil
 }
 
 // mustBeAdmin reports whether the user may create Projects; the admin area

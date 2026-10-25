@@ -13,15 +13,16 @@ import {en as storageEn, zh as storageZh} from './messages/storage'
 import {en as templatesEn, zh as templatesZh} from './messages/templates'
 import {en as clusterEn, zh as clusterZh} from './messages/cluster'
 import {en as templateSourcesEn, zh as templateSourcesZh} from './messages/templateSources'
+import {en as inferenceEn, zh as inferenceZh} from './messages/inference'
 
 export type Locale = 'en' | 'zh'
 
-const en = {...commonEn, ...appEn, ...jobsEn, ...sandboxesEn, ...storageEn, ...templatesEn, ...clusterEn, ...templateSourcesEn}
+const en = {...commonEn, ...appEn, ...jobsEn, ...sandboxesEn, ...storageEn, ...templatesEn, ...clusterEn, ...templateSourcesEn, ...inferenceEn}
 
 export type MessageKey = keyof typeof en
 
 const zh: Record<MessageKey, string> = {
-  ...commonZh, ...appZh, ...jobsZh, ...sandboxesZh, ...storageZh, ...templatesZh, ...clusterZh, ...templateSourcesZh,
+  ...commonZh, ...appZh, ...jobsZh, ...sandboxesZh, ...storageZh, ...templatesZh, ...clusterZh, ...templateSourcesZh, ...inferenceZh,
 }
 
 const catalogs: Record<Locale, Record<MessageKey, string>> = {en, zh}

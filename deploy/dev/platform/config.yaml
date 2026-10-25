@@ -7,6 +7,13 @@ ingress:
   className: nginx
   domain: dev1.bz1.paratera.com
   port: 7443
+# Sandbox ports published through the Gateway API (gateway.yaml). The listener
+# is in-cluster on 8081; the external URL is not wired yet.
+gateway:
+  name: forgeai-sandbox
+  namespace: llmapi
+  scheme: http
+  port: 8081
 registry:
   domain: cr.dev1.bz1.paratera.com:7443
   insecure: true

@@ -121,6 +121,7 @@ The GUI renders the same object from a form (`pkg/sandbox`): image, bash command
 | Idle suspend | a sandbox nothing used for its idle timeout is suspended and marked stopped. The timeout is the form's "Idle timeout" in minutes (0 turns the idle stop off for that sandbox, empty uses `sandbox.idleTimeout`), stored in the `forgeai.wutz.dev/idle-timeout` annotation; clients keep it awake with the `forgeai.wutz.dev/last-active` heartbeat (the GUI sends one while the sandbox is open) |
 | Auto-stop | the form's TTL sets `shutdownTime` with `shutdownPolicy: Retain`, so the sandbox stops instead of being deleted |
 | Templates | `SandboxTemplate`s are listed by the GUI; members create templates, claims and warm pools with `kubectl` (the edit role allows it) |
+| Gateway access | the annotation `forgeai.wutz.dev/gateway-port: "8080"` (the form's `gatewayPort`) publishes the sandbox's HTTP port through the Gateway API: the operator owns a ClusterIP Service `<name>-gw` selecting the sandbox pod on that port and an HTTPRoute for host `<name>-<namespace>.<ingress domain>` on the platform's `gateway`. Clearing the annotation removes both |
 
 Members create, stop, start and delete sandboxes in their namespace with the `forgeai-project-edit` role; `view` members see them read-only. Edit members also open a shell in a running sandbox from the GUI terminal tab (`pods/exec` on the sandbox container, with their own credentials). Project network policies admit the agent-sandbox controller in `sandbox.namespace`, so sandbox API servers reachable from the pod stay reachable in isolated projects.
 
@@ -159,6 +160,7 @@ Platform settings live in the ConfigMap `forgeai-system/forgeai-platform` (`conf
 | `apiServer` | API server URL written into member kubeconfigs |
 | `membersNamespace` | Namespace of member ServiceAccounts (default `forgeai-members`) |
 | `ingress` | Ingress class, wildcard domain, external port and optional TLS secret for the file server |
+| `gateway` | Gateway API Gateway the published sandbox routes attach to (`name`, `namespace`, optional `sectionName`); its listeners must admit routes from the project namespaces (`allowedRoutes`). `scheme` and `port` describe the listener from outside, for the URLs. The gateway does not authenticate published sandboxes: anything that reaches the host reaches the sandbox's port |
 | `registry` | Harbor domain, API URL, `insecure`, and the admin Secret in `forgeai-system` (default `forgeai-harbor`, keys `username` and `password`) |
 | `storageTypes`, `defaultStorageType` | Volume types mapped to StorageClasses |
 | `instanceTypes` | Per-node `reserved` CPU and memory, and offered `sizes` |

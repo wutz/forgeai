@@ -284,6 +284,9 @@ func bundleByName(name string) (*depBundle, error) {
 type depHealth struct {
 	crdsWanted, crdsFound int
 	deployments           []appsv1.Deployment
+	// crdVersion is the version label of the bundle's CRDs. A bundle with no
+	// Deployments, such as the Gateway API CRDs, has nothing else to carry it.
+	crdVersion string
 	// namespace is where the component runs; expectNamespace is where the
 	// platform config says it must. The check is skipped when expectNamespace is empty.
 	namespace, expectNamespace string
@@ -306,6 +309,9 @@ func assess(dep *Dependency, h depHealth) {
 		dep.Status, dep.Message = "degraded", "Operator Deployment not found"
 		dep.Reason = "operatorMissing"
 		return
+	}
+	if dep.Installed == "" {
+		dep.Installed = h.crdVersion
 	}
 	var notReady []string
 	for i := range h.deployments {
@@ -473,6 +479,7 @@ func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *de
 	h.crdsWanted = len(crds)
 	// Each CRD is read at once; a slot per CRD keeps the count free of a lock.
 	found := make([]bool, len(crds))
+	versions := make([]string, len(crds))
 	if err := forEachConcurrently(len(crds), func(i int) error {
 		u := &unstructured.Unstructured{}
 		u.SetGroupVersionKind(crdGVK)
@@ -480,6 +487,7 @@ func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *de
 		switch {
 		case err == nil:
 			found[i] = true
+			versions[i] = u.GetLabels()[depVersionLabel]
 		case !apierrors.IsNotFound(err):
 			return err
 		}
@@ -487,9 +495,12 @@ func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *de
 	}); err != nil {
 		return dep, err
 	}
-	for _, ok := range found {
+	for i, ok := range found {
 		if ok {
 			h.crdsFound++
+		}
+		if h.crdVersion == "" && b != nil && !bundleHasDeployment(b) {
+			h.crdVersion = versions[i]
 		}
 	}
 	if b != nil {
@@ -524,6 +535,16 @@ func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *de
 		dep.Running = running
 	}
 	return dep, nil
+}
+
+// bundleHasDeployment reports whether the bundle declares a Deployment.
+func bundleHasDeployment(b *depBundle) bool {
+	for _, o := range b.objects {
+		if o.GetKind() == "Deployment" && o.GroupVersionKind().Group == appsv1.GroupName {
+			return true
+		}
+	}
+	return false
 }
 
 // bundleRunningTags returns the distinct image tags of the Deployments the

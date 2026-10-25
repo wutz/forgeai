@@ -212,7 +212,7 @@ Platform settings live in the ConfigMap `forgeai-system/forgeai-platform` (`conf
 | `sandbox` | agent-sandbox `namespace`, `defaultImage`, offered `images`, `runtimeClasses` and `defaultRuntimeClass`, `shmSize`, `idleTimeout` (default for sandboxes without their own; 0 disables), `sshImage` of the SSH sidecar |
 | `ssh` | `gatewayImage` of the sshpiperd gateway |
 | `trashRetention` | Default retention of trashed volumes |
-| `templates` | `source` of the public template source the create dialogs offer: an `https://` base URL or a `file://` directory with `index.yaml` (default: [wutz/forgeai-templates](https://github.com/wutz/forgeai-templates) on its `main` branch) |
+| `templates` | `source` of the public template source the create dialogs offer: an `https://` base URL, a `file://` directory with `index.yaml`, or an `oci://` reference to a published source (default: [wutz/forgeai-templates](https://github.com/wutz/forgeai-templates) on its `main` branch) |
 
 The operator rereads the config every 15 seconds.
 
@@ -233,7 +233,7 @@ The desktop client connects with a kubeconfig context and a project namespace (t
 | Projects | Admins only (may create Projects): manage projects and members, export member kubeconfigs |
 | Dependencies | Cluster admins only: install or upgrade Kueue, Kubeflow Trainer v2 (with JobSet) and agent-sandbox at the versions pinned in the GUI, install the forgeai operator from its Helm chart at the pinned chart version, and see each component's status |
 
-The New job and New sandbox dialogs also offer template sources: job and sandbox templates from the platform's `templates.source` (default [wutz/forgeai-templates](https://github.com/wutz/forgeai-templates)), grouped apart from the project templates. You can add other published template sources by URL or `file://` directory under **Template sources** in the sidebar; a source is read before it is added, and its templates are marked as yours in the dialog. Picking a template prefills the form; the name, instance type and volumes stay yours, and the job or sandbox does not reference the template.
+The New job and New sandbox dialogs also offer template sources: job and sandbox templates from the platform's `templates.source` (default [wutz/forgeai-templates](https://github.com/wutz/forgeai-templates)), grouped apart from the project templates. You can add other published template sources by URL, `file://` directory or `oci://` reference (`oci://registry/repository:tag` or `oci://registry/repository@sha256:…`) under **Template sources** in the sidebar; a source is read before it is added, and its templates are marked as yours in the dialog. Picking a template prefills the form; the name, instance type and volumes stay yours, and the job or sandbox does not reference the template.
 
 View-only members see the same views read-only and get no registry or file server credentials.
 

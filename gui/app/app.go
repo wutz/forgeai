@@ -10,16 +10,19 @@ package app
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/wutz/forgeai/pkg/platform"
 
+	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
 )
@@ -50,7 +53,12 @@ type App struct {
 }
 
 // New creates the bound application.
-func New() *App { return &App{} }
+func New() *App {
+	// controller-runtime prints a stack trace and drops its logs until a logger
+	// is set, so set one before the first Kubernetes client is created.
+	logf.SetLogger(logr.FromSlogHandler(slog.Default().Handler()))
+	return &App{}
+}
 
 // Startup stores the Wails context.
 func (a *App) Startup(ctx context.Context) { a.ctx = ctx }

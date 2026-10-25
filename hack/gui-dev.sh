@@ -18,6 +18,18 @@ set -euo pipefail
 export GOWORK=off
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
+
+# `wails dev` rewrites the Wails version in gui/go.mod to the version of the CLI
+# it runs, so a CLI that differs from the pin leaves go.mod and go.sum modified.
+# Refuse to start instead.
+pinned="$(cd "$root/gui" && go list -m -f '{{.Version}}' github.com/wailsapp/wails/v2)"
+cli="$(wails version 2>/dev/null | sed -n 1p)"
+if [[ "$cli" != "$pinned" ]]; then
+  echo "wails CLI $cli does not match gui/go.mod ($pinned)." >&2
+  echo "Install the pinned CLI: go install github.com/wailsapp/wails/v2/cmd/wails@$pinned" >&2
+  exit 1
+fi
+
 bin="$root/gui/build/bin"
 app="$bin/forgeai.app"
 # Kept outside bin/ so a dev build's `-clean` cannot remove it.

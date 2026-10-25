@@ -32,12 +32,15 @@ import (
 // A template source can be published to an OCI registry as an artifact, so
 // it can be pushed by one person and pulled by another. The artifact has one
 // layer: a gzipped tar of the source's index.yaml and the template files it
-// lists. oras pulls it as well (oras pull oci://... works on the same tag).
+// lists. oras pull of the same reference saves that layer as LayerTitle.
 const (
 	// ArtifactType is the artifactType of a published template source.
 	ArtifactType = "application/vnd.forgeai.template.source.v1"
 	// LayerMediaType is the media type of the source layer: a gzipped tar.
 	LayerMediaType = "application/vnd.forgeai.template.source.layer.v1.tar+gzip"
+	// LayerTitle is the file name of the source layer. oras pull saves a layer
+	// by this name, and skips a layer without one.
+	LayerTitle = "forgeai-template-source.tar.gz"
 	// maxArchiveBytes bounds an unpacked source; templates are a few kilobytes.
 	maxArchiveBytes = 16 << 20
 	// maxArchiveFiles bounds the entries of one source.
@@ -121,7 +124,7 @@ func (o *ociSource) load(ctx context.Context) (map[string][]byte, error) {
 	if o.files != nil {
 		return o.files, nil
 	}
-	fail := func(err error) error { return fmt.Errorf("template source %s: %w", o.ref, err) }
+	fail := func(err error) error { return sourceError(o.ref, err) }
 
 	desc, err := o.repo.Resolve(ctx, o.ref.Reference)
 	if err != nil {
@@ -158,6 +161,19 @@ func (o *ociSource) load(ctx context.Context) (map[string][]byte, error) {
 	}
 	o.files = files
 	return files, nil
+}
+
+// sourceError names the source in err. A registry that asks for a login the
+// Docker configuration does not hold gets a hint on how to add one, and a tag
+// or digest the registry does not have is said in words.
+func sourceError(ref registry.Reference, err error) error {
+	switch {
+	case errors.Is(err, auth.ErrBasicCredentialNotFound):
+		return fmt.Errorf("template source %s: the registry needs a login; run docker login %s: %w", ref, ref.Registry, err)
+	case errors.Is(err, errdef.ErrNotFound):
+		return fmt.Errorf("template source %s: the registry has no such tag or digest", ref)
+	}
+	return fmt.Errorf("template source %s: %w", ref, err)
 }
 
 // fetchBlob reads a blob and checks it against its digest.
@@ -249,7 +265,7 @@ func publish(ctx context.Context, dir, location string, client *http.Client, pla
 	}
 	desc, err := pushSource(ctx, repo, ref.Reference, archive)
 	if err != nil {
-		return "", fmt.Errorf("template source %s: %w", ref, err)
+		return "", sourceError(ref, err)
 	}
 	return ociScheme + ref.Registry + "/" + ref.Repository + "@" + desc.Digest.String(), nil
 }
@@ -259,6 +275,7 @@ func publish(ctx context.Context, dir, location string, client *http.Client, pla
 // digest of the manifest.
 func pushSource(ctx context.Context, repo *remote.Repository, reference string, archive []byte) (ocispec.Descriptor, error) {
 	layer := content.NewDescriptorFromBytes(LayerMediaType, archive)
+	layer.Annotations = map[string]string{ocispec.AnnotationTitle: LayerTitle}
 	exists, err := repo.Exists(ctx, layer)
 	if err != nil {
 		return ocispec.Descriptor{}, err
@@ -268,10 +285,11 @@ func pushSource(ctx context.Context, repo *remote.Repository, reference string, 
 			return ocispec.Descriptor{}, err
 		}
 	}
+	// PackManifest returns the manifest's descriptor even when the manifest exists.
 	desc, err := oras.PackManifest(ctx, repo, oras.PackManifestVersion1_1, ArtifactType, oras.PackManifestOptions{
 		Layers: []ocispec.Descriptor{layer},
 	})
-	if err != nil && !errors.Is(err, errdef.ErrAlreadyExists) {
+	if err != nil {
 		return ocispec.Descriptor{}, err
 	}
 	if strings.HasPrefix(reference, "sha256:") {

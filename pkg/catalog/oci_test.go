@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
 	"io"
 	"log"
 	"net/http/httptest"
@@ -195,6 +196,52 @@ func TestOCISourceNeedsSourceArtifact(t *testing.T) {
 	}
 	if _, err := Load(ctx, src); err == nil || !strings.Contains(err.Error(), "not a template source") {
 		t.Fatalf("Load: err = %v, want a not-a-template-source error", err)
+	}
+}
+
+// TestPublishNamesTheLayer checks that the layer has a title, so oras pull
+// saves it instead of skipping it.
+func TestPublishNamesTheLayer(t *testing.T) {
+	host := newTestRegistry(t)
+	location := "oci://" + host + "/forgeai/named:v1"
+	if _, err := publish(context.Background(), fixtureTemplates(t), location, nil, true); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	repo := testRepo(t, location)
+	desc, err := repo.Resolve(ctx, "v1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := fetchBlob(ctx, repo, desc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m ocispec.Manifest
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Layers) != 1 || m.Layers[0].Annotations[ocispec.AnnotationTitle] != LayerTitle {
+		t.Fatalf("layers = %+v, want one layer titled %s", m.Layers, LayerTitle)
+	}
+}
+
+// TestOCISourceMissingTag checks the message for a tag the registry does not have.
+func TestOCISourceMissingTag(t *testing.T) {
+	host := newTestRegistry(t)
+	if _, err := publish(context.Background(), fixtureTemplates(t), "oci://"+host+"/forgeai/templates:v1", nil, true); err != nil {
+		t.Fatal(err)
+	}
+	src, err := newOCISource("oci://"+host+"/forgeai/templates:v2", nil, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = Load(context.Background(), src)
+	if err == nil || !strings.Contains(err.Error(), "no such tag or digest") {
+		t.Fatalf("Load of a missing tag: err = %v, want a no-such-tag error", err)
+	}
+	if strings.Count(err.Error(), host) != 1 {
+		t.Errorf("error repeats the reference: %v", err)
 	}
 }
 

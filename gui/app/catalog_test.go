@@ -123,3 +123,64 @@ func TestCheckCatalogSourceNeedsLocation(t *testing.T) {
 		t.Error("an empty location must be refused before any read")
 	}
 }
+
+// TestCatalogFormsPrefillFromTemplates reads the form of a job and of a
+// sandbox template: the name and the instance type are left for the user.
+func TestCatalogFormsPrefillFromTemplates(t *testing.T) {
+	src := testSource(t)
+	a := testApp(t)
+	jf, err := a.CatalogJobForm(src, "job-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if jf.Name != "" || jf.InstanceType != "" || jf.Image != "example.com/img:1" || jf.Workers != 2 {
+		t.Errorf("job form = %+v", jf)
+	}
+	if _, err := a.CatalogSandboxForm(src, "job-a"); err == nil {
+		t.Error("a job template must not prefill a sandbox form")
+	}
+
+	root := t.TempDir()
+	for name, content := range map[string]string{
+		"index.yaml": `apiVersion: templates.forgeai.wutz.dev/v1alpha1
+kind: TemplateIndex
+metadata:
+  name: test
+spec:
+  displayName: Test
+  templates:
+    - name: box
+      kind: Sandbox
+      displayName: Box
+      description: d
+      version: 1.0.0
+      path: sandboxes/box/template.yaml
+`,
+		"sandboxes/box/template.yaml": `apiVersion: templates.forgeai.wutz.dev/v1alpha1
+kind: SandboxTemplate
+metadata:
+  name: box
+spec:
+  displayName: Box
+  description: d
+  version: 1.0.0
+  image: example.com/box:1
+  command: sleep infinity
+`,
+	} {
+		p := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sf, err := a.CatalogSandboxForm("file://"+root, "box")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sf.Name != "" || sf.Image != "example.com/box:1" || sf.Command != "sleep infinity" {
+		t.Errorf("sandbox form = %+v", sf)
+	}
+}

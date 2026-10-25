@@ -79,8 +79,8 @@ func TestTemplateSource(t *testing.T) {
 	}
 	// Only a directory can be walked for unlisted files; an https source is checked by its templates alone.
 	root := ""
-	if strings.HasPrefix(loc, "file://") {
-		root = strings.TrimPrefix(loc, "file://")
+	if after, ok := strings.CutPrefix(loc, "file://"); ok {
+		root = after
 	}
 	checkSource(t, root, c)
 }
@@ -342,5 +342,107 @@ func TestOpenRejectsLocations(t *testing.T) {
 	}
 	if _, err := Open("", nil); err != nil {
 		t.Errorf("empty location must use the default source: %v", err)
+	}
+}
+
+// TestSandboxFileRejects checks the sandbox file against its index entry: the
+// kind, the name, the summary and the fields it may carry.
+func TestSandboxFileRejects(t *testing.T) {
+	index := `apiVersion: templates.forgeai.wutz.dev/v1alpha1
+kind: TemplateIndex
+metadata:
+  name: test
+spec:
+  displayName: Test
+  templates:
+    - name: box
+      kind: Sandbox
+      displayName: Box
+      description: d
+      version: 1.0.0
+      path: sandboxes/box/template.yaml
+`
+	box := `apiVersion: templates.forgeai.wutz.dev/v1alpha1
+kind: SandboxTemplate
+metadata:
+  name: box
+spec:
+  displayName: Box
+  description: d
+  version: 1.0.0
+  image: example.com/box:1
+`
+	cases := []struct {
+		name    string
+		index   string
+		box     string
+		wantErr string
+	}{
+		{name: "wrong file kind", box: strings.Replace(box, "kind: SandboxTemplate", "kind: JobTemplate", 1), wantErr: "must be"},
+		{name: "name mismatch", box: strings.Replace(box, "name: box", "name: other", 1), wantErr: "does not match"},
+		{name: "summary mismatch", box: strings.Replace(box, "displayName: Box", "displayName: Other", 1), wantErr: "must match the index entry"},
+		{name: "unknown spec field", box: strings.Replace(box, "image: example.com/box:1", "image: example.com/box:1\n  replicas: 3", 1), wantErr: "unknown field"},
+		{name: "unparseable file", box: "spec: [", wantErr: "parse sandboxes/box/template.yaml"},
+		{
+			name:    "empty summary",
+			index:   strings.ReplaceAll(index, "displayName: Box", `displayName: " "`),
+			box:     strings.ReplaceAll(box, "displayName: Box", `displayName: " "`),
+			wantErr: "required",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			idx := tc.index
+			if idx == "" {
+				idx = index
+			}
+			c := load(t, writeTree(t, map[string]string{"index.yaml": idx, "sandboxes/box/template.yaml": tc.box}))
+			got := c.Templates[0]
+			if got.Error == "" || !strings.Contains(got.Error, tc.wantErr) {
+				t.Errorf("Error = %q, want it to contain %q", got.Error, tc.wantErr)
+			}
+			if got.Sandbox != nil {
+				t.Error("a failed sandbox template must not carry a spec")
+			}
+		})
+	}
+}
+
+func TestLoadRejectsEmptyNameAndSummary(t *testing.T) {
+	cases := map[string]struct{ index, job, wantErr string }{
+		"empty entry name": {
+			index:   strings.Replace(goodIndex, "name: job-a", `name: ""`, 1),
+			wantErr: "name is required",
+		},
+		"blank summary": {
+			index:   strings.ReplaceAll(goodIndex, "displayName: Job A", `displayName: " "`),
+			job:     strings.ReplaceAll(goodJob, "displayName: Job A", `displayName: " "`),
+			wantErr: "displayName and version are required",
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			job := tc.job
+			if job == "" {
+				job = goodJob
+			}
+			c := load(t, writeTree(t, map[string]string{"index.yaml": tc.index, "jobs/job-a/template.yaml": job}))
+			if got := c.Templates[0].Error; !strings.Contains(got, tc.wantErr) {
+				t.Errorf("Error = %q, want it to contain %q", got, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestHTTPSourceUnreachable(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler())
+	location := srv.URL
+	srv.Close()
+	src, err := Open(location, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(context.Background(), src); err == nil || !strings.Contains(err.Error(), "fetch index.yaml") {
+		t.Errorf("Load from a closed server = %v, want a fetch error", err)
 	}
 }

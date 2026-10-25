@@ -16,7 +16,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"sigs.k8s.io/yaml"
@@ -52,9 +51,6 @@ const (
 	// KindSandbox is a sandbox template: the agent a new sandbox starts from.
 	KindSandbox Kind = "Sandbox"
 )
-
-// nameRE is the name rule shared with the job and sandbox forms.
-var nameRE = regexp.MustCompile(`^[a-z]([-a-z0-9]*[a-z0-9])?$`)
 
 // Index is index.yaml: the templates of the source, with the summary fields
 // the GUI lists. Each summary must match the template file it points to.
@@ -206,7 +202,7 @@ func (h *httpSource) Read(ctx context.Context, rel string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fetch %s: %w", rel, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("fetch %s: %s", rel, resp.Status)
 	}
@@ -217,7 +213,7 @@ func readLimited(f *os.File, err error) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return io.ReadAll(io.LimitReader(f, maxFileBytes))
 }
 
@@ -268,7 +264,8 @@ func checkIndex(idx *Index) error {
 			return fmt.Errorf("template %s is listed twice", key)
 		}
 		seen[key] = true
-		if clean := path.Clean(e.Path); e.Path == "" || path.IsAbs(e.Path) || clean != e.Path || strings.HasPrefix(clean, "..") {
+		clean := path.Clean(e.Path)
+		if e.Path == "" || path.IsAbs(e.Path) || clean != e.Path || strings.HasPrefix(clean, "..") {
 			return fmt.Errorf("template %s: path %q must be a clean path inside the source", e.Name, e.Path)
 		}
 	}

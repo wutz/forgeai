@@ -9,10 +9,12 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/wutz/forgeai/pkg/kf"
+	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
 	"github.com/wutz/forgeai/pkg/sandbox"
 	"github.com/wutz/forgeai/pkg/training"
@@ -281,5 +283,40 @@ func TestListTemplatesKeepsMalformedSpec(t *testing.T) {
 	}
 	if len(offered) != 1 || offered[0] != "good-spec" {
 		t.Fatalf("TemplateNames = %v, want only the readable template", offered)
+	}
+}
+
+func TestDeleteTemplateOnlyOwnTemplates(t *testing.T) {
+	checkOwnTemplatesOnly(t, kf.TrainingRuntimeGVK, func(a *App, name string) error { return a.DeleteTemplate(name) })
+}
+
+// checkOwnTemplatesOnly checks that del removes the templates of kind gvk that
+// forgeai created, refuses the others and succeeds for a template already gone.
+func checkOwnTemplatesOnly(t *testing.T, gvk schema.GroupVersionKind, del func(*App, string) error) {
+	t.Helper()
+	managed := &unstructured.Unstructured{}
+	managed.SetGroupVersionKind(gvk)
+	managed.SetNamespace(testNamespace)
+	managed.SetName("ours")
+	managed.SetLabels(map[string]string{naming.LabelManagedBy: naming.ManagedBy})
+
+	foreign := managed.DeepCopy()
+	foreign.SetName("theirs")
+	foreign.SetLabels(nil)
+
+	a := testApp(t, managed, foreign)
+	if err := del(a, "theirs"); err == nil || !strings.Contains(err.Error(), "not created by forgeai") {
+		t.Errorf("delete of a foreign template = %v, want a refusal", err)
+	}
+	if err := del(a, "ours"); err != nil {
+		t.Fatal(err)
+	}
+	gone := &unstructured.Unstructured{}
+	gone.SetGroupVersionKind(gvk)
+	if err := a.conn.k8s.Get(context.Background(), client.ObjectKey{Namespace: testNamespace, Name: "ours"}, gone); !apierrors.IsNotFound(err) {
+		t.Errorf("managed template still there: %v", err)
+	}
+	if err := del(a, "ours"); err != nil {
+		t.Errorf("delete of a missing template: %v", err)
 	}
 }

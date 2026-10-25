@@ -67,6 +67,47 @@ func TestGetJobDrillsIntoRetries(t *testing.T) {
 	}
 }
 
+// The list shows each job once: retries are nested under their leader and do
+// not appear as rows of their own.
+func TestListJobsNestsRetriesOnce(t *testing.T) {
+	a := testApp(t)
+	c := a.conn
+	ctx := context.Background()
+	for _, tj := range []*kf.TrainJob{
+		testTrainJob("train-r1", "train"),
+		testTrainJob("train", ""),
+		testTrainJob("solo", ""),
+		testTrainJob("train-r2", "train"),
+	} {
+		obj, err := trainJobObject(tj)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := c.k8s.Create(ctx, obj); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	jobs, err := a.ListJobs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rows := map[string]int{}
+	var leader *Job
+	for _, j := range jobs {
+		rows[j.Name]++
+		if j.Name == "train" {
+			leader = j
+		}
+	}
+	if len(jobs) != 2 || rows["train"] != 1 || rows["solo"] != 1 {
+		t.Fatalf("ListJobs rows = %v, want train and solo once each", rows)
+	}
+	if leader == nil || len(leader.Retries) != 2 {
+		t.Fatalf("leader = %+v, want 2 nested retries", leader)
+	}
+}
+
 func TestRerunFormKeepsTemplate(t *testing.T) {
 	src := testTrainJob("train", "")
 	src.Labels = map[string]string{naming.LabelTemplate: "torch", naming.LabelInstanceType: "cpu.small"}

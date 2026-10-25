@@ -6,6 +6,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -15,6 +16,7 @@ import (
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
 	"github.com/wutz/forgeai/pkg/sandbox"
+	"github.com/wutz/forgeai/pkg/sshgateway"
 )
 
 // sandboxForm renders a small sandbox in the project namespace through the
@@ -117,6 +119,39 @@ var _ = Describe("Sandbox controller", Ordered, func() {
 			HaveKeyWithValue(naming.AnnotationStopped, "true"),
 			HaveKey(naming.AnnotationIdleSince),
 		))
+	})
+
+	It("gives an SSH sandbox a Service and a host key Secret that trust only the platform key", func() {
+		Expect(k8sClient.Create(ctx, renderSandbox(&sandbox.Form{
+			Name: "ssh-agent", Image: "busybox", Command: "sleep 1d", SSH: true,
+		}))).To(Succeed())
+
+		svc := &corev1.Service{}
+		Eventually(func() error {
+			return k8sClient.Get(ctx, client.ObjectKey{Namespace: sandboxNS, Name: naming.SSHServiceName("ssh-agent")}, svc)
+		}, timeout, interval).Should(Succeed())
+		Expect(svc.Spec.Selector).To(Equal(map[string]string{naming.LabelSandbox: "ssh-agent"}))
+		Expect(svc.Spec.Ports).To(HaveLen(1))
+		Expect(svc.Spec.Ports[0].Port).To(BeEquivalentTo(sandbox.SSHPort))
+		Expect(svc.OwnerReferences).To(HaveLen(1))
+		Expect(svc.OwnerReferences[0].Kind).To(Equal(sandbox.SandboxGVK.Kind))
+
+		sec := &corev1.Secret{}
+		Eventually(func() error {
+			return k8sClient.Get(ctx, client.ObjectKey{
+				Namespace: sandboxNS, Name: naming.SSHHostKeySecret(naming.SSHServiceName("ssh-agent")),
+			}, sec)
+		}, timeout, interval).Should(Succeed())
+		Expect(sec.Data).To(HaveKey(sshgateway.SSHHostKeyKey))
+		Expect(sec.OwnerReferences).To(HaveLen(1))
+
+		identity := &corev1.Secret{}
+		Expect(k8sClient.Get(ctx, client.ObjectKey{
+			Namespace: configNamespace, Name: naming.SSHIdentitySecretName,
+		}, identity)).To(Succeed())
+		Expect(identity.Data[sshPrivateKeyKey]).NotTo(BeEmpty())
+		// The sandbox accepts the platform public key and no other key.
+		Expect(sec.Data[sshgateway.SSHAuthorizedKeyKey]).To(Equal(identity.Data[sshPublicKeyKey]))
 	})
 
 	It("uses the idle timeout a sandbox was created with", func() {

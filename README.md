@@ -124,6 +124,47 @@ The GUI renders the same object from a form (`pkg/sandbox`): image, bash command
 
 Members create, stop, start and delete sandboxes in their namespace with the `forgeai-project-edit` role; `view` members see them read-only. Edit members also open a shell in a running sandbox from the GUI terminal tab (`pods/exec` on the sandbox container, with their own credentials). Project network policies admit the agent-sandbox controller in `sandbox.namespace`, so sandbox API servers reachable from the pod stay reachable in isolated projects.
 
+### SSH
+
+A sandbox labelled `forgeai.wutz.dev/ssh: "true"` (the create form's "SSH" switch) gets an sshd sidecar and a Service on port 22. An SSH session reaches only what the sidecar mounts: the project volumes it shares with the agent, not the agent's container image or its processes.
+
+Entry is through sshpiperd, exposed as an SSH gateway modelled on the Gateway API:
+
+```yaml
+apiVersion: forgeai.wutz.dev/v1alpha1
+kind: SSHGateway
+metadata:
+  name: main
+  namespace: forgeai-system
+spec:
+  gatewayClassName: forgeai-ssh
+  listeners:
+    - name: ssh
+      port: 2222
+      allowedRoutes: {namespaces: {from: All}}
+---
+apiVersion: forgeai.wutz.dev/v1alpha1
+kind: SSHRoute
+metadata:
+  name: agent-login
+  namespace: forge-demo
+spec:
+  parentRefs: [{name: main}]
+  rules:
+    - matches: [{username: alice}]
+      authorizedKeys: ["ssh-ed25519 AAAA... alice@example.com"]
+      backendRefs: [{name: agent}]
+```
+
+`SSHGatewayClass` names the controller (`forgeai.wutz.dev/ssh-gateway`). Only the gateway of the platform namespace is served, and only one of them exists: a second one there is rejected. Each rule of a route becomes one sshpiperd `Pipe` that accepts the keys of `authorizedKeys` for the listed usernames and forwards to the `SSHService` of the named sandbox, logging in as `sandbox` with the platform identity key.
+
+- A username is claimed by the first route that matches it; keep login names unique.
+- Keys are the only way in. Passwords, keyboard interaction, agent and TCP forwarding, tunnels and X11 are all off, at the gateway and at the sidecar.
+- The gateway host key is generated once per gateway and kept in `forgeai-system/sshgateway-main`; pin it with `known_hosts` rather than trusting on first use.
+- The sshd sidecar image is `sandbox.sshImage` (default `ghcr.io/wutz/forgeai-sshd:0.1.0`, built by `make sshd-image`); sshpiperd is `ssh.gatewayImage` (default `ghcr.io/tg123/sshpiperd:v1.6.1`).
+
+Route conditions are reported in `status.parents` (`Accepted`, `ResolvedRefs`); gateway conditions in `status.conditions` (`Accepted`, `Programmed`, `Ready`).
+
 ## Volumes
 
 Volumes are PVCs in the project namespace, created from the platform `storageTypes` (ReadWriteMany by default) and limited by the project quota. Volumes can be resized (grow only) and moved to the trash:
@@ -166,7 +207,8 @@ Platform settings live in the ConfigMap `forgeai-system/forgeai-platform` (`conf
 | `network` | `systemNamespaces` allowed into isolated projects, `dnsNamespace` |
 | `fileServer` | dufs `image`, `idleTimeout`, `hostPrefix` |
 | `training` | `defaultRuntime`, `shmSize`, `stuckTimeout`, `maxRetries` |
-| `sandbox` | agent-sandbox `namespace`, `defaultImage`, offered `images`, `runtimeClasses` and `defaultRuntimeClass`, `shmSize`, `idleTimeout` (default for sandboxes without their own; 0 disables) |
+| `sandbox` | agent-sandbox `namespace`, `defaultImage`, offered `images`, `runtimeClasses` and `defaultRuntimeClass`, `shmSize`, `idleTimeout` (default for sandboxes without their own; 0 disables), `sshImage` of the SSH sidecar |
+| `ssh` | `gatewayImage` of the sshpiperd gateway |
 | `trashRetention` | Default retention of trashed volumes |
 | `templates` | `source` of the public template source the create dialogs offer: an `https://` base URL or a `file://` directory with `index.yaml` (default: [`templates/`](templates/README.md) on the forgeai repository's `main` branch) |
 

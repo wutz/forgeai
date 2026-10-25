@@ -12,9 +12,10 @@ type Kind = 'sandbox' | 'job'
 const byName = <T extends {name: string}>(items: T[]) =>
   [...items].sort((a, b) => a.name.localeCompare(b.name))
 
-// Templates is one kind's page, opened from its sidebar entry: sandbox templates
-// (agent blueprints new sandboxes start from) under Sandboxes, and job templates
-// (namespaced TrainingRuntimes that prefill the job form) under Jobs. Each list is sorted by name.
+// Templates is one kind's template list, shown behind the tab row of its page:
+// sandbox templates (agent blueprints new sandboxes start from) in Sandboxes, and
+// job templates (namespaced TrainingRuntimes that prefill the job form) in Jobs.
+// Each list is sorted by name.
 export function Templates({kind}: {kind: Kind}) {
   // The lists are null until the first read, so a failed first read is not shown as an empty list.
   const [sandboxItems, setSandboxItems] = useState<app.SandboxTemplate[] | null>(null)
@@ -51,7 +52,7 @@ export function Templates({kind}: {kind: Kind}) {
 
 
   return (
-    <div className="page">
+    <>
       <PageHeader eyebrow={t('templates.eyebrow')} title={t(isSandbox ? 'templates.titleSandbox' : 'templates.titleJob')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>
                     {isSandbox
@@ -93,7 +94,7 @@ export function Templates({kind}: {kind: Kind}) {
               form: training.Form.createFrom({...tpl.form, name: tpl.name}), existing: tpl.name, version: tpl.resourceVersion,
             })} onDelete={onDeleteJob}/>}
       </Card>}
-    </div>
+    </>
   )
 }
 

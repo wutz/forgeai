@@ -1,4 +1,4 @@
-import {Fragment, ReactNode, useContext, useEffect, useRef, useState, useSyncExternalStore} from 'react'
+import {Fragment, ReactNode, useEffect, useRef, useState, useSyncExternalStore} from 'react'
 import {Connect, Contexts, Projects} from '../wailsjs/go/app/App'
 import {Environment} from '../wailsjs/runtime/runtime'
 import {app} from '../wailsjs/go/models'
@@ -6,7 +6,6 @@ import {Overview} from './Overview'
 import {Jobs} from './Jobs'
 import {Inference} from './Inference'
 import {Sandboxes} from './Sandboxes'
-import {Templates} from './Templates'
 import {Volumes} from './Volumes'
 import {FilesView} from './FilesView'
 import {Images} from './Images'
@@ -15,7 +14,7 @@ import {Admin} from './Admin'
 import {Dependencies} from './Dependencies'
 import {Scope} from './Scope'
 import {errText} from './util'
-import {ActiveView, Empty, HeaderSlot, Icon, IconName, Spinner} from './ui'
+import {Empty, HeaderSlot, Icon, IconName, Pane, Spinner} from './ui'
 import {Preferences} from './Preferences'
 import {UpdateButton, useUpdate} from './Update'
 import {getLocale, subscribeLocale, t} from './i18n'
@@ -29,12 +28,10 @@ const SIDEBAR = 'forgeai.sidebar'
 const NARROW = '(max-width: 820px)'
 const isNarrow = () => window.matchMedia(NARROW).matches
 
-type Area = 'overview' | 'jobs' | 'sandboxes' | 'inference' | 'sandboxTemplates' | 'jobTemplates' | 'volumes' | 'files'
-  | 'images' | 'resources' | 'admin' | 'dependencies'
+type Area = 'overview' | 'jobs' | 'sandboxes' | 'inference' | 'volumes' | 'files' | 'images' | 'resources'
+  | 'admin' | 'dependencies'
 
-// A nested item is a list under the item above it (Sandbox templates under
-// Sandboxes); it is indented and has no icon of its own.
-type NavItem = {area: Area, label: string, icon?: IconName, nested?: boolean}
+type NavItem = {area: Area, label: string, icon: IconName}
 
 // readJSON reads a JSON value from localStorage. A damaged entry counts as
 // absent, so it cannot stop the connection that reads it.
@@ -80,21 +77,7 @@ function areaFor(current: Area, info: app.ConnInfo): Area {
   if (current === 'admin' || current === 'dependencies') return 'overview'
   if (current === 'sandboxes' && !info.sandboxes) return 'overview'
   if (current === 'inference' && !info.inference) return 'overview'
-  if (current === 'sandboxTemplates' && !info.sandboxes) return 'overview'
   return current
-}
-
-// Pane keeps a view mounted while another area is on screen, so the view keeps
-// its selections, filters and drafts. Only the view on screen owns the header.
-function Pane({on, children}: {on: boolean, children: ReactNode}) {
-  const slot = useContext(HeaderSlot)
-  return (
-    <ActiveView.Provider value={on}>
-      <HeaderSlot.Provider value={on ? slot : null}>
-        <div hidden={!on}>{children}</div>
-      </HeaderSlot.Provider>
-    </ActiveView.Provider>
-  )
 }
 
 export default function App() {
@@ -212,19 +195,15 @@ export default function App() {
 
   // The sidebar groups areas like the reference consoles: workspace, storage,
   // cluster catalogue, then admin. Sandboxes appear only when the connected
-  // cluster runs agents.x-k8s.io. Each template list sits under the area it
-  // belongs to: sandbox templates under Sandboxes, job templates under Jobs.
+  // cluster runs agents.x-k8s.io. Templates are reached from the tab row of
+  // their Sandboxes and Jobs pages.
   const groups: {label: string, items: NavItem[]}[] = conn?.project ? [
     {
       label: t('nav.workspace'),
       items: [
         {area: 'overview', label: t('nav.overview'), icon: 'grid'},
-        ...(conn.sandboxes ? [
-          {area: 'sandboxes', label: t('nav.sandboxes'), icon: 'box'} as NavItem,
-          {area: 'sandboxTemplates', label: t('nav.sandboxTemplates'), nested: true} as NavItem,
-        ] : []),
+        ...(conn.sandboxes ? [{area: 'sandboxes', label: t('nav.sandboxes'), icon: 'box'} as NavItem] : []),
         {area: 'jobs', label: t('nav.jobs'), icon: 'play'},
-        {area: 'jobTemplates', label: t('nav.jobTemplates'), nested: true},
         ...(conn.inference ? [{area: 'inference', label: t('nav.inference'), icon: 'bolt'} as NavItem] : []),
       ],
     },
@@ -270,7 +249,7 @@ export default function App() {
               <div className="nav-group" key={g.label}>
                 <div className="nav-label">{g.label}</div>
                 {g.items.map(item => (
-                  <button key={item.area} className={`nav-item ${item.nested ? 'nested' : ''} ${area === item.area ? 'active' : ''}`}
+                  <button key={item.area} className={`nav-item ${area === item.area ? 'active' : ''}`}
                           onClick={() => {
                             setArea(item.area)
                             // On a narrow window the rail is an overlay; picking a page dismisses it.
@@ -278,7 +257,7 @@ export default function App() {
                           }}
                           title={collapsed ? item.label : undefined}
                           aria-label={item.label} aria-current={area === item.area ? 'page' : undefined}>
-                    {item.icon && <Icon name={item.icon}/>}<span>{item.label}</span>
+                    <Icon name={item.icon}/><span>{item.label}</span>
                   </button>
                 ))}
               </div>
@@ -297,8 +276,6 @@ export default function App() {
                 {shown('overview', <Overview onOpen={setArea} onOpenJob={name => { setJobFocus({name}); setArea('jobs') }}/>)}
                 {shown('jobs', <Jobs focus={jobFocus}/>)}
                 {shown('sandboxes', <Sandboxes/>)}
-                {conn.sandboxes && shown('sandboxTemplates', <Templates kind="sandbox"/>)}
-                {shown('jobTemplates', <Templates kind="job"/>)}
                 {shown('inference', <Inference/>)}
                 {shown('volumes', <Volumes/>)}
                 {shown('files', <FilesView/>)}

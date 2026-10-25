@@ -6,8 +6,9 @@ import {app, sandbox} from '../wailsjs/go/models'
 import {SandboxCreateDialog} from './SandboxCreateDialog'
 import {SandboxTemplateDialog} from './SandboxTemplates'
 import {SandboxTerminal} from './SandboxTerminal'
+import {Templates} from './Templates'
 import {Status, envToLines, everyWhileVisible, fmtDate, errText} from './util'
-import {Badge, Card, Empty, Icon, LogView, PageHeader, Spinner, Tabs, tabPanelProps, useActive, useConfirm, useDetailClose} from './ui'
+import {Badge, Card, Empty, Icon, LogView, Pane, PageHeader, Spinner, Tabs, tabPanelProps, useActive, useConfirm, useDetailClose} from './ui'
 import {MessageKey, t} from './i18n'
 
 // HEARTBEAT is how often an open sandbox detail resets the sandbox's idle
@@ -19,8 +20,27 @@ const HEARTBEAT = 60_000
 // the controller a while, but a wait past this is a stuck transition, not a slow one.
 const TRANSITION_TIMEOUT_MS = 120_000
 
-// Sandboxes is the view of the project's agent sandboxes (agents.x-k8s.io).
+type Section = 'sandboxes' | 'templates'
+
+// Sandboxes is the view of the project's agent sandboxes (agents.x-k8s.io). The
+// sandbox templates it starts new sandboxes from sit behind the tab row at its top.
 export function Sandboxes() {
+  const [section, setSection] = useState<Section>('sandboxes')
+  return (
+    <div className="page">
+      <Tabs idPrefix="sandbox-section" tabs={[
+        {value: 'sandboxes', label: t('sandboxes.tabSandboxes')},
+        {value: 'templates', label: t('sandboxes.tabTemplates')},
+      ]} value={section} onChange={setSection}/>
+      <div {...tabPanelProps('sandbox-section', section)}>
+        <Pane on={section === 'sandboxes'}><SandboxList/></Pane>
+        <Pane on={section === 'templates'}><Templates kind="sandbox"/></Pane>
+      </div>
+    </div>
+  )
+}
+
+function SandboxList() {
   // boxes is null until the first read, so a failed first read is not shown as an empty list.
   const [boxes, setBoxes] = useState<app.Sandbox[] | null>(null)
   const [error, setError] = useState('')
@@ -61,7 +81,7 @@ export function Sandboxes() {
   const running = list.filter(b => b.phase === 'Running' || b.phase === 'Pending').length
 
   return (
-    <div className="page">
+    <>
       <PageHeader eyebrow={t('sandboxes.eyebrow')} title={t('sandboxes.title')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>
                     {boxes !== null && t('sandboxes.runningCount', {running, total: list.length})}
@@ -82,7 +102,7 @@ export function Sandboxes() {
         {selected && <SandboxDetail key={selected} name={selected} onDone={refresh}
                                     onDeleted={() => { setSelected(null); refresh() }} onClose={closeDetail}/>}
       </div>
-    </div>
+    </>
   )
 }
 

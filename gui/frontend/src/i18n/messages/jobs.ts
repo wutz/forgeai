@@ -1,6 +1,8 @@
 export const en = {
   'jobs.eyebrow': 'Workspace',
   'jobs.title': 'Jobs',
+  'jobs.tabJobs': 'Jobs',
+  'jobs.tabTemplates': 'Templates',
   'jobs.total': '{count} total',
   'jobs.newJob': 'New job',
   'jobs.filterAll': 'All',
@@ -93,6 +95,8 @@ export const en = {
 export const zh: Record<keyof typeof en, string> = {
   'jobs.eyebrow': '工作区',
   'jobs.title': '任务',
+  'jobs.tabJobs': '任务',
+  'jobs.tabTemplates': '模板',
   'jobs.total': '共 {count} 个',
   'jobs.newJob': '新建任务',
   'jobs.filterAll': '全部',

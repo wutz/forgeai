@@ -3,12 +3,14 @@ import {GetJob, ListJobs, Logs, DeleteJob, StopJob, StartJob, RerunJob} from '..
 import {app, training} from '../wailsjs/go/models'
 import {failureLabel} from './util'
 import {JobCreateDialog} from './JobCreateDialog'
-import {TemplateDialog} from './Templates'
+import {Templates, TemplateDialog} from './Templates'
 import {JobBucket, Status, envToLines, everyWhileVisible, fmtDate, errText, jobBucket, latestAttempt} from './util'
 import {t} from './i18n'
-import {Badge, Card, Empty, Icon, LogView, PageHeader, Segmented, Spinner, Tabs, tabPanelProps, useActive, useConfirm, useDetailClose} from './ui'
+import {Badge, Card, Empty, Icon, LogView, Pane, PageHeader, Segmented, Spinner, Tabs, tabPanelProps, useActive, useConfirm, useDetailClose} from './ui'
 
 type Filter = 'all' | JobBucket
+
+type Section = 'jobs' | 'templates'
 
 // filterOptions is built per render so the labels follow the language.
 const filterOptions = (): {value: Filter, label: string}[] => [
@@ -43,7 +45,27 @@ function retryOnLabel(retryOn: string): string {
 }
 
 // focus asks the page to select a job and show all jobs, so the job is in the list.
+// Jobs is the view of the project's jobs. The job templates that prefill the
+// job form sit behind the tab row at its top.
 export function Jobs({focus}: {focus?: {name: string} | null}) {
+  const [section, setSection] = useState<Section>('jobs')
+  // Opening a job from elsewhere (Overview) shows the job list, whichever tab was open.
+  useEffect(() => { if (focus) setSection('jobs') }, [focus])
+  return (
+    <div className="page">
+      <Tabs idPrefix="job-section" tabs={[
+        {value: 'jobs', label: t('jobs.tabJobs')},
+        {value: 'templates', label: t('jobs.tabTemplates')},
+      ]} value={section} onChange={setSection}/>
+      <div {...tabPanelProps('job-section', section)}>
+        <Pane on={section === 'jobs'}><JobList focus={focus}/></Pane>
+        <Pane on={section === 'templates'}><Templates kind="job"/></Pane>
+      </div>
+    </div>
+  )
+}
+
+function JobList({focus}: {focus?: {name: string} | null}) {
   // jobs is null until the first read, so a failed first read is not shown as an empty list.
   const [jobs, setJobs] = useState<app.Job[] | null>(null)
   const [error, setError] = useState('')
@@ -95,7 +117,7 @@ export function Jobs({focus}: {focus?: {name: string} | null}) {
   }
 
   return (
-    <div className="page">
+    <>
       <PageHeader eyebrow={t('jobs.eyebrow')} title={t('jobs.title')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>{jobs !== null && t('jobs.total', {count: list.length})}</span>}
                   actions={<button className="btn" onClick={() => setCreating(true)}>
@@ -123,7 +145,7 @@ export function Jobs({focus}: {focus?: {name: string} | null}) {
                                 onDeleted={() => { setSelected(null); refresh() }}
                                 onClose={closeDetail}/>}
       </div>
-    </div>
+    </>
   )
 }
 

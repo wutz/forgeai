@@ -14,7 +14,7 @@ import (
 // CatalogSource is one template source the create dialogs read: the source the
 // platform config names, and each source the user added on this machine.
 type CatalogSource struct {
-	// Location is the source's https:// URL or file:// directory. The dialogs
+	// Location is the source's https:// URL, file:// directory or oci:// reference. The dialogs
 	// name the templates they pick by it.
 	Location    string `json:"location"`
 	DisplayName string `json:"displayName,omitempty"`

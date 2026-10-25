@@ -153,8 +153,9 @@ type Source interface {
 	Read(ctx context.Context, rel string) ([]byte, error)
 }
 
-// Open returns the source at location: a file:// directory, or an http(s)
-// URL the files are appended to. An empty location is the DefaultSource.
+// Open returns the source at location: a file:// directory, an http(s) URL the
+// files are appended to, or an oci:// reference to a published source (see
+// Publish). An empty location is the DefaultSource.
 func Open(location string, client *http.Client) (Source, error) {
 	if location == "" {
 		location = DefaultSource
@@ -175,8 +176,14 @@ func Open(location string, client *http.Client) (Source, error) {
 			client = http.DefaultClient
 		}
 		return &httpSource{base: strings.TrimSuffix(location, "/"), client: client}, nil
+	case strings.HasPrefix(location, ociScheme):
+		src, err := newOCISource(location, client, false)
+		if err != nil {
+			return nil, err
+		}
+		return src, nil
 	}
-	return nil, fmt.Errorf("template source %q must be an https:// URL or a file:// path", location)
+	return nil, fmt.Errorf("template source %q must be an https:// URL, a file:// path or an oci:// reference", location)
 }
 
 type dirSource string

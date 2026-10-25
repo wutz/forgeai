@@ -217,8 +217,8 @@ export default function App() {
         {area: 'overview', label: t('nav.overview'), icon: 'grid'},
         {area: 'jobs', label: t('nav.jobs'), icon: 'play'},
         ...(conn.sandboxes ? [{area: 'sandboxes', label: t('nav.sandboxes'), icon: 'box'} as NavItem] : []),
-        ...(conn.inference ? [{area: 'inference', label: t('nav.inference'), icon: 'bolt'} as NavItem] : []),
         {area: 'templates', label: t('nav.templates'), icon: 'scroll'},
+        ...(conn.inference ? [{area: 'inference', label: t('nav.inference'), icon: 'bolt'} as NavItem] : []),
       ],
     },
     {

@@ -3,6 +3,7 @@
 export const en = {
   'sandboxes.title': 'Sandboxes',
   'sandboxes.eyebrow': 'Workspace',
+  'sandboxes.templates': 'Templates',
   'sandboxes.runningCount': '{running} running of {total}',
   'sandboxes.new': 'New sandbox',
   'sandboxes.emptyTitle': 'No sandboxes yet',
@@ -101,6 +102,7 @@ export const en = {
 export const zh: Record<keyof typeof en, string> = {
   'sandboxes.title': '沙箱',
   'sandboxes.eyebrow': '工作区',
+  'sandboxes.templates': '模板',
   'sandboxes.runningCount': '运行中 {running} / 共 {total}',
   'sandboxes.new': '新建沙箱',
   'sandboxes.emptyTitle': '暂无沙箱',

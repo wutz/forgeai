@@ -1,10 +1,10 @@
 // Package app implements the Wails backend of the forgeai desktop client.
 // It is split by area: connection (conn.go), jobs and templates (jobs.go,
 // templates.go), volumes and the file server (volumes.go, files.go),
-// registry images (images.go), instance types and quota (cluster.go) and
-// project administration (admin.go). Every call goes straight to the
-// Kubernetes API of the connected kubeconfig context; the forgeai operator
-// does the rest.
+// registry images (images.go), instance types and quota (cluster.go), the
+// public template source (catalog.go) and project administration (admin.go).
+// Every call goes straight to the Kubernetes API of the connected kubeconfig
+// context; the forgeai operator does the rest.
 package app
 
 import (

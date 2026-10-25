@@ -1,0 +1,9 @@
+apiVersion: templates.forgeai.wutz.dev/v1alpha1
+kind: SandboxTemplate
+metadata:
+  name: python-runtime
+spec:
+  displayName: Python runtime
+  description: The agent-sandbox Python runtime image (the platform default) for code execution and tooling.
+  version: 1.0.0
+  image: registry.k8s.io/agent-sandbox/python-runtime-sandbox:v0.1.0

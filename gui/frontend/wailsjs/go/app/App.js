@@ -6,6 +6,18 @@ export function AppVersion() {
   return window['go']['app']['App']['AppVersion']();
 }
 
+export function CatalogJobForm(arg1) {
+  return window['go']['app']['App']['CatalogJobForm'](arg1);
+}
+
+export function CatalogSandboxForm(arg1) {
+  return window['go']['app']['App']['CatalogSandboxForm'](arg1);
+}
+
+export function CatalogTemplates() {
+  return window['go']['app']['App']['CatalogTemplates']();
+}
+
 export function CheckUpdate() {
   return window['go']['app']['App']['CheckUpdate']();
 }

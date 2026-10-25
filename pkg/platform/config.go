@@ -208,6 +208,14 @@ func (c InferenceCache) Enabled() bool { return c.StorageClass != "" || !c.Size.
 // DefaultSandboxNamespace is where agent-sandbox is installed.
 const DefaultSandboxNamespace = "agent-sandbox-system"
 
+// Templates configures the public template source the GUI offers in the
+// create dialogs.
+type Templates struct {
+	// Source is an https:// URL or a file:// directory holding index.yaml.
+	// Empty uses the forgeai default source (templates/ in the forgeai repository).
+	Source string `json:"source,omitempty"`
+}
+
 // NamespaceOrDefault is the agent-sandbox namespace.
 func (s Sandbox) NamespaceOrDefault() string {
 	if s.Namespace != "" {
@@ -248,6 +256,7 @@ type Config struct {
 	Training      Training      `json:"training"`
 	Sandbox       Sandbox       `json:"sandbox"`
 	Inference     Inference     `json:"inference"`
+	Templates     Templates     `json:"templates,omitzero"`
 
 	// TrashRetention is the default retention of deleted volumes.
 	TrashRetention metav1.Duration `json:"trashRetention,omitzero"`

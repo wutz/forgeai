@@ -168,6 +168,7 @@ Platform settings live in the ConfigMap `forgeai-system/forgeai-platform` (`conf
 | `training` | `defaultRuntime`, `shmSize`, `stuckTimeout`, `maxRetries` |
 | `sandbox` | agent-sandbox `namespace`, `defaultImage`, offered `images`, `runtimeClasses` and `defaultRuntimeClass`, `shmSize`, `idleTimeout` (default for sandboxes without their own; 0 disables) |
 | `trashRetention` | Default retention of trashed volumes |
+| `templates` | `source` of the public template source the create dialogs offer: an `https://` base URL or a `file://` directory with `index.yaml` (default: [`templates/`](templates/README.md) on the forgeai repository's `main` branch) |
 
 The operator rereads the config every 15 seconds.
 
@@ -180,6 +181,8 @@ The desktop client connects with a kubeconfig context and a project namespace (t
 | Jobs | Create, stop, start, rerun and delete jobs; worker status and logs; retries nested under their job |
 | Sandboxes | Create, stop, start and delete agent sandboxes; logs, endpoint, resources and idle state (shown when the cluster runs agent-sandbox) |
 | Templates | Sandbox templates (prefill the sandbox form) and job templates (`TrainingRuntime`s, prefill the job form) in one view; create and delete both, each sorted by name |
+
+The New job and New sandbox dialogs also offer the public catalog: job and sandbox templates from the configured `templates.source`, grouped apart from the project templates. Picking one prefills the form; the name, instance type and volumes stay yours, and the job or sandbox does not reference the catalog template.
 | Volumes | Create, resize, trash, restore and purge volumes |
 | Files | Opens the on-demand file server |
 | Images | Push instructions and robot credentials; list and delete images in the project's Harbor project. Their tags are offered in a dropdown as the image of jobs, sandboxes and their templates, which also accept any other address |

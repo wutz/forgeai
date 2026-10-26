@@ -109,6 +109,20 @@ type ConnInfo struct {
 	// Inference is set when the InferenceService CRD is installed; the
 	// Inference view is hidden otherwise.
 	Inference bool `json:"inference"`
+	// Create says which kinds the user may create in the project namespace.
+	Create CreateAccess `json:"create"`
+}
+
+// CreateAccess says which kinds the user may create in the project namespace.
+// The GUI shows a create button only when its kind is set, so a member is not
+// offered an action the cluster would refuse.
+type CreateAccess struct {
+	Jobs             bool `json:"jobs"`
+	JobTemplates     bool `json:"jobTemplates"`
+	Volumes          bool `json:"volumes"`
+	Inference        bool `json:"inference"`
+	Sandboxes        bool `json:"sandboxes"`
+	SandboxTemplates bool `json:"sandboxTemplates"`
 }
 
 func scheme() *runtime.Scheme {

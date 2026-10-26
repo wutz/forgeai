@@ -219,6 +219,7 @@ func TestMountable(t *testing.T) {
 		pvc("shared", corev1.ClaimBound, corev1.ReadWriteMany, false),
 		pvc("local", corev1.ClaimBound, corev1.ReadWriteOnce, false),
 		pvc("pending", corev1.ClaimPending, corev1.ReadWriteMany, false),
+		pvc("pending-local", corev1.ClaimPending, corev1.ReadWriteOnce, false),
 		pvc("gone-soon", corev1.ClaimBound, corev1.ReadWriteMany, true),
 	).Build()
 	c := &Client{K8s: k8s, Namespace: "forge-a"}
@@ -235,7 +236,8 @@ func TestMountable(t *testing.T) {
 		{"single-node volume on several nodes", []string{"local"}, 2, ErrNotShared},
 		{"missing volume", []string{"nope"}, 1, ErrNotFound},
 		{"trashed volume", []string{"gone-soon"}, 1, ErrInTrash},
-		{"provisioning volume", []string{"pending"}, 1, ErrNotReady},
+		{"pending volume binds at first use", []string{"pending"}, 1, nil},
+		{"pending single-node volume on several nodes", []string{"pending-local"}, 2, ErrNotShared},
 	}
 	for _, tc := range cases {
 		err := c.Mountable(ctx, tc.names, tc.nodes)

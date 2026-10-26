@@ -100,7 +100,6 @@ export const en = {
   // Volume mounts of the New job and New sandbox dialogs.
   'mounts.chooseVolume': 'Choose a volume',
   'mounts.notProject': '{volume} is not a volume of this project',
-  'mounts.pending': '{volume} is still being provisioned and cannot be mounted',
   'mounts.lost': '{volume} is lost and cannot be mounted',
   'mounts.deleting': '{volume} is being deleted and cannot be mounted',
   'mounts.otherPhase': '{volume} is {phase} and cannot be mounted',
@@ -220,7 +219,6 @@ export const zh: Record<keyof typeof en, string> = {
   // 挂载存储卷：新建任务和新建沙箱对话框。
   'mounts.chooseVolume': '请选择存储卷',
   'mounts.notProject': '{volume} 不是本项目的存储卷',
-  'mounts.pending': '{volume} 仍在创建中，无法挂载',
   'mounts.lost': '{volume} 已丢失，无法挂载',
   'mounts.deleting': '{volume} 正在删除，无法挂载',
   'mounts.otherPhase': '{volume} 状态为 {phase}，无法挂载',

@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {ListInstanceTypes, Quota} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
-import {errText, everyWhileVisible, pct, toGiB} from './util'
+import {errText, everyWhileVisible, gpuCapacity, pct, toGiB} from './util'
 import {Badge, Card, Empty, Icon, Meter, MetricTile, PageHeader, RefreshButton, Spinner, useActive} from './ui'
 import {t} from './i18n'
 
@@ -29,12 +29,9 @@ export function Resources() {
     return everyWhileVisible(poll, 10000)
   }, [active])
 
-  // total and free count instances; the GPU tiles count GPUs, so each GPU type
-  // is weighted by its GPUs per instance. CPU-only types have no GPUs to count.
+  // The GPU tiles count physical GPUs; the rows below count instances of each type.
   const list = types ?? []
-  const gpuTypes = list.filter(ty => ty.gpuCount > 0)
-  const total = gpuTypes.reduce((n, ty) => n + ty.total * ty.gpuCount, 0)
-  const free = gpuTypes.reduce((n, ty) => n + ty.free * ty.gpuCount, 0)
+  const {total, free} = gpuCapacity(list)
   const used = Math.max(0, total - free)
   const gpuQuota = quota?.gpuQuota ?? 0
   const gpuUsed = (quota?.gpuClasses || []).reduce((n, g) => n + g.used, 0)

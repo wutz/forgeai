@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {ListInstanceTypes, ListJobs, ListVolumes, ListImages, Quota} from '../wailsjs/go/app/App'
 import {app, volumes} from '../wailsjs/go/models'
 import {Card, Icon, MetricTile, Meter, PageHeader, RefreshButton, Spinner, useActive} from './ui'
-import {Status, errText, everyWhileVisible, fmtDate, jobBucket, latestAttempt, pct, phaseLabel, tagCount, toGiB} from './util'
+import {Status, errText, everyWhileVisible, fmtDate, gpuCapacity, jobBucket, latestAttempt, pct, phaseLabel, tagCount, toGiB} from './util'
 import {t} from './i18n'
 
 // Overview is the landing view of a project: what is running now, the GPU
@@ -96,11 +96,8 @@ export function Overview({onOpen, onOpenJob}: {
   const readyWorkers = active.reduce((n, j) => n + (j.ready || 0), 0)
   const wantedWorkers = active.reduce((n, j) => n + (j.workers || 0), 0)
 
-  // total and free count instances; the GPU tiles count GPUs, so each GPU type
-  // is weighted by its GPUs per instance, as on Resources. CPU-only types have none.
-  const gpuTypes = typeList.filter(ty => ty.gpuCount > 0)
-  const gpuTotal = gpuTypes.reduce((n, ty) => n + ty.total * ty.gpuCount, 0)
-  const gpuFree = gpuTypes.reduce((n, ty) => n + ty.free * ty.gpuCount, 0)
+  // The GPU tiles count physical GPUs, as on Resources; the types only count instances.
+  const {total: gpuTotal, free: gpuFree} = gpuCapacity(typeList)
   const gpuUsed = Math.max(0, gpuTotal - gpuFree)
 
   const storageGiB = (vols ?? []).reduce((n, v) => n + (v.capacityGiB || v.requestedGiB || 0), 0)

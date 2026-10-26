@@ -727,6 +727,7 @@ export namespace app {
 	    trashRetention?: string;
 	    deletionPolicy: string;
 	    ready: boolean;
+	    deleting: boolean;
 	    registry: string;
 	    created: string;
 	    resourceVersion?: string;
@@ -746,6 +747,7 @@ export namespace app {
 	        this.trashRetention = source["trashRetention"];
 	        this.deletionPolicy = source["deletionPolicy"];
 	        this.ready = source["ready"];
+	        this.deleting = source["deleting"];
 	        this.registry = source["registry"];
 	        this.created = source["created"];
 	        this.resourceVersion = source["resourceVersion"];

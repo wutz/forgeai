@@ -3,7 +3,7 @@ import {
   Config, DeleteProject, GetProject, ListInstanceTypes, ListProjects, MemberKubeconfig, SaveProject,
 } from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
-import {errText, fmtDate, generateName, isConflict, phaseLabel} from './util'
+import {errText, everyWhileVisible, fmtDate, generateName, isConflict, phaseLabel} from './util'
 import {Badge, Card, CancelButton, Dialog, Empty, Icon, PageHeader, RefreshButton, Spinner, useActive, useConfirm} from './ui'
 import {t} from './i18n'
 
@@ -27,7 +27,14 @@ export function Admin({onProjectsChanged}: {onProjectsChanged: () => void}) {
     setError(errText(e))
     throw e
   })
-  useEffect(() => { if (active) refresh().catch(() => undefined) }, [active])
+  // The list polls: a deleted Project stays listed while its finalizer runs, and
+  // it goes only when the controller is done, which no action here waits for.
+  useEffect(() => {
+    if (!active) return
+    const poll = () => refresh().catch(() => undefined)
+    poll()
+    return everyWhileVisible(poll, 3000)
+  }, [active])
 
   const newProject = () => app.Project.createFrom({
     name: '', displayName: '', namespace: '',
@@ -89,8 +96,8 @@ export function Admin({onProjectsChanged}: {onProjectsChanged: () => void}) {
                   <span className="cell-main">{p.name}</span>
                   <span className="cell-sub">{p.namespace || t('admin.noNamespace')}</span>
                 </td>
-                <td data-label={t('common.status')}><span className={`status status-${p.ready ? 'running' : 'pending'}`}>
-                  <span className="dot" aria-hidden/>{p.ready ? phaseLabel('Ready') : phaseLabel('Pending')}</span></td>
+                <td data-label={t('common.status')}><span className={`status status-${p.ready && !p.deleting ? 'running' : 'pending'}`}>
+                  <span className="dot" aria-hidden/>{p.deleting ? t('admin.deleting') : p.ready ? phaseLabel('Ready') : phaseLabel('Pending')}</span></td>
                 <td data-label={t('admin.gpus')}>
                   <div className="actions">
                     {Object.entries(p.quota?.gpus || {}).map(([c, n]) =>
@@ -109,8 +116,8 @@ export function Admin({onProjectsChanged}: {onProjectsChanged: () => void}) {
                 <td data-label={t('common.created')} className="muted">{fmtDate(p.created)}</td>
                 <td>
                   <div className="actions">
-                    <button className="btn btn-sm" onClick={() => edit(p.name)}>{t('common.edit')}</button>
-                    <button className="btn btn-sm btn-danger" onClick={() => deleteProject(p)}>{t('common.delete')}</button>
+                    <button className="btn btn-sm" disabled={p.deleting} onClick={() => edit(p.name)}>{t('common.edit')}</button>
+                    <button className="btn btn-sm btn-danger" disabled={p.deleting} onClick={() => deleteProject(p)}>{t('common.delete')}</button>
                   </div>
                 </td>
               </tr>

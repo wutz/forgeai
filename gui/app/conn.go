@@ -20,6 +20,7 @@ import (
 
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
 
+	"github.com/wutz/forgeai/pkg/kf"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
 	"github.com/wutz/forgeai/pkg/sandbox"
@@ -192,11 +193,16 @@ func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
 			return ConnInfo{}, err
 		}
 	}
+	var create CreateAccess
+	if namespace != "" {
+		create = createAccess(ctx, k8s, namespace)
+	}
 	info := ConnInfo{
 		Context: contextName, Server: rest.Host, Namespace: namespace, Project: project,
 		Admin: admin, ClusterAdmin: clusterAdmin, Forgeai: forgeai,
 		Sandboxes: namespace != "" && sandboxesAvailable(ctx, k8s, namespace),
 		Inference: namespace != "" && inferenceAvailable(ctx, k8s, namespace),
+		Create:    create,
 	}
 	conn := &Connection{Info: info, k8s: k8s, rest: rest, core: core}
 	if cfg, err := platform.Load(ctx, k8s, conn.configNamespace()); err == nil {
@@ -250,25 +256,44 @@ func inferenceAvailable(ctx context.Context, k8s client.Client, namespace string
 // mustBeAdmin reports whether the user may create Projects; the admin area
 // is hidden when this is false.
 func mustBeAdmin(ctx context.Context, k8s client.Client) bool {
-	sar := &authv1.SelfSubjectAccessReview{Spec: authv1.SelfSubjectAccessReviewSpec{
-		ResourceAttributes: &authv1.ResourceAttributes{
-			Group: "forgeai.wutz.dev", Resource: "projects", Verb: "create",
-		},
-	}}
-	if err := k8s.Create(ctx, sar); err != nil {
-		return false
-	}
-	return sar.Status.Allowed
+	return allowed(ctx, k8s, &authv1.ResourceAttributes{
+		Group: "forgeai.wutz.dev", Resource: "projects", Verb: "create",
+	})
 }
 
 // mustBeClusterAdmin reports whether the user may install cluster components:
 // it asks for every verb on every resource, which only cluster-admin grants.
 func mustBeClusterAdmin(ctx context.Context, k8s client.Client) bool {
-	sar := &authv1.SelfSubjectAccessReview{Spec: authv1.SelfSubjectAccessReviewSpec{
-		ResourceAttributes: &authv1.ResourceAttributes{
-			Group: "*", Resource: "*", Verb: "*",
-		},
-	}}
+	return allowed(ctx, k8s, &authv1.ResourceAttributes{
+		Group: "*", Resource: "*", Verb: "*",
+	})
+}
+
+// createAccess asks, for each kind the GUI creates, whether the user may create
+// one in the project namespace. The reviews name the resources the project
+// roles grant, so the create buttons follow what the cluster would allow.
+func createAccess(ctx context.Context, k8s client.Client, namespace string) CreateAccess {
+	return CreateAccess{
+		Jobs:             canCreate(ctx, k8s, namespace, kf.TrainJobGVK.Group, "trainjobs"),
+		JobTemplates:     canCreate(ctx, k8s, namespace, kf.TrainingRuntimeGVK.Group, "trainingruntimes"),
+		Volumes:          canCreate(ctx, k8s, namespace, "", "persistentvolumeclaims"),
+		Inference:        canCreate(ctx, k8s, namespace, v1.GroupVersion.Group, "inferenceservices"),
+		Sandboxes:        canCreate(ctx, k8s, namespace, sandbox.Group, "sandboxes"),
+		SandboxTemplates: canCreate(ctx, k8s, namespace, sandbox.ExtensionsGroup, "sandboxtemplates"),
+	}
+}
+
+// canCreate reports whether the user may create resource of group in namespace.
+func canCreate(ctx context.Context, k8s client.Client, namespace, group, resource string) bool {
+	return allowed(ctx, k8s, &authv1.ResourceAttributes{
+		Namespace: namespace, Group: group, Resource: resource, Verb: "create",
+	})
+}
+
+// allowed asks the API server whether the user may perform the action. A
+// failed review counts as denied, so the GUI offers nothing it cannot confirm.
+func allowed(ctx context.Context, k8s client.Client, attrs *authv1.ResourceAttributes) bool {
+	sar := &authv1.SelfSubjectAccessReview{Spec: authv1.SelfSubjectAccessReviewSpec{ResourceAttributes: attrs}}
 	if err := k8s.Create(ctx, sar); err != nil {
 		return false
 	}

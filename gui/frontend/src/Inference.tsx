@@ -5,7 +5,7 @@ import {
 import {app} from '../wailsjs/go/models'
 import {InferenceCreateDialog} from './InferenceCreateDialog'
 import {errText, everyWhileVisible, fmtDate} from './util'
-import {Card, Empty, Icon, PageHeader, Spinner, useActive, useConfirm, useDetailClose} from './ui'
+import {Card, Empty, Icon, PageHeader, Spinner, useActive, useConfirm, useCreateAccess, useDetailClose} from './ui'
 import {MessageKey, t} from './i18n'
 
 // Inference is the view of the project's InferenceServices: each serves one
@@ -17,6 +17,7 @@ export function Inference() {
   const [selected, setSelected] = useState<string | null>(null)
   const {split, close: closeDetail} = useDetailClose(selected, setSelected)
   const [creating, setCreating] = useState(false)
+  const create = useCreateAccess()
   const active = useActive()
 
   // listed holds the names of the last completed list. A selected service that
@@ -54,7 +55,7 @@ export function Inference() {
                   meta={<span className="muted" style={{fontSize: 12.5}}>
                     {services !== null && t('inference.readyCount', {ready, total: list.length})}
                   </span>}
-                  actions={<button className="btn" onClick={() => setCreating(true)}>
+                  actions={create.inference && <button className="btn" onClick={() => setCreating(true)}>
                     <Icon name="plus" size={14}/>{t('inference.new')}
                   </button>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}

@@ -8,7 +8,7 @@ import {SandboxTemplateDialog} from './SandboxTemplates'
 import {SandboxTerminal} from './SandboxTerminal'
 import {Templates} from './Templates'
 import {Status, envToLines, everyWhileVisible, fmtDate, errText} from './util'
-import {Badge, Card, Empty, Icon, LogView, Pane, PageHeader, Spinner, Tabs, tabPanelProps, useActive, useConfirm, useDetailClose} from './ui'
+import {Badge, Card, Empty, Icon, LogView, Pane, PageHeader, Spinner, Tabs, tabPanelProps, useActive, useConfirm, useCreateAccess, useDetailClose} from './ui'
 import {MessageKey, t} from './i18n'
 
 // HEARTBEAT is how often an open sandbox detail resets the sandbox's idle
@@ -41,6 +41,7 @@ function SandboxList({onTemplates}: {onTemplates: () => void}) {
   const [selected, setSelected] = useState<string | null>(null)
   const {split, close: closeDetail} = useDetailClose(selected, setSelected)
   const [creating, setCreating] = useState(false)
+  const create = useCreateAccess()
   const active = useActive()
 
   // listed holds the names of the last completed list. A selected sandbox that
@@ -84,9 +85,9 @@ function SandboxList({onTemplates}: {onTemplates: () => void}) {
                     <button className="btn btn-ghost" onClick={onTemplates}>
                       <Icon name="layers" size={14}/>{t('sandboxes.templates')}
                     </button>
-                    <button className="btn" onClick={() => setCreating(true)}>
+                    {create.sandboxes && <button className="btn" onClick={() => setCreating(true)}>
                       <Icon name="plus" size={14}/>{t('sandboxes.new')}
-                    </button>
+                    </button>}
                   </>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {creating && <SandboxCreateDialog onClose={() => setCreating(false)} onCreated={name => {

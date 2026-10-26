@@ -4,6 +4,7 @@
 
 import {KeyboardEvent as ReactKeyboardEvent, ReactNode, createContext, useContext, useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore} from 'react'
 import {createPortal} from 'react-dom'
+import {app} from '../wailsjs/go/models'
 import {t} from './i18n'
 
 // HeaderSlot is the node in the app header that PageHeader renders into, so
@@ -16,6 +17,14 @@ export const HeaderSlot = createContext<HTMLElement | null>(null)
 // when it turns true again.
 export const ActiveView = createContext(true)
 export const useActive = () => useContext(ActiveView)
+
+// CreateAccessContext is what the user may create in the project, from the
+// connection. Views show a create button only when its kind is allowed.
+export const CreateAccessContext = createContext<app.CreateAccess | null>(null)
+const noCreate: app.CreateAccess = {
+  jobs: false, jobTemplates: false, volumes: false, inference: false, sandboxes: false, sandboxTemplates: false,
+}
+export const useCreateAccess = (): app.CreateAccess => useContext(CreateAccessContext) ?? noCreate
 
 // Pane keeps a view mounted while another view is on screen, so the view keeps
 // its selections, filters and drafts. Only the view on screen owns the header.

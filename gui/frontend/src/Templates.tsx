@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {ListTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, DeleteSandboxTemplate, SandboxTemplates as ListSandboxTemplates, ListInstanceTypes} from '../wailsjs/go/app/App'
 import {app, sandbox, training} from '../wailsjs/go/models'
 import {envErrors, envToLines, linesToEnv, everyWhileVisible, fmtDate, errText, generateName, MAX_RETRIES, NAME_MAX, NAME_PATTERN} from './util'
-import {Card, CancelButton, Dialog, Empty, HintButton, Icon, PageHeader, RefreshButton, Spinner, useActive, useConfirm} from './ui'
+import {Card, CancelButton, Dialog, Empty, HintButton, Icon, PageHeader, RefreshButton, Spinner, useActive, useConfirm, useCreateAccess} from './ui'
 import {SandboxTemplateDialog, SandboxTemplateTable} from './SandboxTemplates'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
@@ -26,6 +26,8 @@ export function Templates({kind, onBack}: {kind: Kind, onBack: () => void}) {
   const [jobDialog, setJobDialog] = useState<JobDialogState | null>(null)
   const active = useActive()
   const isSandbox = kind === 'sandbox'
+  const create = useCreateAccess()
+  const canCreate = isSandbox ? create.sandboxTemplates : create.jobTemplates
   const error = isSandbox ? sandboxError : jobError
 
   // A refused read is shown in the page's banner and rejects, so the header's refresh
@@ -63,11 +65,11 @@ export function Templates({kind, onBack}: {kind: Kind, onBack: () => void}) {
                     <button className="btn btn-ghost" onClick={onBack}>
                       <Icon name="back" size={14}/>{t('common.back')}
                     </button>
-                    <button className="btn" onClick={() => isSandbox
+                    {canCreate && <button className="btn" onClick={() => isSandbox
                       ? setSandboxDialog({})
                       : setJobDialog({form: blankJobForm()})}>
                       <Icon name="plus" size={14}/>{isSandbox ? t('templates.newSandbox') : t('templates.newJob')}
-                    </button>
+                    </button>}
                     <RefreshButton onRefresh={refresh}/>
                   </>}/>
       {error && <div className="banner banner-error" role="alert">

@@ -6,7 +6,7 @@ import {JobCreateDialog} from './JobCreateDialog'
 import {Templates, TemplateDialog} from './Templates'
 import {JobBucket, Status, envToLines, everyWhileVisible, fmtDate, errText, jobBucket, latestAttempt} from './util'
 import {t} from './i18n'
-import {Badge, Card, Empty, Icon, LogView, Pane, PageHeader, Segmented, Spinner, Tabs, tabPanelProps, useActive, useConfirm, useDetailClose} from './ui'
+import {Badge, Card, Empty, Icon, LogView, Pane, PageHeader, Segmented, Spinner, Tabs, tabPanelProps, useActive, useConfirm, useCreateAccess, useDetailClose} from './ui'
 
 type Filter = 'all' | JobBucket
 
@@ -65,6 +65,7 @@ function JobList({focus, onTemplates}: {focus?: {name: string} | null, onTemplat
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const create = useCreateAccess()
   const [filter, setFilter] = useState<Filter>('all')
   const {split, close: closeDetail} = useDetailClose(selected, setSelected)
   useEffect(() => {
@@ -118,9 +119,9 @@ function JobList({focus, onTemplates}: {focus?: {name: string} | null, onTemplat
                     <button className="btn btn-ghost" onClick={onTemplates}>
                       <Icon name="layers" size={14}/>{t('jobs.templates')}
                     </button>
-                    <button className="btn" onClick={() => setCreating(true)}>
+                    {create.jobs && <button className="btn" onClick={() => setCreating(true)}>
                       <Icon name="plus" size={14}/>{t('jobs.newJob')}
-                    </button>
+                    </button>}
                   </>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {creating && <JobCreateDialog onClose={() => setCreating(false)} onCreated={name => {

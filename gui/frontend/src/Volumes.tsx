@@ -6,7 +6,7 @@ import {
 import {app, volumes as vol} from '../wailsjs/go/models'
 import {fmtDate, errText, everyWhileVisible, generateName, phaseLabel} from './util'
 import {t} from './i18n'
-import {Badge, Card, CancelButton, Dialog, Empty, HintButton, Icon, PageHeader, RefreshButton, useActive, useConfirm, Spinner} from './ui'
+import {Badge, Card, CancelButton, Dialog, Empty, HintButton, Icon, PageHeader, RefreshButton, useActive, useConfirm, useCreateAccess, Spinner} from './ui'
 
 // Volumes manages shared filesystems: create, grow, trash (recycle bin),
 // restore and purge. Deleting is delayed — the operator purges expired
@@ -20,6 +20,7 @@ export function Volumes() {
   const [config, setConfig] = useState<app.PlatformConfig | null>(null)
   const [configError, setConfigError] = useState('')
   const [creating, setCreating] = useState(false)
+  const create = useCreateAccess()
   const [growing, setGrowing] = useState<vol.Volume | null>(null)
   const [recycling, setRecycling] = useState(false)
   const confirm = useConfirm()
@@ -87,9 +88,9 @@ export function Volumes() {
                       <Icon name="trash" size={14}/>{t('volumes.recycleBin')}
                       {(trash?.length ?? 0) > 0 && <Badge>{trash?.length}</Badge>}
                     </button>
-                    <button className="btn" disabled={!config} onClick={() => setCreating(true)}>
+                    {create.volumes && <button className="btn" disabled={!config} onClick={() => setCreating(true)}>
                       <Icon name="plus" size={14}/>{t('volumes.new')}
-                    </button>
+                    </button>}
                     <RefreshButton onRefresh={refresh}/>
                   </>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}

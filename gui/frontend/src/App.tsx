@@ -1,4 +1,4 @@
-import {Fragment, ReactNode, useEffect, useRef, useState, useSyncExternalStore} from 'react'
+import {ReactNode, useEffect, useRef, useState, useSyncExternalStore} from 'react'
 import {Connect, Contexts, Projects} from '../wailsjs/go/app/App'
 import {Environment} from '../wailsjs/runtime/runtime'
 import {app} from '../wailsjs/go/models'
@@ -14,7 +14,7 @@ import {Admin} from './Admin'
 import {Dependencies} from './Dependencies'
 import {Scope} from './Scope'
 import {errText} from './util'
-import {Empty, HeaderSlot, Icon, IconName, Pane, Spinner} from './ui'
+import {CreateAccessContext, Empty, HeaderSlot, Icon, IconName, Pane, Spinner} from './ui'
 import {Preferences} from './Preferences'
 import {TemplateSourcesDialog} from './TemplateSourcesDialog'
 import {UpdateButton, useUpdate} from './Update'
@@ -276,7 +276,7 @@ export default function App() {
               </Empty>
             ) : conn ? (
               // Keyed by the connection so every view refetches after a switch.
-              <Fragment key={`${conn.context}/${conn.namespace}`}>
+              <CreateAccessContext.Provider key={`${conn.context}/${conn.namespace}`} value={conn.create}>
                 {shown('overview', <Overview onOpen={setArea} onOpenJob={name => { setJobFocus({name}); setArea('jobs') }}/>)}
                 {shown('jobs', <Jobs focus={jobFocus}/>)}
                 {shown('sandboxes', <Sandboxes/>)}
@@ -287,7 +287,7 @@ export default function App() {
                 {shown('resources', <Resources/>)}
                 {shown('admin', <Admin onProjectsChanged={refreshProjects}/>)}
                 {shown('dependencies', <Dependencies/>)}
-              </Fragment>
+              </CreateAccessContext.Provider>
             ) : loading ? (
               <Spinner label={t('app.connecting')}/>
             ) : (

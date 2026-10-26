@@ -1,7 +1,7 @@
 import {useEffect, useState} from 'react'
 import {ListInstanceTypes, ListJobs, ListVolumes, ListImages, Quota} from '../wailsjs/go/app/App'
 import {app, volumes} from '../wailsjs/go/models'
-import {Card, Icon, MetricTile, Meter, PageHeader, RefreshButton, Spinner, useActive} from './ui'
+import {Card, Icon, MetricTile, Meter, PageHeader, RefreshButton, Spinner, useActive, useCreateAccess} from './ui'
 import {Status, errText, everyWhileVisible, fmtDate, gpuCapacity, jobBucket, latestAttempt, pct, phaseLabel, tagCount, toGiB} from './util'
 import {t} from './i18n'
 
@@ -36,6 +36,7 @@ export function Overview({onOpen, onOpenJob}: {
   const [failures, setFailures] = useState<Partial<Record<Read, string>>>({})
   const error = Object.values(failures).find(Boolean) ?? ''
   const onScreen = useActive()
+  const create = useCreateAccess()
 
   // track records one read's answer or failure as soon as it arrives, so a slow read
   // does not hold back the cards and banner of the reads that already answered.
@@ -204,7 +205,8 @@ export function Overview({onOpen, onOpenJob}: {
           ) : jobs.length === 0 ? (
             <div className="empty">
               <div className="empty-title">{t('overview.noJobs')}</div>
-              <div className="empty-text">{t('overview.createJobHint')}</div>
+              {/* The hint points at the Jobs create button, which a view member does not have. */}
+              {create.jobs && <div className="empty-text">{t('overview.createJobHint')}</div>}
             </div>
           ) : (
             <table className="table">

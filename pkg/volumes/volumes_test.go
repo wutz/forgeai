@@ -7,12 +7,15 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/kf"
@@ -359,5 +362,34 @@ func TestResetExpiry(t *testing.T) {
 	live, _ := c.List(ctx, true)
 	if len(live) != 1 || live[0].ExpireAt != "2026-10-08T00:00:00Z" {
 		t.Fatalf("expiry changed after refusal: %+v", live)
+	}
+}
+
+// A storage class that cannot grow its volumes is named as such. The API
+// refuses the patch as Forbidden, and that must not read as a missing permission.
+func TestResizeNamesNonExpandableClass(t *testing.T) {
+	ctx := context.Background()
+	refused := apierrors.NewForbidden(corev1.Resource("persistentvolumeclaims"), "data", errors.New(
+		"only dynamically provisioned pvc can be resized and the storageclass that provisions the pvc must support resize"))
+	k8s := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithInterceptorFuncs(interceptor.Funcs{
+		Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, patch client.Patch, opts ...client.PatchOption) error {
+			return refused
+		},
+	}).Build()
+	c := &Client{K8s: k8s, Namespace: "forge-a", Now: time.Now}
+	cfg, _ := platform.Parse([]byte("storageTypes: {shared: {storageClass: sc}}\ndefaultStorageType: shared"))
+	if _, err := c.Create(ctx, cfg, "data", "", 10); err != nil {
+		t.Fatal(err)
+	}
+	pvc := &corev1.PersistentVolumeClaim{}
+	if err := k8s.Get(ctx, types.NamespacedName{Namespace: "forge-a", Name: "data"}, pvc); err != nil {
+		t.Fatal(err)
+	}
+	pvc.Status.Phase = corev1.ClaimBound
+	if err := k8s.Status().Update(ctx, pvc); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Resize(ctx, "data", 20); !errors.Is(err, ErrNotExpandable) {
+		t.Fatalf("resize on a class without expansion: %v", err)
 	}
 }

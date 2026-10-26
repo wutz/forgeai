@@ -51,3 +51,29 @@ func TestRegistryForViewOnlyMember(t *testing.T) {
 		t.Fatalf("ListImages = %v, want none without credentials", repos)
 	}
 }
+
+// TestRegistryNotConfigured checks that a project without a robot Secret, on a
+// platform with no registry, reports no registry and lists no images.
+func TestRegistryNotConfigured(t *testing.T) {
+	cfg := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{Name: platform.ConfigMapName, Namespace: testNamespace},
+		Data:       map[string]string{platform.ConfigKey: "namespacePrefix: forge-\n"},
+	}
+	k8s := fake.NewClientBuilder().WithScheme(scheme()).WithObjects(cfg).Build()
+	a := &App{ctx: context.Background(), conn: &Connection{Info: ConnInfo{Namespace: testNamespace}, k8s: k8s}}
+
+	reg, err := a.Registry()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reg.Enabled || reg.Credentials || reg.URL != "" {
+		t.Fatalf("registry = %+v, want not enabled and no address", reg)
+	}
+	repos, err := a.ListImages()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(repos) != 0 {
+		t.Fatalf("ListImages = %v, want none without a registry", repos)
+	}
+}

@@ -456,6 +456,7 @@ const reasonKeys: Record<string, MessageKey> = {
   PodSucceeded: 'sandboxes.reason.podSucceeded',
   InvalidConfiguration: 'sandboxes.reason.invalidConfiguration',
   ReconcilerError: 'sandboxes.reason.reconcilerError',
+  QuotaExceeded: 'sandboxes.reason.quotaExceeded',
   MultiplePods: 'sandboxes.reason.multiplePods',
   SandboxExpired: 'sandboxes.reason.expired',
 }

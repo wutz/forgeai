@@ -301,7 +301,7 @@ a { color: inherit; text-decoration: none; }
 .card { border-radius: var(--radius-lg); box-shadow: var(--shadow-1); }
 .card-head { padding: 14px 18px; border-bottom: 1px solid var(--hairline-soft); }
 .card-head > div:first-child { min-width: 0; }
-.card-head-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.card-head-actions { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; }
 .card-title { margin: 0; font-size: 14px; font-weight: 600; letter-spacing: -0.2px; }
 .card-sub { margin-top: 2px; font-size: 12px; color: var(--mute); }
 /* A card that follows another card in the same view; matches the .metrics gap. */
@@ -432,7 +432,7 @@ code {
 .list-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
 
 /* Status */
-.status { font-size: 12.5px; }
+.status { font-size: 12.5px; white-space: nowrap; }
 .dot { width: 7px; height: 7px; }
 .status-succeeded .dot, .status-stopped .dot, .status-idle .dot, .status-retried .dot { background: var(--faint); }
 .status-starting .dot, .status-resizing .dot { background: var(--warning); }

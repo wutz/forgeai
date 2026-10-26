@@ -22,6 +22,8 @@ const knownErrors: [RegExp, MessageKey][] = [
   [/"[^"]*" already exists/, 'error.alreadyExists'],
   [/context deadline exceeded|Client\.Timeout exceeded/, 'error.timeout'],
   [/dial tcp|connection refused|no such host|i\/o timeout/, 'error.unreachable'],
+  // A platform controller's admission webhook is down, so the apiserver refuses the change until it answers.
+  [/failed calling webhook/, 'error.webhookUnavailable'],
   [/was not created by forgeai and cannot be (edited|deleted) here/, 'error.notCreatedByForgeai'],
   [/registry is not configured for this project/, 'error.registryNotConfigured'],
   [/was superseded by a newer connect/, 'error.connectionSuperseded'],

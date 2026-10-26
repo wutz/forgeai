@@ -26,6 +26,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -169,10 +170,14 @@ func (r *FileServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if wantUp {
 		replicas = 1
 	}
+	// Without an ingress domain the hosts are invalid, so no Ingress is applied.
+	published := cfg.Ingress.Domain != ""
 	objs := []client.Object{
 		fileServerDeployment(fs, cfg, name, labels, vols, secret, replicas),
 		fileServerService(fs, name, labels),
-		fileServerIngress(fs, cfg, name, host, labels),
+	}
+	if published {
+		objs = append(objs, fileServerIngress(fs, cfg, name, host, labels))
 	}
 	for _, o := range objs {
 		if err := ctrl.SetControllerReference(fs, o, r.Scheme); err != nil {
@@ -183,28 +188,11 @@ func (r *FileServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		}
 	}
 
-	fs.Status.URL = cfg.Ingress.URL(strings.TrimSuffix(host, "."+cfg.Ingress.Domain))
 	fs.Status.Secret = naming.FileServerSecretName
 	fs.Status.Volumes = vols
-	switch {
-	case !wantUp:
-		fs.Status.Phase = v1.FileServerIdle
-	case running && dep.Status.UpdatedReplicas == dep.Status.Replicas && dep.Generation == dep.Status.ObservedGeneration:
-		fs.Status.Phase = v1.FileServerReady
-	default:
-		fs.Status.Phase = v1.FileServerStarting
-	}
-	msg := ""
-	if len(vols) == 0 {
-		msg = "no ReadWriteMany volumes to serve"
-	}
-	meta.SetStatusCondition(&fs.Status.Conditions, metav1.Condition{
-		Type: "Ready", Status: conditionStatus(fs.Status.Phase == v1.FileServerReady),
-		Reason: string(fs.Status.Phase), Message: msg, ObservedGeneration: fs.Generation,
-	})
-	if fs.Status.Phase != orig.Status.Phase {
-		log.Info("FileServer changed phase", "phase", fs.Status.Phase, "volumes", len(vols))
-	}
+	ready := running && dep.Status.UpdatedReplicas == dep.Status.Replicas && dep.Generation == dep.Status.ObservedGeneration
+	recordPhase(fs, orig, published, wantUp, ready, len(vols) == 0,
+		cfg.Ingress.URL(strings.TrimSuffix(host, "."+cfg.Ingress.Domain)), log)
 	if err := r.Status().Patch(ctx, fs, client.MergeFrom(orig)); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -213,6 +201,40 @@ func (r *FileServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 	// Check activity again before the idle deadline.
 	return ctrl.Result{RequeueAfter: min(idle-now.Sub(active)+time.Second, activityProbeInterval)}, nil
+}
+
+// recordPhase sets the file server phase, the address and the Ready
+// condition. The address is empty while the server cannot be published.
+func recordPhase(fs *v1.FileServer, orig *v1.FileServer, published, wantUp, ready, noVolumes bool,
+	url string, log logr.Logger) {
+	fs.Status.URL = ""
+	if published {
+		fs.Status.URL = url
+	}
+	switch {
+	case !published:
+		fs.Status.Phase = v1.FileServerFailed
+	case !wantUp:
+		fs.Status.Phase = v1.FileServerIdle
+	case ready:
+		fs.Status.Phase = v1.FileServerReady
+	default:
+		fs.Status.Phase = v1.FileServerStarting
+	}
+	msg := ""
+	switch {
+	case !published:
+		msg = "the platform config sets no ingress domain (ingress.domain), so the file server has no address"
+	case noVolumes:
+		msg = "no ReadWriteMany volumes to serve"
+	}
+	meta.SetStatusCondition(&fs.Status.Conditions, metav1.Condition{
+		Type: "Ready", Status: conditionStatus(fs.Status.Phase == v1.FileServerReady),
+		Reason: string(fs.Status.Phase), Message: msg, ObservedGeneration: fs.Generation,
+	})
+	if fs.Status.Phase != orig.Status.Phase {
+		log.Info("FileServer changed phase", "phase", fs.Status.Phase)
+	}
 }
 
 func conditionStatus(b bool) metav1.ConditionStatus {
@@ -440,6 +462,19 @@ func (r *FileServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}
 		return out
 	})
+	// A changed platform config publishes or unpublishes every file server at once.
+	platformConfigChanged := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, _ client.Object) []reconcile.Request {
+		r.Config.Invalidate()
+		list := &v1.FileServerList{}
+		if err := mgr.GetClient().List(ctx, list); err != nil {
+			return nil
+		}
+		out := make([]reconcile.Request, 0, len(list.Items))
+		for _, fs := range list.Items {
+			out = append(out, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&fs)})
+		}
+		return out
+	})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.FileServer{}, builder.WithPredicates(predicate.Or(
 			predicate.GenerationChangedPredicate{}, predicate.AnnotationChangedPredicate{}))).
@@ -448,6 +483,9 @@ func (r *FileServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&networkingv1.Ingress{}).
 		Watches(&corev1.PersistentVolumeClaim{}, byNamespace, builder.WithPredicates(predicate.Or(
 			predicate.LabelChangedPredicate{}, predicate.GenerationChangedPredicate{}))).
+		Watches(&corev1.ConfigMap{}, platformConfigChanged, builder.WithPredicates(predicate.NewPredicateFuncs(func(o client.Object) bool {
+			return o.GetNamespace() == r.Config.Namespace && o.GetName() == platform.ConfigMapName
+		}))).
 		Named("fileserver").
 		Complete(r)
 }

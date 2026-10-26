@@ -84,6 +84,13 @@ export function FilesView() {
           <iframe src={frame} title={t('files.title')} allow="clipboard-write"
                   sandbox="allow-scripts allow-same-origin allow-forms allow-downloads"/>
         </div>
+      ) : state?.phase === 'Failed' ? (
+        // The platform cannot publish the server, so waiting would never end.
+        <Card>
+          <Empty icon="warning" title={t('files.failed')}>
+            {t('files.failedHint')}
+          </Empty>
+        </Card>
       ) : ready || state?.readOnly ? (
         <Card>
           <Empty icon="folder" title={t('files.noAccess')}>

@@ -54,6 +54,7 @@ export const en = {
   'sandboxes.reason.podSucceeded': 'The workload finished',
   'sandboxes.reason.invalidConfiguration': 'The sandbox configuration is invalid',
   'sandboxes.reason.reconcilerError': 'The sandbox controller could not reconcile the sandbox',
+  'sandboxes.reason.quotaExceeded': 'The project quota is full, so the sandbox pod cannot start. It starts again on its own once quota is free.',
   'sandboxes.reason.multiplePods': 'More than one pod backs this sandbox',
   'sandboxes.reason.expired': 'The sandbox reached its shutdown time',
 
@@ -165,6 +166,7 @@ export const zh: Record<keyof typeof en, string> = {
   'sandboxes.reason.podSucceeded': '工作负载已结束',
   'sandboxes.reason.invalidConfiguration': '沙箱配置无效',
   'sandboxes.reason.reconcilerError': '沙箱控制器无法完成调谐',
+  'sandboxes.reason.quotaExceeded': '项目配额已满，沙箱 Pod 暂时无法创建。释放配额后会自动重试。',
   'sandboxes.reason.multiplePods': '该沙箱对应多个 Pod',
   'sandboxes.reason.expired': '已到达关闭时间',
 

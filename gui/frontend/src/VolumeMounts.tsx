@@ -12,13 +12,13 @@ const reservedPaths = ['/dev/shm']
 
 // phaseProblems names why a volume in another phase cannot be mounted.
 const phaseProblems: Record<string, MessageKey> = {
-  Pending: 'mounts.pending',
   Lost: 'mounts.lost',
   Deleting: 'mounts.deleting',
 }
 
-// mountable is a volume a pod can mount: bound, or bound and growing.
-export const mountable = (v: volumes.Volume) => v.phase === 'Bound' || v.phase === 'Resizing'
+// mountable is a volume a pod can mount: bound, bound and growing, or pending.
+// A pending volume binds when its first pod uses it, so the pod waits for it.
+export const mountable = (v: volumes.Volume) => v.phase === 'Bound' || v.phase === 'Resizing' || v.phase === 'Pending'
 
 // defaultPath is where a newly chosen volume is mounted until the user picks another path.
 const defaultPath = (volume: string) => `/data/${volume}`

@@ -215,9 +215,11 @@ func (c *Client) get(ctx context.Context, name string) (*corev1.PersistentVolume
 }
 
 // Mountable checks that a workload can mount the named volumes: each must be a
-// live volume that is bound (or being resized). A workload on several nodes
-// needs ReadWriteMany volumes, since a ReadWriteOnce volume attaches to one
-// node. Trashed volumes are refused: they are about to be purged.
+// live volume that is bound or pending. A pending claim binds when the first pod
+// uses it on a WaitForFirstConsumer class (local-path), so refusing it would leave
+// a new volume unmountable for good; the pod waits on the claim until it binds.
+// A workload on several nodes needs ReadWriteMany volumes, since a ReadWriteOnce
+// volume attaches to one node. Trashed volumes are refused: they are about to be purged.
 func (c *Client) Mountable(ctx context.Context, names []string, nodes int32) error {
 	for _, name := range names {
 		pvc, err := c.get(ctx, name)
@@ -234,9 +236,7 @@ func (c *Client) Mountable(ctx context.Context, names []string, nodes int32) err
 			return fmt.Errorf("volume %s is being deleted", name)
 		}
 		switch pvc.Status.Phase {
-		case corev1.ClaimBound:
-		case corev1.ClaimPending:
-			return fmt.Errorf("%w: %s is still being provisioned", ErrNotReady, name)
+		case corev1.ClaimBound, corev1.ClaimPending:
 		default:
 			return fmt.Errorf("volume %s is %s and cannot be mounted", name, pvc.Status.Phase)
 		}

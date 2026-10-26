@@ -12,6 +12,8 @@ const knownErrors: [RegExp, MessageKey][] = [
   // Kubernetes reports a quota refusal as "is forbidden: exceeded quota", so it
   // is matched first to keep it from reading as a missing permission.
   [/exceeded quota: /, 'error.quotaExceeded'],
+  // A new pod's service account is created a moment after its Deployment; until then the pod is refused as Forbidden.
+  [/error looking up service account .*not found/, 'error.serviceAccountPending'],
   // A storage class without expansion refuses a grow as Forbidden; name the refusal first.
   [/does not allow growing volumes/, 'volumes.errNotExpandable'],
   [/is forbidden: /, 'error.forbidden'],

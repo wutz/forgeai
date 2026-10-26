@@ -130,14 +130,26 @@ function ServiceStatus({service: s}: {service: app.InferenceService}) {
   }
   // The dot reuses the phase colours: ready is running, starting is pending.
   const phase = {stopped: 'suspended', ready: 'running', starting: 'starting', failed: 'failed'}[state]
-  // A failed or starting service shows the controller's reason, which names what keeps its pods from starting.
-  const detail = state === 'failed' || state === 'starting' ? s.message ?? '' : ''
+  const detail = statusDetail(s, state)
   return (
     <>
       <span className={`status status-${phase}`}><span className="dot" aria-hidden/>{t(labels[state])}</span>
-      {detail && <div className="cell-sub" title={detail}>{/exceeded quota: /.test(detail) ? errText(detail) : detail}</div>}
+      {detail && <div className="cell-sub" title={s.message}>{detail}</div>}
     </>
   )
+}
+
+// statusDetail is the line under a service's state. The controller writes a
+// starting message as "N of M model servers ready", then "; <cause>" when a
+// Deployment cannot create its pods. The count is shown from the service's
+// numbers, and the cause is translated where the catalogue knows it.
+function statusDetail(s: app.InferenceService, state: string): string {
+  if (state === 'failed') return errText(s.message ?? '')
+  if (state !== 'starting') return ''
+  const cut = (s.message ?? '').indexOf('; ')
+  return cut < 0
+    ? t('inference.replicasReady', {ready: s.readyReplicas ?? 0, total: s.replicas ?? 0})
+    : errText((s.message ?? '').slice(cut + 2))
 }
 
 function InferenceDetail({name, onChanged, onDeleted, onClose}: {

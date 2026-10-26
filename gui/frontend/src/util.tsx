@@ -241,6 +241,27 @@ export function pct(value: number, max: number): number {
   return Math.min(100, Math.max(0, Math.round((value / max) * 100)))
 }
 
+// gpuCapacity returns the GPUs of each GPU product, as {total, free}. An instance
+// type counts the instances a node fits, so the types of one product are packings
+// of the same GPUs: rtx-5090.x1 and rtx-5090.x2 on a two-GPU node are both that node's
+// GPUs. Summing the types would count them twice; the type with the most GPUs
+// covers the most of them, so each product takes its largest GPU count.
+export function gpuCapacity(types: {product?: string, class: string, gpuCount: number, total: number, free: number}[]): {total: number, free: number} {
+  const byProduct = new Map<string, {total: number, free: number}>()
+  for (const ty of types) {
+    if (!(ty.gpuCount > 0)) continue
+    const key = ty.product || ty.class
+    const cur = byProduct.get(key) ?? {total: 0, free: 0}
+    byProduct.set(key, {total: Math.max(cur.total, ty.total * ty.gpuCount), free: Math.max(cur.free, ty.free * ty.gpuCount)})
+  }
+  let total = 0, free = 0
+  for (const p of byProduct.values()) {
+    total += p.total
+    free += p.free
+  }
+  return {total, free}
+}
+
 // tagCount is the number of tags across a repository's images. The registry's
 // artifact count is digests, and an untagged digest has no tag to count.
 export function tagCount(repo: {images?: {tags?: string[]}[]}): number {

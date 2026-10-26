@@ -37,6 +37,10 @@ var (
 	// ErrNotReady is returned when growing a volume that is not bound yet;
 	// Kubernetes only expands bound claims.
 	ErrNotReady = errors.New("volume is not ready")
+	// ErrNotExpandable is returned when the storage class cannot grow its
+	// volumes. The API refuses such a grow as Forbidden, which reads like a
+	// missing permission, so the refusal is named here.
+	ErrNotExpandable = errors.New("storage class does not allow growing volumes")
 	// ErrPastExpiry is returned when a purge time is not in the future: the
 	// volume would be purged at the next reconcile.
 	ErrPastExpiry = errors.New("purge time must be in the future")
@@ -364,6 +368,13 @@ func (c *Client) Resize(ctx context.Context, name string, sizeGiB int64) (*Volum
 	patch := client.MergeFrom(pvc.DeepCopy())
 	pvc.Spec.Resources.Requests[corev1.ResourceStorage] = *resource.NewQuantity(sizeGiB<<30, resource.BinarySI)
 	if err := c.K8s.Patch(ctx, pvc, patch); err != nil {
+		if apierrors.IsForbidden(err) && strings.Contains(err.Error(), "must support resize") {
+			sc := ""
+			if pvc.Spec.StorageClassName != nil {
+				sc = *pvc.Spec.StorageClassName
+			}
+			return nil, fmt.Errorf("%w: %s", ErrNotExpandable, sc)
+		}
 		return nil, err
 	}
 	v := toVolume(pvc, nil)

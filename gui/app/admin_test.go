@@ -26,6 +26,19 @@ func TestToProjectReadyFollowsCondition(t *testing.T) {
 	}
 }
 
+// A Project whose finalizer is still running stays listed, and the list must say so.
+func TestToProjectReportsDeleting(t *testing.T) {
+	p := &v1.Project{}
+	if toProject(p).Deleting {
+		t.Error("Deleting = true without a deletion timestamp")
+	}
+	now := metav1.Now()
+	p.DeletionTimestamp = &now
+	if !toProject(p).Deleting {
+		t.Error("Deleting = false with a deletion timestamp")
+	}
+}
+
 // Clearing a limit in the form must clear it on the Project, so the platform
 // default applies again instead of the old value silently staying in place.
 func TestApplyProjectQuotaClearsEmptyLimits(t *testing.T) {

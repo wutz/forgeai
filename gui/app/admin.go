@@ -32,6 +32,9 @@ type Project struct {
 	TrashRetention string          `json:"trashRetention,omitempty"`
 	DeletionPolicy string          `json:"deletionPolicy"`
 	Ready          bool            `json:"ready"`
+	// Deleting is set once the Project is being deleted and its finalizer has not
+	// finished yet; the object stays listed until then.
+	Deleting bool `json:"deleting"`
 	Registry       string          `json:"registry"`
 	Created        string          `json:"created"`
 	// ResourceVersion is the version the form was read at; a save over a newer
@@ -263,6 +266,7 @@ func toProject(p *v1.Project) Project {
 		},
 		DeletionPolicy:  string(p.Spec.DeletionPolicy),
 		Ready:           meta.IsStatusConditionTrue(p.Status.Conditions, v1.ConditionReady),
+		Deleting:        p.DeletionTimestamp != nil,
 		Registry:        p.Status.Registry.URL,
 		Created:         p.CreationTimestamp.UTC().Format(time.RFC3339),
 		ResourceVersion: p.ResourceVersion,

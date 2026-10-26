@@ -34,13 +34,16 @@ type FileServerSpec struct {
 }
 
 // FileServerPhase summarises the server state.
-// +kubebuilder:validation:Enum=Idle;Starting;Ready
+// +kubebuilder:validation:Enum=Idle;Starting;Ready;Failed
 type FileServerPhase string
 
 const (
 	FileServerIdle     FileServerPhase = "Idle"
 	FileServerStarting FileServerPhase = "Starting"
 	FileServerReady    FileServerPhase = "Ready"
+	// FileServerFailed means the server cannot be published, because the
+	// platform config has no ingress domain. Waiting does not help.
+	FileServerFailed FileServerPhase = "Failed"
 )
 
 // FileServerStatus defines the observed state of FileServer.

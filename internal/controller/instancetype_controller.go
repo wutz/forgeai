@@ -196,7 +196,10 @@ func (r *InstanceTypeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			// Undo manual edits and deletions.
 			CreateFunc: func(event.CreateEvent) bool { return false },
 		})).
-		Watches(&corev1.ConfigMap{}, all, builder.WithPredicates(predicate.NewPredicateFuncs(func(o client.Object) bool {
+		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(func(context.Context, client.Object) []reconcile.Request {
+			r.Config.Invalidate()
+			return []reconcile.Request{instanceTypeKey}
+		}), builder.WithPredicates(predicate.NewPredicateFuncs(func(o client.Object) bool {
 			return o.GetName() == platform.ConfigMapName
 		}))).
 		Complete(r)

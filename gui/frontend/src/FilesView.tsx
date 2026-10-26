@@ -90,6 +90,13 @@ export function FilesView() {
             {t('files.noAccessHint')}
           </Empty>
         </Card>
+      ) : state?.phase === 'Idle' && !state.volumes?.length ? (
+        // The operator starts no server without a shared volume, so waiting would never end.
+        <Card>
+          <Empty icon="folder" title={t('files.noVolumes')}>
+            {t('files.noVolumesHint')}
+          </Empty>
+        </Card>
       ) : (
         <Card>
           <Spinner label={state.phase === 'Starting' ? t('files.starting') :

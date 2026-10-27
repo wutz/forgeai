@@ -1,4 +1,5 @@
 build/bin
 build/dist
+build/forgeai.dev-stash
 node_modules
 frontend/dist

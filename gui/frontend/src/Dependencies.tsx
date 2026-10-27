@@ -74,7 +74,9 @@ export function Dependencies() {
   const install = (d: app.Dependency) => confirm.ask({
     title: t('deps.confirmTitle', {action: verb(d), name: title(d.name, d.title)}),
     message: <>
-      {t(d.name === 'forgeai' ? 'deps.chartConfirmMessage' : 'deps.confirmMessage', {version: d.pinned})}
+      {isChart(d.name)
+        ? t('deps.chartConfirmMessage', {chart: title(d.name, d.title), version: d.pinned})
+        : t('deps.confirmMessage', {version: d.pinned})}
       {d.name === 'agent-sandbox' && <><br/>{t('deps.restartNote')}</>}
     </>,
     action: verb(d), primary: true,
@@ -201,7 +203,7 @@ export function Dependencies() {
 
 // installSteps is the order of the steps an install emits (app/deps.go).
 function installSteps(name: string): string[] {
-  if (name === 'forgeai') return ['chart-namespace', 'chart-pull', 'chart-install', 'record']
+  if (isChart(name)) return ['chart-namespace', 'chart-pull', 'chart-install', 'record']
   const steps = ['namespaces', 'crds', 'controllers', 'deployments', 'webhooks', 'record']
   return name === 'agent-sandbox' ? [...steps, 'restart'] : steps
 }
@@ -238,6 +240,12 @@ function InstallSteps({name, step}: {name: string, step: string}) {
 function copy(key: string, fallback: string): string {
   const text = t(key as MessageKey)
   return text === key ? fallback : text
+}
+
+// isChart reports whether a component is installed from a Helm chart (see
+// helmChart in app/chart.go) rather than from an embedded bundle.
+function isChart(name: string): boolean {
+  return name === 'forgeai' || name === 'instancetype-operator'
 }
 
 function title(name: string, fallback = name): string {

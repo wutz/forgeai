@@ -123,8 +123,13 @@ func testDeployment(version string, available bool) appsv1.Deployment {
 
 // helmDeployment returns a Deployment installed by the SSH operator chart at chartVersion.
 func helmDeployment(chartVersion string, available bool) appsv1.Deployment {
+	return helmChartDeployment("ssh-operator", chartVersion, available)
+}
+
+// helmChartDeployment returns a Deployment installed by the chart chart at chartVersion.
+func helmChartDeployment(chart, chartVersion string, available bool) appsv1.Deployment {
 	d := testDeployment("", available)
-	d.Labels = map[string]string{helmChartLabel: "ssh-operator-" + chartVersion}
+	d.Labels = map[string]string{helmChartLabel: chart + "-" + chartVersion}
 	return d
 }
 
@@ -132,6 +137,7 @@ func TestAssess(t *testing.T) {
 	bundled := Dependency{Name: "kueue", Pinned: "v0.20.2", Installable: true}
 	operator := Dependency{Name: "forgeai", Installable: true, Pinned: forgeaiChartVersion}
 	sshOperator := Dependency{Name: "ssh-operator", Installable: true, Pinned: sshOperatorChartVersion}
+	instanceTypes := Dependency{Name: "instancetype-operator", Installable: true, Pinned: instanceTypeOperatorChartVersion}
 	sandbox := Dependency{Name: "agent-sandbox", Pinned: "v1.0.7", Installable: true}
 	gatewayAPI := Dependency{Name: "gateway-api-inference-extension", Pinned: "v1.6.2", Installable: true}
 	tests := []struct {
@@ -168,6 +174,15 @@ func TestAssess(t *testing.T) {
 			deployments: []appsv1.Deployment{helmDeployment("0.0.9", true)}}, "outdated", "0.0.9"},
 		{"SSH operator deployed outside Helm", sshOperator, depHealth{crdsWanted: 3, crdsFound: 3, chart: sshOperatorSpec,
 			deployments: []appsv1.Deployment{testDeployment("", true)}}, "unmanaged", ""},
+		{"InstanceType operator from its chart", instanceTypes, depHealth{crdsWanted: 1, crdsFound: 1,
+			chart: instanceTypeOperatorSpec, deployments: []appsv1.Deployment{
+				helmChartDeployment("forgeai-instancetype-operator", instanceTypeOperatorChartVersion, true)}},
+			"ready", instanceTypeOperatorChartVersion},
+		{"older InstanceType operator chart", instanceTypes, depHealth{crdsWanted: 1, crdsFound: 1,
+			chart: instanceTypeOperatorSpec, deployments: []appsv1.Deployment{
+				helmChartDeployment("forgeai-instancetype-operator", "0.0.9", true)}}, "outdated", "0.0.9"},
+		{"InstanceType operator deployed outside Helm", instanceTypes, depHealth{crdsWanted: 1, crdsFound: 1,
+			chart: instanceTypeOperatorSpec, deployments: []appsv1.Deployment{testDeployment("", true)}}, "unmanaged", ""},
 		{"runs where the config expects", sandbox, depHealth{crdsWanted: 1, crdsFound: 1,
 			deployments: []appsv1.Deployment{testDeployment("v1.0.7", true)},
 			namespace:   "agent-sandbox-system", expectNamespace: "agent-sandbox-system"}, "ready", "v1.0.7"},

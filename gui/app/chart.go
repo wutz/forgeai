@@ -43,7 +43,18 @@ type chartSpec struct {
 	needs []string
 	// values returns the chart values of the install, nil for the chart's defaults.
 	values func() map[string]any
+	// adoptFrom is a release whose chart shipped crds before they moved to this
+	// chart. Helm refuses to install objects another release owns, so the
+	// install hands them over first (see adoptCRDs).
+	adoptFrom string
 }
+
+// Helm bookkeeping on the objects a release owns.
+const (
+	helmReleaseNameKey      = "meta.helm.sh/release-name"
+	helmReleaseNamespaceKey = "meta.helm.sh/release-namespace"
+	helmManagedByKey        = "app.kubernetes.io/managed-by"
+)
 
 // installNamespace is the namespace the chart is installed into.
 func (s *chartSpec) installNamespace() string {
@@ -83,6 +94,26 @@ var sshOperatorSpec = &chartSpec{
 	namespace: sshOperatorNamespace, deployment: sshOperatorDeployment,
 	crds:  []string{"sshgatewayclasses.forgeai.wutz.dev", "sshgateways.forgeai.wutz.dev", "sshroutes.forgeai.wutz.dev"},
 	needs: []string{"pipes.sshpiper.com"},
+	values: func() map[string]any {
+		return map[string]any{"platform": map[string]any{"namespace": platform.Namespace()}}
+	},
+}
+
+// The InstanceType operator is installed from its own Helm chart. It derives the
+// InstanceTypes and Kueue ResourceFlavors that forgeai reads. Its CRD was shipped
+// by the forgeai chart before the split, so the install adopts it from forgeai.
+const (
+	instanceTypeOperatorChart        = "oci://ghcr.io/wutz/charts/forgeai-instancetype-operator"
+	instanceTypeOperatorChartVersion = "0.1.1"
+	instanceTypeOperatorRelease      = "forgeai-instancetype-operator"
+	instanceTypeOperatorDeployment   = "forgeai-instancetype-operator-controller-manager"
+)
+
+var instanceTypeOperatorSpec = &chartSpec{
+	name: "forgeai-instancetype-operator", ref: instanceTypeOperatorChart, version: instanceTypeOperatorChartVersion,
+	release: instanceTypeOperatorRelease, deployment: instanceTypeOperatorDeployment,
+	crds:      []string{"instancetypes.forgeai.wutz.dev"},
+	adoptFrom: forgeaiRelease,
 	values: func() map[string]any {
 		return map[string]any{"platform": map[string]any{"namespace": platform.Namespace()}}
 	},
@@ -142,9 +173,48 @@ func installChart(ctx context.Context, c *Connection, spec *chartSpec, progress 
 	if spec.values != nil {
 		values = spec.values()
 	}
+	if spec.adoptFrom != "" {
+		if err := adoptCRDs(ctx, c.k8s, spec, ns); err != nil {
+			return err
+		}
+	}
 	progress(stepChartInstall)
 	_, err = up.RunWithContext(ctx, spec.release, chrt, values)
 	return err
+}
+
+// adoptCRDs hands the CRDs of spec from the release adoptFrom to spec's release,
+// so Helm accepts them as the new chart's. The keep policy on the CRDs keeps them
+// when the old release lets go of them. CRDs of other releases are left alone.
+func adoptCRDs(ctx context.Context, k8s client.Client, spec *chartSpec, ns string) error {
+	for _, name := range spec.crds {
+		u := &unstructured.Unstructured{}
+		u.SetGroupVersionKind(crdGVK)
+		err := k8s.Get(ctx, client.ObjectKey{Name: name}, u)
+		if apierrors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		anns := u.GetAnnotations()
+		if anns[helmReleaseNameKey] != spec.adoptFrom {
+			continue
+		}
+		anns[helmReleaseNameKey] = spec.release
+		anns[helmReleaseNamespaceKey] = ns
+		u.SetAnnotations(anns)
+		labels := u.GetLabels()
+		if labels == nil {
+			labels = map[string]string{}
+		}
+		labels[helmManagedByKey] = "Helm"
+		u.SetLabels(labels)
+		if err := k8s.Update(ctx, u); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // checkChartTarget refuses an install that the cluster cannot take: a needed

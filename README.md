@@ -198,7 +198,7 @@ The desktop client connects with a kubeconfig context and a project namespace (t
 | Images | Push instructions and robot credentials; list and delete images in the project's Harbor project. Their tags are offered in a dropdown as the image of jobs, sandboxes and their templates, which also accept any other address |
 | Resources | Instance types with availability and the project quota usage |
 | Projects | Admins only (may create Projects): manage projects and members, export member kubeconfigs |
-| Dependencies | Cluster admins only: install or upgrade Kueue, Kubeflow Trainer v2 (with JobSet) and agent-sandbox at the versions pinned in the GUI, install the forgeai operator from its Helm chart at the pinned chart version, install the project-operator Helm chart at its pinned version, install the sshpiper Pipe CRD and the SSH operator from its Helm chart (see [SSH](#ssh)), and see each component's status |
+| Dependencies | Cluster admins only: install or upgrade Kueue, Kubeflow Trainer v2 (with JobSet) and agent-sandbox at the versions pinned in the GUI, install the InstanceType operator, the forgeai operator and the project-operator Helm charts at their pinned versions, install the sshpiper Pipe CRD and the SSH operator from its Helm chart (see [SSH](#ssh)), and see each component's status |
 
 The New job and New sandbox dialogs also offer template sources: job and sandbox templates from the platform's `templates.source` (default [wutz/forgeai-templates](https://github.com/wutz/forgeai-templates)), grouped apart from the project templates. You can add other published template sources by URL, `file://` directory or `oci://` reference (`oci://registry/repository:tag` or `oci://registry/repository@sha256:…`) under **Template sources** in the sidebar; a source is read before it is added, and its templates are marked as yours in the dialog. Picking a template prefills the form; the name, instance type and volumes stay yours, and the job or sandbox does not reference the template.
 
@@ -229,16 +229,18 @@ make deploy-dev                # ko build -> ghcr.io/wutz/forgeai (public), kube
 
 ### Helm charts
 
-forgeai ships as the Helm chart in `charts/chart`: the FileServer and InferenceService CRDs, RBAC and the controller Deployment, with the platform config under `platform.config`. Projects come from a second chart, [project-operator](https://github.com/wutz/project-operator). The Dependencies view installs both at their pinned versions, as releases `forgeai` and `project-operator` in `forgeai-system`. The same installs from the CLI, in this order:
+The operators ship as Helm charts in `charts/chart`. The Dependencies view installs three charts into `forgeai-system` at their pinned versions, in this order: the InstanceType operator, forgeai, then project-operator. The same installs from the CLI:
 
 ```sh
-helm install forgeai oci://ghcr.io/wutz/charts/forgeai --version 0.4.0 \
+helm install forgeai-instancetype-operator oci://ghcr.io/wutz/charts/forgeai-instancetype-operator --version 0.1.1 \
   --namespace forgeai-system --create-namespace
+helm install forgeai oci://ghcr.io/wutz/charts/forgeai --version 0.4.0 \
+  --namespace forgeai-system
 helm install project-operator oci://ghcr.io/wutz/charts/project-operator --version 0.4.1 \
   --namespace forgeai-system
 ```
 
-project-operator must run in the namespace of forgeai: it reads the platform ConfigMap from its own namespace (`FORGEAI_NAMESPACE`).
+forgeai ships the FileServer and InferenceService CRDs, RBAC and the controller Deployment, with the platform config under `platform.config`. The InstanceType operator is a separate project with its own chart (see [InstanceType](#instancetype)); forgeai reads the InstanceTypes that the operator creates. project-operator is [wutz/project-operator](https://github.com/wutz/project-operator). It must run in the namespace of forgeai, because it reads the platform ConfigMap from its own namespace (`FORGEAI_NAMESPACE`).
 
 Releases up to 0.3.1 installed the `projects.forgeai.wutz.dev` CRD as part of the forgeai release. Upgrading keeps that CRD and its Projects, because the CRD carries `helm.sh/resource-policy: keep`. While forgeai owns the CRD, Helm refuses to install project-operator (`invalid ownership metadata`). Hand the CRD to the new release before installing it:
 
@@ -248,6 +250,17 @@ kubectl annotate crd projects.forgeai.wutz.dev \
   meta.helm.sh/release-namespace=forgeai-system --overwrite
 kubectl label crd projects.forgeai.wutz.dev app.kubernetes.io/managed-by=Helm --overwrite
 ```
+
+Upgrading a cluster that runs forgeai 0.3.x: there the `forgeai` release owns the InstanceType CRD `instancetypes.forgeai.wutz.dev`. Helm refuses to install a CRD that another release owns, so before the operator chart is installed the CRD is handed over to the `forgeai-instancetype-operator` release. The Dependencies view does this itself; from the CLI:
+
+```sh
+kubectl annotate crd instancetypes.forgeai.wutz.dev \
+  meta.helm.sh/release-name=forgeai-instancetype-operator \
+  meta.helm.sh/release-namespace=forgeai-system --overwrite
+kubectl label crd instancetypes.forgeai.wutz.dev app.kubernetes.io/managed-by=Helm --overwrite
+```
+
+The CRD carries `helm.sh/resource-policy: keep`, so the later upgrade of `forgeai` to 0.4.0, which no longer ships it, leaves the CRD and its InstanceTypes in place.
 
 Pushing a `v<version>` tag runs `.github/workflows/helm-release.yml`, which publishes the operator image (`ghcr.io/wutz/forgeai:<version>`) and the chart (`oci://ghcr.io/wutz/charts/forgeai:<version>`). `make helm-lint` lints and renders the chart; `make helm-package CHART_VERSION=<version>` writes the package to `dist/`.
 
@@ -263,11 +276,12 @@ A cluster that ran the SSH gateway from an earlier forgeai release has the `SSHG
 
 A cluster set up with `make deploy-dev` runs the operator outside Helm. Helm does not adopt objects it did not create, so the Dependencies view reports that operator as deployed outside Helm and refuses the chart install. Move such a cluster by removing the dev deployment with `make undeploy-dev` (this deletes the forgeai CRDs and all forgeai objects, so back them up first) and then installing the charts.
 
-Prerequisites (the Dependencies view installs Kubeflow Trainer, agent-sandbox, Kueue, the sshpiper Pipe CRD and the SSH operator into a cluster; `make gui-deps` refreshes the pinned manifests embedded in the GUI):
+Prerequisites (the Dependencies view installs Kubeflow Trainer, agent-sandbox, Kueue, the InstanceType operator, the sshpiper Pipe CRD and the SSH operator into a cluster; `make gui-deps` refreshes the pinned manifests embedded in the GUI):
 
 - Kubeflow Trainer v2 (with JobSet) and a `ClusterTrainingRuntime` named after `training.defaultRuntime`
 - agent-sandbox v1.0 or later (CRDs `agents.x-k8s.io/v1beta1`), for the Sandboxes view; the isolation RuntimeClasses (`gvisor`, `kata`) come from the node runtimes
 - Kueue, with the `trainer.kubeflow.org/trainjob` integration enabled (the bundled Kueue config enables it)
+- InstanceType operator (`forgeai-instancetype-operator` chart), which creates the InstanceTypes and Kueue ResourceFlavors from GPU nodes
 - NVIDIA GPU operator (GPU feature discovery labels and the `nvidia.com/gpu` resource); not installed from the GUI
 - A CNI that enforces NetworkPolicies, an ingress controller and Harbor
 - For SSH sandboxes only: the sshpiper `Pipe` CRD and the [SSH operator](https://github.com/wutz/ssh-operator), see [SSH](#ssh)

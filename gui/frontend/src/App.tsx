@@ -15,7 +15,7 @@ import {Dependencies} from './Dependencies'
 import {Templates} from './Templates'
 import {Scope} from './Scope'
 import {errText} from './util'
-import {CreateAccessContext, Empty, HeaderSlot, Icon, IconName, Pane, Spinner} from './ui'
+import {ChangeAccessContext, CreateAccessContext, Empty, HeaderSlot, Icon, IconName, Pane, Spinner} from './ui'
 import {Preferences} from './Preferences'
 import {TemplateSourcesDialog} from './TemplateSourcesDialog'
 import {UpdateButton, useUpdate} from './Update'
@@ -314,18 +314,20 @@ export default function App() {
             ) : conn ? (
               // Keyed by the connection so every view refetches after a switch.
               <CreateAccessContext.Provider key={`${conn.context}/${conn.namespace}`} value={conn.create}>
-                {shown('overview', <Overview onOpen={setArea} onOpenJob={name => { setJobFocus({name}); setArea('jobs') }}/>)}
-                {shown('jobs', <Jobs focus={jobFocus}/>)}
-                {shown('job-templates', <Templates kind="job"/>)}
-                {shown('sandboxes', <Sandboxes/>)}
-                {shown('sandbox-templates', <Templates kind="sandbox"/>)}
-                {shown('inference', <Inference/>)}
-                {shown('volumes', <Volumes/>)}
-                {shown('files', <FilesView/>)}
-                {shown('images', <Images/>)}
-                {shown('resources', <Resources/>)}
-                {shown('admin', <Admin onProjectsChanged={refreshProjects}/>)}
-                {shown('dependencies', <Dependencies/>)}
+                <ChangeAccessContext.Provider value={conn.change}>
+                  {shown('overview', <Overview onOpen={setArea} onOpenJob={name => { setJobFocus({name}); setArea('jobs') }}/>)}
+                  {shown('jobs', <Jobs focus={jobFocus}/>)}
+                  {shown('job-templates', <Templates kind="job"/>)}
+                  {shown('sandboxes', <Sandboxes/>)}
+                  {shown('sandbox-templates', <Templates kind="sandbox"/>)}
+                  {shown('inference', <Inference/>)}
+                  {shown('volumes', <Volumes/>)}
+                  {shown('files', <FilesView/>)}
+                  {shown('images', <Images/>)}
+                  {shown('resources', <Resources/>)}
+                  {shown('admin', <Admin onProjectsChanged={refreshProjects}/>)}
+                  {shown('dependencies', <Dependencies/>)}
+                </ChangeAccessContext.Provider>
               </CreateAccessContext.Provider>
             ) : loading ? (
               <Spinner label={t('app.connecting')}/>

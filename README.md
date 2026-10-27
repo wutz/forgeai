@@ -261,21 +261,37 @@ make deploy-dev                # ko build -> ghcr.io/wutz/forgeai (public), kube
 
 ### Helm chart
 
-The operator also ships as a Helm chart in `charts/chart`: CRDs, RBAC and the controller Deployment, with the platform config under `platform.config`. The Dependencies view installs the pinned chart version as release `forgeai` in `forgeai-system`; the same install from the CLI:
+The operator also ships as a Helm chart in `charts/chart`: CRDs, RBAC and the controller Deployment, with the platform config under `platform.config`. The InstanceType operator is a separate project with its own chart (see [InstanceType](#instancetype)). Install the InstanceType operator first, then forgeai: forgeai reads the InstanceTypes that the operator creates.
+
+The Dependencies view installs both charts into `forgeai-system` at their pinned versions, in this order. The same installs from the CLI:
 
 ```sh
-helm install forgeai oci://ghcr.io/wutz/charts/forgeai --version 0.4.0 \
+helm install forgeai-instancetype-operator oci://ghcr.io/wutz/charts/forgeai-instancetype-operator --version 0.1.0 \
   --namespace forgeai-system --create-namespace
+helm install forgeai oci://ghcr.io/wutz/charts/forgeai --version 0.4.0 \
+  --namespace forgeai-system
 ```
+
+Upgrading a cluster that runs forgeai 0.3.x: there the `forgeai` release owns the InstanceType CRD `instancetypes.forgeai.wutz.dev`. Helm refuses to install a CRD that another release owns, so before the operator chart is installed the CRD is handed over to the `forgeai-instancetype-operator` release. The Dependencies view does this itself; from the CLI:
+
+```sh
+kubectl annotate crd instancetypes.forgeai.wutz.dev \
+  meta.helm.sh/release-name=forgeai-instancetype-operator \
+  meta.helm.sh/release-namespace=forgeai-system --overwrite
+kubectl label crd instancetypes.forgeai.wutz.dev app.kubernetes.io/managed-by=Helm --overwrite
+```
+
+The CRD carries `helm.sh/resource-policy: keep`, so the later upgrade of `forgeai` to 0.4.0, which no longer ships it, leaves the CRD and its InstanceTypes in place.
 
 Pushing a `v<version>` tag runs `.github/workflows/helm-release.yml`, which publishes the operator image (`ghcr.io/wutz/forgeai:<version>`) and the chart (`oci://ghcr.io/wutz/charts/forgeai:<version>`). `make helm-lint` lints and renders the chart; `make helm-package CHART_VERSION=<version>` writes the package to `dist/`.
 
 A cluster set up with `make deploy-dev` runs the operator outside Helm. Helm does not adopt objects it did not create, so the Dependencies view reports that operator as deployed outside Helm and refuses the chart install. Move such a cluster by removing the dev deployment with `make undeploy-dev` (this deletes the Projects and their CRDs, so back them up first) and then installing the chart.
 
-Prerequisites (the Dependencies view installs the first three into a cluster; `make gui-deps` refreshes the pinned manifests embedded in the GUI):
+Prerequisites (the Dependencies view installs the Trainer, Kueue, agent-sandbox and InstanceType operator charts into a cluster; `make gui-deps` refreshes the pinned manifests embedded in the GUI):
 
 - Kubeflow Trainer v2 (with JobSet) and a `ClusterTrainingRuntime` named after `training.defaultRuntime`
 - agent-sandbox v1.0 or later (CRDs `agents.x-k8s.io/v1beta1`), for the Sandboxes view; the isolation RuntimeClasses (`gvisor`, `kata`) come from the node runtimes
 - Kueue, with the `trainer.kubeflow.org/trainjob` integration enabled (the bundled Kueue config enables it)
+- InstanceType operator (`forgeai-instancetype-operator` chart), which creates the InstanceTypes and Kueue ResourceFlavors from GPU nodes
 - NVIDIA GPU operator (GPU feature discovery labels and the `nvidia.com/gpu` resource); not installed from the GUI
 - A CNI that enforces NetworkPolicies, an ingress controller and Harbor

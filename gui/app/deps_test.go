@@ -123,8 +123,16 @@ func testDeployment(version string, available bool) appsv1.Deployment {
 func TestAssess(t *testing.T) {
 	bundled := Dependency{Name: "kueue", Pinned: "v0.20.2", Installable: true}
 	operator := Dependency{Name: "forgeai", Installable: true, Pinned: forgeaiChartVersion}
+	instanceTypes := Dependency{Name: "instancetype-operator", Installable: true, Pinned: instanceTypeChartVersion}
 	sandbox := Dependency{Name: "agent-sandbox", Pinned: "v1.0.7", Installable: true}
 	gatewayAPI := Dependency{Name: "gateway-api-inference-extension", Pinned: "v1.6.2", Installable: true}
+	// chartDeployment is an operator installed from a chart, which labels it
+	// with helm.sh/chart rather than the GUI's dependency-version label.
+	chartDeployment := func(chart string) appsv1.Deployment {
+		d := testDeployment("", true)
+		d.Labels = map[string]string{helmChartLabel: chart}
+		return d
+	}
 	tests := []struct {
 		name      string
 		dep       Dependency
@@ -134,7 +142,7 @@ func TestAssess(t *testing.T) {
 	}{
 		{"nothing installed", bundled, depHealth{crdsWanted: 2}, "missing", ""},
 		{"some CRDs", bundled, depHealth{crdsWanted: 2, crdsFound: 1}, "degraded", ""},
-		{"CRDs without the operator", operator, depHealth{crdsWanted: 2, crdsFound: 2}, "degraded", ""},
+		{"CRDs without the operator", operator, depHealth{crdsWanted: 2, crdsFound: 2, chart: "forgeai"}, "degraded", ""},
 		{"CRDs without a labelled deployment", bundled, depHealth{crdsWanted: 2, crdsFound: 2}, "unmanaged", ""},
 		{"CRD-only bundle installed by forgeai", gatewayAPI, depHealth{crdsWanted: 1, crdsFound: 1,
 			crdVersion: "v1.6.2"}, "ready", "v1.6.2"},
@@ -147,12 +155,24 @@ func TestAssess(t *testing.T) {
 			deployments: []appsv1.Deployment{testDeployment("v0.18.1", true)}}, "outdated", "v0.18.1"},
 		{"not available", bundled, depHealth{crdsWanted: 2, crdsFound: 2,
 			deployments: []appsv1.Deployment{testDeployment("v0.20.2", false)}}, "degraded", "v0.20.2"},
-		{"operator from the chart", operator, depHealth{crdsWanted: 2, crdsFound: 2,
+		{"operator from the chart", operator, depHealth{crdsWanted: 2, crdsFound: 2, chart: "forgeai",
 			deployments: []appsv1.Deployment{testDeployment(forgeaiChartVersion, true)}}, "ready", forgeaiChartVersion},
-		{"older operator chart", operator, depHealth{crdsWanted: 2, crdsFound: 2,
+		{"older operator chart", operator, depHealth{crdsWanted: 2, crdsFound: 2, chart: "forgeai",
 			deployments: []appsv1.Deployment{testDeployment("0.0.9", true)}}, "outdated", "0.0.9"},
-		{"operator deployed outside Helm", operator, depHealth{crdsWanted: 2, crdsFound: 2,
+		{"operator deployed outside Helm", operator, depHealth{crdsWanted: 2, crdsFound: 2, chart: "forgeai",
 			deployments: []appsv1.Deployment{testDeployment("", true)}}, "unmanaged", ""},
+		{"chart operator missing its Deployment", operator, depHealth{crdsWanted: 2, crdsFound: 2, chart: "forgeai"},
+			"degraded", ""},
+		{"InstanceType operator from the chart", instanceTypes, depHealth{crdsWanted: 1, crdsFound: 1,
+			chart: "forgeai-instancetype-operator", deployments: []appsv1.Deployment{
+				chartDeployment("forgeai-instancetype-operator-" + instanceTypeChartVersion)}},
+			"ready", instanceTypeChartVersion},
+		{"older InstanceType operator chart", instanceTypes, depHealth{crdsWanted: 1, crdsFound: 1,
+			chart: "forgeai-instancetype-operator", deployments: []appsv1.Deployment{
+				chartDeployment("forgeai-instancetype-operator-0.0.9")}}, "outdated", "0.0.9"},
+		{"Deployment of another chart", instanceTypes, depHealth{crdsWanted: 1, crdsFound: 1,
+			chart: "forgeai-instancetype-operator", deployments: []appsv1.Deployment{
+				chartDeployment("forgeai-0.4.0")}}, "unmanaged", ""},
 		{"runs where the config expects", sandbox, depHealth{crdsWanted: 1, crdsFound: 1,
 			deployments: []appsv1.Deployment{testDeployment("v1.0.7", true)},
 			namespace:   "agent-sandbox-system", expectNamespace: "agent-sandbox-system"}, "ready", "v1.0.7"},
@@ -186,12 +206,12 @@ func TestAssessReason(t *testing.T) {
 		expect string
 	}{
 		{"installed outside forgeai", bundled, depHealth{crdsWanted: 2, crdsFound: 2}, "unmanaged", ""},
-		{"operator deployed outside Helm", operator, depHealth{crdsWanted: 2, crdsFound: 2,
+		{"operator deployed outside Helm", operator, depHealth{crdsWanted: 2, crdsFound: 2, chart: "forgeai",
 			deployments: []appsv1.Deployment{testDeployment("", true)}}, "unmanagedHelm", ""},
 		{"runs elsewhere than the config expects", sandbox, depHealth{crdsWanted: 1, crdsFound: 1,
 			deployments: []appsv1.Deployment{testDeployment("v1.0.7", true)},
 			namespace:   "other", expectNamespace: "agent-sandbox-system"}, "namespaceMismatch", "agent-sandbox-system"},
-		{"operator deployment missing", operator, depHealth{crdsWanted: 2, crdsFound: 2}, "operatorMissing", ""},
+		{"operator deployment missing", operator, depHealth{crdsWanted: 2, crdsFound: 2, chart: "forgeai"}, "operatorMissing", ""},
 		{"pinned and available", bundled, depHealth{crdsWanted: 2, crdsFound: 2,
 			deployments: []appsv1.Deployment{testDeployment("v0.20.2", true)}}, "", ""},
 	}
@@ -387,7 +407,7 @@ func TestCheckChartTarget(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := checkChartTarget(context.Background(), tt.k8s)
+			err := checkChartTarget(context.Background(), tt.k8s, forgeaiOperatorChart)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("checkChartTarget = %v, want error %v", err, tt.wantErr)
 			}

@@ -18,8 +18,11 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -38,6 +41,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
+	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
+	operatorcontroller "github.com/wutz/forgeai-instancetype-operator/pkg/controller"
+	operatorplatform "github.com/wutz/forgeai-instancetype-operator/pkg/platform"
 	forgeaiv1alpha1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/platform"
 )
@@ -46,6 +52,19 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 const configNamespace = "forgeai-system"
+
+// operatorModule is the module of the InstanceType operator, which runs the
+// InstanceType reconciler in these tests and owns the InstanceType CRD.
+const operatorModule = "github.com/wutz/forgeai-instancetype-operator"
+
+// operatorCRDDir returns the CRD directory of the operator module this build depends on.
+func operatorCRDDir() (string, error) {
+	out, err := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", operatorModule).Output()
+	if err != nil {
+		return "", fmt.Errorf("locate %s: %w", operatorModule, err)
+	}
+	return filepath.Join(strings.TrimSpace(string(out)), "config", "crd", "bases"), nil
+}
 
 const testPlatformConfig = `
 namespacePrefix: forge-
@@ -106,11 +125,17 @@ var _ = BeforeSuite(func() {
 	var err error
 	err = forgeaiv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
+	err = instancetypev1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+
+	operatorCRDs, err := operatorCRDDir()
+	Expect(err).NotTo(HaveOccurred())
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "..", "config", "crd", "bases"),
+			operatorCRDs,
 			// Trainer and Kueue CRDs exported from the dev cluster.
 			filepath.Join("testdata", "crds"),
 		},
@@ -143,14 +168,15 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	loader := &platform.Loader{Reader: mgr.GetAPIReader(), Namespace: configNamespace}
 	for _, r := range []interface{ SetupWithManager(ctrl.Manager) error }{
-		&InstanceTypeReconciler{Client: mgr.GetClient(), Config: loader},
+		&operatorcontroller.InstanceTypeReconciler{
+			Client: mgr.GetClient(),
+			Config: &operatorplatform.Loader{Reader: mgr.GetAPIReader(), Namespace: configNamespace},
+		},
 		&FileServerReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: loader, Activity: activity.get},
 		&PersistentVolumeClaimReconciler{Client: mgr.GetClient(), Config: loader},
 		&TrainJobReconciler{Client: mgr.GetClient(), Config: loader, Recorder: mgr.GetEventRecorder("forgeai-test")},
 		&InferenceServiceReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: loader},
 		&SandboxReconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: loader, Gateway: true},
-		&SSHGatewayReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: loader},
-		&SSHRouteReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme()},
 	} {
 		Expect(r.SetupWithManager(mgr)).To(Succeed())
 	}

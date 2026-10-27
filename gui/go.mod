@@ -6,6 +6,7 @@ require (
 	github.com/go-logr/logr v1.4.4
 	github.com/wailsapp/wails/v2 v2.16.0
 	github.com/wutz/forgeai v0.0.0-00010101000000-000000000000
+	github.com/wutz/forgeai-instancetype-operator v0.1.0
 	helm.sh/helm/v3 v3.22.1
 	k8s.io/api v0.37.1
 	k8s.io/apimachinery v0.37.1

@@ -20,6 +20,9 @@ const (
 	SSHDAuthorizedKeys = SSHDRunDir + "/" + SSHAuthorizedKeyKey
 )
 
+// SandboxUser is the login account of a sandbox, the only one sshd lets in.
+const SandboxUser = "sandbox"
+
 // SSHDEntrypoint is the command of the sshd sidecar: it stages the keys at
 // SSHDRunDir and execs sshd with the options below.
 const SSHDEntrypoint = "/usr/local/bin/forgeai-sshd"

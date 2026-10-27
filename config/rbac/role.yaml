@@ -87,8 +87,6 @@ rules:
   resources:
   - fileservers
   - inferenceservices
-  - instancetypes
-  - sshgateways
   verbs:
   - create
   - delete
@@ -102,8 +100,6 @@ rules:
   resources:
   - fileservers/finalizers
   - inferenceservices/finalizers
-  - sshgateways/finalizers
-  - sshroutes/finalizers
   verbs:
   - update
 - apiGroups:
@@ -111,9 +107,6 @@ rules:
   resources:
   - fileservers/status
   - inferenceservices/status
-  - instancetypes/status
-  - sshgateways/status
-  - sshroutes/status
   verbs:
   - get
   - patch
@@ -121,9 +114,8 @@ rules:
 - apiGroups:
   - forgeai.wutz.dev
   resources:
+  - instancetypes
   - projects
-  - sshgatewayclasses
-  - sshroutes
   verbs:
   - get
   - list
@@ -144,18 +136,6 @@ rules:
   - inference.networking.k8s.io
   resources:
   - inferencepools
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - kueue.x-k8s.io
-  resources:
-  - resourceflavors
   verbs:
   - create
   - delete
@@ -200,18 +180,6 @@ rules:
   resources:
   - rolebindings
   - roles
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - sshpiper.com
-  resources:
-  - pipes
   verbs:
   - create
   - delete

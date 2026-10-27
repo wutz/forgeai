@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
 
 	"github.com/wutz/forgeai/pkg/kf"
@@ -226,7 +227,7 @@ func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
 // cluster admin may connect to a cluster without the forgeai CRDs, to install
 // them from the Dependencies view; it reports whether they are installed.
 func isolate(ctx context.Context, k8s client.Client, clusterAdmin bool) (bool, error) {
-	list := &v1.InstanceTypeList{}
+	list := &instancetypev1.InstanceTypeList{}
 	if err := k8s.List(ctx, list); err != nil {
 		if clusterAdmin && meta.IsNoMatchError(err) {
 			return false, nil

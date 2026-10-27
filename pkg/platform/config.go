@@ -117,17 +117,6 @@ func (r Registry) APIURL() string {
 	return "https://" + r.Domain
 }
 
-// InstanceTypes controls how GPU nodes are sliced.
-type InstanceTypes struct {
-	// Reserved is kept back on every node for the system before slicing.
-	Reserved struct {
-		CPU    resource.Quantity `json:"cpu"`
-		Memory resource.Quantity `json:"memory"`
-	} `json:"reserved"`
-	// Sizes are the GPU counts offered (capped at the GPUs per node).
-	Sizes []int32 `json:"sizes,omitempty"`
-}
-
 // Quota is the default project quota.
 type Quota struct {
 	// GPUs per GPU class; "*" applies to classes not listed.
@@ -207,17 +196,8 @@ type Sandbox struct {
 	SSHImage string `json:"sshImage,omitempty"`
 }
 
-// Default images of the SSH access. The sshd image is built from images/sshd.
-const (
-	DefaultSSHImage        = "ghcr.io/wutz/forgeai-sshd:0.1.0"
-	DefaultSSHGatewayImage = "ghcr.io/tg123/sshpiperd:v1.6.1"
-)
-
-// SSH configures the SSH gateways.
-type SSH struct {
-	// GatewayImage is the sshpiperd image that serves the SSH gateways.
-	GatewayImage string `json:"gatewayImage,omitempty"`
-}
+// DefaultSSHImage is the sshd sidecar image of an SSH sandbox. It is built from images/sshd.
+const DefaultSSHImage = "ghcr.io/wutz/forgeai-sshd:0.1.0"
 
 // Inference configures the model servers of InferenceServices and the llm-d
 // routers in front of them.
@@ -300,15 +280,13 @@ type Config struct {
 	StorageTypes       map[string]StorageType `json:"storageTypes,omitempty"`
 	DefaultStorageType string                 `json:"defaultStorageType,omitempty"`
 
-	InstanceTypes InstanceTypes `json:"instanceTypes"`
-	DefaultQuota  Quota         `json:"defaultQuota"`
-	Network       Network       `json:"network"`
-	FileServer    FileServer    `json:"fileServer"`
-	Training      Training      `json:"training"`
-	Sandbox       Sandbox       `json:"sandbox"`
-	SSH           SSH           `json:"ssh,omitzero"`
-	Inference     Inference     `json:"inference"`
-	Templates     Templates     `json:"templates,omitzero"`
+	DefaultQuota Quota      `json:"defaultQuota"`
+	Network      Network    `json:"network"`
+	FileServer   FileServer `json:"fileServer"`
+	Training     Training   `json:"training"`
+	Sandbox      Sandbox    `json:"sandbox"`
+	Inference    Inference  `json:"inference"`
+	Templates    Templates  `json:"templates,omitzero"`
 
 	// TrashRetention is the default retention of deleted volumes.
 	TrashRetention metav1.Duration `json:"trashRetention,omitzero"`
@@ -361,11 +339,6 @@ func Parse(data []byte) (*Config, error) {
 	if c.Registry.AdminSecret == "" {
 		c.Registry.AdminSecret = "forgeai-harbor"
 	}
-	if len(c.InstanceTypes.Sizes) == 0 {
-		c.InstanceTypes.Sizes = []int32{1, 2, 4, 8}
-	}
-	defaultQuantity(&c.InstanceTypes.Reserved.CPU, "2")
-	defaultQuantity(&c.InstanceTypes.Reserved.Memory, "16Gi")
 	if c.DefaultQuota.GPUs == nil {
 		c.DefaultQuota.GPUs = map[string]int32{"*": 8}
 	}
@@ -405,9 +378,6 @@ func Parse(data []byte) (*Config, error) {
 	defaultQuantity(&c.Sandbox.ShmSize, "2Gi")
 	if c.Sandbox.SSHImage == "" {
 		c.Sandbox.SSHImage = DefaultSSHImage
-	}
-	if c.SSH.GatewayImage == "" {
-		c.SSH.GatewayImage = DefaultSSHGatewayImage
 	}
 	if c.Inference.Image == "" {
 		c.Inference.Image = "vllm/vllm-openai:v0.32.0"

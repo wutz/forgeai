@@ -258,14 +258,15 @@ function SandboxDetail({name, onDone, onDeleted, onClose}: {
   }, [name, active])
 
   // The heartbeat keeps a running sandbox from going idle. A stopped one is left alone.
+  // An account that may not change the sandbox cannot keep it awake, so it does not beat.
   // A failed beat is shown: the sandbox may then go idle and be suspended without the user knowing.
   const running = box?.phase === 'Running' || box?.phase === 'Pending'
   useEffect(() => {
-    if (!active || !running) return
+    if (!active || !running || !change.sandboxes) return
     const beat = () => KeepSandboxAwake(name).then(() => setHeartbeatError(''), e => setHeartbeatError(errText(e)))
     beat()
     return everyWhileVisible(beat, HEARTBEAT)
-  }, [name, active, running])
+  }, [name, active, running, change.sandboxes])
 
   const failure = error || loadError
   if (!box) return <Card>{failure

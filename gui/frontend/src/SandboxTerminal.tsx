@@ -97,7 +97,8 @@ export function SandboxTerminal({name}: {name: string}) {
         term.write(c.data)
         return
       }
-      const text = c.exit ? t('terminal.sessionEndedWith', {message: c.exit}) : t('terminal.sessionEnded')
+      // The exit text is the backend's English error; errText maps the known ones to the catalogue.
+      const text = c.exit ? t('terminal.sessionEndedWith', {message: errText(new Error(c.exit))}) : t('terminal.sessionEnded')
       term.write(`\r\n\x1b[90m[${text}]\x1b[0m\r\n`)
       // An ended shell takes no input; keys would otherwise vanish silently.
       term.options.disableStdin = true

@@ -269,10 +269,10 @@ helm install forgeai oci://ghcr.io/wutz/charts/forgeai --version 0.4.0 \
 
 Pushing a `v<version>` tag runs `.github/workflows/helm-release.yml`, which publishes the operator image (`ghcr.io/wutz/forgeai:<version>`) and the chart (`oci://ghcr.io/wutz/charts/forgeai:<version>`). `make helm-lint` lints and renders the chart; `make helm-package CHART_VERSION=<version>` writes the package to `dist/`.
 
-The SSH operator is a separate project, [wutz/ssh-operator](https://github.com/wutz/ssh-operator), published as the chart `oci://ghcr.io/wutz/charts/ssh-operator`. The Dependencies view installs the sshpiper `Pipe` CRD, then the pinned chart version (0.1.0) as release `ssh-operator` in `ssh-operator-system`, with `platform.namespace` set to the platform namespace. The same install from the CLI, once the Pipe CRD is in the cluster:
+The SSH operator is a separate project, [wutz/ssh-operator](https://github.com/wutz/ssh-operator), published as the chart `oci://ghcr.io/wutz/charts/ssh-operator`. The Dependencies view installs the sshpiper `Pipe` CRD, then the pinned chart version (0.1.1) as release `ssh-operator` in `ssh-operator-system`, with `platform.namespace` set to the platform namespace. The same install from the CLI, once the Pipe CRD is in the cluster:
 
 ```sh
-helm install ssh-operator oci://ghcr.io/wutz/charts/ssh-operator --version 0.1.0 \
+helm install ssh-operator oci://ghcr.io/wutz/charts/ssh-operator --version 0.1.1 \
   --namespace ssh-operator-system --create-namespace \
   --set platform.namespace=forgeai-system
 ```

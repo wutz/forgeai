@@ -72,7 +72,7 @@ var forgeaiSpec = &chartSpec{
 // it needs the Pipe CRD of sshpiper, a bundled component installed first.
 const (
 	sshOperatorChart        = "oci://ghcr.io/wutz/charts/ssh-operator"
-	sshOperatorChartVersion = "0.1.0"
+	sshOperatorChartVersion = "0.1.1"
 	sshOperatorRelease      = "ssh-operator"
 	sshOperatorNamespace    = "ssh-operator-system"
 	sshOperatorDeployment   = "ssh-operator-controller-manager"

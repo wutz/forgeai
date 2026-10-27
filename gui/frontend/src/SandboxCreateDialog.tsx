@@ -232,7 +232,8 @@ export function SandboxCreateDialog({onClose, onCreated}: {
                       onChange={e => set('instanceType', e.target.value)}>
                 <option value="">{t('sandboxCreate.cpuOnly')}</option>
                 {types.map(ty => <option key={ty.name} value={ty.name}>
-                  {ty.name} · {ty.gpuCount ? `${ty.gpuCount}×${ty.class}` : t('sandboxCreate.cpuOnly')} · {ty.cpu}/{ty.memory}{t('sandboxCreate.instanceFree', {free: ty.free})}
+                  {/* Only a GPU class has a status; a type without one reports no free count. */}
+                  {ty.name} · {ty.gpuCount ? `${ty.gpuCount}×${ty.class}` : t('sandboxCreate.cpuOnly')} · {ty.cpu}/{ty.memory}{ty.total > 0 && t('sandboxCreate.instanceFree', {free: ty.free})}
                 </option>)}
               </select>
             </div>

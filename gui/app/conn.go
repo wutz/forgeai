@@ -283,6 +283,9 @@ func createAccess(ctx context.Context, k8s client.Client, namespace string) Crea
 		Inference:        canCreate(ctx, k8s, namespace, v1.GroupVersion.Group, "inferenceservices"),
 		Sandboxes:        canCreate(ctx, k8s, namespace, sandbox.Group, "sandboxes"),
 		SandboxTemplates: canCreate(ctx, k8s, namespace, sandbox.ExtensionsGroup, "sandboxtemplates"),
+		SandboxTerminal: allowed(ctx, k8s, &authv1.ResourceAttributes{
+			Namespace: namespace, Resource: "pods", Subresource: "exec", Verb: "create",
+		}),
 	}
 }
 

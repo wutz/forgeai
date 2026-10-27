@@ -23,6 +23,7 @@ export const useActive = () => useContext(ActiveView)
 export const CreateAccessContext = createContext<app.CreateAccess | null>(null)
 const noCreate: app.CreateAccess = {
   jobs: false, jobTemplates: false, volumes: false, inference: false, sandboxes: false, sandboxTemplates: false,
+  sandboxTerminal: false,
 }
 export const useCreateAccess = (): app.CreateAccess => useContext(CreateAccessContext) ?? noCreate
 

@@ -65,10 +65,10 @@ export function Admin({onProjectsChanged}: {onProjectsChanged: () => void}) {
                     {list.length === 1 ? t('admin.metaOne', {ready}) : t('admin.meta', {total: list.length, ready})}
                   </span>}
                   actions={<>
-                    <RefreshButton onRefresh={refresh}/>
                     <button className="btn" onClick={() => edit('')}>
-                      <Icon name="plus" size={14}/>{t('admin.newProject')}
+                      <Icon name="plus" size={14}/>{t('common.new')}
                     </button>
+                    <RefreshButton onRefresh={refresh}/>
                   </>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {confirm.dialog}

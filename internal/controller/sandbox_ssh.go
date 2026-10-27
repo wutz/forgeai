@@ -41,6 +41,9 @@ const (
 	sshPublicKeyKey  = "ssh-publickey"
 )
 
+// sshPortName names the SSH port of the sshd sidecar and of its Service.
+const sshPortName = "ssh"
+
 // ensureSSH gives an SSH sandbox the Service that reaches its sshd sidecar and
 // the Secret that holds the sshd host key and the platform public key. Both are
 // owned by the sandbox and go with it.

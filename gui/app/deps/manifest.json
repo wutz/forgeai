@@ -27,6 +27,13 @@
       "source": "https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/tag/v1.6.2",
       "file": "gateway-api-inference-extension.yaml",
       "sha256": "f410dfca474608c02903087b47f1ac081706dfb6dfe7f83d00a7cc7e00c4ad0d"
+    },
+    {
+      "name": "sshpiper",
+      "version": "v1.6.1",
+      "source": "https://github.com/tg123/sshpiper/tree/v1.6.1/plugin/kubernetes",
+      "file": "sshpiper.yaml",
+      "sha256": "140d4d2a102a431dd11fb125954387c3ad93b414d754480f9a3197c3ed77f802"
     }
   ]
 }

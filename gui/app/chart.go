@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -26,27 +27,22 @@ import (
 	"github.com/wutz/forgeai/pkg/platform"
 )
 
-// helmChart is a component installed from a Helm chart rather than from an
-// embedded bundle. Every chart installs into the platform namespace, where the
-// operators read the platform config.
-type helmChart struct {
-	// name is the chart name, the prefix of the helm.sh/chart label its
-	// objects carry: "<name>-<version>".
-	name string
-	// ref is the OCI reference the chart is pulled from.
-	ref string
-	// version is the chart version the GUI pins. For a chart whose app version
-	// is an operator image tag, a release bumps both together.
+// chartSpec is a component installed from a Helm chart: where the chart is, the
+// version the GUI pins, and what the cluster must hold for the install.
+type chartSpec struct {
+	// name is the chart name, which Helm stamps on each object as helm.sh/chart.
+	name    string
+	ref     string
 	version string
-	// release is the Helm release the chart is installed as.
 	release string
-	// deployment is the controller Deployment the chart runs.
+	// namespace is where the chart is installed; empty for the platform namespace.
+	namespace  string
 	deployment string
-	// crds are the CRDs the chart installs; the Dependencies view counts them.
-	crds []string
-	// ownerLabel must be set on an existing controller Deployment for the GUI to
-	// upgrade it: a Deployment without it was not installed from the chart.
-	ownerLabel string
+	crds       []string
+	// needs are CRDs of other components the chart's controller requires.
+	needs []string
+	// values returns the chart values of the install, nil for the chart's defaults.
+	values func() map[string]any
 	// adoptFrom is a release whose chart shipped crds before they moved to this
 	// chart. Helm refuses to install objects another release owns, so the
 	// install hands them over first (see adoptCRDs).
@@ -58,51 +54,76 @@ const (
 	helmReleaseNameKey      = "meta.helm.sh/release-name"
 	helmReleaseNamespaceKey = "meta.helm.sh/release-namespace"
 	helmManagedByKey        = "app.kubernetes.io/managed-by"
-	helmChartLabel          = "helm.sh/chart"
 )
 
+// installNamespace is the namespace the chart is installed into.
+func (s *chartSpec) installNamespace() string {
+	if s.namespace != "" {
+		return s.namespace
+	}
+	return platform.Namespace()
+}
+
+// The forgeai operator is installed from its Helm chart. forgeaiChartVersion
+// is the chart version the GUI pins; the chart's app version is the operator
+// image tag, so a release bumps both together.
 const (
+	forgeaiChart        = "oci://ghcr.io/wutz/charts/forgeai"
 	forgeaiChartVersion = "0.4.0"
 	forgeaiRelease      = "forgeai"
-
-	instanceTypeChartVersion = "0.1.1"
-	instanceTypeRelease      = "forgeai-instancetype-operator"
-	// instanceTypeDeployment is the operator Deployment: the chart prefixes its
-	// name with the release.
-	instanceTypeDeployment = "forgeai-instancetype-operator-controller-manager"
 )
 
-// forgeaiOperatorChart is the forgeai operator. It no longer ships the
-// InstanceType CRD, which the InstanceType operator's chart installs.
-var forgeaiOperatorChart = helmChart{
-	name:       "forgeai",
-	ref:        "oci://ghcr.io/wutz/charts/forgeai",
-	version:    forgeaiChartVersion,
-	release:    forgeaiRelease,
-	deployment: forgeaiDeployment,
-	crds:       forgeaiCRDs,
-	ownerLabel: depLabel,
+var forgeaiSpec = &chartSpec{
+	name: "forgeai", ref: forgeaiChart, version: forgeaiChartVersion, release: forgeaiRelease,
+	deployment: forgeaiDeployment, crds: forgeaiCRDs,
 }
 
-// instanceTypeOperatorChart is the InstanceType operator, published from
-// github.com/wutz/forgeai-instancetype-operator. It takes over the
-// InstanceType CRD from the forgeai release that shipped it.
-var instanceTypeOperatorChart = helmChart{
-	name:       "forgeai-instancetype-operator",
-	ref:        "oci://ghcr.io/wutz/charts/forgeai-instancetype-operator",
-	version:    instanceTypeChartVersion,
-	release:    instanceTypeRelease,
-	deployment: instanceTypeDeployment,
-	crds:       []string{"instancetypes.forgeai.wutz.dev"},
-	ownerLabel: helmManagedByKey,
-	adoptFrom:  forgeaiRelease,
+// The SSH operator is installed from its own Helm chart into its namespace. Its
+// SSHGateways are served in the platform namespace, which the chart is told, and
+// it needs the Pipe CRD of sshpiper, a bundled component installed first.
+const (
+	sshOperatorChart        = "oci://ghcr.io/wutz/charts/ssh-operator"
+	sshOperatorChartVersion = "0.1.0"
+	sshOperatorRelease      = "ssh-operator"
+	sshOperatorNamespace    = "ssh-operator-system"
+	sshOperatorDeployment   = "ssh-operator-controller-manager"
+)
+
+var sshOperatorSpec = &chartSpec{
+	name: "ssh-operator", ref: sshOperatorChart, version: sshOperatorChartVersion, release: sshOperatorRelease,
+	namespace: sshOperatorNamespace, deployment: sshOperatorDeployment,
+	crds:  []string{"sshgatewayclasses.forgeai.wutz.dev", "sshgateways.forgeai.wutz.dev", "sshroutes.forgeai.wutz.dev"},
+	needs: []string{"pipes.sshpiper.com"},
+	values: func() map[string]any {
+		return map[string]any{"platform": map[string]any{"namespace": platform.Namespace()}}
+	},
 }
 
-// installChart installs the chart into the platform namespace, or upgrades the
-// release already there. The chart is pulled from the OCI registry at its
+// The InstanceType operator is installed from its own Helm chart. It derives the
+// InstanceTypes and Kueue ResourceFlavors that forgeai reads. Its CRD was shipped
+// by the forgeai chart before the split, so the install adopts it from forgeai.
+const (
+	instanceTypeOperatorChart        = "oci://ghcr.io/wutz/charts/forgeai-instancetype-operator"
+	instanceTypeOperatorChartVersion = "0.1.1"
+	instanceTypeOperatorRelease      = "forgeai-instancetype-operator"
+	instanceTypeOperatorDeployment   = "forgeai-instancetype-operator-controller-manager"
+)
+
+var instanceTypeOperatorSpec = &chartSpec{
+	name: "forgeai-instancetype-operator", ref: instanceTypeOperatorChart, version: instanceTypeOperatorChartVersion,
+	release: instanceTypeOperatorRelease, deployment: instanceTypeOperatorDeployment,
+	crds:      []string{"instancetypes.forgeai.wutz.dev"},
+	adoptFrom: forgeaiRelease,
+	values: func() map[string]any {
+		return map[string]any{"platform": map[string]any{"namespace": platform.Namespace()}}
+	},
+}
+
+// installChart installs the chart of spec into its namespace, or upgrades the
+// release already there. The chart is pulled from the OCI registry at the
 // pinned version and waited on until its Deployment is up.
-func installChart(ctx context.Context, c *Connection, ch helmChart, progress func(string)) error {
-	ns := platform.Namespace()
+func installChart(ctx context.Context, c *Connection, spec *chartSpec, progress func(string)) error {
+	ns := spec.installNamespace()
 	progress(stepChartNamespace)
 	if err := ensureNamespace(ctx, c.k8s, ns); err != nil {
 		return err
@@ -119,13 +140,13 @@ func installChart(ctx context.Context, c *Connection, ch helmChart, progress fun
 	up := action.NewUpgrade(cfg)
 	up.Install = true
 	up.Namespace = ns
-	up.Version = ch.version
+	up.Version = spec.version
 	up.Wait = true
 	up.Atomic = true
 	up.Timeout = deploymentReadyTimeout
 
 	progress(stepChartPull)
-	path, err := up.ChartPathOptions.LocateChart(ch.ref, cli.New())
+	path, err := up.ChartPathOptions.LocateChart(spec.ref, cli.New())
 	if err != nil {
 		return err
 	}
@@ -133,23 +154,25 @@ func installChart(ctx context.Context, c *Connection, ch helmChart, progress fun
 	if err != nil {
 		return err
 	}
-	progress(stepChartInstall)
-	if err := adoptCRDs(ctx, c.k8s, ch, ns); err != nil {
-		return err
+	var values map[string]any
+	if spec.values != nil {
+		values = spec.values()
 	}
-	_, err = up.RunWithContext(ctx, ch.release, chrt, nil)
+	if spec.adoptFrom != "" {
+		if err := adoptCRDs(ctx, c.k8s, spec, ns); err != nil {
+			return err
+		}
+	}
+	progress(stepChartInstall)
+	_, err = up.RunWithContext(ctx, spec.release, chrt, values)
 	return err
 }
 
-// adoptCRDs hands the CRDs of ch.adoptFrom over to ch. A chart keeps its CRDs
-// when its release is uninstalled (helm.sh/resource-policy: keep), so after the
-// old release drops them they still carry its ownership. Helm would refuse to
-// install them for ch; re-labelling them lets the install take them over.
-func adoptCRDs(ctx context.Context, k8s client.Client, ch helmChart, ns string) error {
-	if ch.adoptFrom == "" {
-		return nil
-	}
-	for _, name := range ch.crds {
+// adoptCRDs hands the CRDs of spec from the release adoptFrom to spec's release,
+// so Helm accepts them as the new chart's. The keep policy on the CRDs keeps them
+// when the old release lets go of them. CRDs of other releases are left alone.
+func adoptCRDs(ctx context.Context, k8s client.Client, spec *chartSpec, ns string) error {
+	for _, name := range spec.crds {
 		u := &unstructured.Unstructured{}
 		u.SetGroupVersionKind(crdGVK)
 		err := k8s.Get(ctx, client.ObjectKey{Name: name}, u)
@@ -159,13 +182,13 @@ func adoptCRDs(ctx context.Context, k8s client.Client, ch helmChart, ns string) 
 		if err != nil {
 			return err
 		}
-		if u.GetAnnotations()[helmReleaseNameKey] != ch.adoptFrom {
+		anns := u.GetAnnotations()
+		if anns[helmReleaseNameKey] != spec.adoptFrom {
 			continue
 		}
-		annotations := u.GetAnnotations()
-		annotations[helmReleaseNameKey] = ch.release
-		annotations[helmReleaseNamespaceKey] = ns
-		u.SetAnnotations(annotations)
+		anns[helmReleaseNameKey] = spec.release
+		anns[helmReleaseNamespaceKey] = ns
+		u.SetAnnotations(anns)
 		labels := u.GetLabels()
 		if labels == nil {
 			labels = map[string]string{}
@@ -179,21 +202,44 @@ func adoptCRDs(ctx context.Context, k8s client.Client, ch helmChart, ns string) 
 	return nil
 }
 
-// checkChartTarget refuses to install the chart over an operator that was not
-// installed from it: Helm does not adopt objects it did not create.
-func checkChartTarget(ctx context.Context, k8s client.Client, ch helmChart) error {
+// checkChartTarget refuses an install that the cluster cannot take: a needed
+// CRD that is missing, or an operator the chart did not install. Helm does not
+// adopt objects it did not create.
+func checkChartTarget(ctx context.Context, k8s client.Client, spec *chartSpec) error {
+	for _, crd := range spec.needs {
+		u := &unstructured.Unstructured{}
+		u.SetGroupVersionKind(crdGVK)
+		err := k8s.Get(ctx, client.ObjectKey{Name: crd}, u)
+		if apierrors.IsNotFound(err) {
+			return fmt.Errorf("%s needs the %s CRD; install the component that provides it first", spec.name, crd)
+		}
+		if err != nil {
+			return err
+		}
+	}
 	d := &appsv1.Deployment{}
-	err := k8s.Get(ctx, client.ObjectKey{Namespace: platform.Namespace(), Name: ch.deployment}, d)
+	err := k8s.Get(ctx, client.ObjectKey{Namespace: spec.installNamespace(), Name: spec.deployment}, d)
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	if _, ok := d.Labels[ch.ownerLabel]; !ok {
-		return fmt.Errorf("the %s operator was deployed outside Helm; remove it before installing the chart", ch.release)
+	if chartLabelVersion(d.Labels, spec.name) == "" {
+		return fmt.Errorf("%s is deployed outside Helm; remove it before installing the chart", spec.deployment)
 	}
 	return nil
+}
+
+// chartLabelVersion returns the version of the chart named chartName that
+// installed an object, from its helm.sh/chart label. It is empty when another
+// chart, or none, installed the object.
+func chartLabelVersion(labels map[string]string, chartName string) string {
+	v, ok := strings.CutPrefix(labels[helmChartLabel], chartName+"-")
+	if !ok {
+		return ""
+	}
+	return v
 }
 
 // ensureNamespace creates the namespace unless it exists.

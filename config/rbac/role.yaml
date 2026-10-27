@@ -109,7 +109,6 @@ rules:
   - fileservers
   - inferenceservices
   - projects
-  - sshgateways
   verbs:
   - create
   - delete
@@ -124,8 +123,6 @@ rules:
   - fileservers/finalizers
   - inferenceservices/finalizers
   - projects/finalizers
-  - sshgateways/finalizers
-  - sshroutes/finalizers
   verbs:
   - update
 - apiGroups:
@@ -134,8 +131,6 @@ rules:
   - fileservers/status
   - inferenceservices/status
   - projects/status
-  - sshgateways/status
-  - sshroutes/status
   verbs:
   - get
   - patch
@@ -144,8 +139,6 @@ rules:
   - forgeai.wutz.dev
   resources:
   - instancetypes
-  - sshgatewayclasses
-  - sshroutes
   verbs:
   - get
   - list
@@ -247,18 +240,6 @@ rules:
   - create
   - delete
   - escalate
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - sshpiper.com
-  resources:
-  - pipes
-  verbs:
-  - create
-  - delete
   - get
   - list
   - patch

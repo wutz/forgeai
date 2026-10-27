@@ -35,7 +35,7 @@ func TestAdoptCRDs(t *testing.T) {
 		crd("projects.forgeai.wutz.dev", "other"),
 	).Build()
 
-	if err := adoptCRDs(context.Background(), k8s, instanceTypeOperatorChart, "forgeai-system"); err != nil {
+	if err := adoptCRDs(context.Background(), k8s, instanceTypeOperatorSpec, "forgeai-system"); err != nil {
 		t.Fatalf("adoptCRDs: %v", err)
 	}
 
@@ -44,8 +44,8 @@ func TestAdoptCRDs(t *testing.T) {
 	if err := k8s.Get(context.Background(), client.ObjectKey{Name: "instancetypes.forgeai.wutz.dev"}, got); err != nil {
 		t.Fatal(err)
 	}
-	if got.GetAnnotations()[helmReleaseNameKey] != instanceTypeRelease {
-		t.Errorf("release-name = %q, want %q", got.GetAnnotations()[helmReleaseNameKey], instanceTypeRelease)
+	if got.GetAnnotations()[helmReleaseNameKey] != instanceTypeOperatorRelease {
+		t.Errorf("release-name = %q, want %q", got.GetAnnotations()[helmReleaseNameKey], instanceTypeOperatorRelease)
 	}
 	if got.GetAnnotations()[helmReleaseNamespaceKey] != "forgeai-system" {
 		t.Errorf("release-namespace = %q, want forgeai-system", got.GetAnnotations()[helmReleaseNamespaceKey])

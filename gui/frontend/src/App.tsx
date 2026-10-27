@@ -12,6 +12,7 @@ import {Images} from './Images'
 import {Resources} from './Resources'
 import {Admin} from './Admin'
 import {Dependencies} from './Dependencies'
+import {Templates} from './Templates'
 import {Scope} from './Scope'
 import {errText} from './util'
 import {CreateAccessContext, Empty, HeaderSlot, Icon, IconName, Pane, Spinner} from './ui'
@@ -29,10 +30,11 @@ const SIDEBAR = 'forgeai.sidebar'
 const NARROW = '(max-width: 820px)'
 const isNarrow = () => window.matchMedia(NARROW).matches
 
-type Area = 'overview' | 'jobs' | 'sandboxes' | 'inference' | 'volumes' | 'files' | 'images' | 'resources'
-  | 'admin' | 'dependencies'
+type Area = 'overview' | 'jobs' | 'job-templates' | 'sandboxes' | 'sandbox-templates' | 'inference' | 'volumes'
+  | 'files' | 'images' | 'resources' | 'admin' | 'dependencies'
 
-type NavItem = {area: Area, label: string, icon: IconName}
+// A nav item may fold a child list beneath it; the children are views of their own.
+type NavItem = {area: Area, label: string, icon: IconName, children?: {area: Area, label: string}[]}
 
 // readJSON reads a JSON value from localStorage. A damaged entry counts as
 // absent, so it cannot stop the connection that reads it.
@@ -76,7 +78,7 @@ function areaFor(current: Area, info: app.ConnInfo): Area {
   if (!info.project) return offered.includes(current) ? current : offered[0] ?? 'overview'
   if (offered.includes(current)) return current
   if (current === 'admin' || current === 'dependencies') return 'overview'
-  if (current === 'sandboxes' && !info.sandboxes) return 'overview'
+  if ((current === 'sandboxes' || current === 'sandbox-templates') && !info.sandboxes) return 'overview'
   if (current === 'inference' && !info.inference) return 'overview'
   return current
 }
@@ -94,6 +96,8 @@ export default function App() {
   const [area, setArea] = useState<Area>('overview')
   // sourcesOpen shows the template sources dialog, opened from the sidebar.
   const [sourcesOpen, setSourcesOpen] = useState(false)
+  // expanded lists the nav items whose child list is open. A list starts folded.
+  const [expanded, setExpanded] = useState<Area[]>([])
   // jobFocus asks the Jobs page to select a job; a new object each time, so the same job can be picked again.
   const [jobFocus, setJobFocus] = useState<{name: string} | null>(null)
   // visited lists the areas opened on this connection. A view mounts on its
@@ -176,6 +180,9 @@ export default function App() {
   const opened = visited.includes(area) ? visited : [...visited, area]
   const shown = (a: Area, view: ReactNode) => opened.includes(a) && <Pane on={area === a}>{view}</Pane>
 
+  const toggleChildren = (parent: Area) => setExpanded(v =>
+    v.includes(parent) ? v.filter(a => a !== parent) : [...v, parent])
+
   const switchCluster = (name: string) => {
     if (name !== conn?.context) connectTo(name)
   }
@@ -198,15 +205,19 @@ export default function App() {
 
   // The sidebar groups areas like the reference consoles: workspace, storage,
   // cluster catalogue, then admin. Sandboxes appear only when the connected
-  // cluster runs agents.x-k8s.io. Templates are reached from the tab row of
-  // their Sandboxes and Jobs pages.
+  // cluster runs agents.x-k8s.io. Each of Sandboxes and Jobs folds its template
+  // list beneath it.
   const groups: {label: string, items: NavItem[]}[] = conn?.project ? [
     {
       label: t('nav.workspace'),
       items: [
         {area: 'overview', label: t('nav.overview'), icon: 'grid'},
-        ...(conn.sandboxes ? [{area: 'sandboxes', label: t('nav.sandboxes'), icon: 'box'} as NavItem] : []),
-        {area: 'jobs', label: t('nav.jobs'), icon: 'play'},
+        ...(conn.sandboxes ? [{
+          area: 'sandboxes', label: t('nav.sandboxes'), icon: 'box',
+          children: [{area: 'sandbox-templates', label: t('sandboxes.templates')}],
+        } as NavItem] : []),
+        {area: 'jobs', label: t('nav.jobs'), icon: 'play',
+          children: [{area: 'job-templates', label: t('jobs.templates')}]},
         ...(conn.inference ? [{area: 'inference', label: t('nav.inference'), icon: 'bolt'} as NavItem] : []),
       ],
     },
@@ -251,18 +262,44 @@ export default function App() {
             {groups.map(g => (
               <div className="nav-group" key={g.label}>
                 <div className="nav-label">{g.label}</div>
-                {g.items.map(item => (
-                  <button key={item.area} className={`nav-item ${area === item.area ? 'active' : ''}`}
-                          onClick={() => {
-                            setArea(item.area)
-                            // On a narrow window the rail is an overlay; picking a page dismisses it.
-                            if (isNarrow()) setCollapsed(true)
-                          }}
-                          title={collapsed ? item.label : undefined}
-                          aria-label={item.label} aria-current={area === item.area ? 'page' : undefined}>
-                    <Icon name={item.icon}/><span>{item.label}</span>
-                  </button>
-                ))}
+                {g.items.map(item => {
+                  const open = !!item.children && expanded.includes(item.area)
+                  // A folded list still shows its parent as current while one of its children is on screen.
+                  const inside = !open && !!item.children?.some(c => c.area === area)
+                  const go = (a: Area) => {
+                    setArea(a)
+                    // On a narrow window the rail is an overlay; picking a page dismisses it.
+                    if (isNarrow()) setCollapsed(true)
+                  }
+                  return (
+                    <div key={item.area} className="nav-branch">
+                      <div className="nav-row">
+                        <button className={`nav-item ${item.children ? 'has-children' : ''} ${area === item.area || inside ? 'active' : ''}`}
+                                onClick={() => go(item.area)}
+                                title={collapsed ? item.label : undefined}
+                                aria-label={item.label} aria-current={area === item.area ? 'page' : undefined}>
+                          <Icon name={item.icon}/><span>{item.label}</span>
+                        </button>
+                        {item.children && <button className="nav-toggle" aria-expanded={open}
+                                                  aria-controls={`nav-sub-${item.area}`}
+                                                  aria-label={open ? t('nav.collapse', {label: item.label}) : t('nav.expand', {label: item.label})}
+                                                  title={open ? t('nav.collapse', {label: item.label}) : t('nav.expand', {label: item.label})}
+                                                  onClick={() => toggleChildren(item.area)}>
+                          <Icon name="chevron" size={12}/>
+                        </button>}
+                      </div>
+                      {item.children && open && <div className="nav-sub" id={`nav-sub-${item.area}`}>
+                        {item.children.map(c => (
+                          <button key={c.area} className={`nav-item ${area === c.area ? 'active' : ''}`}
+                                  onClick={() => go(c.area)}
+                                  aria-label={c.label} aria-current={area === c.area ? 'page' : undefined}>
+                            <span>{c.label}</span>
+                          </button>
+                        ))}
+                      </div>}
+                    </div>
+                  )
+                })}
               </div>
             ))}
             <Preferences update={update} onManageSources={() => setSourcesOpen(true)}/>
@@ -279,7 +316,9 @@ export default function App() {
               <CreateAccessContext.Provider key={`${conn.context}/${conn.namespace}`} value={conn.create}>
                 {shown('overview', <Overview onOpen={setArea} onOpenJob={name => { setJobFocus({name}); setArea('jobs') }}/>)}
                 {shown('jobs', <Jobs focus={jobFocus}/>)}
+                {shown('job-templates', <Templates kind="job"/>)}
                 {shown('sandboxes', <Sandboxes/>)}
+                {shown('sandbox-templates', <Templates kind="sandbox"/>)}
                 {shown('inference', <Inference/>)}
                 {shown('volumes', <Volumes/>)}
                 {shown('files', <FilesView/>)}

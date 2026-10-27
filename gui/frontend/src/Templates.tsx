@@ -12,11 +12,11 @@ type Kind = 'sandbox' | 'job'
 const byName = <T extends {name: string}>(items: T[]) =>
   [...items].sort((a, b) => a.name.localeCompare(b.name))
 
-// Templates is one kind's template list, opened from the top bar of its page:
-// sandbox templates (agent blueprints new sandboxes start from) in Sandboxes, and
-// job templates (namespaced TrainingRuntimes that prefill the job form) in Jobs.
-// Each list is sorted by name. onBack returns to the page's list.
-export function Templates({kind, onBack}: {kind: Kind, onBack: () => void}) {
+// Templates is one kind's template list, opened from the sidebar under its page:
+// sandbox templates (agent blueprints new sandboxes start from) under Sandboxes,
+// and job templates (namespaced TrainingRuntimes that prefill the job form) under
+// Jobs. Each list is sorted by name.
+export function Templates({kind}: {kind: Kind}) {
   // The lists are null until the first read, so a failed first read is not shown as an empty list.
   const [sandboxItems, setSandboxItems] = useState<app.SandboxTemplate[] | null>(null)
   const [jobItems, setJobItems] = useState<app.Template[] | null>(null)
@@ -54,7 +54,7 @@ export function Templates({kind, onBack}: {kind: Kind, onBack: () => void}) {
 
 
   return (
-    <>
+    <div className="page">
       <PageHeader eyebrow={t(isSandbox ? 'sandboxes.title' : 'jobs.title')} title={t(isSandbox ? 'sandboxes.templates' : 'jobs.templates')}
                   meta={<span className="muted" style={{fontSize: 12.5}}>
                     {isSandbox
@@ -62,9 +62,6 @@ export function Templates({kind, onBack}: {kind: Kind, onBack: () => void}) {
                       : jobItems !== null && t('templates.countJob', {count: jobItems.length})}
                   </span>}
                   actions={<>
-                    <button className="btn btn-ghost" onClick={onBack}>
-                      <Icon name="back" size={14}/>{t('common.back')}
-                    </button>
                     {canCreate && <button className="btn" onClick={() => isSandbox
                       ? setSandboxDialog({})
                       : setJobDialog({form: blankJobForm()})}>
@@ -99,7 +96,7 @@ export function Templates({kind, onBack}: {kind: Kind, onBack: () => void}) {
               form: training.Form.createFrom({...tpl.form, name: tpl.name}), existing: tpl.name, version: tpl.resourceVersion,
             })} onDelete={onDeleteJob}/>}
       </Card>}
-    </>
+    </div>
   )
 }
 

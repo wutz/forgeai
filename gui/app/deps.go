@@ -34,7 +34,7 @@ import (
 
 // The cluster components forgeai runs on. Their install manifests are
 // embedded from deps/, rendered at the pinned versions by hack/gui-deps.sh.
-// The forgeai operator itself is installed from its Helm chart (chart.go).
+// The operators are installed from their Helm charts (chart.go).
 //
 //go:embed deps
 var depsFS embed.FS
@@ -44,6 +44,9 @@ const (
 	// the GUI finds the deployed version of a component on the cluster.
 	depLabel        = "forgeai.wutz.dev/dependency"
 	depVersionLabel = "forgeai.wutz.dev/dependency-version"
+	// helmChartLabel is the label Helm stamps on the objects of a chart, with the
+	// chart name and version: the GUI finds the version of a chart-installed operator in it.
+	helmChartLabel = "helm.sh/chart"
 	// fieldOwner is the server-side apply manager of the installs.
 	fieldOwner = "forgeai-gui"
 	// depProgressEvent carries DependencyProgress to the frontend.
@@ -92,19 +95,21 @@ type depInfo struct {
 	name        string
 	title       string
 	description string
-	// chart is set for components installed from the forgeai Helm chart
-	// rather than from an embedded bundle.
-	chart bool
+	// chart is set for components installed from a Helm chart rather than from an embedded bundle.
+	chart *chartSpec
 }
 
 // depCatalog lists the components in install order: Kueue's TrainJob
-// integration needs the Trainer CRDs, so Trainer comes first.
+// integration needs the Trainer CRDs, so Trainer comes first, and the SSH
+// operator needs the sshpiper Pipe CRD.
 var depCatalog = []depInfo{
 	{name: "trainer", title: "Kubeflow Trainer v2", description: "TrainJobs and the ClusterTrainingRuntimes, with JobSet"},
 	{name: "kueue", title: "Kueue", description: "GPU quota queues that admit TrainJobs"},
 	{name: "agent-sandbox", title: "agent-sandbox", description: "Sandbox controller and CRDs for the Sandboxes view"},
 	{name: "gateway-api-inference-extension", title: "Gateway API Inference Extension", description: "InferencePool CRD that the llm-d routers of InferenceServices use"},
-	{name: "forgeai", title: "forgeai operator", description: "Projects, instance types and the controllers", chart: true},
+	{name: "forgeai", title: "forgeai operator", description: "Projects, instance types and the controllers", chart: forgeaiSpec},
+	{name: "sshpiper", title: "sshpiper Pipe CRD", description: "Pipe CRD that the SSH gateway routes logins with"},
+	{name: "ssh-operator", title: "SSH operator", description: "SSHGateways and SSHRoutes that serve sandbox SSH logins", chart: sshOperatorSpec},
 }
 
 // depInfoByName returns the catalog entry of a component.
@@ -284,6 +289,8 @@ func bundleByName(name string) (*depBundle, error) {
 type depHealth struct {
 	crdsWanted, crdsFound int
 	deployments           []appsv1.Deployment
+	// chart is set for a component installed from a Helm chart.
+	chart *chartSpec
 	// crdVersion is the version label of the bundle's CRDs. A bundle with no
 	// Deployments, such as the Gateway API CRDs, has nothing else to carry it.
 	crdVersion string
@@ -305,7 +312,7 @@ func assess(dep *Dependency, h depHealth) {
 		}, fmt.Sprintf("%d of %d CRDs installed", h.crdsFound, h.crdsWanted))
 		return
 	}
-	if dep.Name == "forgeai" && len(h.deployments) == 0 {
+	if h.chart != nil && len(h.deployments) == 0 {
 		dep.Status, dep.Message = "degraded", "Operator Deployment not found"
 		dep.Reason = "operatorMissing"
 		return
@@ -316,7 +323,7 @@ func assess(dep *Dependency, h depHealth) {
 	var notReady []string
 	for i := range h.deployments {
 		d := &h.deployments[i]
-		if v := d.Labels[depVersionLabel]; v != "" {
+		if v := deployedVersion(d, h.chart); v != "" {
 			if dep.Installed == "" {
 				dep.Installed = v
 			}
@@ -346,9 +353,9 @@ func assess(dep *Dependency, h depHealth) {
 		dep.Status = "unmanaged"
 		dep.Reason = "unmanaged"
 		dep.Message = "Installed outside forgeai; installing replaces it with the pinned version"
-		if dep.Name == "forgeai" {
+		if h.chart != nil {
 			dep.Reason = "unmanagedHelm"
-			dep.Message = "Deployed outside Helm (make deploy-dev); remove it before installing the chart"
+			dep.Message = fmt.Sprintf("%s is deployed outside Helm; remove it before installing the chart", h.chart.deployment)
 		}
 		return
 	}
@@ -378,6 +385,19 @@ func imageTag(d *appsv1.Deployment) string {
 		return ""
 	}
 	return image[i+1:]
+}
+
+// deployedVersion returns the version a Deployment was installed at: the version
+// label of a bundle, or the version of the chart that installed it. It is empty
+// when neither says.
+func deployedVersion(d *appsv1.Deployment, chart *chartSpec) string {
+	if v := d.Labels[depVersionLabel]; v != "" {
+		return v
+	}
+	if chart == nil {
+		return ""
+	}
+	return chartLabelVersion(d.Labels, chart.name)
 }
 
 // deploymentAvailable reports whether the Deployment has rolled out and is available.
@@ -465,16 +485,18 @@ func forEachConcurrently(n int, fn func(i int) error) error {
 // components are found by their labels; forgeai by its operator Deployment.
 func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *depBundle, expectNamespace string) (Dependency, error) {
 	dep := Dependency{
-		Name: info.name, Title: info.title, Description: info.description, Installable: b != nil || info.chart,
+		Name: info.name, Title: info.title, Description: info.description, Installable: b != nil || info.chart != nil,
 	}
 	var h depHealth
-	crds := forgeaiCRDs
+	var crds []string
 	switch {
 	case b != nil:
 		dep.Pinned = b.Version
 		crds = b.crdNames()
-	case info.chart:
-		dep.Pinned = forgeaiChartVersion
+	case info.chart != nil:
+		dep.Pinned = info.chart.version
+		crds = info.chart.crds
+		h.chart = info.chart
 	}
 	h.crdsWanted = len(crds)
 	// Each CRD is read at once; a slot per CRD keeps the count free of a lock.
@@ -509,9 +531,9 @@ func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *de
 			return dep, err
 		}
 		h.deployments = list.Items
-	} else {
+	} else if info.chart != nil {
 		d := &appsv1.Deployment{}
-		err := k8s.Get(ctx, client.ObjectKey{Namespace: platform.Namespace(), Name: forgeaiDeployment}, d)
+		err := k8s.Get(ctx, client.ObjectKey{Namespace: info.chart.installNamespace(), Name: info.chart.deployment}, d)
 		switch {
 		case err == nil:
 			h.deployments = []appsv1.Deployment{*d}
@@ -735,7 +757,7 @@ func (a *App) InstallDependency(name string) error {
 	if err != nil {
 		return err
 	}
-	if b == nil && !info.chart {
+	if b == nil && info.chart == nil {
 		return fmt.Errorf("%s is not installed from the GUI", name)
 	}
 	cfg, err := loadPlatform(ctx, c.k8s)
@@ -749,7 +771,7 @@ func (a *App) InstallDependency(name string) error {
 		if err := checkSelectors(ctx, c.k8s, b); err != nil {
 			return err
 		}
-	} else if err := checkChartTarget(ctx, c.k8s); err != nil {
+	} else if err := checkChartTarget(ctx, c.k8s, info.chart); err != nil {
 		return err
 	}
 	key := installKey(c, name)
@@ -763,7 +785,7 @@ func (a *App) InstallDependency(name string) error {
 		progress := func(step string) {
 			a.emitEvent(a.ctx, depProgressEvent, DependencyProgress{Cluster: cluster, Name: name, Step: step})
 		}
-		rec, err := installComponent(ctx, c, b, progress)
+		rec, err := installComponent(ctx, c, info, b, progress)
 		if err == nil {
 			progress(stepRecord)
 			rec.AppliedBy = currentUser(ctx, c.k8s)
@@ -786,12 +808,13 @@ func (a *App) InstallDependency(name string) error {
 	return nil
 }
 
-// installComponent installs a bundled component, or the forgeai operator from
-// its chart when there is no bundle. It returns the record of the install.
-func installComponent(ctx context.Context, c *Connection, b *depBundle, progress func(string)) (depRecord, error) {
-	if b == nil {
-		rec := depRecord{Version: forgeaiChartVersion, Namespace: platform.Namespace(), Source: forgeaiChart}
-		return rec, installChart(ctx, c, progress)
+// installComponent installs a bundled component, or the chart of a component
+// that has none. It returns the record of the install.
+func installComponent(ctx context.Context, c *Connection, info depInfo, b *depBundle, progress func(string)) (depRecord, error) {
+	if info.chart != nil {
+		spec := info.chart
+		rec := depRecord{Version: spec.version, Namespace: spec.installNamespace(), Source: spec.ref}
+		return rec, installChart(ctx, c, spec, progress)
 	}
 	rec := depRecord{Version: b.Version, Namespace: bundleNamespace(b), ManifestSHA256: b.SHA256}
 	return rec, installBundle(ctx, c.k8s, b, progress)

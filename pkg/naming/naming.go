@@ -87,13 +87,6 @@ const (
 	// LabelSandbox is set on the pods of a sandbox (value = Sandbox name). The
 	// SSH Service selects its sshd by it.
 	LabelSandbox = "forgeai.wutz.dev/sandbox"
-	// LabelSSHGateway is set on the Pipes and the sshpiperd objects of an
-	// SSHGateway (value = SSHGateway name).
-	LabelSSHGateway = "forgeai.wutz.dev/ssh-gateway"
-	// AnnotationSSHRoute is the namespace/name of the SSHRoute a Pipe serves.
-	AnnotationSSHRoute = "forgeai.wutz.dev/ssh-route"
-	// AnnotationSSHRule is the index of the SSHRoute rule a Pipe serves.
-	AnnotationSSHRule = "forgeai.wutz.dev/ssh-rule"
 
 	ComponentFileServer = "fileserver"
 	ComponentSandbox    = "sandbox"

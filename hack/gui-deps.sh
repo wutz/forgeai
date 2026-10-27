@@ -2,8 +2,9 @@
 # Refreshes the cluster dependency manifests embedded in the GUI (gui/app/deps).
 #
 # Kueue, agent-sandbox and the Gateway API Inference Extension publish their
-# install manifests as release assets;
-# each is checked against the sha256 pinned here before it is copied in.
+# install manifests as release assets, and sshpiper keeps its Pipe CRD in its
+# source at the tag; each is checked against the sha256 pinned here before it is
+# copied in.
 # Kubeflow Trainer has no such asset, so its manifests (Trainer with its JobSet,
 # and the built-in ClusterTrainingRuntimes) are rendered from the tag with
 # kustomize. deps/manifest.json records the version and sha256 of every bundle;
@@ -25,6 +26,8 @@ SANDBOX_VERSION=v1.0.7
 SANDBOX_SHA256=136c10c9347cb5a6740b351444cae82f404e883c3f520272257ba785f2af0da8
 GAIE_VERSION=v1.6.2
 GAIE_SHA256=f410dfca474608c02903087b47f1ac081706dfb6dfe7f83d00a7cc7e00c4ad0d
+SSHPIPER_VERSION=v1.6.1
+SSHPIPER_SHA256=140d4d2a102a431dd11fb125954387c3ad93b414d754480f9a3197c3ed77f802
 
 # fetch URL SHA256 FILE downloads a release asset and checks its digest.
 fetch() {
@@ -52,6 +55,9 @@ fetch "https://github.com/kubernetes-sigs/agent-sandbox/releases/download/$SANDB
 # The InferencePool CRD the llm-d routers of InferenceServices need.
 fetch "https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/$GAIE_VERSION/v1-manifests.yaml" \
   "$GAIE_SHA256" "$dir/gateway-api-inference-extension.yaml"
+# The Pipe CRD the SSH gateway's sshpiperd routes logins with.
+fetch "https://raw.githubusercontent.com/tg123/sshpiper/$SSHPIPER_VERSION/plugin/kubernetes/crd.yaml" \
+  "$SSHPIPER_SHA256" "$dir/sshpiper.yaml"
 
 # The order is the install order.
 cat > "$dir/manifest.json" <<EOF
@@ -84,6 +90,13 @@ cat > "$dir/manifest.json" <<EOF
       "source": "https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/tag/$GAIE_VERSION",
       "file": "gateway-api-inference-extension.yaml",
       "sha256": "$(sha "$dir/gateway-api-inference-extension.yaml")"
+    },
+    {
+      "name": "sshpiper",
+      "version": "$SSHPIPER_VERSION",
+      "source": "https://github.com/tg123/sshpiper/tree/$SSHPIPER_VERSION/plugin/kubernetes",
+      "file": "sshpiper.yaml",
+      "sha256": "$(sha "$dir/sshpiper.yaml")"
     }
   ]
 }

@@ -37,7 +37,7 @@ func TestEmbeddedBundlesVerify(t *testing.T) {
 		}
 	}
 	// Kueue's TrainJob integration needs the Trainer CRDs, so Trainer comes first.
-	if got, want := strings.Join(names, ","), "trainer,kueue,agent-sandbox,gateway-api-inference-extension"; got != want {
+	if got, want := strings.Join(names, ","), "trainer,kueue,agent-sandbox,gateway-api-inference-extension,sshpiper"; got != want {
 		t.Errorf("bundle order = %s, want %s", got, want)
 	}
 	wantCRDs := map[string]string{
@@ -45,6 +45,7 @@ func TestEmbeddedBundlesVerify(t *testing.T) {
 		"kueue":                           "workloads.kueue.x-k8s.io",
 		"agent-sandbox":                   "sandboxes.agents.x-k8s.io",
 		"gateway-api-inference-extension": "inferencepools.inference.networking.k8s.io",
+		"sshpiper":                        "pipes.sshpiper.com",
 	}
 	for _, b := range bs {
 		if !slices.Contains(b.crdNames(), wantCRDs[b.Name]) {
@@ -120,9 +121,17 @@ func testDeployment(version string, available bool) appsv1.Deployment {
 	return d
 }
 
+// helmDeployment returns a Deployment installed by the SSH operator chart at chartVersion.
+func helmDeployment(chartVersion string, available bool) appsv1.Deployment {
+	d := testDeployment("", available)
+	d.Labels = map[string]string{helmChartLabel: "ssh-operator-" + chartVersion}
+	return d
+}
+
 func TestAssess(t *testing.T) {
 	bundled := Dependency{Name: "kueue", Pinned: "v0.20.2", Installable: true}
 	operator := Dependency{Name: "forgeai", Installable: true, Pinned: forgeaiChartVersion}
+	sshOperator := Dependency{Name: "ssh-operator", Installable: true, Pinned: sshOperatorChartVersion}
 	sandbox := Dependency{Name: "agent-sandbox", Pinned: "v1.0.7", Installable: true}
 	gatewayAPI := Dependency{Name: "gateway-api-inference-extension", Pinned: "v1.6.2", Installable: true}
 	tests := []struct {
@@ -134,7 +143,7 @@ func TestAssess(t *testing.T) {
 	}{
 		{"nothing installed", bundled, depHealth{crdsWanted: 2}, "missing", ""},
 		{"some CRDs", bundled, depHealth{crdsWanted: 2, crdsFound: 1}, "degraded", ""},
-		{"CRDs without the operator", operator, depHealth{crdsWanted: 2, crdsFound: 2}, "degraded", ""},
+		{"CRDs without the operator", operator, depHealth{crdsWanted: 2, crdsFound: 2, chart: forgeaiSpec}, "degraded", ""},
 		{"CRDs without a labelled deployment", bundled, depHealth{crdsWanted: 2, crdsFound: 2}, "unmanaged", ""},
 		{"CRD-only bundle installed by forgeai", gatewayAPI, depHealth{crdsWanted: 1, crdsFound: 1,
 			crdVersion: "v1.6.2"}, "ready", "v1.6.2"},
@@ -147,11 +156,17 @@ func TestAssess(t *testing.T) {
 			deployments: []appsv1.Deployment{testDeployment("v0.18.1", true)}}, "outdated", "v0.18.1"},
 		{"not available", bundled, depHealth{crdsWanted: 2, crdsFound: 2,
 			deployments: []appsv1.Deployment{testDeployment("v0.20.2", false)}}, "degraded", "v0.20.2"},
-		{"operator from the chart", operator, depHealth{crdsWanted: 2, crdsFound: 2,
+		{"operator from the chart", operator, depHealth{crdsWanted: 2, crdsFound: 2, chart: forgeaiSpec,
 			deployments: []appsv1.Deployment{testDeployment(forgeaiChartVersion, true)}}, "ready", forgeaiChartVersion},
-		{"older operator chart", operator, depHealth{crdsWanted: 2, crdsFound: 2,
+		{"older operator chart", operator, depHealth{crdsWanted: 2, crdsFound: 2, chart: forgeaiSpec,
 			deployments: []appsv1.Deployment{testDeployment("0.0.9", true)}}, "outdated", "0.0.9"},
-		{"operator deployed outside Helm", operator, depHealth{crdsWanted: 2, crdsFound: 2,
+		{"operator deployed outside Helm", operator, depHealth{crdsWanted: 2, crdsFound: 2, chart: forgeaiSpec,
+			deployments: []appsv1.Deployment{testDeployment("", true)}}, "unmanaged", ""},
+		{"SSH operator from its chart", sshOperator, depHealth{crdsWanted: 3, crdsFound: 3, chart: sshOperatorSpec,
+			deployments: []appsv1.Deployment{helmDeployment(sshOperatorChartVersion, true)}}, "ready", sshOperatorChartVersion},
+		{"older SSH operator chart", sshOperator, depHealth{crdsWanted: 3, crdsFound: 3, chart: sshOperatorSpec,
+			deployments: []appsv1.Deployment{helmDeployment("0.0.9", true)}}, "outdated", "0.0.9"},
+		{"SSH operator deployed outside Helm", sshOperator, depHealth{crdsWanted: 3, crdsFound: 3, chart: sshOperatorSpec,
 			deployments: []appsv1.Deployment{testDeployment("", true)}}, "unmanaged", ""},
 		{"runs where the config expects", sandbox, depHealth{crdsWanted: 1, crdsFound: 1,
 			deployments: []appsv1.Deployment{testDeployment("v1.0.7", true)},
@@ -186,12 +201,12 @@ func TestAssessReason(t *testing.T) {
 		expect string
 	}{
 		{"installed outside forgeai", bundled, depHealth{crdsWanted: 2, crdsFound: 2}, "unmanaged", ""},
-		{"operator deployed outside Helm", operator, depHealth{crdsWanted: 2, crdsFound: 2,
+		{"operator deployed outside Helm", operator, depHealth{crdsWanted: 2, crdsFound: 2, chart: forgeaiSpec,
 			deployments: []appsv1.Deployment{testDeployment("", true)}}, "unmanagedHelm", ""},
 		{"runs elsewhere than the config expects", sandbox, depHealth{crdsWanted: 1, crdsFound: 1,
 			deployments: []appsv1.Deployment{testDeployment("v1.0.7", true)},
 			namespace:   "other", expectNamespace: "agent-sandbox-system"}, "namespaceMismatch", "agent-sandbox-system"},
-		{"operator deployment missing", operator, depHealth{crdsWanted: 2, crdsFound: 2}, "operatorMissing", ""},
+		{"operator deployment missing", operator, depHealth{crdsWanted: 2, crdsFound: 2, chart: forgeaiSpec}, "operatorMissing", ""},
 		{"pinned and available", bundled, depHealth{crdsWanted: 2, crdsFound: 2,
 			deployments: []appsv1.Deployment{testDeployment("v0.20.2", true)}}, "", ""},
 	}
@@ -370,24 +385,36 @@ func TestCheckChartTarget(t *testing.T) {
 	if err := clientgoscheme.AddToScheme(s); err != nil {
 		t.Fatal(err)
 	}
-	operator := func(labels map[string]string) client.Client {
-		d := &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{
-			Namespace: "forgeai-system", Name: forgeaiDeployment, Labels: labels,
-		}}
-		return fake.NewClientBuilder().WithScheme(s).WithObjects(d).Build()
+	withObjects := func(objs ...client.Object) client.Client {
+		return fake.NewClientBuilder().WithScheme(s).WithObjects(objs...).Build()
 	}
+	deployment := func(spec *chartSpec, labels map[string]string) *appsv1.Deployment {
+		return &appsv1.Deployment{ObjectMeta: metav1.ObjectMeta{
+			Namespace: spec.installNamespace(), Name: spec.deployment, Labels: labels,
+		}}
+	}
+	pipeCRD := &unstructured.Unstructured{}
+	pipeCRD.SetGroupVersionKind(crdGVK)
+	pipeCRD.SetName("pipes.sshpiper.com")
 	tests := []struct {
 		name    string
+		spec    *chartSpec
 		k8s     client.Client
 		wantErr bool
 	}{
-		{"nothing installed", fake.NewClientBuilder().WithScheme(s).Build(), false},
-		{"installed from the chart", operator(map[string]string{depLabel: "forgeai"}), false},
-		{"deployed outside Helm", operator(map[string]string{"app": "forgeai"}), true},
+		{"nothing installed", forgeaiSpec, withObjects(), false},
+		{"installed from the chart", forgeaiSpec,
+			withObjects(deployment(forgeaiSpec, map[string]string{helmChartLabel: "forgeai-" + forgeaiChartVersion})), false},
+		{"deployed outside Helm", forgeaiSpec,
+			withObjects(deployment(forgeaiSpec, map[string]string{"app": "forgeai"})), true},
+		{"SSH operator without the Pipe CRD", sshOperatorSpec, withObjects(), true},
+		{"SSH operator with the Pipe CRD", sshOperatorSpec, withObjects(pipeCRD), false},
+		{"SSH operator installed from another chart", sshOperatorSpec, withObjects(pipeCRD,
+			deployment(sshOperatorSpec, map[string]string{helmChartLabel: "forgeai-" + forgeaiChartVersion})), true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := checkChartTarget(context.Background(), tt.k8s)
+			err := checkChartTarget(context.Background(), tt.k8s, tt.spec)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("checkChartTarget = %v, want error %v", err, tt.wantErr)
 			}

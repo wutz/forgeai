@@ -45,8 +45,6 @@ import (
 	operatorcontroller "github.com/wutz/forgeai-instancetype-operator/pkg/controller"
 	operatorplatform "github.com/wutz/forgeai-instancetype-operator/pkg/platform"
 	forgeaiv1alpha1 "github.com/wutz/forgeai/api/v1alpha1"
-	"github.com/wutz/forgeai/pkg/harbor"
-	"github.com/wutz/forgeai/pkg/harbor/harbortest"
 	"github.com/wutz/forgeai/pkg/platform"
 )
 
@@ -73,7 +71,7 @@ namespacePrefix: forge-
 apiServer: https://api.example.com:6443
 ingress: {className: nginx, domain: example.com, port: 7443}
 gateway: {name: forgeai-sandbox, namespace: forgeai-system, scheme: http, port: 8080}
-registry: {domain: cr.example.com:7443, adminSecret: harbor-admin}
+registry: {domain: cr.example.com:7443}
 storageTypes:
   shared: {storageClass: shared}
 defaultStorageType: shared
@@ -93,13 +91,12 @@ trashRetention: 1h
 `
 
 var (
-	ctx        context.Context
-	cancel     context.CancelFunc
-	testEnv    *envtest.Environment
-	cfg        *rest.Config
-	k8sClient  client.Client
-	fakeHarbor *harbortest.Server
-	activity   = &fakeActivity{}
+	ctx       context.Context
+	cancel    context.CancelFunc
+	testEnv   *envtest.Environment
+	cfg       *rest.Config
+	k8sClient client.Client
+	activity  = &fakeActivity{}
 )
 
 // fakeActivity stands in for reading the dufs access log.
@@ -157,15 +154,10 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
-	fakeHarbor = harbortest.New("admin", "harbor-pw")
 	Expect(k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: configNamespace}})).To(Succeed())
 	Expect(k8sClient.Create(ctx, &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: platform.ConfigMapName, Namespace: configNamespace},
 		Data:       map[string]string{platform.ConfigKey: testPlatformConfig},
-	})).To(Succeed())
-	Expect(k8sClient.Create(ctx, &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: "harbor-admin", Namespace: configNamespace},
-		StringData: map[string]string{"username": "admin", "password": "harbor-pw"},
 	})).To(Succeed())
 
 	mgr, err := ctrl.NewManager(cfg, ctrl.Options{
@@ -176,11 +168,6 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	loader := &platform.Loader{Reader: mgr.GetAPIReader(), Namespace: configNamespace}
 	for _, r := range []interface{ SetupWithManager(ctrl.Manager) error }{
-		&ProjectReconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Scheme: mgr.GetScheme(), Config: loader},
-		&RegistryReconciler{
-			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: loader, ConfigNamespace: configNamespace,
-			NewHarbor: func(_ platform.Registry, u, p string) *harbor.Client { return harbor.New(fakeHarbor.URL, u, p, true) },
-		},
 		&operatorcontroller.InstanceTypeReconciler{
 			Client: mgr.GetClient(),
 			Config: &operatorplatform.Loader{Reader: mgr.GetAPIReader(), Namespace: configNamespace},
@@ -203,7 +190,6 @@ var _ = BeforeSuite(func() {
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
 	cancel()
-	fakeHarbor.Close()
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })

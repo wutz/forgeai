@@ -21,11 +21,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/kf"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
 	"github.com/wutz/forgeai/pkg/training"
+	projectv1 "github.com/wutz/project-operator/api/v1alpha1"
 )
 
 var (
@@ -109,7 +109,7 @@ func Retention(ctx context.Context, c client.Reader, ns string, platformDefault 
 	if name == "" {
 		return platformDefault, nil
 	}
-	p := &v1.Project{}
+	p := &projectv1.Project{}
 	if err := c.Get(ctx, types.NamespacedName{Name: name}, p); err != nil {
 		return platformDefault, client.IgnoreNotFound(err)
 	}

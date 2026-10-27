@@ -6,7 +6,7 @@ import {
 import {app, volumes as vol} from '../wailsjs/go/models'
 import {fmtDate, errText, everyWhileVisible, generateName, phaseLabel} from './util'
 import {t} from './i18n'
-import {Badge, Card, CancelButton, Dialog, Empty, HintButton, Icon, PageHeader, RefreshButton, useActive, useConfirm, useCreateAccess, Spinner} from './ui'
+import {Badge, Card, CancelButton, Dialog, Empty, HintButton, Icon, PageHeader, RefreshButton, useActive, useChangeAccess, useConfirm, useCreateAccess, Spinner} from './ui'
 
 // Volumes manages shared filesystems: create, grow, trash (recycle bin),
 // restore and purge. Deleting is delayed — the operator purges expired
@@ -21,6 +21,7 @@ export function Volumes() {
   const [configError, setConfigError] = useState('')
   const [creating, setCreating] = useState(false)
   const create = useCreateAccess()
+  const change = useChangeAccess()
   const [growing, setGrowing] = useState<vol.Volume | null>(null)
   const [recycling, setRecycling] = useState(false)
   const confirm = useConfirm()
@@ -132,12 +133,14 @@ export function Volumes() {
                 <td data-label={t('common.created')} className="muted">{fmtDate(v.created)}</td>
                 <td>
                   <div className="actions">
-                    <HintButton className="btn btn-sm" disabled={v.phase !== 'Bound' && v.phase !== 'Resizing'}
-                                reason={v.phase === 'Pending' ? t('volumes.pendingHint') : undefined}
-                                onClick={() => setGrowing(v)}>{t('volumes.grow')}</HintButton>
-                    <HintButton className="btn btn-sm btn-danger" disabled={!!v.users?.length}
-                                reason={v.users?.length ? t('volumes.inUseHint') : undefined}
-                                onClick={() => trashVolume(v)}>{t('common.delete')}</HintButton>
+                    {change.volumes && <>
+                      <HintButton className="btn btn-sm" disabled={v.phase !== 'Bound' && v.phase !== 'Resizing'}
+                                  reason={v.phase === 'Pending' ? t('volumes.pendingHint') : undefined}
+                                  onClick={() => setGrowing(v)}>{t('volumes.grow')}</HintButton>
+                      <HintButton className="btn btn-sm btn-danger" disabled={!!v.users?.length}
+                                  reason={v.users?.length ? t('volumes.inUseHint') : undefined}
+                                  onClick={() => trashVolume(v)}>{t('common.delete')}</HintButton>
+                    </>}
                   </div>
                 </td>
               </tr>
@@ -162,6 +165,7 @@ function RecycleBinDialog({volumes, loadError, onChanged, onClose}: {
   // stay disabled until the call answers, so a double click sends one request.
   const [busy, setBusy] = useState('')
   const confirm = useConfirm()
+  const change = useChangeAccess()
 
   const act = (name: string, call: () => Promise<unknown>) => {
     setBusy(name)
@@ -196,9 +200,11 @@ function RecycleBinDialog({volumes, loadError, onChanged, onClose}: {
               <td data-label={t('volumes.purgeAt')} className="muted">{v.expireAt ? fmtDate(v.expireAt) : '—'}</td>
               <td>
                 <div className="actions">
-                  <button className="btn btn-sm" disabled={!!busy} onClick={() => restore(v)}>{t('volumes.restore')}</button>
-                  <button className="btn btn-sm" disabled={!!busy} onClick={() => setExpiring(v)}>{t('volumes.setExpiry')}</button>
-                  <button className="btn btn-sm btn-danger" disabled={!!busy} onClick={() => purge(v)}>{t('volumes.purgeNow')}</button>
+                  {change.volumes && <>
+                    <button className="btn btn-sm" disabled={!!busy} onClick={() => restore(v)}>{t('volumes.restore')}</button>
+                    <button className="btn btn-sm" disabled={!!busy} onClick={() => setExpiring(v)}>{t('volumes.setExpiry')}</button>
+                    <button className="btn btn-sm btn-danger" disabled={!!busy} onClick={() => purge(v)}>{t('volumes.purgeNow')}</button>
+                  </>}
                 </div>
               </td>
             </tr>

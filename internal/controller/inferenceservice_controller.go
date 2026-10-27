@@ -37,6 +37,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
+	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/inference"
 	"github.com/wutz/forgeai/pkg/naming"
@@ -93,7 +94,7 @@ func (r *InferenceServiceReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 	orig := svc.DeepCopy()
 
-	it := &v1.InstanceType{}
+	it := &instancetypev1.InstanceType{}
 	if err := r.Get(ctx, types.NamespacedName{Name: svc.Spec.InstanceType}, it); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return ctrl.Result{}, err

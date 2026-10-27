@@ -44,8 +44,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
+	"github.com/wutz/forgeai-instancetype-operator/pkg/instancetype"
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
-	"github.com/wutz/forgeai/pkg/instancetype"
 	"github.com/wutz/forgeai/pkg/kf"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
@@ -278,7 +279,7 @@ func (r *ProjectReconciler) platformConfig(ctx context.Context, p *v1.Project, n
 
 // gpuClasses returns the GPU classes and their per-GPU slice from the InstanceTypes.
 func (r *ProjectReconciler) gpuClasses(ctx context.Context) ([]instancetype.Class, error) {
-	list := &v1.InstanceTypeList{}
+	list := &instancetypev1.InstanceTypeList{}
 	if err := r.List(ctx, list); err != nil {
 		return nil, err
 	}
@@ -734,7 +735,7 @@ func (r *ProjectReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(lq, byProjectLabel, managed).
 		Watches(cq, byProjectLabel, managed).
 		// Quotas follow the GPU classes and their slices.
-		Watches(&v1.InstanceType{}, allProjects, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
+		Watches(&instancetypev1.InstanceType{}, allProjects, builder.WithPredicates(predicate.GenerationChangedPredicate{})).
 		// Agent sandboxes carry the project label, so a new one is a new
 		// member of the project (nothing to reconcile yet, but the watch
 		// documents ownership and keeps quotas in sync on changes).

@@ -9,8 +9,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/wutz/forgeai/api/v1alpha1"
-	"github.com/wutz/forgeai/pkg/instancetype"
+	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
+	"github.com/wutz/forgeai-instancetype-operator/pkg/instancetype"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
 )
@@ -29,11 +29,11 @@ sandbox:
 	return cfg
 }
 
-func instanceType(gpus int32) *v1.InstanceType {
-	return &v1.InstanceType{
+func instanceType(gpus int32) *instancetypev1.InstanceType {
+	return &instancetypev1.InstanceType{
 		ObjectMeta: metav1.ObjectMeta{Name: "rtx-5090.x1"},
-		Spec: v1.InstanceTypeSpec{
-			GPU:          v1.InstanceTypeGPU{Class: "rtx-5090", Product: "NVIDIA-GeForce-RTX-5090", Count: gpus},
+		Spec: instancetypev1.InstanceTypeSpec{
+			GPU:          instancetypev1.InstanceTypeGPU{Class: "rtx-5090", Product: "NVIDIA-GeForce-RTX-5090", Count: gpus},
 			CPU:          resource.MustParse("15"),
 			Memory:       resource.MustParse("120Gi"),
 			NodeSelector: map[string]string{naming.LabelGPUProduct: "NVIDIA-GeForce-RTX-5090"},

@@ -364,3 +364,12 @@ func (r *TrainJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Named("trainjob").
 		Complete(r)
 }
+
+func nodeReady(n *corev1.Node) bool {
+	for _, c := range n.Status.Conditions {
+		if c.Type == corev1.NodeReady {
+			return c.Status == corev1.ConditionTrue
+		}
+	}
+	return false
+}

@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/kf"
 	"github.com/wutz/forgeai/pkg/naming"
@@ -97,7 +98,7 @@ var _ = Describe("forgeai operator", Ordered, func() {
 	})
 
 	It("derives instance types and resource flavors from GPU nodes", func() {
-		it := &v1.InstanceType{}
+		it := &instancetypev1.InstanceType{}
 		Eventually(get(it, "", "rtx-5090.x2"), timeout, interval).Should(Succeed())
 		// (128 - 8) / 8 = 15 cores, (1024 - 64) / 8 = 120 GiB per GPU.
 		Expect(it.Spec.CPU.String()).To(Equal("30"))
@@ -120,7 +121,7 @@ var _ = Describe("forgeai operator", Ordered, func() {
 		// Manually deleted instance types come back.
 		Expect(k8sClient.Delete(ctx, it)).To(Succeed())
 		Eventually(func() bool {
-			cur := &v1.InstanceType{}
+			cur := &instancetypev1.InstanceType{}
 			return k8sClient.Get(ctx, client.ObjectKeyFromObject(it), cur) == nil && cur.UID != it.UID
 		}, timeout, interval).Should(BeTrue())
 	})
@@ -429,7 +430,7 @@ var _ = Describe("forgeai operator", Ordered, func() {
 
 	It("classifies a failed TrainJob and retries infrastructure failures", func() {
 		f := &training.Form{Name: "train", Image: "img", InstanceType: "rtx-5090.x1", Workers: 1, MaxRetries: 1}
-		it := &v1.InstanceType{}
+		it := &instancetypev1.InstanceType{}
 		Expect(get(it, "", "rtx-5090.x1")()).To(Succeed())
 		pcfg, _ := platform.Parse([]byte(testPlatformConfig))
 		tj, err := training.TrainJob(f, training.Context{Namespace: ns, InstanceType: it, Config: pcfg})
@@ -470,7 +471,7 @@ var _ = Describe("forgeai operator", Ordered, func() {
 
 	It("fails jobs stuck on image pulls without retrying them", func() {
 		f := &training.Form{Name: "stuck", Image: "nope", InstanceType: "rtx-5090.x1", Workers: 1, MaxRetries: 3, RetryOn: training.RetryAny}
-		it := &v1.InstanceType{}
+		it := &instancetypev1.InstanceType{}
 		Expect(get(it, "", "rtx-5090.x1")()).To(Succeed())
 		pcfg, _ := platform.Parse([]byte(testPlatformConfig))
 		tj, _ := training.TrainJob(f, training.Context{Namespace: ns, InstanceType: it, Config: pcfg})
@@ -505,7 +506,7 @@ var _ = Describe("forgeai operator", Ordered, func() {
 
 	It("keeps the worker failure seen while a TrainJob ran once its pods are gone", func() {
 		f := &training.Form{Name: "gone", Image: "img", InstanceType: "rtx-5090.x1", Workers: 1}
-		it := &v1.InstanceType{}
+		it := &instancetypev1.InstanceType{}
 		Expect(get(it, "", "rtx-5090.x1")()).To(Succeed())
 		pcfg, _ := platform.Parse([]byte(testPlatformConfig))
 		tj, err := training.TrainJob(f, training.Context{Namespace: ns, InstanceType: it, Config: pcfg})
@@ -546,7 +547,7 @@ var _ = Describe("forgeai operator", Ordered, func() {
 
 	It("deactivates the Kueue Workload of a stopped TrainJob and reactivates it on resume", func() {
 		f := &training.Form{Name: "pause", Image: "img", InstanceType: "rtx-5090.x1", Workers: 1}
-		it := &v1.InstanceType{}
+		it := &instancetypev1.InstanceType{}
 		Expect(get(it, "", "rtx-5090.x1")()).To(Succeed())
 		pcfg, _ := platform.Parse([]byte(testPlatformConfig))
 		tj, err := training.TrainJob(f, training.Context{Namespace: ns, InstanceType: it, Config: pcfg})

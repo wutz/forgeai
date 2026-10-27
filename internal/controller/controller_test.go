@@ -11,7 +11,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	rbacv1 "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -95,6 +94,11 @@ var _ = Describe("forgeai operator", Ordered, func() {
 	BeforeAll(func() {
 		createGPUNode("gn-1")
 		createGPUNode("gn-2")
+		// The project operator creates this namespace from a Project; the
+		// remaining cases only need its name and label.
+		Expect(k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			Name: ns, Labels: map[string]string{naming.LabelProject: project},
+		}})).To(Succeed())
 	})
 
 	It("derives instance types and resource flavors from GPU nodes", func() {
@@ -124,159 +128,6 @@ var _ = Describe("forgeai operator", Ordered, func() {
 			cur := &instancetypev1.InstanceType{}
 			return k8sClient.Get(ctx, client.ObjectKeyFromObject(it), cur) == nil && cur.UID != it.UID
 		}, timeout, interval).Should(BeTrue())
-	})
-
-	It("sets up a project namespace with quota, isolation, queue, members and registry", func() {
-		p := &v1.Project{
-			ObjectMeta: metav1.ObjectMeta{Name: project},
-			Spec: v1.ProjectSpec{
-				Quota:   v1.ProjectQuota{GPUs: []v1.GPUQuota{{Class: "rtx-5090", Count: 2}}},
-				Network: v1.ProjectNetwork{Isolation: v1.NetworkIsolated, DenyInternet: true},
-				Members: []v1.Member{{Name: "alice", Role: v1.RoleEdit}, {Name: "bob", Role: v1.RoleView}},
-			},
-		}
-		Expect(k8sClient.Create(ctx, p)).To(Succeed())
-		Eventually(func() bool {
-			_ = k8sClient.Get(ctx, client.ObjectKeyFromObject(p), p)
-			return meta.IsStatusConditionTrue(p.Status.Conditions, v1.ConditionReady) &&
-				meta.IsStatusConditionTrue(p.Status.Conditions, v1.ConditionRegistry)
-		}, timeout, interval).Should(BeTrue(), func() string { return fmt.Sprintf("%+v", p.Status) })
-		Expect(p.Status.Namespace).To(Equal(ns))
-		Expect(p.Status.Registry.URL).To(Equal("cr.example.com:7443/" + ns))
-
-		nsObj := &corev1.Namespace{}
-		Expect(get(nsObj, "", ns)()).To(Succeed())
-		Expect(nsObj.Labels).To(HaveKeyWithValue(naming.LabelProject, project))
-
-		rq := &corev1.ResourceQuota{}
-		Expect(get(rq, ns, naming.ResourceQuotaName)()).To(Succeed())
-		gpus := rq.Spec.Hard["requests.nvidia.com/gpu"]
-		cpu := rq.Spec.Hard[corev1.ResourceRequestsCPU]
-		Expect(gpus.Value()).To(Equal(int64(2)))
-		// 2 GPUs x 15 cores + 4 cores headroom.
-		Expect(cpu.String()).To(Equal("34"))
-
-		// The defaulted requests satisfy the quota. A default limit would apply
-		// to every container that declares none and reject any request above it,
-		// which is how a 4-CPU router pod used to be refused.
-		lr := &corev1.LimitRange{}
-		Expect(get(lr, ns, naming.LimitRangeName)()).To(Succeed())
-		Expect(lr.Spec.Limits).To(HaveLen(1))
-		Expect(lr.Spec.Limits[0].DefaultRequest).To(HaveKeyWithValue(corev1.ResourceCPU, resource.MustParse("100m")))
-		Expect(lr.Spec.Limits[0].Default).To(BeEmpty())
-
-		// Members read the platform config from their namespace.
-		pc := &corev1.ConfigMap{}
-		Expect(get(pc, ns, platform.ConfigMapName)()).To(Succeed())
-		Expect(pc.Data).To(HaveKeyWithValue(platform.ConfigKey, testPlatformConfig))
-
-		np := &networkingv1.NetworkPolicy{}
-		Expect(get(np, ns, naming.NetworkPolicyName)()).To(Succeed())
-		Expect(np.Spec.PolicyTypes).To(ConsistOf(networkingv1.PolicyTypeIngress, networkingv1.PolicyTypeEgress))
-
-		cq := &unstructured.Unstructured{}
-		cq.SetGroupVersionKind(kf.ClusterQueueGVK)
-		Expect(get(cq, "", ns)()).To(Succeed())
-		flavors, _, _ := unstructured.NestedSlice(cq.Object, "spec", "resourceGroups")
-		Expect(fmt.Sprint(flavors)).To(ContainSubstring("forgeai-rtx-5090"))
-		Expect(fmt.Sprint(flavors)).To(ContainSubstring(naming.ResourceFlavor("cpu")))
-		cpuFlavor := &unstructured.Unstructured{}
-		cpuFlavor.SetGroupVersionKind(kf.ResourceFlavorGVK)
-		Expect(get(cpuFlavor, "", naming.ResourceFlavor("cpu"))()).To(Succeed())
-		lq := &unstructured.Unstructured{}
-		lq.SetGroupVersionKind(kf.LocalQueueGVK)
-		Expect(get(lq, ns, "default")()).To(Succeed())
-
-		Expect(p.Status.Members).To(HaveLen(2))
-		sa := &corev1.ServiceAccount{}
-		Expect(get(sa, "forgeai-members", "demo.alice")()).To(Succeed())
-		rb := &rbacv1.RoleBinding{}
-		Expect(get(rb, ns, "forgeai-member-bob")()).To(Succeed())
-		Expect(rb.RoleRef.Name).To(Equal("forgeai-project-view"))
-		crb := &rbacv1.ClusterRoleBinding{}
-		Expect(get(crb, "", "forgeai:project:demo")()).To(Succeed())
-		Expect(crb.Subjects).To(HaveLen(2))
-
-		Expect(fakeHarbor.HasProject(ns)).To(BeTrue())
-		reg := &corev1.Secret{}
-		Expect(get(reg, ns, naming.RegistrySecretName)()).To(Succeed())
-		Expect(reg.Type).To(Equal(corev1.SecretTypeDockerConfigJson))
-		Expect(fakeHarbor.RobotSecret(string(reg.Data["username"]))).To(Equal(string(reg.Data["password"])))
-		def := &corev1.ServiceAccount{}
-		Eventually(func() []corev1.LocalObjectReference {
-			_ = get(def, ns, "default")()
-			return def.ImagePullSecrets
-		}, timeout, interval).Should(ContainElement(corev1.LocalObjectReference{Name: naming.RegistrySecretName}))
-	})
-
-	It("issues the robot again when Harbor lost it", func() {
-		reg := &corev1.Secret{}
-		Expect(get(reg, ns, naming.RegistrySecretName)()).To(Succeed())
-		login, oldSecret := string(reg.Data["username"]), string(reg.Data["password"])
-		fakeHarbor.RemoveRobot(login)
-
-		// A spec change makes the registry controller reconcile the project.
-		p := &v1.Project{}
-		Expect(get(p, "", project)()).To(Succeed())
-		p.Spec.Quota.RegistryStorage = resource.NewQuantity(10<<30, resource.BinarySI)
-		Expect(k8sClient.Update(ctx, p)).To(Succeed())
-
-		Eventually(func() bool {
-			cur := &corev1.Secret{}
-			if get(cur, ns, naming.RegistrySecretName)() != nil {
-				return false
-			}
-			newSecret := string(cur.Data["password"])
-			return newSecret != oldSecret && fakeHarbor.RobotSecret(login) == newSecret
-		}, timeout, interval).Should(BeTrue())
-	})
-
-	It("updates members and quota", func() {
-		p := &v1.Project{}
-		Expect(get(p, "", project)()).To(Succeed())
-		p.Spec.Members = p.Spec.Members[:1]
-		p.Spec.Network.Isolation = v1.NetworkNone
-		Expect(k8sClient.Update(ctx, p)).To(Succeed())
-		Eventually(func() bool {
-			return apierrors.IsNotFound(get(&corev1.ServiceAccount{}, "forgeai-members", "demo.bob")())
-		}, timeout, interval).Should(BeTrue())
-		Eventually(func() bool {
-			return apierrors.IsNotFound(get(&rbacv1.RoleBinding{}, ns, "forgeai-member-bob")())
-		}, timeout, interval).Should(BeTrue())
-		Eventually(func() bool {
-			return apierrors.IsNotFound(get(&networkingv1.NetworkPolicy{}, ns, naming.NetworkPolicyName)())
-		}, timeout, interval).Should(BeTrue())
-	})
-
-	It("copies platform config changes into project namespaces", func() {
-		src := &corev1.ConfigMap{}
-		Expect(get(src, configNamespace, platform.ConfigMapName)()).To(Succeed())
-		changed := testPlatformConfig + "# edited\n"
-		src.Data[platform.ConfigKey] = changed
-		Expect(k8sClient.Update(ctx, src)).To(Succeed())
-		DeferCleanup(func() {
-			Expect(get(src, configNamespace, platform.ConfigMapName)()).To(Succeed())
-			src.Data[platform.ConfigKey] = testPlatformConfig
-			Expect(k8sClient.Update(ctx, src)).To(Succeed())
-		})
-		Eventually(func() string {
-			pc := &corev1.ConfigMap{}
-			_ = get(pc, ns, platform.ConfigMapName)()
-			return pc.Data[platform.ConfigKey]
-		}, timeout, interval).Should(Equal(changed))
-	})
-
-	It("refuses to adopt a foreign namespace", func() {
-		Expect(k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "forge-taken"}})).To(Succeed())
-		p := &v1.Project{ObjectMeta: metav1.ObjectMeta{Name: "taken"}}
-		Expect(k8sClient.Create(ctx, p)).To(Succeed())
-		Eventually(func() string {
-			_ = k8sClient.Get(ctx, client.ObjectKeyFromObject(p), p)
-			if c := meta.FindStatusCondition(p.Status.Conditions, v1.ConditionReady); c != nil {
-				return c.Reason
-			}
-			return ""
-		}, timeout, interval).Should(Equal("NamespaceConflict"))
 	})
 
 	It("purges expired volumes from the trash", func() {
@@ -598,31 +449,5 @@ var _ = Describe("forgeai operator", Ordered, func() {
 
 		setStopped(false)
 		Eventually(activeOf, timeout, interval).Should(BeTrue())
-	})
-
-	It("rebinds a member whose role changed", func() {
-		p := &v1.Project{}
-		Expect(get(p, "", project)()).To(Succeed())
-		p.Spec.Members[0].Role = v1.RoleView
-		Expect(k8sClient.Update(ctx, p)).To(Succeed())
-		Eventually(func() string {
-			rb := &rbacv1.RoleBinding{}
-			_ = get(rb, ns, "forgeai-member-alice")()
-			return rb.RoleRef.Name
-		}, timeout, interval).Should(Equal("forgeai-project-view"))
-	})
-
-	It("deletes the namespace and registry with deletionPolicy Delete", func() {
-		p := &v1.Project{}
-		Expect(get(p, "", project)()).To(Succeed())
-		p.Spec.DeletionPolicy = v1.DeletionDelete
-		Expect(k8sClient.Update(ctx, p)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, p)).To(Succeed())
-		Eventually(func() bool { return apierrors.IsNotFound(get(&v1.Project{}, "", project)()) }, timeout, interval).Should(BeTrue())
-		Expect(fakeHarbor.HasProject(ns)).To(BeFalse())
-		nsObj := &corev1.Namespace{}
-		Expect(get(nsObj, "", ns)()).To(Succeed())
-		Expect(nsObj.DeletionTimestamp.IsZero()).To(BeFalse())
-		Expect(apierrors.IsNotFound(get(&rbacv1.ClusterRole{}, "", "forgeai:project:demo")())).To(BeTrue())
 	})
 })

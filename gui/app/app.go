@@ -26,6 +26,7 @@ import (
 
 	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	projectv1 "github.com/wutz/project-operator/api/v1alpha1"
 )
 
 // ErrNotConnected is returned when no kubeconfig context is selected.
@@ -148,6 +149,7 @@ func scheme() *runtime.Scheme {
 	_ = clientgoscheme.AddToScheme(s)
 	_ = v1.AddToScheme(s)
 	_ = instancetypev1.AddToScheme(s)
+	_ = projectv1.AddToScheme(s)
 	return s
 }
 

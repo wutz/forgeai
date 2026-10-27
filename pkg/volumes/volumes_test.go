@@ -23,6 +23,7 @@ import (
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
 	"github.com/wutz/forgeai/pkg/training"
+	projectv1 "github.com/wutz/project-operator/api/v1alpha1"
 )
 
 func TestLifecycle(t *testing.T) {
@@ -133,13 +134,16 @@ func TestRetentionUsesProjectOverride(t *testing.T) {
 	if err := v1.AddToScheme(s); err != nil {
 		t.Fatal(err)
 	}
+	if err := projectv1.AddToScheme(s); err != nil {
+		t.Fatal(err)
+	}
 	k8s := fake.NewClientBuilder().WithScheme(s).WithObjects(
 		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "forge-a", Labels: map[string]string{naming.LabelProject: "alpha"}}},
 		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "forge-b", Labels: map[string]string{naming.LabelProject: "beta"}}},
 		&corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "forge-c"}},
-		&v1.Project{ObjectMeta: metav1.ObjectMeta{Name: "alpha"}, Spec: v1.ProjectSpec{
+		&projectv1.Project{ObjectMeta: metav1.ObjectMeta{Name: "alpha"}, Spec: projectv1.ProjectSpec{
 			TrashRetention: &metav1.Duration{Duration: time.Hour}}},
-		&v1.Project{ObjectMeta: metav1.ObjectMeta{Name: "beta"}},
+		&projectv1.Project{ObjectMeta: metav1.ObjectMeta{Name: "beta"}},
 	).Build()
 	const platformDefault = 7 * 24 * time.Hour
 

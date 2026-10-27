@@ -59,9 +59,6 @@ const (
 	depInstallTimeout      = 30 * time.Minute
 	crdEstablishedTimeout  = 2 * time.Minute
 	deploymentReadyTimeout = 10 * time.Minute
-	// forgeaiDeployment is the operator Deployment: config/default prefixes
-	// its names with forgeai-.
-	forgeaiDeployment = "forgeai-controller-manager"
 )
 
 // Install steps, the values of DependencyProgress.Step. The GUI keys its text
@@ -87,7 +84,8 @@ var (
 		{Group: "admissionregistration.k8s.io", Kind: "MutatingWebhookConfiguration"},
 		{Group: "admissionregistration.k8s.io", Kind: "ValidatingWebhookConfiguration"},
 	}
-	forgeaiCRDs = []string{"projects.forgeai.wutz.dev", "fileservers.forgeai.wutz.dev", "inferenceservices.forgeai.wutz.dev"}
+	forgeaiDeployment = "forgeai-controller-manager"
+	forgeaiCRDs = []string{"fileservers.forgeai.wutz.dev", "inferenceservices.forgeai.wutz.dev"}
 )
 
 // depInfo describes a component on the admin page.
@@ -108,7 +106,8 @@ var depCatalog = []depInfo{
 	{name: "agent-sandbox", title: "agent-sandbox", description: "Sandbox controller and CRDs for the Sandboxes view"},
 	{name: "gateway-api-inference-extension", title: "Gateway API Inference Extension", description: "InferencePool CRD that the llm-d routers of InferenceServices use"},
 	{name: "instancetype-operator", title: "InstanceType operator", description: "InstanceTypes and Kueue ResourceFlavors derived from GPU nodes", chart: instanceTypeOperatorSpec},
-	{name: "forgeai", title: "forgeai operator", description: "Projects, instance types and the controllers", chart: forgeaiSpec},
+	{name: "forgeai", title: "forgeai operator", description: "File servers, inference services and sandboxes", chart: forgeaiSpec},
+	{name: "project-operator", title: "Project operator", description: "Project namespaces, quotas, members and registries", chart: projectOperatorSpec},
 	{name: "sshpiper", title: "sshpiper Pipe CRD", description: "Pipe CRD that the SSH gateway routes logins with"},
 	{name: "ssh-operator", title: "SSH operator", description: "SSHGateways and SSHRoutes that serve sandbox SSH logins", chart: sshOperatorSpec},
 }
@@ -543,6 +542,7 @@ func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *de
 		}
 	}
 	h.expectNamespace = expectNamespace
+	h.chart = info.chart
 	if len(h.deployments) > 0 {
 		h.namespace = h.deployments[0].Namespace
 	}

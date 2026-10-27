@@ -119,6 +119,21 @@ var instanceTypeOperatorSpec = &chartSpec{
 	},
 }
 
+// The Project operator is installed from its own Helm chart into the platform
+// namespace. It reads the platform config that the forgeai chart installs, so
+// it installs second.
+const (
+	projectOperatorChart        = "oci://ghcr.io/wutz/charts/project-operator"
+	projectOperatorChartVersion = "0.4.1"
+	projectOperatorRelease      = "project-operator"
+	projectOperatorDeployment   = "project-operator-controller-manager"
+)
+
+var projectOperatorSpec = &chartSpec{
+	name: "project-operator", ref: projectOperatorChart, version: projectOperatorChartVersion, release: projectOperatorRelease,
+	deployment: projectOperatorDeployment, crds: []string{"projects.forgeai.wutz.dev"},
+}
+
 // installChart installs the chart of spec into its namespace, or upgrades the
 // release already there. The chart is pulled from the OCI registry at the
 // pinned version and waited on until its Deployment is up.

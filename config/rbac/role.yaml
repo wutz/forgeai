@@ -8,10 +8,6 @@ rules:
   - ""
   resources:
   - configmaps
-  - limitranges
-  - namespaces
-  - persistentvolumeclaims
-  - resourcequotas
   - secrets
   - serviceaccounts
   - services
@@ -26,13 +22,30 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - namespaces
   - nodes
   - pods
-  - pods/log
   verbs:
   - get
   - list
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - persistentvolumeclaims
+  verbs:
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods/log
+  verbs:
+  - get
 - apiGroups:
   - ""
   - events.k8s.io
@@ -40,17 +53,12 @@ rules:
   - events
   verbs:
   - create
-  - get
-  - list
   - patch
-  - watch
 - apiGroups:
   - agents.x-k8s.io
   resources:
   - sandboxes
   verbs:
-  - create
-  - delete
   - get
   - list
   - patch
@@ -75,40 +83,10 @@ rules:
   - update
   - watch
 - apiGroups:
-  - authorization.k8s.io
-  resources:
-  - selfsubjectaccessreviews
-  - selfsubjectrulesreviews
-  verbs:
-  - create
-- apiGroups:
-  - batch
-  resources:
-  - jobs
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - extensions.agents.x-k8s.io
-  resources:
-  - sandboxclaims
-  - sandboxtemplates
-  - sandboxwarmpools
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
   - forgeai.wutz.dev
   resources:
   - fileservers
   - inferenceservices
-  - projects
   verbs:
   - create
   - delete
@@ -122,7 +100,6 @@ rules:
   resources:
   - fileservers/finalizers
   - inferenceservices/finalizers
-  - projects/finalizers
   verbs:
   - update
 - apiGroups:
@@ -130,7 +107,6 @@ rules:
   resources:
   - fileservers/status
   - inferenceservices/status
-  - projects/status
   verbs:
   - get
   - patch
@@ -139,6 +115,7 @@ rules:
   - forgeai.wutz.dev
   resources:
   - instancetypes
+  - projects
   verbs:
   - get
   - list
@@ -168,35 +145,6 @@ rules:
   - update
   - watch
 - apiGroups:
-  - jobset.x-k8s.io
-  resources:
-  - jobsets
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - kueue.x-k8s.io
-  resources:
-  - clusterqueues
-  - localqueues
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - kueue.x-k8s.io
-  resources:
-  - resourceflavors
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - kueue.x-k8s.io
   resources:
   - workloads
@@ -219,7 +167,6 @@ rules:
   - networking.k8s.io
   resources:
   - ingresses
-  - networkpolicies
   verbs:
   - create
   - delete
@@ -231,15 +178,11 @@ rules:
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
-  - clusterrolebindings
-  - clusterroles
   - rolebindings
   - roles
   verbs:
-  - bind
   - create
   - delete
-  - escalate
   - get
   - list
   - patch
@@ -248,19 +191,9 @@ rules:
 - apiGroups:
   - trainer.kubeflow.org
   resources:
-  - clustertrainingruntimes
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - trainer.kubeflow.org
-  resources:
-  - trainingruntimes
   - trainjobs
   verbs:
   - create
-  - delete
   - get
   - list
   - patch

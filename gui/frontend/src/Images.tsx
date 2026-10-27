@@ -10,8 +10,23 @@ import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Spinner, useActive,
 const countImages = (n: number) => n === 1 ? t('images.imagesOne') : t('images.imagesMany', {count: n})
 const countTags = (n: number) => n === 1 ? t('images.tagsOne') : t('images.tagsMany', {count: n})
 
-// Images shows the project registry: the push command with the robot
-// credentials and the pushed tags with delete buttons.
+// useCopy copies text and reports the key it was copied under for a moment, so
+// the button that copied it can say so. A failed copy goes to onFail.
+function useCopy(onFail: () => void) {
+  const [copied, setCopied] = useState('')
+  const timer = useRef<number>()
+  const copy = (text: string, key: string) =>
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key)
+      // A second copy restarts the notice, so the earlier timer must not clear it early.
+      window.clearTimeout(timer.current)
+      timer.current = window.setTimeout(() => setCopied(''), 1500)
+    }, onFail)
+  return {copied, copy}
+}
+
+// Images shows the project registry's repositories: the pushed tags with delete
+// buttons. How to push is in ImagePush, which sits under it in the sidebar.
 export function Images() {
   // repos is null until the first list answers, so the empty state does not show while it loads.
   const [repos, setRepos] = useState<app.ImageRepo[] | null>(null)
@@ -19,9 +34,7 @@ export function Images() {
   // reg stays null until Registry answers, so the empty states do not flash.
   const [reg, setReg] = useState<app.Registry | null>(null)
   const [error, setError] = useState('')
-  const [copied, setCopied] = useState('')
-  const copyTimer = useRef<number>()
-  const [showPassword, setShowPassword] = useState(false)
+  const {copied, copy} = useCopy(() => setError(t('images.copyFailed')))
   const confirm = useConfirm()
   const active = useActive()
 
@@ -40,19 +53,6 @@ export function Images() {
     return everyWhileVisible(poll, 60000)
   }, [active])
 
-  const copy = (text: string, key: string) =>
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(key)
-      // A second copy restarts the notice, so the earlier timer must not clear it early.
-      window.clearTimeout(copyTimer.current)
-      copyTimer.current = window.setTimeout(() => setCopied(''), 1500)
-    }, () => setError(t('images.copyFailed')))
-
-  // The password is not part of the command: docker asks for it, so it stays
-  // out of shell history and the process list. The robot name contains "$",
-  // which the shell would expand, so the username is single-quoted.
-  const host = reg?.url.split('/')[0] ?? ''
-  const login = reg?.username ? `docker login ${host} -u '${reg.username}'` : ''
   const address = (repo: string, tag: string) => reg ? `${reg.url}/${repo}:${tag}` : ''
   const totalTags = list.reduce((n, r) => n + tagCount(r), 0)
   const totalPulls = list.reduce((n, r) => n + r.pulls, 0)
@@ -101,41 +101,6 @@ export function Images() {
                   actions={<RefreshButton onRefresh={refresh}/>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {confirm.dialog}
-
-      {reg?.enabled && login && (
-        <Card title={t('images.pushTitle')} subtitle={t('images.pushSubtitle')}
-              actions={<button className="btn btn-sm" onClick={() => copy(login, 'login')}>
-                <Icon name={copied === 'login' ? 'check' : 'copy'} size={13}/>
-                {copied === 'login' ? t('common.copied') : t('images.copyLogin')}
-              </button>}>
-          <pre className="code" style={{margin: 0, padding: 14, borderRadius: 0, border: 0}}>{login}</pre>
-          <div className="robot-password">
-            <span className="muted">{t('images.password')}</span>
-            <code className="mono">{showPassword ? reg.password : '••••••••••••'}</code>
-            <button className="btn btn-sm" onClick={() => setShowPassword(v => !v)}>
-              {showPassword ? t('images.hide') : t('images.show')}
-            </button>
-            <button className="btn btn-sm" onClick={() => copy(reg.password ?? '', 'password')}>
-              <Icon name={copied === 'password' ? 'check' : 'copy'} size={13}/>
-              {copied === 'password' ? t('common.copied') : t('images.copyPassword')}
-            </button>
-          </div>
-          <div className="robot-password">
-            <span className="muted">{t('common.project')}</span>
-            <code className="mono">{reg.url}</code>
-            <button className="btn btn-sm" onClick={() => copy(reg.url, 'project')}>
-              <Icon name={copied === 'project' ? 'check' : 'copy'} size={13}/>
-              {copied === 'project' ? t('common.copied') : t('images.copyProject')}
-            </button>
-          </div>
-          <div className="robot-password">
-            <span className="muted">{t('images.pushThen')}</span>
-            <pre className="code" style={{margin: 0, padding: 0, border: 0, background: 'none'}}>
-              {`docker tag <image>:<tag> ${reg.url}/<repo>:<tag>\ndocker push ${reg.url}/<repo>:<tag>\ndocker pull ${reg.url}/<repo>:<tag>`}
-            </pre>
-          </div>
-        </Card>
-      )}
 
       {/* A failed first read leaves no list, so the card is left out rather than drawn empty under the banner. */}
       {(repos || !error) && <Card title={t('images.repositories')} className="card-spaced">
@@ -222,6 +187,96 @@ export function Images() {
           </div>
         ))}
       </Card>}
+    </div>
+  )
+}
+
+// ImagePush shows how to push images to the project registry: the robot login,
+// its password and the project address, then the commands that tag, push and
+// pull. The repositories already pushed are listed by Images.
+export function ImagePush() {
+  // reg stays null until Registry answers, so the cards do not show their empty states while it loads.
+  const [reg, setReg] = useState<app.Registry | null>(null)
+  const [error, setError] = useState('')
+  const {copied, copy} = useCopy(() => setError(t('images.copyFailed')))
+  const [showPassword, setShowPassword] = useState(false)
+  const active = useActive()
+
+  // refresh rejects when the read fails; the banner shows why and the header's refresh button reports it.
+  const refresh = () => Registry().then(r => {
+    setReg(r)
+    setError('')
+  }, e => {
+    setError(errText(e))
+    throw e
+  })
+  // reload is for the effect, which has nowhere to show a rejection; the banner already shows it.
+  const reload = () => refresh().catch(() => undefined)
+  useEffect(() => {
+    if (!active) return
+    reload()
+  }, [active])
+
+  // The password is not part of the command: docker asks for it, so it stays
+  // out of shell history and the process list. The robot name contains "$",
+  // which the shell would expand, so the username is single-quoted.
+  const host = reg?.url.split('/')[0] ?? ''
+  const login = reg?.username ? `docker login ${host} -u '${reg.username}'` : ''
+
+  return (
+    <div className="page">
+      <PageHeader eyebrow={t('storage.eyebrow')} title={t('images.pushTitle')}
+                  actions={<RefreshButton onRefresh={refresh}/>}/>
+      {error && <div className="banner banner-error" role="alert">{error}</div>}
+      {reg === null && !error && <Spinner label={t('common.loading')}/>}
+      {reg && !reg.enabled && (
+        <Card>
+          <Empty icon="image" title={t('images.notConfigured')}>
+            {t('images.notConfiguredHint')}
+          </Empty>
+        </Card>
+      )}
+      {reg?.enabled && !reg.credentials && (
+        <Card>
+          <Empty icon="shield" title={t('images.viewOnlyTitle')}>
+            {t('images.viewOnlyHint')}
+          </Empty>
+        </Card>
+      )}
+
+      {reg?.enabled && login && (
+        <>
+          <p className="muted" style={{margin: '0 0 12px'}}>{t('images.pushSubtitle')}</p>
+          <Card>
+            <pre className="code" style={{margin: 0, padding: 14, borderRadius: 0, border: 0}}>{login}</pre>
+            <div className="robot-password">
+              <span className="muted">{t('images.password')}</span>
+              <code className="mono">{showPassword ? reg.password : '••••••••••••'}</code>
+              <button className="btn btn-sm" onClick={() => setShowPassword(v => !v)}>
+                {showPassword ? t('images.hide') : t('images.show')}
+              </button>
+              <button className="btn btn-sm" onClick={() => copy(reg.password ?? '', 'password')}>
+                <Icon name={copied === 'password' ? 'check' : 'copy'} size={13}/>
+                {copied === 'password' ? t('common.copied') : t('images.copyPassword')}
+              </button>
+            </div>
+            <div className="robot-password">
+              <span className="muted">{t('common.project')}</span>
+              <code className="mono">{reg.url}</code>
+              <button className="btn btn-sm" onClick={() => copy(reg.url, 'project')}>
+                <Icon name={copied === 'project' ? 'check' : 'copy'} size={13}/>
+                {copied === 'project' ? t('common.copied') : t('images.copyProject')}
+              </button>
+            </div>
+            <div className="robot-password">
+              <span className="muted">{t('images.pushThen')}</span>
+              <pre className="code" style={{margin: 0, padding: 0, border: 0, background: 'none'}}>
+                {`docker tag <image>:<tag> ${reg.url}/<repo>:<tag>\ndocker push ${reg.url}/<repo>:<tag>\ndocker pull ${reg.url}/<repo>:<tag>`}
+              </pre>
+            </div>
+          </Card>
+        </>
+      )}
     </div>
   )
 }

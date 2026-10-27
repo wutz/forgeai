@@ -3,7 +3,6 @@
 export const en = {
   'inference.title': 'Inference',
   'inference.eyebrow': 'Workspace',
-  'inference.new': 'New service',
   'inference.readyCount': '{ready} of {total} ready',
   'inference.emptyTitle': 'No inference services yet',
   'inference.emptyHint': 'Serve an open model on a GPU instance type behind an OpenAI-compatible endpoint.',
@@ -69,7 +68,6 @@ export const en = {
 export const zh: Record<keyof typeof en, string> = {
   'inference.title': '推理',
   'inference.eyebrow': '工作区',
-  'inference.new': '新建服务',
   'inference.readyCount': '{ready}/{total} 个就绪',
   'inference.emptyTitle': '暂无推理服务',
   'inference.emptyHint': '在 GPU 实例上部署开源模型，并通过 OpenAI 兼容接口对外提供服务。',

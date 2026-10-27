@@ -73,6 +73,10 @@ back: 'M15 18l-6-6 6-6',
   monitor: 'M3 4h18v12H3zM8 20h8M12 16v4',
   sun: 'M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4',
   moon: 'M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z',
+  // template: a page split into a header band and two blocks, for saved templates.
+  template: 'M3 3h18v6H3zM3 13h8v8H3zM15 13h6v8h-6z',
+  // upload: an arrow lifted out of a tray, for pushing an image.
+  upload: 'M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4M7 8l5-5 5 5M12 3v12',
 } as const
 
 export type IconName = keyof typeof ICONS
@@ -377,7 +381,7 @@ export function RefreshButton({label = 'Refresh', onRefresh}: {
   const current = shown[state]
 
   return (
-    <button className={`btn btn-sm btn-ghost ${state === 'failed' ? 'btn-failed' : ''}`}
+    <button className={`btn ${state === 'failed' ? 'btn-failed' : ''}`}
             disabled={state === 'busy'} onClick={click} aria-live="polite">
       {state === 'busy'
         ? <span className="spinner" aria-hidden/>

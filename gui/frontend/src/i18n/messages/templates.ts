@@ -4,8 +4,6 @@
 export const en = {
   'templates.countSandbox': 'Sandbox templates: {count}',
   'templates.countJob': 'Job templates: {count}',
-  'templates.newSandbox': 'New sandbox template',
-  'templates.newJob': 'New job template',
   'templates.emptyJobTitle': 'No job templates yet',
   'templates.unreadable': 'Cannot be read',
   'templates.unreadableHint': 'The template cannot be read, so it can only be deleted.',
@@ -47,8 +45,6 @@ export const en = {
 export const zh: Record<keyof typeof en, string> = {
   'templates.countSandbox': '沙箱模板：{count}',
   'templates.countJob': '任务模板：{count}',
-  'templates.newSandbox': '新建沙箱模板',
-  'templates.newJob': '新建任务模板',
   'templates.emptyJobTitle': '还没有任务模板',
   'templates.unreadable': '无法读取',
   'templates.unreadableHint': '模板无法读取，只能删除。',

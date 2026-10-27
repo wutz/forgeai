@@ -56,7 +56,7 @@ export function Inference() {
                     {services !== null && t('inference.readyCount', {ready, total: list.length})}
                   </span>}
                   actions={create.inference && <button className="btn" onClick={() => setCreating(true)}>
-                    <Icon name="plus" size={14}/>{t('inference.new')}
+                    <Icon name="plus" size={14}/>{t('common.new')}
                   </button>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {creating && <InferenceCreateDialog onClose={() => setCreating(false)} onCreated={name => {

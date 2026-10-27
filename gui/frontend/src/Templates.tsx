@@ -65,7 +65,7 @@ export function Templates({kind}: {kind: Kind}) {
                     {canCreate && <button className="btn" onClick={() => isSandbox
                       ? setSandboxDialog({})
                       : setJobDialog({form: blankJobForm()})}>
-                      <Icon name="plus" size={14}/>{isSandbox ? t('templates.newSandbox') : t('templates.newJob')}
+                      <Icon name="plus" size={14}/>{t('common.new')}
                     </button>}
                     <RefreshButton onRefresh={refresh}/>
                   </>}/>
@@ -73,7 +73,7 @@ export function Templates({kind}: {kind: Kind}) {
         <span>{error}</span>
         {/* A conflict says to reload; the refresh is here so the user does not have to find it. */}
         <span className="spacer"/>
-        <button className="btn btn-sm" onClick={() => reload()}>{t('common.refresh')}</button>
+        <button className="btn" onClick={() => reload()}>{t('common.refresh')}</button>
       </div>}
       {/* Closing a dialog reloads the list: a save that failed on a stale version
           says to reload, and the reload here gives the reopened edit the current version. */}

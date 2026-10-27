@@ -89,7 +89,7 @@ export function Volumes() {
                       {(trash?.length ?? 0) > 0 && <Badge>{trash?.length}</Badge>}
                     </button>
                     {create.volumes && <button className="btn" disabled={!config} onClick={() => setCreating(true)}>
-                      <Icon name="plus" size={14}/>{t('volumes.new')}
+                      <Icon name="plus" size={14}/>{t('common.new')}
                     </button>}
                     <RefreshButton onRefresh={refresh}/>
                   </>}/>

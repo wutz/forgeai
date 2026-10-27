@@ -8,7 +8,7 @@ import {Inference} from './Inference'
 import {Sandboxes} from './Sandboxes'
 import {Volumes} from './Volumes'
 import {FilesView} from './FilesView'
-import {Images} from './Images'
+import {Images, ImagePush} from './Images'
 import {Resources} from './Resources'
 import {Admin} from './Admin'
 import {Dependencies} from './Dependencies'
@@ -31,10 +31,11 @@ const NARROW = '(max-width: 820px)'
 const isNarrow = () => window.matchMedia(NARROW).matches
 
 type Area = 'overview' | 'jobs' | 'job-templates' | 'sandboxes' | 'sandbox-templates' | 'inference' | 'volumes'
-  | 'files' | 'images' | 'resources' | 'admin' | 'dependencies'
+  | 'files' | 'images' | 'image-push' | 'resources' | 'admin' | 'dependencies'
 
 // A nav item may fold a child list beneath it; the children are views of their own.
-type NavItem = {area: Area, label: string, icon: IconName, children?: {area: Area, label: string}[]}
+type NavChild = {area: Area, label: string, icon: IconName}
+type NavItem = {area: Area, label: string, icon: IconName, children?: NavChild[]}
 
 // readJSON reads a JSON value from localStorage. A damaged entry counts as
 // absent, so it cannot stop the connection that reads it.
@@ -205,8 +206,8 @@ export default function App() {
 
   // The sidebar groups areas like the reference consoles: workspace, storage,
   // cluster catalogue, then admin. Sandboxes appear only when the connected
-  // cluster runs agents.x-k8s.io. Each of Sandboxes and Jobs folds its template
-  // list beneath it.
+  // cluster runs agents.x-k8s.io. Sandboxes and Jobs fold their template list
+  // beneath them, and Images folds the push instructions.
   const groups: {label: string, items: NavItem[]}[] = conn?.project ? [
     {
       label: t('nav.workspace'),
@@ -214,10 +215,10 @@ export default function App() {
         {area: 'overview', label: t('nav.overview'), icon: 'grid'},
         ...(conn.sandboxes ? [{
           area: 'sandboxes', label: t('nav.sandboxes'), icon: 'box',
-          children: [{area: 'sandbox-templates', label: t('sandboxes.templates')}],
+          children: [{area: 'sandbox-templates', label: t('sandboxes.templates'), icon: 'template'}],
         } as NavItem] : []),
         {area: 'jobs', label: t('nav.jobs'), icon: 'play',
-          children: [{area: 'job-templates', label: t('jobs.templates')}]},
+          children: [{area: 'job-templates', label: t('jobs.templates'), icon: 'template'}]},
         ...(conn.inference ? [{area: 'inference', label: t('nav.inference'), icon: 'bolt'} as NavItem] : []),
       ],
     },
@@ -226,7 +227,8 @@ export default function App() {
       items: [
         {area: 'volumes', label: t('nav.volumes'), icon: 'database'},
         {area: 'files', label: t('nav.files'), icon: 'folder'},
-        {area: 'images', label: t('nav.images'), icon: 'image'},
+        {area: 'images', label: t('nav.images'), icon: 'image',
+          children: [{area: 'image-push', label: t('images.pushTitle'), icon: 'upload'}]},
       ],
     },
     {
@@ -293,7 +295,7 @@ export default function App() {
                           <button key={c.area} className={`nav-item ${area === c.area ? 'active' : ''}`}
                                   onClick={() => go(c.area)}
                                   aria-label={c.label} aria-current={area === c.area ? 'page' : undefined}>
-                            <span>{c.label}</span>
+                            <Icon name={c.icon} size={14}/><span>{c.label}</span>
                           </button>
                         ))}
                       </div>}
@@ -323,6 +325,7 @@ export default function App() {
                 {shown('volumes', <Volumes/>)}
                 {shown('files', <FilesView/>)}
                 {shown('images', <Images/>)}
+                {shown('image-push', <ImagePush/>)}
                 {shown('resources', <Resources/>)}
                 {shown('admin', <Admin onProjectsChanged={refreshProjects}/>)}
                 {shown('dependencies', <Dependencies/>)}

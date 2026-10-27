@@ -7,7 +7,7 @@ import {SandboxCreateDialog} from './SandboxCreateDialog'
 import {SandboxTemplateDialog} from './SandboxTemplates'
 import {SandboxTerminal} from './SandboxTerminal'
 import {Status, envToLines, everyWhileVisible, fmtDate, errText} from './util'
-import {Badge, Card, Empty, Icon, LogView, PageHeader, Spinner, Tabs, tabPanelProps, useActive, useConfirm, useCreateAccess, useDetailClose} from './ui'
+import {Badge, Card, Empty, Icon, LogView, PageHeader, RefreshButton, Spinner, Tabs, tabPanelProps, useActive, useConfirm, useCreateAccess, useDetailClose} from './ui'
 import {MessageKey, t} from './i18n'
 
 // HEARTBEAT is how often an open sandbox detail resets the sandbox's idle
@@ -46,9 +46,10 @@ function SandboxList() {
   // Each refresh takes a number; a response that is not from the latest refresh
   // is dropped, so a slow older poll cannot overwrite a newer list.
   const latest = useRef(0)
+  // refresh rejects when the list fails; the banner shows why and the header's refresh button reports it.
   const refresh = () => {
     const seq = ++latest.current
-    ListSandboxes().then(bs => {
+    return ListSandboxes().then(bs => {
       if (seq !== latest.current) return
       const names = new Set(bs.map(b => b.name))
       const before = listed.current
@@ -57,13 +58,17 @@ function SandboxList() {
       setSelected(cur => cur && before.has(cur) && !names.has(cur) ? null : cur)
       setError('')
     }).catch(e => {
-      if (seq === latest.current) setError(errText(e))
+      if (seq !== latest.current) return
+      setError(errText(e))
+      throw e
     })
   }
+  // reload is for the callers with nowhere to show a rejection; the failure is already in the banner.
+  const reload = () => refresh().catch(() => undefined)
   useEffect(() => {
     if (!active) return
-    refresh()
-    return everyWhileVisible(refresh, 5000)
+    reload()
+    return everyWhileVisible(reload, 5000)
   }, [active])
 
   // Same definition as the detail view: a Pending sandbox is on its way up.
@@ -78,21 +83,22 @@ function SandboxList() {
                   </span>}
                   actions={<>
                     {create.sandboxes && <button className="btn" onClick={() => setCreating(true)}>
-                      <Icon name="plus" size={14}/>{t('sandboxes.new')}
+                      <Icon name="plus" size={14}/>{t('common.new')}
                     </button>}
+                    <RefreshButton onRefresh={refresh}/>
                   </>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {creating && <SandboxCreateDialog onClose={() => setCreating(false)} onCreated={name => {
         setCreating(false)
         setSelected(name)
-        refresh()
+        reload()
       }}/>}
       <div className="split" ref={split}>
         <SandboxTable boxes={boxes} failed={!!error} selected={selected} onSelect={n =>
           setSelected(prev => prev === n ? null : n)}/>
         {/* Keyed by name: a read still in flight for the previous sandbox must not land on this detail, where Stop and Delete would act on it. */}
-        {selected && <SandboxDetail key={selected} name={selected} onDone={refresh}
-                                    onDeleted={() => { setSelected(null); refresh() }} onClose={closeDetail}/>}
+        {selected && <SandboxDetail key={selected} name={selected} onDone={reload}
+                                    onDeleted={() => { setSelected(null); reload() }} onClose={closeDetail}/>}
       </div>
     </>
   )

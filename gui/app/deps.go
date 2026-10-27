@@ -34,7 +34,7 @@ import (
 
 // The cluster components forgeai runs on. Their install manifests are
 // embedded from deps/, rendered at the pinned versions by hack/gui-deps.sh.
-// The forgeai operator itself is installed from its Helm chart (chart.go).
+// The forgeai and project operators are installed from their Helm charts (chart.go).
 //
 //go:embed deps
 var depsFS embed.FS
@@ -56,9 +56,6 @@ const (
 	depInstallTimeout      = 30 * time.Minute
 	crdEstablishedTimeout  = 2 * time.Minute
 	deploymentReadyTimeout = 10 * time.Minute
-	// forgeaiDeployment is the operator Deployment: config/default prefixes
-	// its names with forgeai-.
-	forgeaiDeployment = "forgeai-controller-manager"
 )
 
 // Install steps, the values of DependencyProgress.Step. The GUI keys its text
@@ -84,7 +81,6 @@ var (
 		{Group: "admissionregistration.k8s.io", Kind: "MutatingWebhookConfiguration"},
 		{Group: "admissionregistration.k8s.io", Kind: "ValidatingWebhookConfiguration"},
 	}
-	forgeaiCRDs = []string{"projects.forgeai.wutz.dev", "instancetypes.forgeai.wutz.dev", "fileservers.forgeai.wutz.dev", "inferenceservices.forgeai.wutz.dev"}
 )
 
 // depInfo describes a component on the admin page.
@@ -92,9 +88,9 @@ type depInfo struct {
 	name        string
 	title       string
 	description string
-	// chart is set for components installed from the forgeai Helm chart
-	// rather than from an embedded bundle.
-	chart bool
+	// chart is set for components installed from a Helm chart rather than
+	// from an embedded bundle.
+	chart *helmChart
 }
 
 // depCatalog lists the components in install order: Kueue's TrainJob
@@ -104,7 +100,8 @@ var depCatalog = []depInfo{
 	{name: "kueue", title: "Kueue", description: "GPU quota queues that admit TrainJobs"},
 	{name: "agent-sandbox", title: "agent-sandbox", description: "Sandbox controller and CRDs for the Sandboxes view"},
 	{name: "gateway-api-inference-extension", title: "Gateway API Inference Extension", description: "InferencePool CRD that the llm-d routers of InferenceServices use"},
-	{name: "forgeai", title: "forgeai operator", description: "Projects, instance types and the controllers", chart: true},
+	{name: "forgeai", title: "forgeai operator", description: "Instance types, file servers, inference and sandboxes", chart: &forgeaiChart},
+	{name: "project-operator", title: "Project operator", description: "Project namespaces, quotas, members and registries", chart: &projectOperatorChart},
 }
 
 // depInfoByName returns the catalog entry of a component.
@@ -290,6 +287,9 @@ type depHealth struct {
 	// namespace is where the component runs; expectNamespace is where the
 	// platform config says it must. The check is skipped when expectNamespace is empty.
 	namespace, expectNamespace string
+	// chart is set for a component installed from a Helm chart, whose
+	// Deployment is found by name rather than by label.
+	chart bool
 }
 
 // assess sets the status of a component from its cluster state.
@@ -305,7 +305,7 @@ func assess(dep *Dependency, h depHealth) {
 		}, fmt.Sprintf("%d of %d CRDs installed", h.crdsFound, h.crdsWanted))
 		return
 	}
-	if dep.Name == "forgeai" && len(h.deployments) == 0 {
+	if h.chart && len(h.deployments) == 0 {
 		dep.Status, dep.Message = "degraded", "Operator Deployment not found"
 		dep.Reason = "operatorMissing"
 		return
@@ -346,9 +346,9 @@ func assess(dep *Dependency, h depHealth) {
 		dep.Status = "unmanaged"
 		dep.Reason = "unmanaged"
 		dep.Message = "Installed outside forgeai; installing replaces it with the pinned version"
-		if dep.Name == "forgeai" {
+		if h.chart {
 			dep.Reason = "unmanagedHelm"
-			dep.Message = "Deployed outside Helm (make deploy-dev); remove it before installing the chart"
+			dep.Message = "Deployed outside Helm; remove it before installing the chart"
 		}
 		return
 	}
@@ -465,16 +465,17 @@ func forEachConcurrently(n int, fn func(i int) error) error {
 // components are found by their labels; forgeai by its operator Deployment.
 func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *depBundle, expectNamespace string) (Dependency, error) {
 	dep := Dependency{
-		Name: info.name, Title: info.title, Description: info.description, Installable: b != nil || info.chart,
+		Name: info.name, Title: info.title, Description: info.description, Installable: b != nil || info.chart != nil,
 	}
 	var h depHealth
-	crds := forgeaiCRDs
+	var crds []string
 	switch {
 	case b != nil:
 		dep.Pinned = b.Version
 		crds = b.crdNames()
-	case info.chart:
-		dep.Pinned = forgeaiChartVersion
+	case info.chart != nil:
+		dep.Pinned = info.chart.version
+		crds = info.chart.crds
 	}
 	h.crdsWanted = len(crds)
 	// Each CRD is read at once; a slot per CRD keeps the count free of a lock.
@@ -509,9 +510,9 @@ func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *de
 			return dep, err
 		}
 		h.deployments = list.Items
-	} else {
+	} else if info.chart != nil {
 		d := &appsv1.Deployment{}
-		err := k8s.Get(ctx, client.ObjectKey{Namespace: platform.Namespace(), Name: forgeaiDeployment}, d)
+		err := k8s.Get(ctx, client.ObjectKey{Namespace: platform.Namespace(), Name: info.chart.deployment}, d)
 		switch {
 		case err == nil:
 			h.deployments = []appsv1.Deployment{*d}
@@ -520,6 +521,7 @@ func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *de
 		}
 	}
 	h.expectNamespace = expectNamespace
+	h.chart = info.chart != nil
 	if len(h.deployments) > 0 {
 		h.namespace = h.deployments[0].Namespace
 	}
@@ -735,7 +737,7 @@ func (a *App) InstallDependency(name string) error {
 	if err != nil {
 		return err
 	}
-	if b == nil && !info.chart {
+	if b == nil && info.chart == nil {
 		return fmt.Errorf("%s is not installed from the GUI", name)
 	}
 	cfg, err := loadPlatform(ctx, c.k8s)
@@ -749,7 +751,7 @@ func (a *App) InstallDependency(name string) error {
 		if err := checkSelectors(ctx, c.k8s, b); err != nil {
 			return err
 		}
-	} else if err := checkChartTarget(ctx, c.k8s); err != nil {
+	} else if err := checkChartTarget(ctx, c.k8s, *info.chart); err != nil {
 		return err
 	}
 	key := installKey(c, name)
@@ -763,7 +765,7 @@ func (a *App) InstallDependency(name string) error {
 		progress := func(step string) {
 			a.emitEvent(a.ctx, depProgressEvent, DependencyProgress{Cluster: cluster, Name: name, Step: step})
 		}
-		rec, err := installComponent(ctx, c, b, progress)
+		rec, err := installComponent(ctx, c, info, b, progress)
 		if err == nil {
 			progress(stepRecord)
 			rec.AppliedBy = currentUser(ctx, c.k8s)
@@ -786,12 +788,13 @@ func (a *App) InstallDependency(name string) error {
 	return nil
 }
 
-// installComponent installs a bundled component, or the forgeai operator from
-// its chart when there is no bundle. It returns the record of the install.
-func installComponent(ctx context.Context, c *Connection, b *depBundle, progress func(string)) (depRecord, error) {
+// installComponent installs a bundled component, or an operator from its chart
+// when there is no bundle. It returns the record of the install.
+func installComponent(ctx context.Context, c *Connection, info depInfo, b *depBundle, progress func(string)) (depRecord, error) {
 	if b == nil {
-		rec := depRecord{Version: forgeaiChartVersion, Namespace: platform.Namespace(), Source: forgeaiChart}
-		return rec, installChart(ctx, c, progress)
+		chart := *info.chart
+		rec := depRecord{Version: chart.version, Namespace: platform.Namespace(), Source: chart.ref}
+		return rec, installChart(ctx, c, chart, progress)
 	}
 	rec := depRecord{Version: b.Version, Namespace: bundleNamespace(b), ManifestSHA256: b.SHA256}
 	return rec, installBundle(ctx, c.k8s, b, progress)
@@ -941,7 +944,7 @@ func waitDeployments(ctx context.Context, k8s client.Client, objs []*unstructure
 // controller only for agent-sandbox CRDs present when it starts.
 func restartOperator(ctx context.Context, k8s client.Client) error {
 	d := &appsv1.Deployment{}
-	key := client.ObjectKey{Namespace: platform.Namespace(), Name: forgeaiDeployment}
+	key := client.ObjectKey{Namespace: platform.Namespace(), Name: forgeaiChart.deployment}
 	if err := k8s.Get(ctx, key, d); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil

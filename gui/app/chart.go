@@ -2,7 +2,7 @@ package app
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"io"
 
 	"helm.sh/helm/v3/pkg/action"
@@ -25,19 +25,48 @@ import (
 	"github.com/wutz/forgeai/pkg/platform"
 )
 
-// The forgeai operator is installed from its Helm chart. forgeaiChartVersion
-// is the chart version the GUI pins; the chart's app version is the operator
-// image tag, so a release bumps both together.
-const (
-	forgeaiChart        = "oci://ghcr.io/wutz/charts/forgeai"
-	forgeaiChartVersion = "0.4.0"
-	forgeaiRelease      = "forgeai"
+// helmChart is an operator the GUI installs from its Helm chart. The chart's
+// app version is the operator image tag, so the pinned version and the image
+// move together in a release.
+type helmChart struct {
+	// ref is the OCI reference of the chart.
+	ref string
+	// version is the chart version the GUI pins.
+	version string
+	// release is the Helm release name; the operator's Deployment is named
+	// after it in the platform namespace.
+	release string
+	// deployment is the operator's controller Deployment.
+	deployment string
+	// crds are the CRDs the operator owns; the Dependencies view counts them.
+	crds []string
+}
+
+var (
+	// forgeaiChart carries the platform config, the InstanceType CRD and the
+	// controllers of the remaining kinds. It is installed first.
+	forgeaiChart = helmChart{
+		ref:        "oci://ghcr.io/wutz/charts/forgeai",
+		version:    "0.4.0",
+		release:    "forgeai",
+		deployment: "forgeai-controller-manager",
+		crds:       []string{"instancetypes.forgeai.wutz.dev", "fileservers.forgeai.wutz.dev", "inferenceservices.forgeai.wutz.dev"},
+	}
+	// projectOperatorChart owns the Project CRD and its namespaces. It reads the
+	// platform config that forgeaiChart installs, so it comes second.
+	projectOperatorChart = helmChart{
+		ref:        "oci://ghcr.io/wutz/charts/project-operator",
+		version:    "0.4.1",
+		release:    "project-operator",
+		deployment: "project-operator-controller-manager",
+		crds:       []string{"projects.forgeai.wutz.dev"},
+	}
 )
 
-// installChart installs the forgeai chart into the platform namespace, or
-// upgrades the release already there. The chart is pulled from the OCI
-// registry at forgeaiChartVersion and waited on until its Deployment is up.
-func installChart(ctx context.Context, c *Connection, progress func(string)) error {
+// installChart installs a chart into the platform namespace, or upgrades the
+// release already there. The chart is pulled from the OCI registry at its
+// pinned version and waited on until its Deployment is up.
+func installChart(ctx context.Context, c *Connection, chart helmChart, progress func(string)) error {
 	ns := platform.Namespace()
 	progress(stepChartNamespace)
 	if err := ensureNamespace(ctx, c.k8s, ns); err != nil {
@@ -55,13 +84,13 @@ func installChart(ctx context.Context, c *Connection, progress func(string)) err
 	up := action.NewUpgrade(cfg)
 	up.Install = true
 	up.Namespace = ns
-	up.Version = forgeaiChartVersion
+	up.Version = chart.version
 	up.Wait = true
 	up.Atomic = true
 	up.Timeout = deploymentReadyTimeout
 
 	progress(stepChartPull)
-	path, err := up.ChartPathOptions.LocateChart(forgeaiChart, cli.New())
+	path, err := up.ChartPathOptions.LocateChart(chart.ref, cli.New())
 	if err != nil {
 		return err
 	}
@@ -70,15 +99,15 @@ func installChart(ctx context.Context, c *Connection, progress func(string)) err
 		return err
 	}
 	progress(stepChartInstall)
-	_, err = up.RunWithContext(ctx, forgeaiRelease, chrt, nil)
+	_, err = up.RunWithContext(ctx, chart.release, chrt, nil)
 	return err
 }
 
 // checkChartTarget refuses to install the chart over an operator that was not
 // installed from it: Helm does not adopt objects it did not create.
-func checkChartTarget(ctx context.Context, k8s client.Client) error {
+func checkChartTarget(ctx context.Context, k8s client.Client, chart helmChart) error {
 	d := &appsv1.Deployment{}
-	err := k8s.Get(ctx, client.ObjectKey{Namespace: platform.Namespace(), Name: forgeaiDeployment}, d)
+	err := k8s.Get(ctx, client.ObjectKey{Namespace: platform.Namespace(), Name: chart.deployment}, d)
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
@@ -86,8 +115,8 @@ func checkChartTarget(ctx context.Context, k8s client.Client) error {
 		return err
 	}
 	if _, ok := d.Labels[depLabel]; !ok {
-		return errors.New("the forgeai operator was deployed outside Helm (make deploy-dev); " +
-			"remove it before installing the chart")
+		return fmt.Errorf("the %s operator was deployed outside Helm; "+
+			"remove it before installing the chart", chart.release)
 	}
 	return nil
 }

@@ -24,8 +24,8 @@ func TestForgeaiChartRenders(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load chart: %v", err)
 	}
-	if chrt.Metadata.Version != forgeaiChartVersion {
-		t.Errorf("chart version = %s, want %s", chrt.Metadata.Version, forgeaiChartVersion)
+	if chrt.Metadata.Version != forgeaiChart.version {
+		t.Errorf("chart version = %s, want %s", chrt.Metadata.Version, forgeaiChart.version)
 	}
 	cfg := &action.Configuration{
 		Capabilities: chartutil.DefaultCapabilities,
@@ -36,7 +36,7 @@ func TestForgeaiChartRenders(t *testing.T) {
 	ins := action.NewInstall(cfg)
 	ins.ClientOnly = true
 	ins.DryRun = true
-	ins.ReleaseName = forgeaiRelease
+	ins.ReleaseName = forgeaiChart.release
 	ins.Namespace = ns
 	rel, err := ins.Run(chrt, nil)
 	if err != nil {
@@ -53,24 +53,24 @@ func TestForgeaiChartRenders(t *testing.T) {
 		switch {
 		case o.GroupVersionKind().GroupKind() == crdGK:
 			crds = append(crds, o.GetName())
-		case o.GetKind() == "Deployment" && o.GetName() == forgeaiDeployment:
+		case o.GetKind() == "Deployment" && o.GetName() == forgeaiChart.deployment:
 			operator = o
 		}
 	}
-	for _, name := range forgeaiCRDs {
+	for _, name := range forgeaiChart.crds {
 		if !slices.Contains(crds, name) {
 			t.Errorf("chart lacks CRD %s; rendered %v", name, crds)
 		}
 	}
 	if operator == nil {
-		t.Fatalf("chart lacks Deployment %s", forgeaiDeployment)
+		t.Fatalf("chart lacks Deployment %s", forgeaiChart.deployment)
 	}
 	if operator.GetNamespace() != ns {
 		t.Errorf("operator namespace = %s, want %s", operator.GetNamespace(), ns)
 	}
 	labels := operator.GetLabels()
-	if labels[depLabel] != "forgeai" || labels[depVersionLabel] != forgeaiChartVersion {
-		t.Errorf("operator labels = %v, want %s=forgeai %s=%s", labels, depLabel, depVersionLabel, forgeaiChartVersion)
+	if labels[depLabel] != "forgeai" || labels[depVersionLabel] != forgeaiChart.version {
+		t.Errorf("operator labels = %v, want %s=forgeai %s=%s", labels, depLabel, depVersionLabel, forgeaiChart.version)
 	}
 
 	containers, _, _ := unstructured.NestedSlice(operator.Object, "spec", "template", "spec", "containers")

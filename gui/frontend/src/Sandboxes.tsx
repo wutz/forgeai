@@ -7,7 +7,7 @@ import {SandboxCreateDialog} from './SandboxCreateDialog'
 import {SandboxTemplateDialog} from './SandboxTemplates'
 import {SandboxTerminal} from './SandboxTerminal'
 import {Status, envToLines, everyWhileVisible, fmtDate, errText} from './util'
-import {Badge, Card, Empty, Icon, LogView, PageHeader, RefreshButton, Spinner, Tabs, tabPanelProps, useActive, useConfirm, useCreateAccess, useDetailClose} from './ui'
+import {Badge, Card, Empty, Icon, LogView, PageHeader, RefreshButton, Spinner, Tabs, tabPanelProps, useActive, useChangeAccess, useConfirm, useCreateAccess, useDetailClose} from './ui'
 import {MessageKey, t} from './i18n'
 
 // HEARTBEAT is how often an open sandbox detail resets the sandbox's idle
@@ -187,6 +187,8 @@ function SandboxDetail({name, onDone, onDeleted, onClose}: {
   // deleting is the delete call in flight; the view closes once it succeeds.
   const [deleting, setDeleting] = useState(false)
   const active = useActive()
+  const create = useCreateAccess()
+  const change = useChangeAccess()
   const confirm = useConfirm()
   const phase = box?.phase
   // reload reads the sandbox now, so an action's result shows without waiting for the poll.
@@ -305,7 +307,7 @@ function SandboxDetail({name, onDone, onDeleted, onClose}: {
                                         onSaved={n => { setSaving(false); setSavedTemplate(n) }}/>}
 
       <div className="detail-actions">
-        {running && <button className="btn btn-sm" disabled={busy} onClick={() => confirm.ask({
+        {change.sandboxes && running && <button className="btn btn-sm" disabled={busy} onClick={() => confirm.ask({
           title: t('sandboxes.stopTitle', {name: box.name}),
           message: t('sandboxes.stopMessage'),
           action: t('common.stop'),
@@ -314,16 +316,16 @@ function SandboxDetail({name, onDone, onDeleted, onClose}: {
           {pending === 'stop' ? <span className="spinner" aria-hidden/> : <Icon name="square" size={12}/>}
           {pending === 'stop' ? t('sandboxes.stopping') : t('common.stop')}
         </button>}
-        {!running && <button className="btn btn-sm btn-accent" disabled={busy}
+        {change.sandboxes && !running && <button className="btn btn-sm btn-accent" disabled={busy}
                              onClick={() => transition('start', StartSandbox(box.name))}>
           {pending === 'start' ? <span className="spinner" aria-hidden/> : <Icon name="play" size={12}/>}
           {pending === 'start' ? t('sandboxes.starting') : t('common.start')}
         </button>}
-        <button className="btn btn-sm" onClick={() => setSaving(true)}>
+        {create.sandboxTemplates && <button className="btn btn-sm" onClick={() => setSaving(true)}>
           <Icon name="layers" size={13}/>{t('sandboxes.saveAsTemplate')}
-        </button>
+        </button>}
         <span className="spacer"/>
-        <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => confirm.ask({
+        {change.sandboxes && <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => confirm.ask({
           title: t('sandboxes.deleteTitle', {name: box.name}),
           message: t('sandboxes.deleteMessage'),
           action: t('sandboxes.deleteAction'), danger: true,
@@ -332,7 +334,7 @@ function SandboxDetail({name, onDone, onDeleted, onClose}: {
             setError('')
             DeleteSandbox(box.name).then(onDeleted).catch(e => setError(errText(e))).finally(() => setDeleting(false))
           },
-        })}><Icon name="trash" size={13}/>{deleting ? t('sandboxes.deleting') : t('common.delete')}</button>
+        })}><Icon name="trash" size={13}/>{deleting ? t('sandboxes.deleting') : t('common.delete')}</button>}
       </div>
 
       <div className="section">
@@ -388,7 +390,7 @@ function SandboxDetail({name, onDone, onDeleted, onClose}: {
                       ? t('sandboxes.terminalStarting')
                       : t('sandboxes.startToOpenTerminal'))}
                 </span>
-                {!running && <button className="btn btn-sm btn-accent" disabled={busy}
+                {change.sandboxes && !running && <button className="btn btn-sm btn-accent" disabled={busy}
                                      onClick={() => transition('start', StartSandbox(box.name))}>
                   {pending === 'start' ? <span className="spinner" aria-hidden/> : <Icon name="play" size={12}/>}
                   {pending === 'start' ? t('sandboxes.starting') : t('common.start')}

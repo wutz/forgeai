@@ -26,6 +26,14 @@ const noCreate: app.CreateAccess = {
 }
 export const useCreateAccess = (): app.CreateAccess => useContext(CreateAccessContext) ?? noCreate
 
+// ChangeAccessContext is what the user may change and remove in the project, from
+// the connection. Views show a row action (edit, grow, trash, delete) only when its kind is allowed.
+export const ChangeAccessContext = createContext<app.ChangeAccess | null>(null)
+const noChange: app.ChangeAccess = {
+  jobs: false, jobTemplates: false, volumes: false, inference: false, sandboxes: false, sandboxTemplates: false,
+}
+export const useChangeAccess = (): app.ChangeAccess => useContext(ChangeAccessContext) ?? noChange
+
 // Pane keeps a view mounted while another view is on screen, so the view keeps
 // its selections, filters and drafts. Only the view on screen owns the header.
 export function Pane({on, children}: {on: boolean, children: ReactNode}) {

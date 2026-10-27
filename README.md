@@ -159,6 +159,7 @@ spec:
 
 `SSHGatewayClass` names the controller (`forgeai.wutz.dev/ssh-gateway`). Only the gateway of the platform namespace is served, and only one of them exists: a second one there is rejected. Each rule of a route becomes one sshpiperd `Pipe` that accepts the keys of `authorizedKeys` for the listed usernames and forwards to the `SSHService` of the named sandbox, logging in as `sandbox` with the platform identity key.
 
+- The gateway needs the sshpiper `Pipe` CRD (`pipes.sshpiper.com`, served by the sshpiper kubernetes plugin) installed in the cluster. Without it the operator logs `sshpiper Pipe CRD is not installed; the SSH gateway controllers are off` at startup, and the SSHGateway and SSHRoute stay without status.
 - A username is claimed by the first route that matches it; keep login names unique.
 - Keys are the only way in. Passwords, keyboard interaction, agent and TCP forwarding, tunnels and X11 are all off, at the gateway and at the sidecar.
 - The gateway host key is generated once per gateway and kept in `forgeai-system/sshgateway-main`; pin it with `known_hosts` rather than trusting on first use.

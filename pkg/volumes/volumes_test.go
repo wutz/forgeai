@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
+	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/kf"
 	"github.com/wutz/forgeai/pkg/naming"
@@ -262,7 +263,7 @@ func trainJob(t *testing.T, name, volume string, conditions ...metav1.Condition)
 		Name: name, Image: "img:1", InstanceType: "cpu.small", Workers: 1,
 		Volumes: []training.VolumeMount{{Volume: volume, MountPath: "/data"}},
 	}
-	it := &v1.InstanceType{ObjectMeta: metav1.ObjectMeta{Name: "cpu.small"}}
+	it := &instancetypev1.InstanceType{ObjectMeta: metav1.ObjectMeta{Name: "cpu.small"}}
 	tj, err := training.TrainJob(&form, training.Context{Namespace: "forge-a", InstanceType: it, Config: cfg})
 	if err != nil {
 		t.Fatal(err)

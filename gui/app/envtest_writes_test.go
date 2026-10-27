@@ -46,7 +46,7 @@ func TestEnvtestWrites(t *testing.T) {
 	}
 	env := &envtest.Environment{
 		BinaryAssetsDirectory: "../../bin/k8s/1.37.0-darwin-arm64",
-		CRDDirectoryPaths:     []string{"../../config/crd/bases"},
+		CRDDirectoryPaths:     crdDirs(t),
 	}
 	cfg, err := env.Start()
 	if err != nil {

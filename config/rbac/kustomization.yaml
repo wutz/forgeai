@@ -27,9 +27,6 @@ resources:
 - fileserver_admin_role.yaml
 - fileserver_editor_role.yaml
 - fileserver_viewer_role.yaml
-- instancetype_admin_role.yaml
-- instancetype_editor_role.yaml
-- instancetype_viewer_role.yaml
 - project_admin_role.yaml
 - project_editor_role.yaml
 - project_viewer_role.yaml

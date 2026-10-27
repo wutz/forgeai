@@ -23,14 +23,6 @@ resources:
   version: v1alpha1
 - api:
     crdVersion: v1
-  controller: true
-  domain: wutz.dev
-  group: forgeai
-  kind: InstanceType
-  path: github.com/wutz/forgeai/api/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
     namespaced: true
   controller: true
   domain: wutz.dev

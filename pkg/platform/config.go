@@ -117,17 +117,6 @@ func (r Registry) APIURL() string {
 	return "https://" + r.Domain
 }
 
-// InstanceTypes controls how GPU nodes are sliced.
-type InstanceTypes struct {
-	// Reserved is kept back on every node for the system before slicing.
-	Reserved struct {
-		CPU    resource.Quantity `json:"cpu"`
-		Memory resource.Quantity `json:"memory"`
-	} `json:"reserved"`
-	// Sizes are the GPU counts offered (capped at the GPUs per node).
-	Sizes []int32 `json:"sizes,omitempty"`
-}
-
 // Quota is the default project quota.
 type Quota struct {
 	// GPUs per GPU class; "*" applies to classes not listed.
@@ -291,14 +280,13 @@ type Config struct {
 	StorageTypes       map[string]StorageType `json:"storageTypes,omitempty"`
 	DefaultStorageType string                 `json:"defaultStorageType,omitempty"`
 
-	InstanceTypes InstanceTypes `json:"instanceTypes"`
-	DefaultQuota  Quota         `json:"defaultQuota"`
-	Network       Network       `json:"network"`
-	FileServer    FileServer    `json:"fileServer"`
-	Training      Training      `json:"training"`
-	Sandbox       Sandbox       `json:"sandbox"`
-	Inference     Inference     `json:"inference"`
-	Templates     Templates     `json:"templates,omitzero"`
+	DefaultQuota Quota      `json:"defaultQuota"`
+	Network      Network    `json:"network"`
+	FileServer   FileServer `json:"fileServer"`
+	Training     Training   `json:"training"`
+	Sandbox      Sandbox    `json:"sandbox"`
+	Inference    Inference  `json:"inference"`
+	Templates    Templates  `json:"templates,omitzero"`
 
 	// TrashRetention is the default retention of deleted volumes.
 	TrashRetention metav1.Duration `json:"trashRetention,omitzero"`
@@ -351,11 +339,6 @@ func Parse(data []byte) (*Config, error) {
 	if c.Registry.AdminSecret == "" {
 		c.Registry.AdminSecret = "forgeai-harbor"
 	}
-	if len(c.InstanceTypes.Sizes) == 0 {
-		c.InstanceTypes.Sizes = []int32{1, 2, 4, 8}
-	}
-	defaultQuantity(&c.InstanceTypes.Reserved.CPU, "2")
-	defaultQuantity(&c.InstanceTypes.Reserved.Memory, "16Gi")
 	if c.DefaultQuota.GPUs == nil {
 		c.DefaultQuota.GPUs = map[string]int32{"*": 8}
 	}

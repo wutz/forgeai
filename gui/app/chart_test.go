@@ -12,6 +12,8 @@ import (
 	"helm.sh/helm/v3/pkg/storage"
 	"helm.sh/helm/v3/pkg/storage/driver"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/wutz/forgeai/pkg/platform"
 )
 
 // TestForgeaiChartRenders renders the chart the GUI installs and checks what
@@ -72,6 +74,9 @@ func TestForgeaiChartRenders(t *testing.T) {
 	if labels[depLabel] != "forgeai" || labels[depVersionLabel] != forgeaiChartVersion {
 		t.Errorf("operator labels = %v, want %s=forgeai %s=%s", labels, depLabel, depVersionLabel, forgeaiChartVersion)
 	}
+	if labels[helmChartLabel] != "forgeai-"+forgeaiChartVersion {
+		t.Errorf("operator %s = %q, want forgeai-%s", helmChartLabel, labels[helmChartLabel], forgeaiChartVersion)
+	}
 
 	containers, _, _ := unstructured.NestedSlice(operator.Object, "spec", "template", "spec", "containers")
 	var env []any
@@ -84,5 +89,35 @@ func TestForgeaiChartRenders(t *testing.T) {
 		return m["name"] == "FORGEAI_NAMESPACE" && m["value"] == ns
 	}) {
 		t.Errorf("operator lacks FORGEAI_NAMESPACE=%s in its env %v", ns, env)
+	}
+}
+
+// TestSSHOperatorSpec checks what the GUI tells the SSH operator chart: the
+// platform namespace its gateways are served in, and the Pipe CRD it needs.
+func TestSSHOperatorSpec(t *testing.T) {
+	if got := sshOperatorSpec.installNamespace(); got != sshOperatorNamespace {
+		t.Errorf("installNamespace = %s, want %s", got, sshOperatorNamespace)
+	}
+	ns, _, _ := unstructured.NestedString(sshOperatorSpec.values(nil), "platform", "namespace")
+	if ns != platform.Namespace() {
+		t.Errorf("platform.namespace = %q, want %s", ns, platform.Namespace())
+	}
+	if !slices.Contains(sshOperatorSpec.needs, "pipes.sshpiper.com") {
+		t.Errorf("needs = %v, want the sshpiper Pipe CRD", sshOperatorSpec.needs)
+	}
+}
+
+// TestSSHPiperBundle checks that the sshpiper component is a CRD-only bundle
+// of the Pipe CRD the SSH operator needs.
+func TestSSHPiperBundle(t *testing.T) {
+	b, err := bundleByName("sshpiper")
+	if err != nil || b == nil {
+		t.Fatalf("bundleByName(sshpiper) = %v, %v", b, err)
+	}
+	if got := b.crdNames(); !slices.Equal(got, []string{"pipes.sshpiper.com"}) {
+		t.Errorf("crdNames = %v, want the Pipe CRD only", got)
+	}
+	if bundleHasDeployment(b) {
+		t.Error("sshpiper bundle declares a Deployment; it should be CRD-only")
 	}
 }

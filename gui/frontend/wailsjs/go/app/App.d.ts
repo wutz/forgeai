@@ -26,6 +26,8 @@ export function Connect(arg1:string,arg2:string):Promise<app.ConnInfo>;
 
 export function Contexts():Promise<Array<app.KubeContext>>;
 
+export function CreateImageBuild(arg1:app.ImageBuildRequest):Promise<string>;
+
 export function CreateInferenceService(arg1:app.InferenceForm):Promise<app.InferenceService>;
 
 export function CreateJob(arg1:training.Form):Promise<app.Job>;
@@ -39,6 +41,8 @@ export function CreateTemplate(arg1:training.Form):Promise<app.Template>;
 export function CreateVolume(arg1:string,arg2:string,arg3:number):Promise<volumes.Volume>;
 
 export function DeleteImage(arg1:string,arg2:string):Promise<void>;
+
+export function DeleteImageBuild(arg1:string):Promise<void>;
 
 export function DeleteImageRepo(arg1:string):Promise<void>;
 
@@ -68,6 +72,8 @@ export function GetProject(arg1:string):Promise<app.Project>;
 
 export function GetSandbox(arg1:string):Promise<app.Sandbox>;
 
+export function ImageBuildLogs(arg1:string,arg2:number):Promise<string>;
+
 export function InferenceAPIKey(arg1:string):Promise<string>;
 
 export function InstallDependency(arg1:string):Promise<void>;
@@ -77,6 +83,8 @@ export function InstallUpdate():Promise<void>;
 export function KeepSandboxAwake(arg1:string):Promise<void>;
 
 export function ListDependencies():Promise<app.Dependencies>;
+
+export function ListImageBuilds():Promise<Array<app.ImageBuild>>;
 
 export function ListImages():Promise<Array<app.ImageRepo>>;
 

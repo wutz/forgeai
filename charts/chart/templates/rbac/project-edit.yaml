@@ -120,6 +120,18 @@ rules:
   - patch
   - delete
 - apiGroups:
+  - forgeai.wutz.dev
+  resources:
+  - imagebuilds
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
   - agents.x-k8s.io
   resources:
   - sandboxes

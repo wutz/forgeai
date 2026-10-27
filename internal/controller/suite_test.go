@@ -156,6 +156,7 @@ var _ = BeforeSuite(func() {
 			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: loader, ConfigNamespace: configNamespace,
 			NewHarbor: func(_ platform.Registry, u, p string) *harbor.Client { return harbor.New(fakeHarbor.URL, u, p, true) },
 		},
+		&ImageBuildReconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: loader},
 		&InstanceTypeReconciler{Client: mgr.GetClient(), Config: loader},
 		&FileServerReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: loader, Activity: activity.get},
 		&PersistentVolumeClaimReconciler{Client: mgr.GetClient(), Config: loader},

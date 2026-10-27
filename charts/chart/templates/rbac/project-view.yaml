@@ -82,6 +82,14 @@ rules:
   - list
   - watch
 - apiGroups:
+  - forgeai.wutz.dev
+  resources:
+  - imagebuilds
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - agents.x-k8s.io
   resources:
   - sandboxes

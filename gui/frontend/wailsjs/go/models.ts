@@ -297,6 +297,94 @@ export namespace app {
 	        this.pulledAt = source["pulledAt"];
 	    }
 	}
+	export class ImageBuild {
+	    name: string;
+	    repository: string;
+	    tags: string[];
+	    source: string;
+	    phase: string;
+	    message: string;
+	    images: string[];
+	    digest: string;
+	    createdAt: string;
+	    startedAt: string;
+	    completedAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImageBuild(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.repository = source["repository"];
+	        this.tags = source["tags"];
+	        this.source = source["source"];
+	        this.phase = source["phase"];
+	        this.message = source["message"];
+	        this.images = source["images"];
+	        this.digest = source["digest"];
+	        this.createdAt = source["createdAt"];
+	        this.startedAt = source["startedAt"];
+	        this.completedAt = source["completedAt"];
+	    }
+	}
+	export class ImageBuildGit {
+	    url: string;
+	    revision: string;
+	    contextPath: string;
+	    dockerfilePath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImageBuildGit(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.url = source["url"];
+	        this.revision = source["revision"];
+	        this.contextPath = source["contextPath"];
+	        this.dockerfilePath = source["dockerfilePath"];
+	    }
+	}
+	export class ImageBuildRequest {
+	    name: string;
+	    repository: string;
+	    tags: string[];
+	    dockerfile: string;
+	    git?: ImageBuildGit;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImageBuildRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.repository = source["repository"];
+	        this.tags = source["tags"];
+	        this.dockerfile = source["dockerfile"];
+	        this.git = this.convertValues(source["git"], ImageBuildGit);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ImageRepo {
 	    name: string;
 	    count: number;

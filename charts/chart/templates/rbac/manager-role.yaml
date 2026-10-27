@@ -92,6 +92,8 @@ rules:
   resources:
   - jobs
   verbs:
+  - create
+  - delete
   - get
   - list
   - watch
@@ -128,6 +130,7 @@ rules:
   - forgeai.wutz.dev
   resources:
   - fileservers/finalizers
+  - imagebuilds/finalizers
   - inferenceservices/finalizers
   - projects/finalizers
   verbs:
@@ -136,6 +139,7 @@ rules:
   - forgeai.wutz.dev
   resources:
   - fileservers/status
+  - imagebuilds/status
   - inferenceservices/status
   - instancetypes/status
   - projects/status
@@ -143,6 +147,16 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - forgeai.wutz.dev
+  resources:
+  - imagebuilds
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
 - apiGroups:
   - gateway.networking.k8s.io
   resources:

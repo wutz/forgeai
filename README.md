@@ -209,6 +209,7 @@ Platform settings live in the ConfigMap `forgeai-system/forgeai-platform` (`conf
 | `network` | `systemNamespaces` allowed into isolated projects, `dnsNamespace` |
 | `fileServer` | dufs `image`, `idleTimeout`, `hostPrefix` |
 | `training` | `defaultRuntime`, `shmSize`, `stuckTimeout`, `maxRetries` |
+| `imageBuild` | `builderImage` (BuildKit rootless image, default `moby/buildkit:v0.34.1-rootless`) and `gitImage` that clones the build context (default `alpine/git:v2.54.0`) |
 | `sandbox` | agent-sandbox `namespace`, `defaultImage`, offered `images`, `runtimeClasses` and `defaultRuntimeClass`, `shmSize`, `idleTimeout` (default for sandboxes without their own; 0 disables), `sshImage` of the SSH sidecar |
 | `ssh` | `gatewayImage` of the sshpiperd gateway |
 | `trashRetention` | Default retention of trashed volumes |
@@ -229,6 +230,7 @@ The desktop client connects with a kubeconfig context and a project namespace (t
 | Volumes | Create, resize, trash, restore and purge volumes |
 | Files | Opens the on-demand file server |
 | Images | Push instructions and robot credentials; list and delete images in the project's Harbor project. Their tags are offered in a dropdown as the image of jobs, sandboxes and their templates, which also accept any other address |
+| Builds (in Images) | Build an image from a git repository (`https://`, revision, context and Dockerfile paths) or from a pasted Dockerfile and push it to the project's Harbor project under the given repository and tags. Builds run as `ImageBuild`s in the project's build namespace `<namespace>-build`; members with view access list them, editors start and delete them, and the logs show the BuildKit output |
 | Resources | Instance types with availability and the project quota usage |
 | Projects | Admins only (may create Projects): manage projects and members, export member kubeconfigs |
 | Dependencies | Cluster admins only: install or upgrade Kueue, Kubeflow Trainer v2 (with JobSet) and agent-sandbox at the versions pinned in the GUI, install the forgeai operator from its Helm chart at the pinned chart version, and see each component's status |

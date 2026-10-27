@@ -169,6 +169,14 @@ type FileServer struct {
 	HostPrefix string `json:"hostPrefix,omitempty"`
 }
 
+// ImageBuild configures the Dockerfile builds of ImageBuilds.
+type ImageBuild struct {
+	// BuilderImage is the rootless BuildKit image, with its tag.
+	BuilderImage string `json:"builderImage,omitempty"`
+	// GitImage clones the build context. It needs git and sh.
+	GitImage string `json:"gitImage,omitempty"`
+}
+
 // Training configures job rendering and failure handling.
 type Training struct {
 	// DefaultRuntime is the ClusterTrainingRuntime used by jobs without a template.
@@ -304,6 +312,7 @@ type Config struct {
 	DefaultQuota  Quota         `json:"defaultQuota"`
 	Network       Network       `json:"network"`
 	FileServer    FileServer    `json:"fileServer"`
+	ImageBuild    ImageBuild    `json:"imageBuild,omitzero"`
 	Training      Training      `json:"training"`
 	Sandbox       Sandbox       `json:"sandbox"`
 	SSH           SSH           `json:"ssh,omitzero"`
@@ -388,6 +397,12 @@ func Parse(data []byte) (*Config, error) {
 		c.FileServer.HostPrefix = "files-"
 	}
 	defaultDuration(&c.FileServer.IdleTimeout, 30*time.Minute)
+	if c.ImageBuild.BuilderImage == "" {
+		c.ImageBuild.BuilderImage = "moby/buildkit:v0.34.1-rootless"
+	}
+	if c.ImageBuild.GitImage == "" {
+		c.ImageBuild.GitImage = "alpine/git:v2.54.0"
+	}
 	if c.Training.DefaultRuntime == "" {
 		c.Training.DefaultRuntime = "torch-distributed"
 	}

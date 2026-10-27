@@ -228,6 +228,9 @@ func main() {
 		"registry": &controller.RegistryReconciler{
 			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: cfg, ConfigNamespace: platform.Namespace(),
 		},
+		"imagebuild": &controller.ImageBuildReconciler{
+			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: cfg,
+		},
 		"instancetype": &controller.InstanceTypeReconciler{Client: mgr.GetClient(), Config: cfg},
 		"fileserver": &controller.FileServerReconciler{
 			Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: cfg, Activity: controller.LogActivity(clientset),

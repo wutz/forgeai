@@ -81,6 +81,13 @@ const (
 	// model servers by it.
 	LabelInference = "forgeai.wutz.dev/inference"
 
+	// LabelImageBuild is set on the Job, the pods and the Dockerfile ConfigMap of
+	// an ImageBuild (value = ImageBuild name).
+	LabelImageBuild = "forgeai.wutz.dev/image-build"
+	// FinalizerImageBuild keeps an ImageBuild until its build objects in the
+	// build namespace are deleted, since owner references cannot cross namespaces.
+	FinalizerImageBuild = "forgeai.wutz.dev/image-build"
+
 	// LabelSSH is set on a sandbox that serves SSH (value = "true"). The
 	// operator adds the sshd sidecar and the Service of the sandbox for it.
 	LabelSSH = "forgeai.wutz.dev/ssh"
@@ -142,6 +149,17 @@ const ClusterRolePrefix = "forgeai-project-"
 
 // Namespace is the namespace of a project.
 func Namespace(prefix, project string) string { return prefix + project }
+
+// BuildNamespace is the namespace where the image builds of a project run. The
+// BuildKit pods need the Unconfined seccomp and AppArmor profiles, which the
+// baseline Pod Security level of project namespaces rejects; members get
+// read access to it like to the project.
+func BuildNamespace(namespace string) string { return namespace + "-build" }
+
+// ProjectOfBuildNamespace is the project namespace of a build namespace.
+func ProjectOfBuildNamespace(buildNamespace string) string {
+	return strings.TrimSuffix(buildNamespace, "-build")
+}
 
 // ClusterQueue is the Kueue ClusterQueue of a project.
 func ClusterQueue(namespace string) string { return namespace }

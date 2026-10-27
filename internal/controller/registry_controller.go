@@ -187,7 +187,7 @@ func (r *RegistryReconciler) reconcile(ctx context.Context, p *v1.Project, cfg *
 	if err != nil {
 		return err
 	}
-	if err := apply(ctx, r.Client, &corev1.Secret{
+	secret := &corev1.Secret{
 		TypeMeta: metav1.TypeMeta{APIVersion: corev1.SchemeGroupVersion.String(), Kind: kindSecret},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: naming.RegistrySecretName, Namespace: ns, Labels: projectLabels(p),
@@ -199,7 +199,14 @@ func (r *RegistryReconciler) reconcile(ctx context.Context, p *v1.Project, cfg *
 			RegistryKeyPassword:        []byte(password),
 			RegistryKeyServer:          []byte(cfg.Registry.Domain),
 		},
-	}); err != nil {
+	}
+	if err := apply(ctx, r.Client, secret); err != nil {
+		return err
+	}
+	// Image builds push with the same robot in the build namespace.
+	buildSecret := secret.DeepCopy()
+	buildSecret.Namespace = naming.BuildNamespace(ns)
+	if err := apply(ctx, r.Client, buildSecret); err != nil {
 		return err
 	}
 	// Pods without explicit pull secrets (e.g. kubectl-created ones) pull

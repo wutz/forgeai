@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -202,8 +203,25 @@ func (r *ProjectReconciler) dropStaleRoleBinding(ctx context.Context, name, ns s
 }
 
 func (r *ProjectReconciler) reconcileProject(ctx context.Context, p *v1.Project, cfg *platform.Config, ns string) error {
-	if err := r.ensureNamespace(ctx, p, ns); err != nil {
+	// Restricted pod security: no privileged or host access for project pods.
+	if err := r.ensureNamespace(ctx, p, ns, map[string]string{
+		"pod-security.kubernetes.io/enforce": "baseline",
+		"pod-security.kubernetes.io/warn":    "restricted",
+	}); err != nil {
 		return err
+	}
+	if cfg.Registry.Enabled() {
+		// The build namespace is privileged: rootless BuildKit needs the
+		// Unconfined seccomp and AppArmor profiles (see naming.BuildNamespace).
+		bns := naming.BuildNamespace(ns)
+		if err := r.ensureNamespace(ctx, p, bns, map[string]string{
+			"pod-security.kubernetes.io/enforce": "privileged",
+		}); err != nil {
+			return err
+		}
+		if err := apply(ctx, r.Client, buildNetworkPolicy(p, bns)); err != nil {
+			return fmt.Errorf("apply build NetworkPolicy: %w", err)
+		}
 	}
 	classes, err := r.gpuClasses(ctx)
 	if err != nil {
@@ -240,7 +258,8 @@ func (r *ProjectReconciler) reconcileProject(ctx context.Context, p *v1.Project,
 	return r.reconcileMembers(ctx, p, cfg, ns)
 }
 
-func (r *ProjectReconciler) ensureNamespace(ctx context.Context, p *v1.Project, ns string) error {
+// ensureNamespace creates a namespace of the project with the given Pod Security labels.
+func (r *ProjectReconciler) ensureNamespace(ctx context.Context, p *v1.Project, ns string, podSecurity map[string]string) error {
 	cur := &corev1.Namespace{}
 	err := r.APIReader.Get(ctx, types.NamespacedName{Name: ns}, cur)
 	if err == nil && cur.Labels[naming.LabelProject] != p.Name {
@@ -250,9 +269,7 @@ func (r *ProjectReconciler) ensureNamespace(ctx context.Context, p *v1.Project, 
 		return err
 	}
 	labels := projectLabels(p)
-	// Restricted pod security: no privileged or host access for project pods.
-	labels["pod-security.kubernetes.io/enforce"] = "baseline"
-	labels["pod-security.kubernetes.io/warn"] = "restricted"
+	maps.Copy(labels, podSecurity)
 	return apply(ctx, r.Client, &corev1.Namespace{
 		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Namespace"},
 		ObjectMeta: metav1.ObjectMeta{Name: ns, Labels: labels},
@@ -377,6 +394,19 @@ func nsPeer(name string) networkingv1.NetworkPolicyPeer {
 	return networkingv1.NetworkPolicyPeer{NamespaceSelector: &metav1.LabelSelector{
 		MatchLabels: map[string]string{corev1.LabelMetadataName: name},
 	}}
+}
+
+// buildNetworkPolicy admits no traffic into the build namespace. Builds only
+// clone and push, so their egress stays open.
+func buildNetworkPolicy(p *v1.Project, bns string) *networkingv1.NetworkPolicy {
+	return &networkingv1.NetworkPolicy{
+		TypeMeta:   metav1.TypeMeta{APIVersion: "networking.k8s.io/v1", Kind: "NetworkPolicy"},
+		ObjectMeta: metav1.ObjectMeta{Name: naming.NetworkPolicyName, Namespace: bns, Labels: projectLabels(p)},
+		Spec: networkingv1.NetworkPolicySpec{
+			PodSelector: metav1.LabelSelector{},
+			PolicyTypes: []networkingv1.PolicyType{networkingv1.PolicyTypeIngress},
+		},
+	}
 }
 
 // networkPolicy admits traffic from the same namespace and the platform
@@ -516,6 +546,7 @@ func ownerRefs(p *v1.Project) []metav1.OwnerReference {
 // binding per member, and prunes removed members.
 func (r *ProjectReconciler) reconcileMembers(ctx context.Context, p *v1.Project, cfg *platform.Config, ns string) error {
 	mns := cfg.MembersNamespace
+	bns := naming.BuildNamespace(ns)
 	if err := apply(ctx, r.Client, &corev1.Namespace{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Namespace"},
 		ObjectMeta: metav1.ObjectMeta{Name: mns, Labels: map[string]string{
@@ -564,6 +595,21 @@ func (r *ProjectReconciler) reconcileMembers(ctx context.Context, p *v1.Project,
 				Subjects:   []rbacv1.Subject{{Kind: rbacv1.ServiceAccountKind, Name: sa, Namespace: mns}},
 			},
 		}
+		if cfg.Registry.Enabled() {
+			// Members read builds (status, logs, the Dockerfile) in the build
+			// namespace with the view role only: edit would allow exec into its
+			// pods, and the namespace holds the registry credentials.
+			view := rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: kindClusterRole, Name: naming.ClusterRolePrefix + string(v1.RoleView)}
+			if err := r.dropStaleRoleBinding(ctx, naming.MemberRoleBinding(m.Name), bns, view); err != nil {
+				return fmt.Errorf("member %s: %w", m.Name, err)
+			}
+			objs = append(objs, &rbacv1.RoleBinding{
+				TypeMeta:   metav1.TypeMeta{APIVersion: rbacv1.SchemeGroupVersion.String(), Kind: "RoleBinding"},
+				ObjectMeta: metav1.ObjectMeta{Name: naming.MemberRoleBinding(m.Name), Namespace: bns, Labels: ml, OwnerReferences: ownerRefs(p)},
+				RoleRef:    view,
+				Subjects:   []rbacv1.Subject{{Kind: rbacv1.ServiceAccountKind, Name: sa, Namespace: mns}},
+			})
+		}
 		for _, o := range objs {
 			if err := apply(ctx, r.Client, o); err != nil {
 				return fmt.Errorf("member %s: %w", m.Name, err)
@@ -600,10 +646,12 @@ func (r *ProjectReconciler) reconcileMembers(ctx context.Context, p *v1.Project,
 	}); err != nil {
 		return err
 	}
-	return r.pruneMembers(ctx, p, mns, ns, want)
+	return r.pruneMembers(ctx, p, mns, want, ns, bns)
 }
 
-func (r *ProjectReconciler) pruneMembers(ctx context.Context, p *v1.Project, mns, ns string, want map[string]bool) error {
+// pruneMembers deletes the ServiceAccounts, token Secrets and RoleBindings
+// (in namespaces) of members that are not in want.
+func (r *ProjectReconciler) pruneMembers(ctx context.Context, p *v1.Project, mns string, want map[string]bool, namespaces ...string) error {
 	sel := client.MatchingLabels{naming.LabelProject: p.Name}
 	sas := &corev1.ServiceAccountList{}
 	if err := r.List(ctx, sas, client.InNamespace(mns), sel); err != nil {
@@ -628,15 +676,17 @@ func (r *ProjectReconciler) pruneMembers(ctx context.Context, p *v1.Project, mns
 			}
 		}
 	}
-	rbs := &rbacv1.RoleBindingList{}
-	if err := r.List(ctx, rbs, client.InNamespace(ns), sel); err != nil {
-		return err
-	}
-	for i := range rbs.Items {
-		m := rbs.Items[i].Labels[naming.LabelMember]
-		if m != "" && !want[naming.MemberServiceAccount(p.Name, m)] {
-			if err := client.IgnoreNotFound(r.Delete(ctx, &rbs.Items[i])); err != nil {
-				return err
+	for _, ns := range namespaces {
+		rbs := &rbacv1.RoleBindingList{}
+		if err := r.List(ctx, rbs, client.InNamespace(ns), sel); err != nil {
+			return err
+		}
+		for i := range rbs.Items {
+			m := rbs.Items[i].Labels[naming.LabelMember]
+			if m != "" && !want[naming.MemberServiceAccount(p.Name, m)] {
+				if err := client.IgnoreNotFound(r.Delete(ctx, &rbs.Items[i])); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -647,7 +697,8 @@ func (r *ProjectReconciler) pruneMembers(ctx context.Context, p *v1.Project, mns
 // the namespace. It reports whether cleanup is complete.
 func (r *ProjectReconciler) finalize(ctx context.Context, p *v1.Project, cfg *platform.Config, ns string) (bool, error) {
 	log := logf.FromContext(ctx)
-	if err := r.pruneMembers(ctx, p, cfg.MembersNamespace, ns, map[string]bool{}); err != nil {
+	bns := naming.BuildNamespace(ns)
+	if err := r.pruneMembers(ctx, p, cfg.MembersNamespace, map[string]bool{}, ns, bns); err != nil {
 		return false, err
 	}
 	role := naming.ProjectClusterRole(p.Name)
@@ -662,6 +713,10 @@ func (r *ProjectReconciler) finalize(ctx context.Context, p *v1.Project, cfg *pl
 		if err := r.Delete(ctx, o); err != nil && !apierrors.IsNotFound(err) && !meta.IsNoMatchError(err) {
 			return false, err
 		}
+	}
+	// The build namespace only holds build objects, so it goes whatever the policy.
+	if err := r.deleteBuildNamespace(ctx, p, bns); err != nil {
+		return false, err
 	}
 	if p.Spec.DeletionPolicy != v1.DeletionDelete {
 		return true, nil
@@ -686,6 +741,22 @@ func (r *ProjectReconciler) finalize(ctx context.Context, p *v1.Project, cfg *pl
 	// The registry finalizer may need the namespace's secrets gone first; we
 	// do not wait for the namespace to disappear.
 	return true, nil
+}
+
+// deleteBuildNamespace deletes the build namespace of the project, if the project owns it.
+func (r *ProjectReconciler) deleteBuildNamespace(ctx context.Context, p *v1.Project, bns string) error {
+	cur := &corev1.Namespace{}
+	err := r.APIReader.Get(ctx, types.NamespacedName{Name: bns}, cur)
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if cur.Labels[naming.LabelProject] != p.Name || !cur.DeletionTimestamp.IsZero() {
+		return nil
+	}
+	return client.IgnoreNotFound(r.Delete(ctx, cur))
 }
 
 // SetupWithManager sets up the controller with the Manager.

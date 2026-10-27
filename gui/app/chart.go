@@ -198,6 +198,11 @@ func installChart(ctx context.Context, c *Connection, spec *chartSpec, platformC
 			return err
 		}
 	}
+	if spec.adoptFrom != "" {
+		if err := adoptCRDs(ctx, c.k8s, spec, ns); err != nil {
+			return err
+		}
+	}
 	progress(stepChartInstall)
 	_, err = up.RunWithContext(ctx, spec.release, chrt, values)
 	return err

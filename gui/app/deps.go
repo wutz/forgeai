@@ -694,10 +694,15 @@ func readRecords(ctx context.Context, k8s client.Reader) (map[string]depRecord, 
 }
 
 // writeRecord stores the record of a component's install, creating the record
-// ConfigMap on first use. Other components' entries are left as they are.
+// ConfigMap on first use. Other components' entries are left as they are. The
+// platform namespace is created when it is missing: the first component
+// installed on a cluster, a bundle, has no chart to create it.
 func writeRecord(ctx context.Context, k8s client.Client, name string, r depRecord) error {
 	raw, err := json.Marshal(r)
 	if err != nil {
+		return err
+	}
+	if err := ensureNamespace(ctx, k8s, platform.Namespace()); err != nil {
 		return err
 	}
 	key := client.ObjectKey{Namespace: platform.Namespace(), Name: depRecordName}

@@ -342,8 +342,12 @@ func TestRecordRoundTrip(t *testing.T) {
 		AppliedBy: "alice", AppliedAt: "2026-10-22T00:00:00Z"}
 	kueue := depRecord{Version: "v0.20.2", Namespace: "kueue-system", ManifestSHA256: "bb",
 		AppliedAt: "2026-10-22T01:00:00Z"}
+	// A fresh cluster has no platform namespace before its first install.
 	if err := writeRecord(ctx, k8s, "trainer", trainer); err != nil {
 		t.Fatalf("create record: %v", err)
+	}
+	if err := k8s.Get(ctx, client.ObjectKey{Name: platform.Namespace()}, &corev1.Namespace{}); err != nil {
+		t.Fatalf("record namespace: %v", err)
 	}
 	if err := writeRecord(ctx, k8s, "kueue", kueue); err != nil {
 		t.Fatalf("add record: %v", err)

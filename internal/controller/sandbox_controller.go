@@ -29,6 +29,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
@@ -268,7 +269,7 @@ func (r *SandboxReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	b := ctrl.NewControllerManagedBy(mgr).
 		Named("sandbox").
 		For(u, builder.WithPredicates(projectSandbox())).
-		Owns(&corev1.Service{}, builder.WithPredicates(projectSandbox())).
+		Owns(&corev1.Service{}, builder.WithPredicates(projectSandbox(), ignoreGatewayDelete())).
 		Owns(&corev1.Secret{}, builder.WithPredicates(projectSandbox())).
 		Watches(&corev1.Pod{}, handler.EnqueueRequestsFromMapFunc(func(_ context.Context, o client.Object) []reconcile.Request {
 			return []reconcile.Request{{NamespacedName: types.NamespacedName{
@@ -280,9 +281,21 @@ func (r *SandboxReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if r.Gateway {
 		route := &unstructured.Unstructured{}
 		route.SetGroupVersionKind(sandbox.HTTPRouteGVK)
-		b = b.Owns(&corev1.Service{}).Owns(route)
+		b = b.Owns(route)
 	}
 	return b.Complete(r)
+}
+
+// ignoreGatewayDelete drops the delete events of a sandbox's gateway Service.
+// The vcluster syncer deletes a virtual Service whose ClusterIP differs from its
+// host Service and recreates it with the host's. A reconcile on that delete
+// re-creates the Service first, so the syncer's recreate fails and the two keep
+// replacing it. The Service is still published by the next reconcile.
+func ignoreGatewayDelete() predicate.Predicate {
+	return predicate.Funcs{DeleteFunc: func(e event.DeleteEvent) bool {
+		ref := metav1.GetControllerOf(e.Object)
+		return ref == nil || ref.Kind != sandbox.SandboxGVK.Kind || e.Object.GetName() != sandbox.GatewayServiceName(ref.Name)
+	}}
 }
 
 // sandboxOfPod is the sandbox a pod belongs to: its controller reference, or

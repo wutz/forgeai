@@ -15,8 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/wutz/forgeai/api/v1alpha1"
-	"github.com/wutz/forgeai/pkg/instancetype"
+	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
+	"github.com/wutz/forgeai-instancetype-operator/pkg/instancetype"
 	"github.com/wutz/forgeai/pkg/kf"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
@@ -125,7 +125,7 @@ func (f *Form) Validate() error {
 // Context is what a job needs beyond the form.
 type Context struct {
 	Namespace    string
-	InstanceType *v1.InstanceType
+	InstanceType *instancetypev1.InstanceType
 	Config       *platform.Config
 	// RegistrySecret is added to imagePullSecrets when set.
 	RegistrySecret string
@@ -147,7 +147,7 @@ func env(in []EnvVar) []corev1.EnvVar {
 }
 
 // Resources returns the per-worker requests and limits of an instance type.
-func Resources(it *v1.InstanceType) corev1.ResourceRequirements {
+func Resources(it *instancetypev1.InstanceType) corev1.ResourceRequirements {
 	rl := corev1.ResourceList{
 		corev1.ResourceCPU:       it.Spec.CPU.DeepCopy(),
 		corev1.ResourceMemory:    it.Spec.Memory.DeepCopy(),

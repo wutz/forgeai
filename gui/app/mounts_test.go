@@ -8,7 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
 	"github.com/wutz/forgeai/pkg/sandbox"
@@ -35,7 +35,7 @@ func mountFixtures() []client.Object {
 			ObjectMeta: metav1.ObjectMeta{Name: platform.ConfigMapName, Namespace: testNamespace},
 			Data:       map[string]string{platform.ConfigKey: ""},
 		},
-		&v1.InstanceType{ObjectMeta: metav1.ObjectMeta{Name: "cpu.small"}},
+		&instancetypev1.InstanceType{ObjectMeta: metav1.ObjectMeta{Name: "cpu.small"}},
 		pvc("shared", corev1.ReadWriteMany, false),
 		pvc("local", corev1.ReadWriteOnce, false),
 		pvc("old", corev1.ReadWriteMany, true),

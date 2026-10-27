@@ -7,8 +7,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/wutz/forgeai/api/v1alpha1"
-	"github.com/wutz/forgeai/pkg/instancetype"
+	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
+	"github.com/wutz/forgeai-instancetype-operator/pkg/instancetype"
 	"github.com/wutz/forgeai/pkg/naming"
 )
 
@@ -33,7 +33,7 @@ func (a *App) ListInstanceTypes() ([]InstanceType, error) {
 	}
 	ctx, cancel := a.call()
 	defer cancel()
-	list := &v1.InstanceTypeList{}
+	list := &instancetypev1.InstanceTypeList{}
 	if err := c.k8s.List(ctx, list); err != nil {
 		return nil, err
 	}

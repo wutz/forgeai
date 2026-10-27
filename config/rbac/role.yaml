@@ -108,7 +108,6 @@ rules:
   resources:
   - fileservers
   - inferenceservices
-  - instancetypes
   - projects
   - sshgateways
   verbs:
@@ -134,7 +133,6 @@ rules:
   resources:
   - fileservers/status
   - inferenceservices/status
-  - instancetypes/status
   - projects/status
   - sshgateways/status
   - sshroutes/status
@@ -145,6 +143,7 @@ rules:
 - apiGroups:
   - forgeai.wutz.dev
   resources:
+  - instancetypes
   - sshgatewayclasses
   - sshroutes
   verbs:
@@ -188,7 +187,6 @@ rules:
   resources:
   - clusterqueues
   - localqueues
-  - resourceflavors
   verbs:
   - create
   - delete
@@ -196,6 +194,14 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - kueue.x-k8s.io
+  resources:
+  - resourceflavors
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - kueue.x-k8s.io

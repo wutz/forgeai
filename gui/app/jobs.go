@@ -17,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/kf"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
@@ -424,7 +424,7 @@ func (a *App) renderTrainJob(ctx context.Context, c *Connection, f training.Form
 			return nil, err
 		}
 	}
-	it := &v1.InstanceType{}
+	it := &instancetypev1.InstanceType{}
 	if err := c.k8s.Get(ctx, client.ObjectKey{Name: f.InstanceType}, it); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, fmt.Errorf("instance type %q not found", f.InstanceType)
@@ -461,7 +461,7 @@ func (a *App) renderTrainJob(ctx context.Context, c *Connection, f training.Form
 // once per job.
 type jobIndex struct {
 	pods          map[string][]corev1.Pod // by job set name
-	instanceTypes map[string]*v1.InstanceType
+	instanceTypes map[string]*instancetypev1.InstanceType
 	// names holds the TrainJobs of the listing; nil when the listing was not read.
 	names map[string]bool
 }
@@ -481,13 +481,13 @@ func loadJobIndex(ctx context.Context, c *Connection) (*jobIndex, error) {
 		client.HasLabels{kf.LabelJobSetName}); err != nil {
 		return nil, err
 	}
-	ix := &jobIndex{pods: map[string][]corev1.Pod{}, instanceTypes: map[string]*v1.InstanceType{}}
+	ix := &jobIndex{pods: map[string][]corev1.Pod{}, instanceTypes: map[string]*instancetypev1.InstanceType{}}
 	for _, p := range pods.Items {
 		ix.pods[p.Labels[kf.LabelJobSetName]] = append(ix.pods[p.Labels[kf.LabelJobSetName]], p)
 	}
 	// Instance types only add the GPU and CPU of the job view. A user who cannot
 	// list them still sees the jobs, without those details.
-	its := &v1.InstanceTypeList{}
+	its := &instancetypev1.InstanceTypeList{}
 	if err := c.k8s.List(ctx, its); err == nil {
 		for i := range its.Items {
 			ix.instanceTypes[its.Items[i].Name] = &its.Items[i]
@@ -619,11 +619,11 @@ func patchOf(tj *kf.TrainJob) *kf.PodSpecPatch {
 	return nil
 }
 
-func lookupInstanceType(ctx context.Context, c *Connection, name string) (*v1.InstanceType, error) {
+func lookupInstanceType(ctx context.Context, c *Connection, name string) (*instancetypev1.InstanceType, error) {
 	if name == "" {
 		return nil, nil
 	}
-	it := &v1.InstanceType{}
+	it := &instancetypev1.InstanceType{}
 	if err := c.k8s.Get(ctx, client.ObjectKey{Name: name}, it); err != nil {
 		return nil, client.IgnoreNotFound(err)
 	}

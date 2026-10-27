@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/inference"
 	"github.com/wutz/forgeai/pkg/naming"
@@ -99,10 +100,10 @@ func readyCondition(svc *v1.InferenceService) *metav1.Condition {
 var _ = Describe("InferenceService controller", Ordered, func() {
 	BeforeAll(func() {
 		Expect(k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: inferenceNS}})).To(Succeed())
-		Expect(k8sClient.Create(ctx, &v1.InstanceType{
+		Expect(k8sClient.Create(ctx, &instancetypev1.InstanceType{
 			ObjectMeta: metav1.ObjectMeta{Name: inferenceITName},
-			Spec: v1.InstanceTypeSpec{
-				GPU:          v1.InstanceTypeGPU{Class: "rtx-5090", Product: inferenceProduct, Count: 1, MemoryMiB: 32768},
+			Spec: instancetypev1.InstanceTypeSpec{
+				GPU:          instancetypev1.InstanceTypeGPU{Class: "rtx-5090", Product: inferenceProduct, Count: 1, MemoryMiB: 32768},
 				CPU:          resource.MustParse("8"),
 				Memory:       resource.MustParse("64Gi"),
 				NodeSelector: map[string]string{naming.LabelGPUProduct: inferenceProduct},
@@ -213,9 +214,9 @@ var _ = Describe("InferenceService controller", Ordered, func() {
 	})
 
 	It("reports an InstanceType without GPUs and renders nothing", func() {
-		Expect(k8sClient.Create(ctx, &v1.InstanceType{
+		Expect(k8sClient.Create(ctx, &instancetypev1.InstanceType{
 			ObjectMeta: metav1.ObjectMeta{Name: "infer-cpu.x1"},
-			Spec: v1.InstanceTypeSpec{
+			Spec: instancetypev1.InstanceTypeSpec{
 				CPU:          resource.MustParse("4"),
 				Memory:       resource.MustParse("8Gi"),
 				NodeSelector: map[string]string{naming.LabelGPUProduct: "cpu"},

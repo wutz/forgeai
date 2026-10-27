@@ -40,8 +40,8 @@ func TestDefaults(t *testing.T) {
 	if c.DefaultQuota.GPUCount("any") != 8 || c.FileServer.IdleTimeout.Duration != 30*time.Minute {
 		t.Errorf("defaults: %+v", c.DefaultQuota)
 	}
-	if c.InstanceTypes.Reserved.CPU.String() != "2" || c.TrashRetention.Duration != 7*24*time.Hour {
-		t.Errorf("defaults: %+v", c.InstanceTypes)
+	if c.TrashRetention.Duration != 7*24*time.Hour {
+		t.Errorf("defaults: %+v", c.TrashRetention)
 	}
 	if _, _, err := c.StorageType("nope"); err == nil {
 		t.Error("expected unknown storage type error")

@@ -114,7 +114,6 @@ rules:
   resources:
   - fileservers
   - inferenceservices
-  - instancetypes
   - projects
   verbs:
   - create
@@ -137,12 +136,19 @@ rules:
   resources:
   - fileservers/status
   - inferenceservices/status
-  - instancetypes/status
   - projects/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - forgeai.wutz.dev
+  resources:
+  - instancetypes
+  verbs:
+  - get
+  - list
+  - watch
 - apiGroups:
   - gateway.networking.k8s.io
   resources:

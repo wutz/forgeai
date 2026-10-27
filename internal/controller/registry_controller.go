@@ -44,6 +44,8 @@ import (
 
 const (
 	registryFinalizer = "forgeai.wutz.dev/registry"
+	// kindSecret is the Kind of the Secrets the controllers build.
+	kindSecret = "Secret"
 	// Keys of the registry Secret besides .dockerconfigjson.
 	RegistryKeyUsername = "username"
 	RegistryKeyPassword = "password"

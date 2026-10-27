@@ -387,7 +387,7 @@ func TestCheckChartTarget(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := checkChartTarget(context.Background(), tt.k8s)
+			err := checkChartTarget(context.Background(), tt.k8s, forgeaiChartSpec)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("checkChartTarget = %v, want error %v", err, tt.wantErr)
 			}

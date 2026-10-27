@@ -84,7 +84,7 @@ var (
 		{Group: "admissionregistration.k8s.io", Kind: "MutatingWebhookConfiguration"},
 		{Group: "admissionregistration.k8s.io", Kind: "ValidatingWebhookConfiguration"},
 	}
-	forgeaiCRDs = []string{"projects.forgeai.wutz.dev", "fileservers.forgeai.wutz.dev", "inferenceservices.forgeai.wutz.dev"}
+	forgeaiCRDs = []string{"projects.forgeai.wutz.dev", "inferenceservices.forgeai.wutz.dev"}
 )
 
 // depInfo describes a component on the admin page.
@@ -92,9 +92,9 @@ type depInfo struct {
 	name        string
 	title       string
 	description string
-	// chart is set for components installed from the forgeai Helm chart
+	// chart is set for components installed from an operator Helm chart
 	// rather than from an embedded bundle.
-	chart bool
+	chart *chartSpec
 }
 
 // depCatalog lists the components in install order: Kueue's TrainJob
@@ -104,7 +104,8 @@ var depCatalog = []depInfo{
 	{name: "kueue", title: "Kueue", description: "GPU quota queues that admit TrainJobs"},
 	{name: "agent-sandbox", title: "agent-sandbox", description: "Sandbox controller and CRDs for the Sandboxes view"},
 	{name: "gateway-api-inference-extension", title: "Gateway API Inference Extension", description: "InferencePool CRD that the llm-d routers of InferenceServices use"},
-	{name: "forgeai", title: "forgeai operator", description: "Projects, instance types and the controllers", chart: true},
+	{name: "forgeai", title: "forgeai operator", description: "Projects, instance types and the controllers", chart: forgeaiChartSpec},
+	{name: "fileserver", title: "FileServer operator", description: "On-demand file servers for the project volumes", chart: fileServerChartSpec},
 }
 
 // depInfoByName returns the catalog entry of a component.
@@ -290,6 +291,17 @@ type depHealth struct {
 	// namespace is where the component runs; expectNamespace is where the
 	// platform config says it must. The check is skipped when expectNamespace is empty.
 	namespace, expectNamespace string
+	// versionLabel is the Deployment label that carries the installed version;
+	// empty means depVersionLabel.
+	versionLabel string
+}
+
+// versionKey is the Deployment label that carries the installed version.
+func (h depHealth) versionKey() string {
+	if h.versionLabel != "" {
+		return h.versionLabel
+	}
+	return depVersionLabel
 }
 
 // assess sets the status of a component from its cluster state.
@@ -316,7 +328,7 @@ func assess(dep *Dependency, h depHealth) {
 	var notReady []string
 	for i := range h.deployments {
 		d := &h.deployments[i]
-		if v := d.Labels[depVersionLabel]; v != "" {
+		if v := d.Labels[h.versionKey()]; v != "" {
 			if dep.Installed == "" {
 				dep.Installed = v
 			}
@@ -465,16 +477,18 @@ func forEachConcurrently(n int, fn func(i int) error) error {
 // components are found by their labels; forgeai by its operator Deployment.
 func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *depBundle, expectNamespace string) (Dependency, error) {
 	dep := Dependency{
-		Name: info.name, Title: info.title, Description: info.description, Installable: b != nil || info.chart,
+		Name: info.name, Title: info.title, Description: info.description, Installable: b != nil || info.chart != nil,
 	}
 	var h depHealth
-	crds := forgeaiCRDs
+	var crds []string
 	switch {
 	case b != nil:
 		dep.Pinned = b.Version
 		crds = b.crdNames()
-	case info.chart:
-		dep.Pinned = forgeaiChartVersion
+	case info.chart != nil:
+		dep.Pinned = info.chart.version
+		crds = info.chart.crds
+		h.versionLabel = info.chart.versionLabel
 	}
 	h.crdsWanted = len(crds)
 	// Each CRD is read at once; a slot per CRD keeps the count free of a lock.
@@ -511,7 +525,7 @@ func probeDependency(ctx context.Context, k8s client.Client, info depInfo, b *de
 		h.deployments = list.Items
 	} else {
 		d := &appsv1.Deployment{}
-		err := k8s.Get(ctx, client.ObjectKey{Namespace: platform.Namespace(), Name: forgeaiDeployment}, d)
+		err := k8s.Get(ctx, client.ObjectKey{Namespace: platform.Namespace(), Name: info.chart.deployment}, d)
 		switch {
 		case err == nil:
 			h.deployments = []appsv1.Deployment{*d}
@@ -735,7 +749,7 @@ func (a *App) InstallDependency(name string) error {
 	if err != nil {
 		return err
 	}
-	if b == nil && !info.chart {
+	if b == nil && info.chart == nil {
 		return fmt.Errorf("%s is not installed from the GUI", name)
 	}
 	cfg, err := loadPlatform(ctx, c.k8s)
@@ -749,7 +763,7 @@ func (a *App) InstallDependency(name string) error {
 		if err := checkSelectors(ctx, c.k8s, b); err != nil {
 			return err
 		}
-	} else if err := checkChartTarget(ctx, c.k8s); err != nil {
+	} else if err := checkChartTarget(ctx, c.k8s, info.chart); err != nil {
 		return err
 	}
 	key := installKey(c, name)
@@ -763,7 +777,7 @@ func (a *App) InstallDependency(name string) error {
 		progress := func(step string) {
 			a.emitEvent(a.ctx, depProgressEvent, DependencyProgress{Cluster: cluster, Name: name, Step: step})
 		}
-		rec, err := installComponent(ctx, c, b, progress)
+		rec, err := installComponent(ctx, c, b, info.chart, cfg, progress)
 		if err == nil {
 			progress(stepRecord)
 			rec.AppliedBy = currentUser(ctx, c.k8s)
@@ -786,12 +800,13 @@ func (a *App) InstallDependency(name string) error {
 	return nil
 }
 
-// installComponent installs a bundled component, or the forgeai operator from
+// installComponent installs a bundled component, or the operator of spec from
 // its chart when there is no bundle. It returns the record of the install.
-func installComponent(ctx context.Context, c *Connection, b *depBundle, progress func(string)) (depRecord, error) {
+func installComponent(ctx context.Context, c *Connection, b *depBundle, spec *chartSpec, cfg *platform.Config,
+	progress func(string)) (depRecord, error) {
 	if b == nil {
-		rec := depRecord{Version: forgeaiChartVersion, Namespace: platform.Namespace(), Source: forgeaiChart}
-		return rec, installChart(ctx, c, progress)
+		rec := depRecord{Version: spec.version, Namespace: platform.Namespace(), Source: spec.ref}
+		return rec, installChart(ctx, c, spec, cfg, progress)
 	}
 	rec := depRecord{Version: b.Version, Namespace: bundleNamespace(b), ManifestSHA256: b.SHA256}
 	return rec, installBundle(ctx, c.k8s, b, progress)

@@ -4,7 +4,7 @@ forgeai is a Kubernetes-native AI platform covering development, training, RL an
 
 | Component | Path | Description |
 |---|---|---|
-| Operator | `api/`, `internal/`, `cmd/` | `Project` and `FileServer` CRDs; adds stop/resume, failure classification and retries to `TrainJob`s; purges trashed volumes |
+| Operator | `api/`, `internal/`, `cmd/` | `Project` CRD; adds stop/resume, failure classification and retries to `TrainJob`s; purges trashed volumes |
 | GUI | `gui/` | [Wails](https://wails.io) desktop client that talks to Kubernetes directly through a kubeconfig context |
 | Website | `website/` | Official site ([Astro](https://astro.build)), deployed to Cloudflare Workers at https://forgeai.wutz.dev |
 | Shared library | `pkg/` | Naming, platform config, instance types, job rendering and status, sandboxes, volumes, Harbor client, kubeconfig export |
@@ -175,20 +175,11 @@ Volumes are PVCs in the project namespace, created from the platform `storageTyp
 
 ## FileServer
 
-A `FileServer` (short name `ffs`) runs [dufs](https://github.com/sigoden/dufs) on demand to browse and transfer the files of the project's volumes:
+The file servers that browse and transfer the files of a project's volumes are run by [fileserver-operator](https://github.com/wutz/fileserver-operator), a separate project with its own Helm chart. It serves a `FileServer` (short name `ffs`) per namespace with [dufs](https://github.com/sigoden/dufs), scaled to zero when idle. forgeai only creates the `default` `FileServer` on first use of the Files view and keeps it awake by updating the `forgeai.wutz.dev/last-active` annotation; the operator does the rest.
 
-```yaml
-apiVersion: forgeai.wutz.dev/v1alpha1
-kind: FileServer
-metadata:
-  name: default
-  namespace: forge-demo
-spec:
-  volumes: []        # empty serves every ReadWriteMany volume not in the trash
-  idleTimeout: 30m   # defaults to fileServer.idleTimeout
-```
+The Dependencies view installs the operator from `oci://ghcr.io/wutz/charts/fileserver-operator` at the pinned chart version, as release `fileserver-operator` in `forgeai-system`. It maps the platform config into the chart values: `ingress` (class, domain, port, TLS secret) and `fileServer` (dufs image, idle timeout, host prefix). Until the operator is installed, the Files view has no server to show.
 
-The GUI creates the `default` server on first use of the Files view and keeps it awake by updating the `forgeai.wutz.dev/last-active` annotation. The operator also reads the dufs access log for activity and scales the Deployment to zero after `idleTimeout`. Each volume is served under `/<name>` at `https://files-<namespace>.<ingress domain>[:port]`, with basic auth from the Secret `forgeai-fileserver`.
+Upgrading from forgeai 0.4.0 removes the `FileServer` CRD, since the forgeai chart no longer ships it. That deletes existing `FileServer` objects and their dufs Deployments. Install the FileServer operator from the Dependencies view afterwards; the next visit to the Files view recreates the `default` server.
 
 ## Platform config
 
@@ -230,7 +221,7 @@ The desktop client connects with a kubeconfig context and a project namespace (t
 | Images | Push instructions and robot credentials; list and delete images in the project's Harbor project. Their tags are offered in a dropdown as the image of jobs, sandboxes and their templates, which also accept any other address |
 | Resources | Instance types with availability and the project quota usage |
 | Projects | Admins only (may create Projects): manage projects and members, export member kubeconfigs |
-| Dependencies | Cluster admins only: install or upgrade Kueue, Kubeflow Trainer v2 (with JobSet) and agent-sandbox at the versions pinned in the GUI, install the forgeai operator from its Helm chart at the pinned chart version, and see each component's status |
+| Dependencies | Cluster admins only: install or upgrade Kueue, Kubeflow Trainer v2 (with JobSet) and agent-sandbox at the versions pinned in the GUI, install the forgeai operator and the FileServer operator from their Helm charts at the pinned chart versions, and see each component's status |
 
 The New job and New sandbox dialogs also offer template sources: job and sandbox templates from the platform's `templates.source` (default [wutz/forgeai-templates](https://github.com/wutz/forgeai-templates)), grouped apart from the project templates. You can add other published template sources by URL, `file://` directory or `oci://` reference (`oci://registry/repository:tag` or `oci://registry/repository@sha256:…`) under **Template sources** in the sidebar; a source is read before it is added, and its templates are marked as yours in the dialog. Picking a template prefills the form; the name, instance type and volumes stay yours, and the job or sandbox does not reference the template.
 

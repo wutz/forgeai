@@ -107,6 +107,16 @@ rules:
   - forgeai.wutz.dev
   resources:
   - fileservers
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - forgeai.wutz.dev
+  resources:
   - inferenceservices
   - projects
   - sshgateways
@@ -121,7 +131,6 @@ rules:
 - apiGroups:
   - forgeai.wutz.dev
   resources:
-  - fileservers/finalizers
   - inferenceservices/finalizers
   - projects/finalizers
   - sshgateways/finalizers
@@ -131,7 +140,6 @@ rules:
 - apiGroups:
   - forgeai.wutz.dev
   resources:
-  - fileservers/status
   - inferenceservices/status
   - projects/status
   - sshgateways/status

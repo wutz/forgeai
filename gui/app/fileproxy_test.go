@@ -22,8 +22,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/wutz/forgeai/api/v1alpha1"
-	"github.com/wutz/forgeai/pkg/naming"
+	fsv1 "github.com/wutz/fileserver-operator/api/v1alpha1"
 )
 
 // proxyFor starts a proxy in front of target, with the test credentials, and
@@ -158,12 +157,12 @@ func TestFilesAddressIsLoopbackAndHidesPassword(t *testing.T) {
 	}))
 	defer up.Close()
 
-	fs := &v1.FileServer{
-		ObjectMeta: metav1.ObjectMeta{Name: naming.FileServerName, Namespace: testNamespace},
-		Status:     v1.FileServerStatus{Phase: v1.FileServerReady, URL: up.URL, Volumes: []string{"data"}},
+	fs := &fsv1.FileServer{
+		ObjectMeta: metav1.ObjectMeta{Name: fsv1.DefaultName, Namespace: testNamespace},
+		Status:     fsv1.FileServerStatus{Phase: fsv1.FileServerReady, URL: up.URL, Volumes: []string{"data"}},
 	}
 	sec := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{Name: naming.FileServerSecretName, Namespace: testNamespace},
+		ObjectMeta: metav1.ObjectMeta{Name: fsv1.SecretName, Namespace: testNamespace},
 		Data: map[string][]byte{
 			corev1.BasicAuthUsernameKey: []byte("forgeai"),
 			corev1.BasicAuthPasswordKey: []byte("s3cret"),
@@ -193,12 +192,12 @@ func TestFilesAddressIsLoopbackAndHidesPassword(t *testing.T) {
 
 	// The server goes idle: the address is withdrawn and the proxy stops
 	// forwarding to the old pod.
-	cur := &v1.FileServer{}
-	key := client.ObjectKey{Namespace: testNamespace, Name: naming.FileServerName}
+	cur := &fsv1.FileServer{}
+	key := client.ObjectKey{Namespace: testNamespace, Name: fsv1.DefaultName}
 	if err := a.conn.k8s.Get(context.Background(), key, cur); err != nil {
 		t.Fatal(err)
 	}
-	cur.Status.Phase = v1.FileServerIdle
+	cur.Status.Phase = fsv1.FileServerIdle
 	// The fake client has no status subresource, so a plain update sets status.
 	if err := a.conn.k8s.Update(context.Background(), cur); err != nil {
 		t.Fatal(err)

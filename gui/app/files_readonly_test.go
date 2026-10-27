@@ -14,8 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
-	v1 "github.com/wutz/forgeai/api/v1alpha1"
-	"github.com/wutz/forgeai/pkg/naming"
+	fsv1 "github.com/wutz/fileserver-operator/api/v1alpha1"
 )
 
 // viewerApp is an App whose client refuses the calls a view member has no
@@ -33,9 +32,9 @@ func forbiddenErr(resource, name string) error {
 // is refused, and Files reports the state read-only instead of failing.
 func TestFilesReadOnlyWhenHeartbeatIsRefused(t *testing.T) {
 	stale := time.Now().UTC().Add(-time.Hour).Format(time.RFC3339)
-	fs := &v1.FileServer{ObjectMeta: metav1.ObjectMeta{
-		Name: naming.FileServerName, Namespace: testNamespace,
-		Annotations: map[string]string{naming.AnnotationLastActive: stale},
+	fs := &fsv1.FileServer{ObjectMeta: metav1.ObjectMeta{
+		Name: fsv1.DefaultName, Namespace: testNamespace,
+		Annotations: map[string]string{fsv1.AnnotationLastActive: stale},
 	}}
 	a := viewerApp(interceptor.Funcs{
 		Patch: func(ctx context.Context, c client.WithWatch, obj client.Object, p client.Patch, opts ...client.PatchOption) error {
@@ -77,12 +76,12 @@ func TestFilesReadOnlyWhenServerCannotBeCreated(t *testing.T) {
 // basic-auth password is refused, so the page shows the state only.
 func TestFilesReadOnlyWhenSecretIsRefused(t *testing.T) {
 	fresh := time.Now().UTC().Format(time.RFC3339)
-	fs := &v1.FileServer{
+	fs := &fsv1.FileServer{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: naming.FileServerName, Namespace: testNamespace,
-			Annotations: map[string]string{naming.AnnotationLastActive: fresh},
+			Name: fsv1.DefaultName, Namespace: testNamespace,
+			Annotations: map[string]string{fsv1.AnnotationLastActive: fresh},
 		},
-		Status: v1.FileServerStatus{Phase: v1.FileServerReady, URL: "https://files.example.com"},
+		Status: fsv1.FileServerStatus{Phase: fsv1.FileServerReady, URL: "https://files.example.com"},
 	}
 	a := viewerApp(interceptor.Funcs{
 		Get: func(ctx context.Context, c client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
@@ -100,7 +99,7 @@ func TestFilesReadOnlyWhenSecretIsRefused(t *testing.T) {
 	if !got.ReadOnly || got.Address != "" {
 		t.Errorf("Files with a refused Secret = %+v, want read-only without an address", got)
 	}
-	if got.Phase != string(v1.FileServerReady) {
+	if got.Phase != string(fsv1.FileServerReady) {
 		t.Errorf("Phase = %q, want Ready", got.Phase)
 	}
 }

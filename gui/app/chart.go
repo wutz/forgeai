@@ -2,7 +2,7 @@ package app
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"io"
 
 	"helm.sh/helm/v3/pkg/action"
@@ -25,19 +25,77 @@ import (
 	"github.com/wutz/forgeai/pkg/platform"
 )
 
-// The forgeai operator is installed from its Helm chart. forgeaiChartVersion
-// is the chart version the GUI pins; the chart's app version is the operator
-// image tag, so a release bumps both together.
+// The operators installed from a Helm chart. Each chart version is pinned
+// here; the chart's app version is the operator image tag, so a release bumps
+// both together.
 const (
 	forgeaiChart        = "oci://ghcr.io/wutz/charts/forgeai"
-	forgeaiChartVersion = "0.4.0"
+	forgeaiChartVersion = "0.5.0"
 	forgeaiRelease      = "forgeai"
+
+	fileServerChart        = "oci://ghcr.io/wutz/charts/fileserver-operator"
+	fileServerChartVersion = "0.1.0"
+	fileServerRelease      = "fileserver-operator"
+	// fileServerDeployment is the operator Deployment: the chart names it after the release.
+	fileServerDeployment = fileServerRelease
 )
 
-// installChart installs the forgeai chart into the platform namespace, or
+// chartSpec describes a component installed from a Helm chart into the
+// platform namespace.
+type chartSpec struct {
+	// ref is the OCI reference of the chart, installed at version.
+	ref, version string
+	// release is the Helm release the chart is installed as.
+	release string
+	// deployment is the operator Deployment in the platform namespace.
+	deployment string
+	// crds are the CRDs the chart installs.
+	crds []string
+	// ownerLabel is set on the operator Deployment of an install from the chart.
+	ownerLabel string
+	// versionLabel carries the chart version on the operator Deployment.
+	versionLabel string
+	// values renders the chart values from the platform config; nil when the
+	// chart takes none.
+	values func(cfg *platform.Config) map[string]any
+}
+
+var (
+	forgeaiChartSpec = &chartSpec{
+		ref: forgeaiChart, version: forgeaiChartVersion, release: forgeaiRelease,
+		deployment: forgeaiDeployment, crds: forgeaiCRDs,
+		ownerLabel: depLabel, versionLabel: depVersionLabel,
+	}
+	fileServerChartSpec = &chartSpec{
+		ref: fileServerChart, version: fileServerChartVersion, release: fileServerRelease,
+		deployment: fileServerDeployment, crds: []string{"fileservers.forgeai.wutz.dev"},
+		// The chart labels its objects with the standard Helm and app labels.
+		ownerLabel: "helm.sh/chart", versionLabel: "app.kubernetes.io/version",
+		values: fileServerValues,
+	}
+)
+
+// fileServerValues maps the platform config onto the operator config the
+// chart renders into its ConfigMap. The file servers are published under the
+// platform ingress, so the operator reads the same domain and class.
+func fileServerValues(cfg *platform.Config) map[string]any {
+	return map[string]any{"config": map[string]any{
+		"ingress": map[string]any{
+			"className": cfg.Ingress.ClassName, "domain": cfg.Ingress.Domain,
+			"port": cfg.Ingress.Port, "tlsSecret": cfg.Ingress.TLSSecret,
+		},
+		"fileServer": map[string]any{
+			"image":       cfg.FileServer.Image,
+			"idleTimeout": cfg.FileServer.IdleTimeout.Duration.String(),
+			"hostPrefix":  cfg.FileServer.HostPrefix,
+		},
+	}}
+}
+
+// installChart installs the chart of spec into the platform namespace, or
 // upgrades the release already there. The chart is pulled from the OCI
-// registry at forgeaiChartVersion and waited on until its Deployment is up.
-func installChart(ctx context.Context, c *Connection, progress func(string)) error {
+// registry at spec.version and waited on until its Deployment is up.
+func installChart(ctx context.Context, c *Connection, spec *chartSpec, cfg *platform.Config, progress func(string)) error {
 	ns := platform.Namespace()
 	progress(stepChartNamespace)
 	if err := ensureNamespace(ctx, c.k8s, ns); err != nil {
@@ -47,21 +105,25 @@ func installChart(ctx context.Context, c *Connection, progress func(string)) err
 	if err != nil {
 		return err
 	}
-	cfg := new(action.Configuration)
-	if err := cfg.Init(restGetter{rest: c.rest, namespace: ns}, ns, "secret", func(string, ...any) {}); err != nil {
+	acfg := new(action.Configuration)
+	if err := acfg.Init(restGetter{rest: c.rest, namespace: ns}, ns, "secret", func(string, ...any) {}); err != nil {
 		return err
 	}
-	cfg.RegistryClient = registryClient
-	up := action.NewUpgrade(cfg)
+	acfg.RegistryClient = registryClient
+	up := action.NewUpgrade(acfg)
 	up.Install = true
 	up.Namespace = ns
-	up.Version = forgeaiChartVersion
+	up.Version = spec.version
 	up.Wait = true
 	up.Atomic = true
 	up.Timeout = deploymentReadyTimeout
 
+	var values map[string]any
+	if spec.values != nil {
+		values = spec.values(cfg)
+	}
 	progress(stepChartPull)
-	path, err := up.ChartPathOptions.LocateChart(forgeaiChart, cli.New())
+	path, err := up.ChartPathOptions.LocateChart(spec.ref, cli.New())
 	if err != nil {
 		return err
 	}
@@ -70,24 +132,23 @@ func installChart(ctx context.Context, c *Connection, progress func(string)) err
 		return err
 	}
 	progress(stepChartInstall)
-	_, err = up.RunWithContext(ctx, forgeaiRelease, chrt, nil)
+	_, err = up.RunWithContext(ctx, spec.release, chrt, values)
 	return err
 }
 
 // checkChartTarget refuses to install the chart over an operator that was not
 // installed from it: Helm does not adopt objects it did not create.
-func checkChartTarget(ctx context.Context, k8s client.Client) error {
+func checkChartTarget(ctx context.Context, k8s client.Client, spec *chartSpec) error {
 	d := &appsv1.Deployment{}
-	err := k8s.Get(ctx, client.ObjectKey{Namespace: platform.Namespace(), Name: forgeaiDeployment}, d)
+	err := k8s.Get(ctx, client.ObjectKey{Namespace: platform.Namespace(), Name: spec.deployment}, d)
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	if _, ok := d.Labels[depLabel]; !ok {
-		return errors.New("the forgeai operator was deployed outside Helm (make deploy-dev); " +
-			"remove it before installing the chart")
+	if _, ok := d.Labels[spec.ownerLabel]; !ok {
+		return fmt.Errorf("the %s operator was deployed outside Helm; remove it before installing the chart", spec.release)
 	}
 	return nil
 }

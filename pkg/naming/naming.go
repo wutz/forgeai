@@ -127,13 +127,11 @@ func InferenceAPIKeySecret(service string) string { return service + "-api-key" 
 
 // Fixed names inside a project namespace.
 const (
-	LocalQueueName       = "default"
-	RegistrySecretName   = "forgeai-registry"
-	FileServerName       = "default"
-	FileServerSecretName = "forgeai-fileserver"
-	NetworkPolicyName    = "forgeai-isolation"
-	ResourceQuotaName    = "forgeai-quota"
-	LimitRangeName       = "forgeai-defaults"
+	LocalQueueName     = "default"
+	RegistrySecretName = "forgeai-registry"
+	NetworkPolicyName  = "forgeai-isolation"
+	ResourceQuotaName  = "forgeai-quota"
+	LimitRangeName     = "forgeai-defaults"
 )
 
 // ClusterRolePrefix + role (edit, view) is bound per member in the project

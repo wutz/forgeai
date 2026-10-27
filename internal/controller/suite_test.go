@@ -23,9 +23,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -99,20 +97,7 @@ var (
 	cfg        *rest.Config
 	k8sClient  client.Client
 	fakeHarbor *harbortest.Server
-	activity   = &fakeActivity{}
 )
-
-// fakeActivity stands in for reading the dufs access log.
-type fakeActivity struct {
-	mu sync.Mutex
-	t  time.Time
-}
-
-func (f *fakeActivity) get(context.Context, string, string, time.Time) (time.Time, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return f.t, nil
-}
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
@@ -185,7 +170,6 @@ var _ = BeforeSuite(func() {
 			Client: mgr.GetClient(),
 			Config: &operatorplatform.Loader{Reader: mgr.GetAPIReader(), Namespace: configNamespace},
 		},
-		&FileServerReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: loader, Activity: activity.get},
 		&PersistentVolumeClaimReconciler{Client: mgr.GetClient(), Config: loader},
 		&TrainJobReconciler{Client: mgr.GetClient(), Config: loader, Recorder: mgr.GetEventRecorder("forgeai-test")},
 		&InferenceServiceReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: loader},

@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"strconv"
@@ -159,7 +160,7 @@ func (r *TrainJobReconciler) annotate(ctx context.Context, tj *kf.TrainJob, ann 
 	u.SetNamespace(tj.Namespace)
 	u.SetName(tj.Name)
 	patch := map[string]any{naming.KeyMetadata: map[string]any{"annotations": toAny(ann)}}
-	data, err := jsonMarshal(patch)
+	data, err := json.Marshal(patch)
 	if err != nil {
 		return err
 	}
@@ -195,7 +196,7 @@ func (r *TrainJobReconciler) syncActive(ctx context.Context, tj *kf.TrainJob) er
 		if active == want {
 			continue
 		}
-		data, _ := jsonMarshal(map[string]any{naming.KeySpec: map[string]any{"active": want}})
+		data, _ := json.Marshal(map[string]any{naming.KeySpec: map[string]any{"active": want}})
 		if err := r.Patch(ctx, wl, client.RawPatch(types.MergePatchType, data)); err != nil && !apierrors.IsNotFound(err) {
 			return err
 		}

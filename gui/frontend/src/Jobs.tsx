@@ -160,7 +160,7 @@ function JobTable({jobs, failed, filtered, selected, onSelect}: {
     <Card>
       {/* Beside an open job the table keeps its status, instance and ready columns on one line and
           drops the age: the detail shows when the job was created. */}
-      <table className={selected ? 'table jobs-table' : 'table'}>
+      <table className={selected ? 'table split-table' : 'table'}>
         <thead>
         <tr>
           <th>{t('common.name')}</th>

@@ -668,11 +668,11 @@ pre.code { padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height:
 .table .actions { flex-wrap: nowrap; }
 .card details { min-width: 0; overflow-x: auto; }
 
-/* The job list beside an open job: its status, instance and ready columns keep their
-   natural width and the card scrolls sideways, instead of cutting the text. */
-.split .table.jobs-table { table-layout: auto; }
-.split .table.jobs-table th, .split .table.jobs-table td { overflow: visible; }
-.split .table.jobs-table td:first-child .cell-sub { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+/* A list beside an open detail: its status and detail columns keep their natural width and the
+   card scrolls sideways, instead of cutting the text. */
+.split .table.split-table { table-layout: auto; }
+.split .table.split-table th, .split .table.split-table td { overflow: visible; }
+.split .table.split-table td:first-child .cell-sub { max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
 
 /* A banner's own button (Refresh, Retry) keeps a gap from the message it follows. */
 .banner .btn { margin-left: 12px; vertical-align: middle; }

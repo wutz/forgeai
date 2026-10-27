@@ -266,7 +266,7 @@ The operator also ships as a Helm chart in `charts/chart`: CRDs, RBAC and the co
 The Dependencies view installs both charts into `forgeai-system` at their pinned versions, in this order. The same installs from the CLI:
 
 ```sh
-helm install forgeai-instancetype-operator oci://ghcr.io/wutz/charts/forgeai-instancetype-operator --version 0.1.0 \
+helm install forgeai-instancetype-operator oci://ghcr.io/wutz/charts/forgeai-instancetype-operator --version 0.1.1 \
   --namespace forgeai-system --create-namespace
 helm install forgeai oci://ghcr.io/wutz/charts/forgeai --version 0.4.0 \
   --namespace forgeai-system

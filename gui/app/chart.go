@@ -65,7 +65,7 @@ const (
 	forgeaiChartVersion = "0.4.0"
 	forgeaiRelease      = "forgeai"
 
-	instanceTypeChartVersion = "0.1.0"
+	instanceTypeChartVersion = "0.1.1"
 	instanceTypeRelease      = "forgeai-instancetype-operator"
 	// instanceTypeDeployment is the operator Deployment: the chart prefixes its
 	// name with the release.

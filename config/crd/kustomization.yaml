@@ -9,6 +9,7 @@ resources:
 - bases/forgeai.wutz.dev_sshgatewayclasses.yaml
 - bases/forgeai.wutz.dev_sshgateways.yaml
 - bases/forgeai.wutz.dev_sshroutes.yaml
+- bases/forgeai.wutz.dev_imagebuilds.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:

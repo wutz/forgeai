@@ -118,11 +118,13 @@ function ServiceTable({services, failed, selected, onSelect}: {
 }
 
 // ServiceStatus names the state of a service from its Ready condition. A
-// service the controller has not reconciled yet is still starting.
+// service the controller has not reconciled yet is still starting, and so is
+// one whose condition still says Stopped after a start, until the controller
+// clears it.
 function ServiceStatus({service: s}: {service: app.InferenceService}) {
   const state = s.stopped ? 'stopped'
     : s.ready ? 'ready'
-      : s.reason === 'Starting' || !s.reason ? 'starting'
+      : s.reason === 'Starting' || s.reason === 'Stopped' || !s.reason ? 'starting'
         : 'failed'
   const labels: Record<string, MessageKey> = {
     stopped: 'inference.stateStopped', ready: 'inference.stateReady',

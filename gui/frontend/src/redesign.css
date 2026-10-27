@@ -166,6 +166,25 @@ a { color: inherit; text-decoration: none; }
 /* On the darker chrome the default light hover wash would read as a lift;
    hover steps down instead, so only the active row is lighter. */
 .sidebar .nav-item:not(.active):hover { background: var(--hover-wash); }
+/* A nav item that folds a child list: the chevron sits at the row's right end,
+   and the children hang off a hairline guide beneath the parent. */
+.nav-branch { display: flex; flex-direction: column; gap: 2px; }
+.nav-row { position: relative; }
+.nav-row .nav-item { width: 100%; }
+.nav-row .nav-item.has-children { padding-right: 34px; }
+.nav-toggle {
+  position: absolute; top: 4px; right: 4px; width: 24px; height: 24px;
+  display: grid; place-items: center; border: 0; border-radius: 6px;
+  background: none; color: var(--mute); cursor: pointer;
+}
+.nav-toggle:hover { background: var(--hover-wash); color: var(--ink); }
+.nav-toggle .icon { transition: transform 140ms ease; }
+.nav-toggle[aria-expanded="true"] .icon { transform: rotate(90deg); }
+.nav-sub {
+  display: flex; flex-direction: column; gap: 2px;
+  margin: 2px 0 2px 19px; padding-left: 8px; border-left: 1px solid var(--chrome-line);
+}
+.nav-sub .nav-item { height: 28px; font-size: 13px; }
 .header .icon-btn:hover { background: var(--hover-wash); color: var(--ink); }
 /* Scope: the cluster and project pickers at the top of the sidebar, one compact
    row each: a small mono label beside a 28px select. */

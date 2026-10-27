@@ -6,9 +6,8 @@ import {app, sandbox} from '../wailsjs/go/models'
 import {SandboxCreateDialog} from './SandboxCreateDialog'
 import {SandboxTemplateDialog} from './SandboxTemplates'
 import {SandboxTerminal} from './SandboxTerminal'
-import {Templates} from './Templates'
 import {Status, envToLines, everyWhileVisible, fmtDate, errText} from './util'
-import {Badge, Card, Empty, Icon, LogView, Pane, PageHeader, Spinner, Tabs, tabPanelProps, useActive, useConfirm, useCreateAccess, useDetailClose} from './ui'
+import {Badge, Card, Empty, Icon, LogView, PageHeader, Spinner, Tabs, tabPanelProps, useActive, useConfirm, useCreateAccess, useDetailClose} from './ui'
 import {MessageKey, t} from './i18n'
 
 // HEARTBEAT is how often an open sandbox detail resets the sandbox's idle
@@ -20,21 +19,17 @@ const HEARTBEAT = 60_000
 // the controller a while, but a wait past this is a stuck transition, not a slow one.
 const TRANSITION_TIMEOUT_MS = 120_000
 
-type Section = 'sandboxes' | 'templates'
-
 // Sandboxes is the view of the project's agent sandboxes (agents.x-k8s.io). The
-// sandbox templates it starts new sandboxes from open from a button in its top bar.
+// sandbox templates it starts new sandboxes from sit under it in the sidebar.
 export function Sandboxes() {
-  const [section, setSection] = useState<Section>('sandboxes')
   return (
     <div className="page">
-      <Pane on={section === 'sandboxes'}><SandboxList onTemplates={() => setSection('templates')}/></Pane>
-      <Pane on={section === 'templates'}><Templates kind="sandbox" onBack={() => setSection('sandboxes')}/></Pane>
+      <SandboxList/>
     </div>
   )
 }
 
-function SandboxList({onTemplates}: {onTemplates: () => void}) {
+function SandboxList() {
   // boxes is null until the first read, so a failed first read is not shown as an empty list.
   const [boxes, setBoxes] = useState<app.Sandbox[] | null>(null)
   const [error, setError] = useState('')
@@ -82,9 +77,6 @@ function SandboxList({onTemplates}: {onTemplates: () => void}) {
                     {boxes !== null && t('sandboxes.runningCount', {running, total: list.length})}
                   </span>}
                   actions={<>
-                    <button className="btn btn-ghost" onClick={onTemplates}>
-                      <Icon name="layers" size={14}/>{t('sandboxes.templates')}
-                    </button>
                     {create.sandboxes && <button className="btn" onClick={() => setCreating(true)}>
                       <Icon name="plus" size={14}/>{t('sandboxes.new')}
                     </button>}

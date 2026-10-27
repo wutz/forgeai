@@ -202,10 +202,11 @@ func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
 	info := ConnInfo{
 		Context: contextName, Server: rest.Host, Namespace: namespace, Project: project,
 		Admin: admin, ClusterAdmin: clusterAdmin, Forgeai: forgeai,
-		Sandboxes: namespace != "" && sandboxesAvailable(ctx, k8s, namespace),
-		Inference: namespace != "" && inferenceAvailable(ctx, k8s, namespace),
-		Create:    create,
-		Change:    change,
+		Sandboxes:   namespace != "" && sandboxesAvailable(ctx, k8s, namespace),
+		Inference:   namespace != "" && inferenceAvailable(ctx, k8s, namespace),
+		ImageBuilds: namespace != "" && imageBuildsAvailable(ctx, k8s, namespace),
+		Create:      create,
+		Change:      change,
 	}
 	conn := &Connection{Info: info, k8s: k8s, rest: rest, core: core}
 	if cfg, err := platform.Load(ctx, k8s, conn.configNamespace()); err == nil {
@@ -253,6 +254,14 @@ func sandboxesAvailable(ctx context.Context, k8s client.Client, namespace string
 // view when it is not.
 func inferenceAvailable(ctx context.Context, k8s client.Client, namespace string) bool {
 	list := &v1.InferenceServiceList{}
+	return k8s.List(ctx, list, client.InNamespace(namespace), client.Limit(1)) == nil
+}
+
+// imageBuildsAvailable reports whether the ImageBuild CRD is installed and the
+// user may list builds in the project namespace; the GUI hides the image builds
+// card when it is not. Clusters without user namespaces have no ImageBuild CRD.
+func imageBuildsAvailable(ctx context.Context, k8s client.Client, namespace string) bool {
+	list := &v1.ImageBuildList{}
 	return k8s.List(ctx, list, client.InNamespace(namespace), client.Limit(1)) == nil
 }
 

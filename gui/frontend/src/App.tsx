@@ -325,7 +325,7 @@ export default function App() {
                   {shown('inference', <Inference/>)}
                   {shown('volumes', <Volumes/>)}
                   {shown('files', <FilesView/>)}
-                  {shown('images', <Images/>)}
+                  {shown('images', <Images buildsAvailable={!!conn?.imageBuilds}/>)}
                   {shown('image-push', <ImagePush/>)}
                   {shown('resources', <Resources/>)}
                   {shown('admin', <Admin onProjectsChanged={refreshProjects}/>)}

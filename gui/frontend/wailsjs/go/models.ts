@@ -117,6 +117,7 @@ export namespace app {
 	    forgeai: boolean;
 	    sandboxes: boolean;
 	    inference: boolean;
+	    imageBuilds: boolean;
 	    create: CreateAccess;
 	    change: ChangeAccess;
 	
@@ -135,6 +136,7 @@ export namespace app {
 	        this.forgeai = source["forgeai"];
 	        this.sandboxes = source["sandboxes"];
 	        this.inference = source["inference"];
+	        this.imageBuilds = source["imageBuilds"];
 	        this.create = this.convertValues(source["create"], CreateAccess);
 	        this.change = this.convertValues(source["change"], ChangeAccess);
 	    }

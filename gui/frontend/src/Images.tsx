@@ -29,7 +29,9 @@ function useCopy(onFail: () => void) {
 
 // Images shows the project registry's repositories: the pushed tags with delete
 // buttons. How to push is in ImagePush, which sits under it in the sidebar.
-export function Images() {
+// buildsAvailable says the cluster has the ImageBuild CRD; without it the builds
+// card is left out and its list is never read.
+export function Images({buildsAvailable}: {buildsAvailable: boolean}) {
   // repos is null until the first list answers, so the empty state does not show while it loads.
   const [repos, setRepos] = useState<app.ImageRepo[] | null>(null)
   const list = repos ?? []
@@ -62,7 +64,7 @@ export function Images() {
   }, [active])
 
   // Listing builds needs read access only; starting one needs the robot credentials.
-  const canList = !!reg?.enabled
+  const canList = buildsAvailable && !!reg?.enabled
   const canBuild = canList && !!reg.credentials
   const refreshBuilds = () => ListImageBuilds().then(list => {
     setBuilds(list)
@@ -149,7 +151,7 @@ export function Images() {
       {logsOf && <ImageBuildLogsDialog name={logsOf} running={!!builds?.some(b => b.name === logsOf && (b.phase === 'Pending' || b.phase === 'Running'))}
         onClose={() => setLogsOf('')}/>}
 
-      {reg && (
+      {reg && buildsAvailable && (
         <Card title={t('builds.title')} subtitle={t('builds.subtitle')} className="card-spaced"
               actions={<HintButton className="btn btn-sm" disabled={!canBuild}
                                   reason={reg.enabled ? t('builds.needCredentials') : t('builds.needRegistry')}

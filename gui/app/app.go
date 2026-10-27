@@ -109,6 +109,9 @@ type ConnInfo struct {
 	// Inference is set when the InferenceService CRD is installed; the
 	// Inference view is hidden otherwise.
 	Inference bool `json:"inference"`
+	// ImageBuilds is set when the ImageBuild CRD is installed and the user may
+	// list the builds; the image builds card is hidden otherwise.
+	ImageBuilds bool `json:"imageBuilds"`
 	// Create says which kinds the user may create in the project namespace.
 	Create CreateAccess `json:"create"`
 	// Change says which kinds the user may change and remove in the project namespace.

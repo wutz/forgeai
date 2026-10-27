@@ -8,11 +8,15 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/naming"
@@ -227,6 +231,35 @@ func TestListImageBuildsEmpty(t *testing.T) {
 	}
 	if got == nil || len(got) != 0 {
 		t.Fatalf("got %#v, want an empty list", got)
+	}
+}
+
+// TestImageBuildsAvailable checks that the builds card is offered only where
+// the ImageBuild CRD is installed and the user may list builds.
+func TestImageBuildsAvailable(t *testing.T) {
+	gk := v1.GroupVersion.WithKind("ImageBuild").GroupKind()
+	cases := map[string]struct {
+		err  error
+		want bool
+	}{
+		"installed":     {err: nil, want: true},
+		"crd missing":   {err: &meta.NoKindMatchError{GroupKind: gk, SearchedVersions: []string{v1.GroupVersion.Version}}, want: false},
+		"not permitted": {err: apierrors.NewForbidden(schema.GroupResource{Group: v1.GroupVersion.Group, Resource: "imagebuilds"}, "", nil), want: false},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			k8s := fake.NewClientBuilder().WithScheme(scheme()).WithInterceptorFuncs(interceptor.Funcs{
+				List: func(ctx context.Context, c client.WithWatch, list client.ObjectList, opts ...client.ListOption) error {
+					if _, ok := list.(*v1.ImageBuildList); ok && tc.err != nil {
+						return tc.err
+					}
+					return c.List(ctx, list, opts...)
+				},
+			}).Build()
+			if got := imageBuildsAvailable(context.Background(), k8s, testNamespace); got != tc.want {
+				t.Fatalf("imageBuildsAvailable() = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
 

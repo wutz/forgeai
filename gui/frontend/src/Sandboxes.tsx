@@ -341,7 +341,8 @@ function SandboxDetail({name, onDone, onDeleted, onClose}: {
       <div className="section">
         <Tabs idPrefix="sandbox" tabs={[
           {value: 'overview', label: t('sandboxes.tabOverview'), icon: 'grid'},
-          {value: 'terminal', label: t('sandboxes.tabTerminal'), icon: 'terminal'},
+          // The terminal is a shell in the pod, so only accounts that may exec there get the tab.
+          ...(create.sandboxTerminal ? [{value: 'terminal' as const, label: t('sandboxes.tabTerminal'), icon: 'terminal' as const}] : []),
           {value: 'log', label: t('sandboxes.tabLog'), icon: 'scroll'},
           {value: 'env', label: t('sandboxes.tabEnv'), icon: 'layers'},
         ]} value={tab} onChange={selectTab}/>
@@ -382,7 +383,7 @@ function SandboxDetail({name, onDone, onDeleted, onClose}: {
               <dt>{t('common.created')}</dt><dd>{fmtDate(box.created)}</dd>
             </dl>
           )}
-          {tab === 'terminal' && ((box.containerRunning || box.podUnknown)
+          {tab === 'terminal' && create.sandboxTerminal && ((box.containerRunning || box.podUnknown)
             ? <SandboxTerminal name={box.name}/>
             // The idle box is the terminal's size, so opening it does not shift the layout.
             : <div className="term term-idle">

@@ -92,6 +92,7 @@ export namespace app {
 	    inference: boolean;
 	    sandboxes: boolean;
 	    sandboxTemplates: boolean;
+	    sandboxTerminal: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new CreateAccess(source);
@@ -105,6 +106,7 @@ export namespace app {
 	        this.inference = source["inference"];
 	        this.sandboxes = source["sandboxes"];
 	        this.sandboxTemplates = source["sandboxTemplates"];
+	        this.sandboxTerminal = source["sandboxTerminal"];
 	    }
 	}
 	export class ConnInfo {

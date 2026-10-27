@@ -125,6 +125,9 @@ type CreateAccess struct {
 	Inference        bool `json:"inference"`
 	Sandboxes        bool `json:"sandboxes"`
 	SandboxTemplates bool `json:"sandboxTemplates"`
+	// SandboxTerminal says whether the user may open a shell in a sandbox: that
+	// is a create on the pods/exec subresource, not a kind of its own.
+	SandboxTerminal bool `json:"sandboxTerminal"`
 }
 
 // ChangeAccess says which kinds the user may change and remove in the project

@@ -13,7 +13,8 @@ import (
 )
 
 // reviewGrants answers each create review from grants, a set of
-// "group/resource" pairs the user may create in testNamespace. Other reviews
+// "group/resource" pairs (with "/subresource" when the review names one) the
+// user may create in testNamespace. Other reviews
 // pass through to the fake client.
 func reviewGrants(grants ...string) interceptor.Funcs {
 	allow := map[string]bool{}
@@ -27,8 +28,15 @@ func reviewGrants(grants ...string) interceptor.Funcs {
 				return c.Create(ctx, obj, opts...)
 			}
 			ra := sar.Spec.ResourceAttributes
+			key := ""
+			if ra != nil {
+				key = ra.Group + "/" + ra.Resource
+				if ra.Subresource != "" {
+					key += "/" + ra.Subresource
+				}
+			}
 			sar.Status.Allowed = ra != nil && ra.Verb == "create" && ra.Namespace == testNamespace &&
-				allow[ra.Group+"/"+ra.Resource]
+				allow[key]
 			return nil
 		},
 	}
@@ -44,10 +52,11 @@ func TestCreateAccessForEditor(t *testing.T) {
 		"forgeai.wutz.dev/inferenceservices",
 		sandbox.Group+"/sandboxes",
 		sandbox.ExtensionsGroup+"/sandboxtemplates",
+		"/pods/exec",
 	))
 
 	got := createAccess(context.Background(), a.conn.k8s, testNamespace)
-	want := CreateAccess{Jobs: true, JobTemplates: true, Volumes: true, Inference: true, Sandboxes: true, SandboxTemplates: true}
+	want := CreateAccess{Jobs: true, JobTemplates: true, Volumes: true, Inference: true, Sandboxes: true, SandboxTemplates: true, SandboxTerminal: true}
 	if got != want {
 		t.Errorf("createAccess for an editor = %+v, want %+v", got, want)
 	}
@@ -60,6 +69,17 @@ func TestCreateAccessForViewer(t *testing.T) {
 	got := createAccess(context.Background(), a.conn.k8s, testNamespace)
 	if got != (CreateAccess{}) {
 		t.Errorf("createAccess for a viewer = %+v, want none", got)
+	}
+}
+
+// Creating pods does not open a shell: the terminal needs pods/exec, which the
+// project roles grant separately.
+func TestCreateAccessTerminalNeedsExec(t *testing.T) {
+	a := viewerApp(reviewGrants("/pods"))
+
+	got := createAccess(context.Background(), a.conn.k8s, testNamespace)
+	if got.SandboxTerminal {
+		t.Errorf("createAccess allowed a terminal with pod create but no exec: %+v", got)
 	}
 }
 

@@ -22,7 +22,4 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the forgeai itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
-- fileserver_admin_role.yaml
-- fileserver_editor_role.yaml
-- fileserver_viewer_role.yaml
 

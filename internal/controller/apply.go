@@ -29,6 +29,9 @@ import (
 // fieldOwner is the server-side apply field manager of every object the operator applies.
 const fieldOwner = client.FieldOwner("forgeai")
 
+// kindSecret is the Kind of the Secrets the controllers build.
+const kindSecret = "Secret"
+
 // apply server-side applies obj (typed or unstructured) as the forgeai field owner.
 func apply(ctx context.Context, c client.Client, obj client.Object) error {
 	u := &unstructured.Unstructured{}

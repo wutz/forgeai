@@ -13,7 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	fsv1 "github.com/wutz/fileserver-operator/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/naming"
 )
 
@@ -49,21 +49,21 @@ func (a *App) Files() (*Files, error) {
 
 	// Wake the server (or keep it awake): the operator treats a fresh
 	// last-active annotation as activity and scales to one replica.
-	key := client.ObjectKey{Namespace: c.namespace(), Name: naming.FileServerName}
-	fs := &v1.FileServer{}
+	key := client.ObjectKey{Namespace: c.namespace(), Name: fsv1.DefaultName}
+	fs := &fsv1.FileServer{}
 	err = c.k8s.Get(ctx, key, fs)
 	if err != nil {
 		if !isNotFound(err) {
 			return nil, err
 		}
-		fs = &v1.FileServer{
-			ObjectMeta: metav1.ObjectMeta{Name: naming.FileServerName, Namespace: c.namespace(),
+		fs = &fsv1.FileServer{
+			ObjectMeta: metav1.ObjectMeta{Name: fsv1.DefaultName, Namespace: c.namespace(),
 				Labels: map[string]string{naming.LabelManagedBy: naming.ManagedBy}},
 		}
 		if err := c.k8s.Create(ctx, fs); err != nil && !isAlreadyExists(err) {
 			// A view member cannot create the server, so there is none to show yet.
 			if apierrors.IsForbidden(err) {
-				return &Files{Phase: string(v1.FileServerIdle), ReadOnly: true}, nil
+				return &Files{Phase: string(fsv1.FileServerIdle), ReadOnly: true}, nil
 			}
 			return nil, err
 		}
@@ -77,7 +77,7 @@ func (a *App) Files() (*Files, error) {
 		readOnly = true
 	}
 	out := &Files{Phase: "Starting"}
-	fs = &v1.FileServer{}
+	fs = &fsv1.FileServer{}
 	if err := c.k8s.Get(ctx, key, fs); err == nil {
 		// A server the operator has not reconciled yet has no phase; it is still starting.
 		if p := string(fs.Status.Phase); p != "" {
@@ -88,8 +88,8 @@ func (a *App) Files() (*Files, error) {
 	// View-only members cannot read the Secret: they get no address.
 	var target *fileTarget
 	sec := &corev1.Secret{}
-	secKey := client.ObjectKey{Namespace: c.namespace(), Name: naming.FileServerSecretName}
-	if out.Phase == string(v1.FileServerReady) && fs.Status.URL != "" {
+	secKey := client.ObjectKey{Namespace: c.namespace(), Name: fsv1.SecretName}
+	if out.Phase == string(fsv1.FileServerReady) && fs.Status.URL != "" {
 		switch err := c.k8s.Get(ctx, secKey, sec); {
 		case apierrors.IsForbidden(err):
 			readOnly = true
@@ -102,7 +102,7 @@ func (a *App) Files() (*Files, error) {
 			// browser gets 503 and the frame would never recover. Report Starting
 			// until the server answers through the ingress.
 			if !fileServerServing(ctx, base, c.insecure) {
-				out.Phase = string(v1.FileServerStarting)
+				out.Phase = string(fsv1.FileServerStarting)
 			} else {
 				target = &fileTarget{
 					base:     base,
@@ -183,8 +183,8 @@ func (a *App) FileServerPhase() (string, error) {
 	}
 	ctx, cancel := a.call()
 	defer cancel()
-	fs := &v1.FileServer{}
-	if err := c.k8s.Get(ctx, client.ObjectKey{Namespace: c.namespace(), Name: naming.FileServerName}, fs); err != nil {
+	fs := &fsv1.FileServer{}
+	if err := c.k8s.Get(ctx, client.ObjectKey{Namespace: c.namespace(), Name: fsv1.DefaultName}, fs); err != nil {
 		if isNotFound(err) {
 			return "", nil
 		}
@@ -201,13 +201,13 @@ const heartbeatEvery = 30 * time.Second
 // so the view keeps the server awake without a separate binding.
 
 func (a *App) heartbeat(ctx context.Context, c *Connection) error {
-	fs := &v1.FileServer{}
-	key := client.ObjectKey{Namespace: c.namespace(), Name: naming.FileServerName}
+	fs := &fsv1.FileServer{}
+	key := client.ObjectKey{Namespace: c.namespace(), Name: fsv1.DefaultName}
 	if err := c.k8s.Get(ctx, key, fs); err != nil {
 		return err
 	}
 	now := time.Now().UTC()
-	if last, err := time.Parse(time.RFC3339, fs.Annotations[naming.AnnotationLastActive]); err == nil && now.Sub(last) < heartbeatEvery {
+	if last, err := time.Parse(time.RFC3339, fs.Annotations[fsv1.AnnotationLastActive]); err == nil && now.Sub(last) < heartbeatEvery {
 		return nil
 	}
 	// The patch base must be copied before the annotation changes; otherwise
@@ -216,7 +216,7 @@ func (a *App) heartbeat(ctx context.Context, c *Connection) error {
 	if fs.Annotations == nil {
 		fs.Annotations = map[string]string{}
 	}
-	fs.Annotations[naming.AnnotationLastActive] = now.Format(time.RFC3339)
+	fs.Annotations[fsv1.AnnotationLastActive] = now.Format(time.RFC3339)
 	return c.k8s.Patch(ctx, fs, patch)
 }
 

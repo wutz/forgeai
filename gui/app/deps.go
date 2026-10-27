@@ -85,7 +85,7 @@ var (
 		{Group: "admissionregistration.k8s.io", Kind: "ValidatingWebhookConfiguration"},
 	}
 	forgeaiDeployment = "forgeai-controller-manager"
-	forgeaiCRDs = []string{"fileservers.forgeai.wutz.dev", "inferenceservices.forgeai.wutz.dev"}
+	forgeaiCRDs       = []string{"inferenceservices.forgeai.wutz.dev"}
 )
 
 // depInfo describes a component on the admin page.
@@ -106,8 +106,9 @@ var depCatalog = []depInfo{
 	{name: "agent-sandbox", title: "agent-sandbox", description: "Sandbox controller and CRDs for the Sandboxes view"},
 	{name: "gateway-api-inference-extension", title: "Gateway API Inference Extension", description: "InferencePool CRD that the llm-d routers of InferenceServices use"},
 	{name: "instancetype-operator", title: "InstanceType operator", description: "InstanceTypes and Kueue ResourceFlavors derived from GPU nodes", chart: instanceTypeOperatorSpec},
-	{name: "forgeai", title: "forgeai operator", description: "File servers, inference services and sandboxes", chart: forgeaiSpec},
+	{name: "forgeai", title: "forgeai operator", description: "Inference services and sandboxes", chart: forgeaiSpec},
 	{name: "project-operator", title: "Project operator", description: "Project namespaces, quotas, members and registries", chart: projectOperatorSpec},
+	{name: "fileserver-operator", title: "FileServer operator", description: "On-demand file servers for the project volumes", chart: fileServerSpec},
 	{name: "sshpiper", title: "sshpiper Pipe CRD", description: "Pipe CRD that the SSH gateway routes logins with"},
 	{name: "ssh-operator", title: "SSH operator", description: "SSHGateways and SSHRoutes that serve sandbox SSH logins", chart: sshOperatorSpec},
 }
@@ -786,7 +787,7 @@ func (a *App) InstallDependency(name string) error {
 		progress := func(step string) {
 			a.emitEvent(a.ctx, depProgressEvent, DependencyProgress{Cluster: cluster, Name: name, Step: step})
 		}
-		rec, err := installComponent(ctx, c, info, b, progress)
+		rec, err := installComponent(ctx, c, info, b, cfg, progress)
 		if err == nil {
 			progress(stepRecord)
 			rec.AppliedBy = currentUser(ctx, c.k8s)
@@ -811,11 +812,11 @@ func (a *App) InstallDependency(name string) error {
 
 // installComponent installs a bundled component, or the chart of a component
 // that has none. It returns the record of the install.
-func installComponent(ctx context.Context, c *Connection, info depInfo, b *depBundle, progress func(string)) (depRecord, error) {
+func installComponent(ctx context.Context, c *Connection, info depInfo, b *depBundle, platformCfg *platform.Config, progress func(string)) (depRecord, error) {
 	if info.chart != nil {
 		spec := info.chart
 		rec := depRecord{Version: spec.version, Namespace: spec.installNamespace(), Source: spec.ref}
-		return rec, installChart(ctx, c, spec, progress)
+		return rec, installChart(ctx, c, spec, platformCfg, progress)
 	}
 	rec := depRecord{Version: b.Version, Namespace: bundleNamespace(b), ManifestSHA256: b.SHA256}
 	return rec, installBundle(ctx, c.k8s, b, progress)

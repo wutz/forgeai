@@ -4,8 +4,9 @@ forgeai is a Kubernetes-native AI platform covering development, training, RL an
 
 | Component | Path | Description |
 |---|---|---|
-| Operator | `api/`, `internal/`, `cmd/` | `FileServer` and `InferenceService` CRDs; adds stop/resume, failure classification and retries to `TrainJob`s; purges trashed volumes |
+| Operator | `api/`, `internal/`, `cmd/` | `InferenceService` CRD; adds stop/resume, failure classification and retries to `TrainJob`s; purges trashed volumes |
 | Project operator | [wutz/project-operator](https://github.com/wutz/project-operator) | Separate repository and Helm chart: the `Project` CRD and its namespaces, quotas, queues, network policies and members. Installed next to this operator |
+| FileServer operator | [wutz/fileserver-operator](https://github.com/wutz/fileserver-operator) | Separate repository and Helm chart: the `FileServer` CRD and the on-demand file servers of project volumes. Installed next to this operator |
 | GUI | `gui/` | [Wails](https://wails.io) desktop client that talks to Kubernetes directly through a kubeconfig context |
 | Website | `website/` | Official site ([Astro](https://astro.build)), deployed to Cloudflare Workers at https://forgeai.wutz.dev |
 | Shared library | `pkg/` | Naming, platform config, instance types, job rendering and status, sandboxes, volumes, Harbor client, kubeconfig export |
@@ -144,20 +145,11 @@ Volumes are PVCs in the project namespace, created from the platform `storageTyp
 
 ## FileServer
 
-A `FileServer` (short name `ffs`) runs [dufs](https://github.com/sigoden/dufs) on demand to browse and transfer the files of the project's volumes:
+The file servers that browse and transfer the files of a project's volumes are run by [fileserver-operator](https://github.com/wutz/fileserver-operator), a separate project with its own Helm chart. It serves a `FileServer` (short name `ffs`) per namespace with [dufs](https://github.com/sigoden/dufs), scaled to zero when idle. forgeai only creates the `default` `FileServer` on first use of the Files view and keeps it awake by updating the `forgeai.wutz.dev/last-active` annotation; the operator does the rest.
 
-```yaml
-apiVersion: forgeai.wutz.dev/v1alpha1
-kind: FileServer
-metadata:
-  name: default
-  namespace: forge-demo
-spec:
-  volumes: []        # empty serves every ReadWriteMany volume not in the trash
-  idleTimeout: 30m   # defaults to fileServer.idleTimeout
-```
+The Dependencies view installs the operator from `oci://ghcr.io/wutz/charts/fileserver-operator` at the pinned chart version, as release `fileserver-operator` in `forgeai-system`. It maps the platform config into the chart values: `ingress` (class, domain, port, TLS secret) and `fileServer` (dufs image, idle timeout, host prefix). Until the operator is installed, the Files view has no server to show.
 
-The GUI creates the `default` server on first use of the Files view and keeps it awake by updating the `forgeai.wutz.dev/last-active` annotation. The operator also reads the dufs access log for activity and scales the Deployment to zero after `idleTimeout`. Each volume is served under `/<name>` at `https://files-<namespace>.<ingress domain>[:port]`, with basic auth from the Secret `forgeai-fileserver`.
+Upgrading from forgeai 0.4.0 keeps the `FileServer` CRD and the file servers in it. The forgeai chart stops shipping the CRD, but the CRD carries the `helm.sh/resource-policy: keep` annotation (the `crd.keep` value, on by default), so the upgrade leaves it in place. Install the FileServer operator from the Dependencies view afterwards: its chart adopts the CRD, and the existing file servers keep running under it. Uninstalling the FileServer operator chart deletes its CRD, and with it every `FileServer`. The upgrade path is not verified on a cluster.
 
 ## Platform config
 
@@ -198,7 +190,7 @@ The desktop client connects with a kubeconfig context and a project namespace (t
 | Images | Push instructions and robot credentials; list and delete images in the project's Harbor project. Their tags are offered in a dropdown as the image of jobs, sandboxes and their templates, which also accept any other address |
 | Resources | Instance types with availability and the project quota usage |
 | Projects | Admins only (may create Projects): manage projects and members, export member kubeconfigs |
-| Dependencies | Cluster admins only: install or upgrade Kueue, Kubeflow Trainer v2 (with JobSet) and agent-sandbox at the versions pinned in the GUI, install the InstanceType operator, the forgeai operator and the project-operator Helm charts at their pinned versions, install the sshpiper Pipe CRD and the SSH operator from its Helm chart (see [SSH](#ssh)), and see each component's status |
+| Dependencies | Cluster admins only: install or upgrade Kueue, Kubeflow Trainer v2 (with JobSet) and agent-sandbox at the versions pinned in the GUI, install the InstanceType operator, the forgeai, Project operator and FileServer operator Helm charts at their pinned versions, install the sshpiper Pipe CRD and the SSH operator from its Helm chart (see [SSH](#ssh)), and see each component's status |
 
 The New job and New sandbox dialogs also offer template sources: job and sandbox templates from the platform's `templates.source` (default [wutz/forgeai-templates](https://github.com/wutz/forgeai-templates)), grouped apart from the project templates. You can add other published template sources by URL, `file://` directory or `oci://` reference (`oci://registry/repository:tag` or `oci://registry/repository@sha256:…`) under **Template sources** in the sidebar; a source is read before it is added, and its templates are marked as yours in the dialog. Picking a template prefills the form; the name, instance type and volumes stay yours, and the job or sandbox does not reference the template.
 
@@ -229,18 +221,20 @@ make deploy-dev                # ko build -> ghcr.io/wutz/forgeai (public), kube
 
 ### Helm charts
 
-The operators ship as Helm charts in `charts/chart`. The Dependencies view installs three charts into `forgeai-system` at their pinned versions, in this order: the InstanceType operator, forgeai, then project-operator. The same installs from the CLI:
+The forgeai operator ships as a Helm chart in `charts/chart`: the InferenceService CRD, RBAC and the controller Deployment, with the platform config under `platform.config`. The InstanceType, Project and FileServer operators are separate projects with their own charts (see [InstanceType](#instancetype)). The Dependencies view installs four charts into `forgeai-system` at their pinned versions, in this order. The same installs from the CLI:
 
 ```sh
 helm install forgeai-instancetype-operator oci://ghcr.io/wutz/charts/forgeai-instancetype-operator --version 0.1.1 \
   --namespace forgeai-system --create-namespace
-helm install forgeai oci://ghcr.io/wutz/charts/forgeai --version 0.4.0 \
+helm install forgeai oci://ghcr.io/wutz/charts/forgeai --version 0.5.0 \
   --namespace forgeai-system
 helm install project-operator oci://ghcr.io/wutz/charts/project-operator --version 0.4.1 \
   --namespace forgeai-system
+helm install fileserver-operator oci://ghcr.io/wutz/charts/fileserver-operator --version 0.1.0 \
+  --namespace forgeai-system
 ```
 
-forgeai ships the FileServer and InferenceService CRDs, RBAC and the controller Deployment, with the platform config under `platform.config`. The InstanceType operator is a separate project with its own chart (see [InstanceType](#instancetype)); forgeai reads the InstanceTypes that the operator creates. project-operator is [wutz/project-operator](https://github.com/wutz/project-operator). It must run in the namespace of forgeai, because it reads the platform ConfigMap from its own namespace (`FORGEAI_NAMESPACE`).
+forgeai reads the InstanceTypes that the InstanceType operator creates. project-operator is [wutz/project-operator](https://github.com/wutz/project-operator). It must run in the namespace of forgeai, because it reads the platform ConfigMap from its own namespace (`FORGEAI_NAMESPACE`). fileserver-operator is [wutz/fileserver-operator](https://github.com/wutz/fileserver-operator), see [FileServer](#fileserver).
 
 Releases up to 0.3.1 installed the `projects.forgeai.wutz.dev` CRD as part of the forgeai release. Upgrading keeps that CRD and its Projects, because the CRD carries `helm.sh/resource-policy: keep`. While forgeai owns the CRD, Helm refuses to install project-operator (`invalid ownership metadata`). Hand the CRD to the new release before installing it:
 
@@ -276,7 +270,7 @@ A cluster that ran the SSH gateway from an earlier forgeai release has the `SSHG
 
 A cluster set up with `make deploy-dev` runs the operator outside Helm. Helm does not adopt objects it did not create, so the Dependencies view reports that operator as deployed outside Helm and refuses the chart install. Move such a cluster by removing the dev deployment with `make undeploy-dev` (this deletes the forgeai CRDs and all forgeai objects, so back them up first) and then installing the charts.
 
-Prerequisites (the Dependencies view installs Kubeflow Trainer, agent-sandbox, Kueue, the InstanceType operator, the sshpiper Pipe CRD and the SSH operator into a cluster; `make gui-deps` refreshes the pinned manifests embedded in the GUI):
+Prerequisites (the Dependencies view installs Kubeflow Trainer, agent-sandbox, Kueue, the InstanceType operator, the forgeai, Project and FileServer operators, the sshpiper Pipe CRD and the SSH operator into a cluster; `make gui-deps` refreshes the pinned manifests embedded in the GUI):
 
 - Kubeflow Trainer v2 (with JobSet) and a `ClusterTrainingRuntime` named after `training.defaultRuntime`
 - agent-sandbox v1.0 or later (CRDs `agents.x-k8s.io/v1beta1`), for the Sandboxes view; the isolation RuntimeClasses (`gvisor`, `kata`) come from the node runtimes

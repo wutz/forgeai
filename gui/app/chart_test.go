@@ -98,7 +98,7 @@ func TestSSHOperatorSpec(t *testing.T) {
 	if got := sshOperatorSpec.installNamespace(); got != sshOperatorNamespace {
 		t.Errorf("installNamespace = %s, want %s", got, sshOperatorNamespace)
 	}
-	ns, _, _ := unstructured.NestedString(sshOperatorSpec.values(), "platform", "namespace")
+	ns, _, _ := unstructured.NestedString(sshOperatorSpec.values(nil), "platform", "namespace")
 	if ns != platform.Namespace() {
 		t.Errorf("platform.namespace = %q, want %s", ns, platform.Namespace())
 	}

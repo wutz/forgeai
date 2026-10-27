@@ -2,17 +2,13 @@ package controller
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -21,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
-	v1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/kf"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
@@ -152,131 +147,6 @@ var _ = Describe("forgeai operator", Ordered, func() {
 		Consistently(get(&corev1.PersistentVolumeClaim{}, ns, "keep"), 2*time.Second, interval).Should(Succeed())
 		_, err = vc.Restore(ctx, "keep")
 		Expect(err).NotTo(HaveOccurred())
-	})
-
-	It("runs the file server while active and stops it when idle", func() {
-		fs := &v1.FileServer{ObjectMeta: metav1.ObjectMeta{Name: naming.FileServerName, Namespace: ns, Annotations: map[string]string{
-			naming.AnnotationLastActive: time.Now().UTC().Format(time.RFC3339),
-		}}, Spec: v1.FileServerSpec{IdleTimeout: &metav1.Duration{Duration: 3 * time.Second}}}
-		Expect(k8sClient.Create(ctx, fs)).To(Succeed())
-		dep := &appsv1.Deployment{}
-		name := "forgeai-files-default"
-		Eventually(func() int32 {
-			if err := get(dep, ns, name)(); err != nil {
-				return -1
-			}
-			return *dep.Spec.Replicas
-		}, timeout, interval).Should(Equal(int32(1)))
-		Expect(dep.Spec.Template.Annotations[annotationServedVolumes]).To(Equal("keep"))
-		ing := &networkingv1.Ingress{}
-		Expect(get(ing, ns, name)()).To(Succeed())
-		Expect(ing.Spec.Rules[0].Host).To(Equal("files-forge-demo.example.com"))
-		// The status is patched after the workload, so poll for it.
-		Eventually(func() string {
-			_ = get(fs, ns, fs.Name)()
-			return fs.Status.URL
-		}, timeout, interval).Should(Equal("https://files-forge-demo.example.com:7443"))
-		Expect(get(&corev1.Secret{}, ns, naming.FileServerSecretName)()).To(Succeed())
-
-		// No heartbeat: scaled to zero after the idle timeout.
-		Eventually(func() int32 {
-			_ = get(dep, ns, name)()
-			return *dep.Spec.Replicas
-		}, timeout, interval).Should(Equal(int32(0)))
-		Eventually(func() v1.FileServerPhase {
-			_ = get(fs, ns, fs.Name)()
-			return fs.Status.Phase
-		}, timeout, interval).Should(Equal(v1.FileServerIdle))
-
-		// A heartbeat wakes it up again.
-		fs.Annotations[naming.AnnotationLastActive] = time.Now().UTC().Format(time.RFC3339)
-		Expect(k8sClient.Update(ctx, fs)).To(Succeed())
-		Eventually(func() int32 {
-			_ = get(dep, ns, name)()
-			return *dep.Spec.Replicas
-		}, timeout, interval).Should(Equal(int32(1)))
-	})
-
-	It("fails a file server without an ingress domain and recovers when it is set", func() {
-		fs := &v1.FileServer{ObjectMeta: metav1.ObjectMeta{Name: naming.FileServerName, Namespace: ns}}
-		Expect(client.IgnoreAlreadyExists(k8sClient.Create(ctx, fs))).To(Succeed())
-		key := client.ObjectKey{Namespace: configNamespace, Name: platform.ConfigMapName}
-		setConfig := func(data string) {
-			cm := &corev1.ConfigMap{}
-			Expect(k8sClient.Get(ctx, key, cm)).To(Succeed())
-			cm.Data[platform.ConfigKey] = data
-			Expect(k8sClient.Update(ctx, cm)).To(Succeed())
-		}
-		cm := &corev1.ConfigMap{}
-		Expect(k8sClient.Get(ctx, key, cm)).To(Succeed())
-		original := cm.Data[platform.ConfigKey]
-		DeferCleanup(setConfig, original)
-
-		ingress := &networkingv1.Ingress{ObjectMeta: metav1.ObjectMeta{Name: "forgeai-files-default", Namespace: ns}}
-		setConfig(strings.Replace(original, "domain: example.com", `domain: ""`, 1))
-		Eventually(func() v1.FileServerPhase {
-			_ = get(fs, ns, fs.Name)()
-			return fs.Status.Phase
-		}, timeout, interval).Should(Equal(v1.FileServerFailed))
-		Expect(fs.Status.URL).To(BeEmpty())
-		Eventually(func() string {
-			_ = get(fs, ns, fs.Name)()
-			if c := meta.FindStatusCondition(fs.Status.Conditions, "Ready"); c != nil {
-				return c.Message
-			}
-			return ""
-		}, timeout, interval).Should(ContainSubstring("ingress.domain"))
-		// No Ingress is applied for an empty host: drop the one the earlier
-		// specs left and make sure nothing re-applies it. A reconcile that
-		// started with the old config may recreate it once, so wait for the
-		// Failed phase first.
-		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, ingress))).To(Succeed())
-		Consistently(func() bool {
-			return apierrors.IsNotFound(get(ingress, ns, ingress.Name)())
-		}, 2*time.Second, interval).Should(BeTrue())
-
-		setConfig(original)
-		Eventually(func() v1.FileServerPhase {
-			_ = get(fs, ns, fs.Name)()
-			return fs.Status.Phase
-		}, timeout, interval).Should(Equal(v1.FileServerIdle))
-		Expect(fs.Status.URL).To(Equal("https://files-forge-demo.example.com:7443"))
-	})
-
-	It("releases a trashed volume from the file server", func() {
-		pcfg, err := platform.Parse([]byte(testPlatformConfig))
-		Expect(err).NotTo(HaveOccurred())
-		vc := &volumes.Client{K8s: k8sClient, Namespace: ns}
-		_, err = vc.Create(ctx, pcfg, "shared", "", 10)
-		Expect(err).NotTo(HaveOccurred())
-		dep := &appsv1.Deployment{}
-		name := "forgeai-files-default"
-		Eventually(func() string {
-			_ = get(dep, ns, name)()
-			return dep.Spec.Template.Annotations[annotationServedVolumes]
-		}, timeout, interval).Should(Equal("keep,shared"))
-
-		// A file server pod mounts the volume, as the deployment would once running.
-		pod := &corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Name: name + "-0", Namespace: ns, Labels: map[string]string{
-				naming.LabelComponent: naming.ComponentFileServer, labelInstance: name}},
-			Spec: corev1.PodSpec{
-				Containers: []corev1.Container{{Name: fileServerContainer, Image: "dufs"}},
-				Volumes: []corev1.Volume{{Name: "v-shared", VolumeSource: corev1.VolumeSource{
-					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{ClaimName: "shared"}}}},
-			},
-		}
-		Expect(k8sClient.Create(ctx, pod)).To(Succeed())
-		pod.Status.Phase = corev1.PodRunning
-		Expect(k8sClient.Status().Update(ctx, pod)).To(Succeed())
-
-		_, err = vc.Trash(ctx, "shared", time.Hour)
-		Expect(err).NotTo(HaveOccurred())
-		Eventually(func() string {
-			_ = get(dep, ns, name)()
-			return dep.Spec.Template.Annotations[annotationServedVolumes]
-		}, timeout, interval).Should(Equal("keep"))
-		Expect(k8sClient.Delete(ctx, pod)).To(Succeed())
 	})
 
 	It("classifies a failed TrainJob and retries infrastructure failures", func() {

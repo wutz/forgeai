@@ -44,7 +44,7 @@ type chartSpec struct {
 	// needs are CRDs of other components the chart's controller requires.
 	needs []string
 	// values returns the chart values of the install, nil for the chart's defaults.
-	values func() map[string]any
+	values func(platformCfg *platform.Config) map[string]any
 	// adoptFrom is a release whose chart shipped crds before they moved to this
 	// chart. Helm refuses to install objects another release owns, so the
 	// install hands them over first (see adoptCRDs).
@@ -71,7 +71,7 @@ func (s *chartSpec) installNamespace() string {
 // image tag, so a release bumps both together.
 const (
 	forgeaiChart        = "oci://ghcr.io/wutz/charts/forgeai"
-	forgeaiChartVersion = "0.4.0"
+	forgeaiChartVersion = "0.5.0"
 	forgeaiRelease      = "forgeai"
 )
 
@@ -96,7 +96,7 @@ var sshOperatorSpec = &chartSpec{
 	namespace: sshOperatorNamespace, deployment: sshOperatorDeployment,
 	crds:  []string{"sshgatewayclasses.forgeai.wutz.dev", "sshgateways.forgeai.wutz.dev", "sshroutes.forgeai.wutz.dev"},
 	needs: []string{"pipes.sshpiper.com"},
-	values: func() map[string]any {
+	values: func(*platform.Config) map[string]any {
 		return map[string]any{"platform": map[string]any{"namespace": platform.Namespace()}}
 	},
 }
@@ -116,9 +116,44 @@ var instanceTypeOperatorSpec = &chartSpec{
 	release: instanceTypeOperatorRelease, deployment: instanceTypeOperatorDeployment,
 	crds:      []string{"instancetypes.forgeai.wutz.dev"},
 	adoptFrom: forgeaiRelease,
-	values: func() map[string]any {
+	values: func(*platform.Config) map[string]any {
 		return map[string]any{"platform": map[string]any{"namespace": platform.Namespace()}}
 	},
+}
+
+// The FileServer operator is installed from its own Helm chart into the platform
+// namespace. Its file servers are published under the platform ingress, so the
+// chart takes the platform's ingress and file server settings. Its CRD shipped
+// with the forgeai chart before the split, so the install adopts it.
+const (
+	fileServerChart        = "oci://ghcr.io/wutz/charts/fileserver-operator"
+	fileServerChartVersion = "0.1.0"
+	fileServerRelease      = "fileserver-operator"
+	fileServerDeployment   = "fileserver-operator"
+)
+
+var fileServerSpec = &chartSpec{
+	name: "fileserver-operator", ref: fileServerChart, version: fileServerChartVersion,
+	release: fileServerRelease, deployment: fileServerDeployment,
+	crds:      []string{"fileservers.forgeai.wutz.dev"},
+	adoptFrom: forgeaiRelease,
+	values:    fileServerValues,
+}
+
+// fileServerValues maps the platform config onto the operator config the chart
+// renders into its ConfigMap.
+func fileServerValues(platformCfg *platform.Config) map[string]any {
+	return map[string]any{"config": map[string]any{
+		"ingress": map[string]any{
+			"className": platformCfg.Ingress.ClassName, "domain": platformCfg.Ingress.Domain,
+			"port": platformCfg.Ingress.Port, "tlsSecret": platformCfg.Ingress.TLSSecret,
+		},
+		"fileServer": map[string]any{
+			"image":       platformCfg.FileServer.Image,
+			"idleTimeout": platformCfg.FileServer.IdleTimeout.Duration.String(),
+			"hostPrefix":  platformCfg.FileServer.HostPrefix,
+		},
+	}}
 }
 
 // The Project operator is installed from its own Helm chart into the platform
@@ -139,7 +174,7 @@ var projectOperatorSpec = &chartSpec{
 // installChart installs the chart of spec into its namespace, or upgrades the
 // release already there. The chart is pulled from the OCI registry at the
 // pinned version and waited on until its Deployment is up.
-func installChart(ctx context.Context, c *Connection, spec *chartSpec, progress func(string)) error {
+func installChart(ctx context.Context, c *Connection, spec *chartSpec, platformCfg *platform.Config, progress func(string)) error {
 	ns := spec.installNamespace()
 	progress(stepChartNamespace)
 	if err := ensureNamespace(ctx, c.k8s, ns); err != nil {
@@ -172,7 +207,7 @@ func installChart(ctx context.Context, c *Connection, spec *chartSpec, progress 
 	}
 	var values map[string]any
 	if spec.values != nil {
-		values = spec.values()
+		values = spec.values(platformCfg)
 	}
 	if spec.adoptFrom != "" {
 		if err := adoptCRDs(ctx, c.k8s, spec, ns); err != nil {

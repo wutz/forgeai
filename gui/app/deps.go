@@ -107,6 +107,7 @@ var depCatalog = []depInfo{
 	{name: "kueue", title: "Kueue", description: "GPU quota queues that admit TrainJobs"},
 	{name: "agent-sandbox", title: "agent-sandbox", description: "Sandbox controller and CRDs for the Sandboxes view"},
 	{name: "gateway-api-inference-extension", title: "Gateway API Inference Extension", description: "InferencePool CRD that the llm-d routers of InferenceServices use"},
+	{name: "instancetype-operator", title: "InstanceType operator", description: "InstanceTypes and Kueue ResourceFlavors derived from GPU nodes", chart: instanceTypeOperatorSpec},
 	{name: "forgeai", title: "forgeai operator", description: "Projects, instance types and the controllers", chart: forgeaiSpec},
 	{name: "sshpiper", title: "sshpiper Pipe CRD", description: "Pipe CRD that the SSH gateway routes logins with"},
 	{name: "ssh-operator", title: "SSH operator", description: "SSHGateways and SSHRoutes that serve sandbox SSH logins", chart: sshOperatorSpec},

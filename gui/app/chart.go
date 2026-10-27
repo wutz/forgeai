@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/cli"
 	"helm.sh/helm/v3/pkg/registry"
+	"helm.sh/helm/v3/pkg/storage/driver"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -83,7 +85,7 @@ var forgeaiSpec = &chartSpec{
 // it needs the Pipe CRD of sshpiper, a bundled component installed first.
 const (
 	sshOperatorChart        = "oci://ghcr.io/wutz/charts/ssh-operator"
-	sshOperatorChartVersion = "0.1.0"
+	sshOperatorChartVersion = "0.1.1"
 	sshOperatorRelease      = "ssh-operator"
 	sshOperatorNamespace    = "ssh-operator-system"
 	sshOperatorDeployment   = "ssh-operator-controller-manager"
@@ -154,6 +156,21 @@ func fileServerValues(platformCfg *platform.Config) map[string]any {
 	}}
 }
 
+// The Project operator is installed from its own Helm chart into the platform
+// namespace. It reads the platform config that the forgeai chart installs, so
+// it installs second.
+const (
+	projectOperatorChart        = "oci://ghcr.io/wutz/charts/project-operator"
+	projectOperatorChartVersion = "0.4.1"
+	projectOperatorRelease      = "project-operator"
+	projectOperatorDeployment   = "project-operator-controller-manager"
+)
+
+var projectOperatorSpec = &chartSpec{
+	name: "project-operator", ref: projectOperatorChart, version: projectOperatorChartVersion, release: projectOperatorRelease,
+	deployment: projectOperatorDeployment, crds: []string{"projects.forgeai.wutz.dev"},
+}
+
 // installChart installs the chart of spec into its namespace, or upgrades the
 // release already there. The chart is pulled from the OCI registry at the
 // pinned version and waited on until its Deployment is up.
@@ -173,7 +190,6 @@ func installChart(ctx context.Context, c *Connection, spec *chartSpec, platformC
 	}
 	cfg.RegistryClient = registryClient
 	up := action.NewUpgrade(cfg)
-	up.Install = true
 	up.Namespace = ns
 	up.Version = spec.version
 	up.Wait = true
@@ -198,12 +214,19 @@ func installChart(ctx context.Context, c *Connection, spec *chartSpec, platformC
 			return err
 		}
 	}
-	if spec.adoptFrom != "" {
-		if err := adoptCRDs(ctx, c.k8s, spec, ns); err != nil {
-			return err
-		}
-	}
 	progress(stepChartInstall)
+	// Upgrade refuses a release that does not exist and does not install one by
+	// itself, so a first install takes the Install action.
+	if _, err := cfg.Releases.Last(spec.release); errors.Is(err, driver.ErrReleaseNotFound) {
+		ins := action.NewInstall(cfg)
+		ins.ReleaseName = spec.release
+		ins.Namespace = ns
+		ins.Wait = true
+		ins.Atomic = true
+		ins.Timeout = deploymentReadyTimeout
+		_, err = ins.RunWithContext(ctx, chrt, values)
+		return err
+	}
 	_, err = up.RunWithContext(ctx, spec.release, chrt, values)
 	return err
 }

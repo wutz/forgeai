@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	projectv1 "github.com/wutz/project-operator/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/kubeconfig"
 	"github.com/wutz/forgeai/pkg/platform"
 )
@@ -71,7 +71,7 @@ func (a *App) ListProjects() ([]Project, error) {
 	}
 	ctx, cancel := a.call()
 	defer cancel()
-	list := &v1.ProjectList{}
+	list := &projectv1.ProjectList{}
 	if err := c.k8s.List(ctx, list); err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func (a *App) GetProject(name string) (*Project, error) {
 	}
 	ctx, cancel := a.call()
 	defer cancel()
-	p := &v1.Project{}
+	p := &projectv1.Project{}
 	if err := c.k8s.Get(ctx, client.ObjectKey{Name: name}, p); err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func (a *App) SaveProject(f Project) error {
 	ctx, cancel := a.call()
 	defer cancel()
 
-	p := &v1.Project{}
+	p := &projectv1.Project{}
 	create := false
 	if err := c.k8s.Get(ctx, client.ObjectKey{Name: f.Name}, p); err != nil {
 		// Only a missing project is created: a forbidden or failed read must
@@ -118,18 +118,18 @@ func (a *App) SaveProject(f Project) error {
 		if !apierrors.IsNotFound(err) {
 			return err
 		}
-		p = &v1.Project{ObjectMeta: metav1.ObjectMeta{Name: f.Name}}
+		p = &projectv1.Project{ObjectMeta: metav1.ObjectMeta{Name: f.Name}}
 		create = true
 	}
 	if !create && f.ResourceVersion != "" && f.ResourceVersion != p.ResourceVersion {
 		return errProjectChanged
 	}
 	p.Spec.DisplayName = f.DisplayName
-	p.Spec.Network = v1.ProjectNetwork{
-		Isolation: v1.NetworkIsolation(f.Network.Isolation), DenyInternet: f.Network.DenyInternet,
+	p.Spec.Network = projectv1.ProjectNetwork{
+		Isolation: projectv1.NetworkIsolation(f.Network.Isolation), DenyInternet: f.Network.DenyInternet,
 	}
 	if f.DeletionPolicy != "" {
-		p.Spec.DeletionPolicy = v1.DeletionPolicy(f.DeletionPolicy)
+		p.Spec.DeletionPolicy = projectv1.DeletionPolicy(f.DeletionPolicy)
 	}
 	// An empty trash retention falls back to the platform default.
 	p.Spec.TrashRetention = nil
@@ -149,7 +149,7 @@ func (a *App) SaveProject(f Project) error {
 		if name == "" {
 			continue
 		}
-		p.Spec.Members = append(p.Spec.Members, v1.Member{Name: name, Role: v1.MemberRole(m.Role)})
+		p.Spec.Members = append(p.Spec.Members, projectv1.Member{Name: name, Role: projectv1.MemberRole(m.Role)})
 	}
 	if create {
 		return c.k8s.Create(ctx, p)
@@ -160,11 +160,11 @@ func (a *App) SaveProject(f Project) error {
 // applyProjectQuota replaces the limits with the form's. An empty or zero
 // field is unset, so the platform default applies (or unlimited for the
 // registry); clearing a limit in the form clears it on the Project.
-func applyProjectQuota(q *v1.ProjectQuota, f ProjectQuota) error {
+func applyProjectQuota(q *projectv1.ProjectQuota, f ProjectQuota) error {
 	// Sorted by class: map order would reorder the Project's list on every save.
 	q.GPUs = q.GPUs[:0]
 	for _, class := range slices.Sorted(maps.Keys(f.GPUs)) {
-		q.GPUs = append(q.GPUs, v1.GPUQuota{Class: class, Count: f.GPUs[class]})
+		q.GPUs = append(q.GPUs, projectv1.GPUQuota{Class: class, Count: f.GPUs[class]})
 	}
 	q.Storage, q.RegistryStorage, q.Volumes, q.Pods = nil, nil, nil, nil
 	for _, field := range []struct {
@@ -204,7 +204,7 @@ func (a *App) DeleteProject(name string) error {
 	}
 	ctx, cancel := a.call()
 	defer cancel()
-	return c.k8s.Delete(ctx, &v1.Project{ObjectMeta: metav1.ObjectMeta{Name: name}})
+	return c.k8s.Delete(ctx, &projectv1.Project{ObjectMeta: metav1.ObjectMeta{Name: name}})
 }
 
 // MemberKubeconfig exports the kubeconfig of a project member as YAML. The
@@ -222,11 +222,11 @@ func (a *App) MemberKubeconfig(projectName, member string) (string, error) {
 	}
 	// The token secret lives in the members namespace, out of reach of
 	// project members; read it by name from the project status.
-	p := &v1.Project{}
+	p := &projectv1.Project{}
 	if err := c.k8s.Get(ctx, client.ObjectKey{Name: projectName}, p); err != nil {
 		return "", err
 	}
-	var st *v1.MemberStatus
+	var st *projectv1.MemberStatus
 	for i := range p.Status.Members {
 		if p.Status.Members[i].Name == member {
 			st = &p.Status.Members[i]
@@ -258,14 +258,14 @@ type memberNotFoundErr struct{ name string }
 
 func (e *memberNotFoundErr) Error() string { return "member " + e.name + " has no credentials yet" }
 
-func toProject(p *v1.Project) Project {
+func toProject(p *projectv1.Project) Project {
 	out := Project{
 		Name: p.Name, DisplayName: p.Spec.DisplayName, Namespace: p.Status.Namespace,
 		Network: ProjectNetwork{
 			Isolation: string(p.Spec.Network.Isolation), DenyInternet: p.Spec.Network.DenyInternet,
 		},
 		DeletionPolicy:  string(p.Spec.DeletionPolicy),
-		Ready:           meta.IsStatusConditionTrue(p.Status.Conditions, v1.ConditionReady),
+		Ready:           meta.IsStatusConditionTrue(p.Status.Conditions, projectv1.ConditionReady),
 		Deleting:        p.DeletionTimestamp != nil,
 		Registry:        p.Status.Registry.URL,
 		Created:         p.CreationTimestamp.UTC().Format(time.RFC3339),

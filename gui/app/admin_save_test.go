@@ -7,17 +7,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	projectv1 "github.com/wutz/project-operator/api/v1alpha1"
 )
 
 // TestSaveProjectRefusesStaleVersion checks that a form read before another
 // save cannot overwrite that save: the stale form is refused, the current one
 // is written.
 func TestSaveProjectRefusesStaleVersion(t *testing.T) {
-	a := testApp(t, &v1.Project{ObjectMeta: metav1.ObjectMeta{Name: "demo"}})
+	a := testApp(t, &projectv1.Project{ObjectMeta: metav1.ObjectMeta{Name: "demo"}})
 	ctx := context.Background()
 
-	stored := &v1.Project{}
+	stored := &projectv1.Project{}
 	if err := a.conn.k8s.Get(ctx, client.ObjectKey{Name: "demo"}, stored); err != nil {
 		t.Fatal(err)
 	}

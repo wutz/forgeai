@@ -182,16 +182,13 @@ func main() {
 		Cache: cache.Options{
 			DefaultTransform: cache.TransformStripManagedFields(),
 			ByObject: map[client.Object]cache.ByObject{
-				&corev1.Secret{}:              managed,
-				&corev1.ServiceAccount{}:      managed,
-				&corev1.ResourceQuota{}:       managed,
-				&corev1.LimitRange{}:          managed,
-				&corev1.Service{}:             managed,
-				&corev1.ConfigMap{}:           platformNS,
-				&appsv1.Deployment{}:          managed,
-				&networkingv1.NetworkPolicy{}: managed,
-				&networkingv1.Ingress{}:       managed,
-				&rbacv1.RoleBinding{}:         managed,
+				&corev1.Secret{}:         managed,
+				&corev1.ServiceAccount{}: managed,
+				&corev1.Service{}:        managed,
+				&corev1.ConfigMap{}:      platformNS,
+				&appsv1.Deployment{}:     managed,
+				&networkingv1.Ingress{}:  managed,
+				&rbacv1.RoleBinding{}:    managed,
 			},
 		},
 		Client:                 client.Options{Cache: &client.CacheOptions{Unstructured: true}},
@@ -219,12 +216,6 @@ func main() {
 
 	cfg := &platform.Loader{Reader: mgr.GetAPIReader(), Namespace: platform.Namespace()}
 	for name, r := range map[string]interface{ SetupWithManager(ctrl.Manager) error }{
-		"project": &controller.ProjectReconciler{
-			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Scheme: mgr.GetScheme(), Config: cfg,
-		},
-		"registry": &controller.RegistryReconciler{
-			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: cfg, ConfigNamespace: platform.Namespace(),
-		},
 		"volume-trash": &controller.PersistentVolumeClaimReconciler{Client: mgr.GetClient(), Config: cfg},
 		"inferenceservice": &controller.InferenceServiceReconciler{
 			Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: cfg,

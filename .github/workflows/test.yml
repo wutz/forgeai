@@ -1,0 +1,36 @@
+name: Test
+
+# Runs the unit tests of the operator and the GUI on every pull request, so a
+# change that breaks them fails before it can be merged.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions: {}
+
+jobs:
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Test the operator packages
+        run: go test ./pkg/... ./api/...
+
+      - name: Test the GUI
+        working-directory: gui
+        run: go test ./app/ -count=1

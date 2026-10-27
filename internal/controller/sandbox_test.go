@@ -8,12 +8,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
 	"github.com/wutz/forgeai/pkg/sandbox"
@@ -61,18 +59,11 @@ const (
 
 var _ = Describe("Sandbox controller", Ordered, func() {
 	BeforeAll(func() {
-		p := &v1.Project{
-			ObjectMeta: metav1.ObjectMeta{Name: sandboxProject},
-			Spec: v1.ProjectSpec{
-				Quota:   v1.ProjectQuota{GPUs: []v1.GPUQuota{{Class: "rtx-5090", Count: 1}}},
-				Network: v1.ProjectNetwork{Isolation: v1.NetworkIsolated},
-			},
-		}
-		Expect(k8sClient.Create(ctx, p)).To(Succeed())
-		Eventually(func() bool {
-			_ = k8sClient.Get(ctx, client.ObjectKeyFromObject(p), p)
-			return meta.IsStatusConditionTrue(p.Status.Conditions, v1.ConditionReady)
-		}, timeout, interval).Should(BeTrue())
+		// The project operator creates this namespace from a Project; the sandbox
+		// controller only reads its label.
+		Expect(k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
+			Name: sandboxNS, Labels: map[string]string{naming.LabelProject: sandboxProject},
+		}})).To(Succeed())
 	})
 
 	It("stops and starts a sandbox from the stop annotation", func() {

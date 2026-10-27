@@ -14,10 +14,7 @@ rules:
   - ""
   resources:
   - configmaps
-  - limitranges
-  - namespaces
   - persistentvolumeclaims
-  - resourcequotas
   - secrets
   - serviceaccounts
   - services
@@ -32,6 +29,7 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - namespaces
   - nodes
   - pods
   - pods/log
@@ -114,7 +112,6 @@ rules:
   resources:
   - fileservers
   - inferenceservices
-  - projects
   verbs:
   - create
   - delete
@@ -127,14 +124,12 @@ rules:
   - forgeai.wutz.dev
   resources:
   - inferenceservices/finalizers
-  - projects/finalizers
   verbs:
   - update
 - apiGroups:
   - forgeai.wutz.dev
   resources:
   - inferenceservices/status
-  - projects/status
   verbs:
   - get
   - patch
@@ -143,6 +138,7 @@ rules:
   - forgeai.wutz.dev
   resources:
   - instancetypes
+  - projects
   verbs:
   - get
   - list
@@ -182,20 +178,6 @@ rules:
 - apiGroups:
   - kueue.x-k8s.io
   resources:
-  - clusterqueues
-  - localqueues
-  - resourceflavors
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - kueue.x-k8s.io
-  resources:
   - workloads
   verbs:
   - get
@@ -216,7 +198,6 @@ rules:
   - networking.k8s.io
   resources:
   - ingresses
-  - networkpolicies
   verbs:
   - create
   - delete
@@ -228,8 +209,6 @@ rules:
 - apiGroups:
   - rbac.authorization.k8s.io
   resources:
-  - clusterrolebindings
-  - clusterroles
   - rolebindings
   - roles
   verbs:

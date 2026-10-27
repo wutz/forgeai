@@ -59,7 +59,7 @@ func TestForgeaiChartRenders(t *testing.T) {
 			operator = o
 		}
 	}
-	for _, name := range forgeaiCRDs {
+	for _, name := range forgeaiSpec.crds {
 		if !slices.Contains(crds, name) {
 			t.Errorf("chart lacks CRD %s; rendered %v", name, crds)
 		}

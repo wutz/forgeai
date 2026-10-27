@@ -7,16 +7,16 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	projectv1 "github.com/wutz/project-operator/api/v1alpha1"
 )
 
 // The admin list shows Ready only once the controller reports the Ready condition.
 func TestToProjectReadyFollowsCondition(t *testing.T) {
-	p := &v1.Project{}
+	p := &projectv1.Project{}
 	if toProject(p).Ready {
 		t.Error("Ready = true without a Ready condition")
 	}
-	p.Status.Conditions = []metav1.Condition{{Type: v1.ConditionReady, Status: metav1.ConditionFalse, Reason: "ReconcileError"}}
+	p.Status.Conditions = []metav1.Condition{{Type: projectv1.ConditionReady, Status: metav1.ConditionFalse, Reason: "ReconcileError"}}
 	if toProject(p).Ready {
 		t.Error("Ready = true with Ready=False")
 	}
@@ -28,7 +28,7 @@ func TestToProjectReadyFollowsCondition(t *testing.T) {
 
 // A Project whose finalizer is still running stays listed, and the list must say so.
 func TestToProjectReportsDeleting(t *testing.T) {
-	p := &v1.Project{}
+	p := &projectv1.Project{}
 	if toProject(p).Deleting {
 		t.Error("Deleting = true without a deletion timestamp")
 	}
@@ -44,7 +44,7 @@ func TestToProjectReportsDeleting(t *testing.T) {
 func TestApplyProjectQuotaClearsEmptyLimits(t *testing.T) {
 	storage := resource.MustParse("1Ti")
 	volumes, pods := int32(10), int32(20)
-	q := &v1.ProjectQuota{Storage: &storage, RegistryStorage: &storage, Volumes: &volumes, Pods: &pods}
+	q := &projectv1.ProjectQuota{Storage: &storage, RegistryStorage: &storage, Volumes: &volumes, Pods: &pods}
 
 	if err := applyProjectQuota(q, ProjectQuota{GPUs: map[string]int32{"rtx-5090": 4}}); err != nil {
 		t.Fatal(err)
@@ -58,7 +58,7 @@ func TestApplyProjectQuotaClearsEmptyLimits(t *testing.T) {
 }
 
 func TestApplyProjectQuotaRejectsBadStorage(t *testing.T) {
-	q := &v1.ProjectQuota{}
+	q := &projectv1.ProjectQuota{}
 	if err := applyProjectQuota(q, ProjectQuota{Storage: "lots"}); err == nil {
 		t.Error("expected parse error for storage")
 	}
@@ -70,8 +70,8 @@ func TestApplyProjectQuotaRejectsBadStorage(t *testing.T) {
 func TestToProjectKeepsRegistryStorageThroughSave(t *testing.T) {
 	registry := resource.MustParse("200Gi")
 	storage := resource.MustParse("1Ti")
-	p := &v1.Project{}
-	p.Spec.Quota = v1.ProjectQuota{Storage: &storage, RegistryStorage: &registry}
+	p := &projectv1.Project{}
+	p.Spec.Quota = projectv1.ProjectQuota{Storage: &storage, RegistryStorage: &registry}
 
 	form := toProject(p).Quota
 	if form.RegistryStorage != "200Gi" {
@@ -90,7 +90,7 @@ func TestToProjectKeepsRegistryStorageThroughSave(t *testing.T) {
 func TestApplyProjectQuotaSortsGPUClasses(t *testing.T) {
 	gpus := map[string]int32{"rtx-5090": 1, "a100": 2, "h100": 3, "l4": 4}
 	for range 20 {
-		q := &v1.ProjectQuota{}
+		q := &projectv1.ProjectQuota{}
 		if err := applyProjectQuota(q, ProjectQuota{GPUs: gpus}); err != nil {
 			t.Fatal(err)
 		}

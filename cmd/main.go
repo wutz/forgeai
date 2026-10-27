@@ -228,9 +228,6 @@ func main() {
 		"registry": &controller.RegistryReconciler{
 			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: cfg, ConfigNamespace: platform.Namespace(),
 		},
-		"imagebuild": &controller.ImageBuildReconciler{
-			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: cfg,
-		},
 		"instancetype": &controller.InstanceTypeReconciler{Client: mgr.GetClient(), Config: cfg},
 		"fileserver": &controller.FileServerReconciler{
 			Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: cfg, Activity: controller.LogActivity(clientset),
@@ -288,6 +285,20 @@ func main() {
 			Scheme: mgr.GetScheme(),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "Failed to create controller", "controller", "sshroute")
+			os.Exit(1)
+		}
+	}
+	// Image builds are optional: their build pods need user namespaces, so the
+	// ImageBuild CRD and its controller are installed only on clusters that
+	// have them.
+	buildGVK := forgeaiv1alpha1.GroupVersion.WithKind("ImageBuild")
+	if _, err := mgr.GetRESTMapper().RESTMapping(buildGVK.GroupKind(), buildGVK.Version); err != nil {
+		setupLog.Info("ImageBuild CRD is not installed; the image build controller is off")
+	} else {
+		if err := (&controller.ImageBuildReconciler{
+			Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: cfg,
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "Failed to create controller", "controller", "imagebuild")
 			os.Exit(1)
 		}
 	}

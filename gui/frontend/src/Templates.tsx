@@ -120,10 +120,11 @@ function JobTemplateTable({items, failed, onEdit, onDelete}: {
   const confirm = useConfirm()
   // The instance types say which templates name a type the project no longer offers. A failed
   // read marks nothing, since the list cannot tell an unavailable type from an unread one.
+  // Read again with each refresh of the list, so a type added or removed while the page is open is seen.
   const [offered, setOffered] = useState<Set<string> | null>(null)
   useEffect(() => {
     ListInstanceTypes().then(ts => setOffered(new Set(ts.map(ty => ty.name)))).catch(() => {})
-  }, [])
+  }, [items])
   if (!items) return failed ? null : <Spinner label={t('common.loading')}/>
   if (items.length === 0) {
     return (

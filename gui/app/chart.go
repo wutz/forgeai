@@ -158,7 +158,8 @@ func fileServerValues(platformCfg *platform.Config) map[string]any {
 
 // The Project operator is installed from its own Helm chart into the platform
 // namespace. It reads the platform config that the forgeai chart installs, so
-// it installs second.
+// it installs second. Its CRD shipped with the forgeai chart before the split,
+// so the install adopts it.
 const (
 	projectOperatorChart        = "oci://ghcr.io/wutz/charts/project-operator"
 	projectOperatorChartVersion = "0.4.1"
@@ -169,6 +170,7 @@ const (
 var projectOperatorSpec = &chartSpec{
 	name: "project-operator", ref: projectOperatorChart, version: projectOperatorChartVersion, release: projectOperatorRelease,
 	deployment: projectOperatorDeployment, crds: []string{"projects.forgeai.wutz.dev"},
+	adoptFrom: forgeaiRelease,
 }
 
 // installChart installs the chart of spec into its namespace, or upgrades the

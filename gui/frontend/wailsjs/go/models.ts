@@ -63,6 +63,28 @@ export namespace app {
 		}
 	}
 	
+	export class ChangeAccess {
+	    jobs: boolean;
+	    jobTemplates: boolean;
+	    volumes: boolean;
+	    inference: boolean;
+	    sandboxes: boolean;
+	    sandboxTemplates: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ChangeAccess(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.jobs = source["jobs"];
+	        this.jobTemplates = source["jobTemplates"];
+	        this.volumes = source["volumes"];
+	        this.inference = source["inference"];
+	        this.sandboxes = source["sandboxes"];
+	        this.sandboxTemplates = source["sandboxTemplates"];
+	    }
+	}
 	export class CreateAccess {
 	    jobs: boolean;
 	    jobTemplates: boolean;
@@ -96,6 +118,7 @@ export namespace app {
 	    sandboxes: boolean;
 	    inference: boolean;
 	    create: CreateAccess;
+	    change: ChangeAccess;
 	
 	    static createFrom(source: any = {}) {
 	        return new ConnInfo(source);
@@ -113,6 +136,7 @@ export namespace app {
 	        this.sandboxes = source["sandboxes"];
 	        this.inference = source["inference"];
 	        this.create = this.convertValues(source["create"], CreateAccess);
+	        this.change = this.convertValues(source["change"], ChangeAccess);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

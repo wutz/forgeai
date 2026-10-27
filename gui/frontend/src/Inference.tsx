@@ -5,7 +5,7 @@ import {
 import {app} from '../wailsjs/go/models'
 import {InferenceCreateDialog} from './InferenceCreateDialog'
 import {errText, everyWhileVisible, fmtDate} from './util'
-import {Card, Empty, Icon, PageHeader, Spinner, useActive, useConfirm, useCreateAccess, useDetailClose} from './ui'
+import {Card, Empty, Icon, PageHeader, Spinner, useActive, useChangeAccess, useConfirm, useCreateAccess, useDetailClose} from './ui'
 import {MessageKey, t} from './i18n'
 
 // Inference is the view of the project's InferenceServices: each serves one
@@ -56,7 +56,7 @@ export function Inference() {
                     {services !== null && t('inference.readyCount', {ready, total: list.length})}
                   </span>}
                   actions={create.inference && <button className="btn" onClick={() => setCreating(true)}>
-                    <Icon name="plus" size={14}/>{t('inference.new')}
+                    <Icon name="plus" size={14}/>{t('common.new')}
                   </button>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {creating && <InferenceCreateDialog onClose={() => setCreating(false)} onCreated={name => {
@@ -163,6 +163,7 @@ function InferenceDetail({name, onChanged, onDeleted, onClose}: {
   // pending is the start or stop call in flight.
   const [pending, setPending] = useState<'start' | 'stop' | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const change = useChangeAccess()
   // key is the API key once the user shows it. It lives only as long as this detail.
   const [key, setKey] = useState<string | null>(null)
   const [keyError, setKeyError] = useState('')
@@ -248,7 +249,7 @@ function InferenceDetail({name, onChanged, onDeleted, onClose}: {
       {confirm.dialog}
 
       <div className="detail-actions">
-        {!svc.stopped && <button className="btn btn-sm" disabled={busy} onClick={() => confirm.ask({
+        {change.inference && !svc.stopped && <button className="btn btn-sm" disabled={busy} onClick={() => confirm.ask({
           title: t('inference.stopTitle', {name: svc.name}),
           message: t('inference.stopMessage'),
           action: t('inference.stopAction'),
@@ -257,13 +258,13 @@ function InferenceDetail({name, onChanged, onDeleted, onClose}: {
           {pending === 'stop' ? <span className="spinner" aria-hidden/> : <Icon name="square" size={12}/>}
           {pending === 'stop' ? t('inference.stopping') : t('common.stop')}
         </button>}
-        {svc.stopped && <button className="btn btn-sm btn-accent" disabled={busy}
+        {change.inference && svc.stopped && <button className="btn btn-sm btn-accent" disabled={busy}
                                 onClick={() => transition('start', StartInferenceService(svc.name))}>
           {pending === 'start' ? <span className="spinner" aria-hidden/> : <Icon name="play" size={12}/>}
           {pending === 'start' ? t('inference.starting') : t('common.start')}
         </button>}
         <span className="spacer"/>
-        <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => confirm.ask({
+        {change.inference && <button className="btn btn-sm btn-danger" disabled={busy} onClick={() => confirm.ask({
           title: t('inference.deleteTitle', {name: svc.name}),
           message: t('inference.deleteMessage'),
           action: t('inference.deleteAction'), danger: true,
@@ -273,7 +274,7 @@ function InferenceDetail({name, onChanged, onDeleted, onClose}: {
             return DeleteInferenceService(svc.name).then(onDeleted).catch(e => setError(errText(e)))
               .finally(() => setDeleting(false))
           },
-        })}><Icon name="trash" size={13}/>{deleting ? t('inference.deleting') : t('common.delete')}</button>
+        })}><Icon name="trash" size={13}/>{deleting ? t('inference.deleting') : t('common.delete')}</button>}
       </div>
 
       <div className="section">

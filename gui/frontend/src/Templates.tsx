@@ -2,7 +2,7 @@ import {useEffect, useState} from 'react'
 import {ListTemplates, CreateTemplate, UpdateTemplate, DeleteTemplate, DeleteSandboxTemplate, SandboxTemplates as ListSandboxTemplates, ListInstanceTypes} from '../wailsjs/go/app/App'
 import {app, sandbox, training} from '../wailsjs/go/models'
 import {envErrors, envToLines, linesToEnv, everyWhileVisible, fmtDate, errText, generateName, MAX_RETRIES, NAME_MAX, NAME_PATTERN} from './util'
-import {Card, CancelButton, Dialog, Empty, HintButton, Icon, PageHeader, RefreshButton, Spinner, useActive, useConfirm, useCreateAccess} from './ui'
+import {Card, CancelButton, Dialog, Empty, HintButton, Icon, PageHeader, RefreshButton, Spinner, useActive, useChangeAccess, useConfirm, useCreateAccess} from './ui'
 import {SandboxTemplateDialog, SandboxTemplateTable} from './SandboxTemplates'
 import {t} from './i18n'
 import {ImageField} from './ImageField'
@@ -65,7 +65,7 @@ export function Templates({kind}: {kind: Kind}) {
                     {canCreate && <button className="btn" onClick={() => isSandbox
                       ? setSandboxDialog({})
                       : setJobDialog({form: blankJobForm()})}>
-                      <Icon name="plus" size={14}/>{isSandbox ? t('templates.newSandbox') : t('templates.newJob')}
+                      <Icon name="plus" size={14}/>{t('common.new')}
                     </button>}
                     <RefreshButton onRefresh={refresh}/>
                   </>}/>
@@ -73,7 +73,7 @@ export function Templates({kind}: {kind: Kind}) {
         <span>{error}</span>
         {/* A conflict says to reload; the refresh is here so the user does not have to find it. */}
         <span className="spacer"/>
-        <button className="btn btn-sm" onClick={() => reload()}>{t('common.refresh')}</button>
+        <button className="btn" onClick={() => reload()}>{t('common.refresh')}</button>
       </div>}
       {/* Closing a dialog reloads the list: a save that failed on a stale version
           says to reload, and the reload here gives the reopened edit the current version. */}
@@ -115,6 +115,7 @@ function JobTemplateTable({items, failed, onEdit, onDelete}: {
   items: app.Template[] | null, failed: boolean, onEdit: (t: app.Template) => void, onDelete: (name: string) => void
 }) {
   const confirm = useConfirm()
+  const change = useChangeAccess()
   // The instance types say which templates name a type the project no longer offers. A failed
   // read marks nothing, since the list cannot tell an unavailable type from an unread one.
   // Read again with each refresh of the list, so a type added or removed while the page is open is seen.
@@ -155,17 +156,19 @@ function JobTemplateTable({items, failed, onEdit, onDelete}: {
           <td data-label={t('common.created')} className="muted col-optional">{fmtDate(tpl.created)}</td>
           <td>
             <div className="actions">
-              <HintButton className="btn btn-sm" disabled={!!tpl.error} reason={t('templates.unreadableHint')}
-                          onClick={() => onEdit(tpl)}>{t('common.edit')}</HintButton>
-              <button className="btn btn-sm btn-danger" onClick={() =>
-                confirm.ask({
-                  title: t('templates.deleteTitle', {name: tpl.name}),
-                  message: t('templates.deleteMessage'),
-                  action: t('templates.deleteAction'), danger: true,
-                  run: () => onDelete(tpl.name),
-                })}>
-                {t('common.delete')}
-              </button>
+              {change.jobTemplates && <>
+                <HintButton className="btn btn-sm" disabled={!!tpl.error} reason={t('templates.unreadableHint')}
+                            onClick={() => onEdit(tpl)}>{t('common.edit')}</HintButton>
+                <button className="btn btn-sm btn-danger" onClick={() =>
+                  confirm.ask({
+                    title: t('templates.deleteTitle', {name: tpl.name}),
+                    message: t('templates.deleteMessage'),
+                    action: t('templates.deleteAction'), danger: true,
+                    run: () => onDelete(tpl.name),
+                  })}>
+                  {t('common.delete')}
+                </button>
+              </>}
             </div>
           </td>
         </tr>

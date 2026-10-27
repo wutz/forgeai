@@ -111,12 +111,26 @@ type ConnInfo struct {
 	Inference bool `json:"inference"`
 	// Create says which kinds the user may create in the project namespace.
 	Create CreateAccess `json:"create"`
+	// Change says which kinds the user may change and remove in the project namespace.
+	Change ChangeAccess `json:"change"`
 }
 
 // CreateAccess says which kinds the user may create in the project namespace.
 // The GUI shows a create button only when its kind is set, so a member is not
 // offered an action the cluster would refuse.
 type CreateAccess struct {
+	Jobs             bool `json:"jobs"`
+	JobTemplates     bool `json:"jobTemplates"`
+	Volumes          bool `json:"volumes"`
+	Inference        bool `json:"inference"`
+	Sandboxes        bool `json:"sandboxes"`
+	SandboxTemplates bool `json:"sandboxTemplates"`
+}
+
+// ChangeAccess says which kinds the user may change and remove in the project
+// namespace. A row action (edit, grow, trash, delete) is shown only when its
+// kind is set, for the same reason as CreateAccess.
+type ChangeAccess struct {
 	Jobs             bool `json:"jobs"`
 	JobTemplates     bool `json:"jobTemplates"`
 	Volumes          bool `json:"volumes"`

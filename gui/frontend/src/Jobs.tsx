@@ -6,7 +6,7 @@ import {JobCreateDialog} from './JobCreateDialog'
 import {TemplateDialog} from './Templates'
 import {JobBucket, Status, envToLines, everyWhileVisible, fmtDate, errText, jobBucket, latestAttempt} from './util'
 import {t} from './i18n'
-import {Badge, Card, Empty, Icon, LogView, PageHeader, Segmented, Spinner, Tabs, tabPanelProps, useActive, useConfirm, useCreateAccess, useDetailClose} from './ui'
+import {Badge, Card, Empty, Icon, LogView, PageHeader, RefreshButton, Segmented, Spinner, Tabs, tabPanelProps, useActive, useChangeAccess, useConfirm, useCreateAccess, useDetailClose} from './ui'
 
 type Filter = 'all' | JobBucket
 
@@ -72,22 +72,27 @@ function JobList({focus}: {focus?: {name: string} | null}) {
   // is dropped, so a slow older poll cannot overwrite a newer list.
   const latest = useRef(0)
 
+  // refresh rejects when the list fails; the banner shows why and the header's refresh button reports it.
   const refresh = () => {
     const seq = ++latest.current
-    ListJobs().then(jobs => {
+    return ListJobs().then(jobs => {
       if (seq !== latest.current) return
       setJobs(jobs)
       setError('')
     }).catch(e => {
-      if (seq === latest.current) setError(errText(e))
+      if (seq !== latest.current) return
+      setError(errText(e))
+      throw e
     })
   }
+  // reload is for the callers with nowhere to show a rejection; the failure is already in the banner.
+  const reload = () => refresh().catch(() => undefined)
   const list = jobs ?? []
   const busy = list.some(j => settling(latestAttempt(j).phase))
   useEffect(() => {
     if (!active) return
-    refresh()
-    return everyWhileVisible(refresh, busy ? 1500 : 5000)
+    reload()
+    return everyWhileVisible(reload, busy ? 1500 : 5000)
   }, [active, busy])
 
   const counts = useMemo(() => {
@@ -111,8 +116,9 @@ function JobList({focus}: {focus?: {name: string} | null}) {
                   meta={<span className="muted" style={{fontSize: 12.5}}>{jobs !== null && t('jobs.total', {count: list.length})}</span>}
                   actions={<>
                     {create.jobs && <button className="btn" onClick={() => setCreating(true)}>
-                      <Icon name="plus" size={14}/>{t('jobs.newJob')}
+                      <Icon name="plus" size={14}/>{t('common.new')}
                     </button>}
+                    <RefreshButton onRefresh={refresh}/>
                   </>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {creating && <JobCreateDialog onClose={() => setCreating(false)} onCreated={name => {
@@ -120,7 +126,7 @@ function JobList({focus}: {focus?: {name: string} | null}) {
         // A new job is queued or running, so a filter that is not All may hide it; the list goes back to All with it open.
         setFilter('all')
         setSelected(name)
-        refresh()
+        reload()
       }}/>}
 
       <div className="list-toolbar">
@@ -132,8 +138,8 @@ function JobList({focus}: {focus?: {name: string} | null}) {
         <JobTable jobs={shown} failed={!!error} filtered={filter !== 'all'} selected={selected} onSelect={n =>
           setSelected(prev => prev === n ? null : n)}/>
         {/* Keyed by name: a read still in flight for the previous job lands on an unmounted detail. */}
-        {selected && <JobDetail key={selected} name={selected} onDone={refresh} onOpen={n => { setFilter('all'); setSelected(n); refresh() }}
-                                onDeleted={() => { setSelected(null); refresh() }}
+        {selected && <JobDetail key={selected} name={selected} onDone={reload} onOpen={n => { setFilter('all'); setSelected(n); reload() }}
+                                onDeleted={() => { setSelected(null); reload() }}
                                 onClose={closeDetail}/>}
       </div>
     </>
@@ -226,6 +232,8 @@ function JobDetail({name, onDone, onOpen, onDeleted, onClose}: {
   // pending is the action in flight; its button stays disabled until it answers.
   const [pending, setPending] = useState('')
   const confirm = useConfirm()
+  const create = useCreateAccess()
+  const change = useChangeAccess()
   // detailSeq numbers the reads, so a slow reply cannot overwrite a newer one.
   const detailSeq = useRef(0)
   const detailOf = (n: string) => {
@@ -322,7 +330,7 @@ function JobDetail({name, onDone, onOpen, onDeleted, onClose}: {
         <button className="btn btn-sm" onClick={() => viewLog(0, t('jobs.workerLabel', {index: 0})).catch(() => {})}>
           <Icon name="scroll" size={13}/>{t('common.logs')}
         </button>
-        {live && attempt.phase !== 'Stopped' &&
+        {change.jobs && live && attempt.phase !== 'Stopped' &&
           <button className="btn btn-sm" disabled={!!pending} onClick={() => confirm.ask({
             title: t('jobs.stopTitle', {name: attempt.name}),
             message: t('jobs.stopMessage'),
@@ -331,19 +339,19 @@ function JobDetail({name, onDone, onOpen, onDeleted, onClose}: {
           })}>
             <Icon name="square" size={12}/>{pending === 'stop' ? t('jobs.stopping') : t('common.stop')}
           </button>}
-        {attempt.phase === 'Stopped' &&
+        {change.jobs && attempt.phase === 'Stopped' &&
           <button className="btn btn-sm btn-accent" disabled={!!pending} onClick={() => act('start', StartJob(attempt.name))}>
             <Icon name="play" size={12}/>{pending === 'start' ? t('jobs.resuming') : t('common.resume')}
           </button>}
-        {retriable &&
+        {change.jobs && retriable &&
           <button className="btn btn-sm" disabled={!!pending} onClick={rerun}>
             <Icon name="refresh" size={13}/>{pending === 'rerun' ? t('jobs.rerunning') : t('jobs.rerun')}
           </button>}
-        <button className="btn btn-sm" onClick={() => setSaving(true)}>
+        {create.jobTemplates && <button className="btn btn-sm" onClick={() => setSaving(true)}>
           <Icon name="layers" size={13}/>{t('jobs.saveAsTemplate')}
-        </button>
+        </button>}
         <span className="spacer"/>
-        <button className="btn btn-sm btn-danger" disabled={!!pending} onClick={() => confirm.ask({
+        {change.jobs && <button className="btn btn-sm btn-danger" disabled={!!pending} onClick={() => confirm.ask({
           title: t('jobs.deleteTitle', {name: job.name}),
           message: t('jobs.deleteMessage') + (job.retries?.length
             ? ' ' + t('jobs.deleteRetries', {count: job.retries.length}) : ''),
@@ -355,7 +363,7 @@ function JobDetail({name, onDone, onOpen, onDeleted, onClose}: {
           },
         })}>
           <Icon name="trash" size={13}/>{pending === 'delete' ? t('jobs.deleting') : t('common.delete')}
-        </button>
+        </button>}
       </div>
 
       <div className="section">

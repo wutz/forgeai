@@ -194,8 +194,10 @@ func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
 		}
 	}
 	var create CreateAccess
+	var change ChangeAccess
 	if namespace != "" {
 		create = createAccess(ctx, k8s, namespace)
+		change = changeAccess(ctx, k8s, namespace)
 	}
 	info := ConnInfo{
 		Context: contextName, Server: rest.Host, Namespace: namespace, Project: project,
@@ -203,6 +205,7 @@ func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
 		Sandboxes: namespace != "" && sandboxesAvailable(ctx, k8s, namespace),
 		Inference: namespace != "" && inferenceAvailable(ctx, k8s, namespace),
 		Create:    create,
+		Change:    change,
 	}
 	conn := &Connection{Info: info, k8s: k8s, rest: rest, core: core}
 	if cfg, err := platform.Load(ctx, k8s, conn.configNamespace()); err == nil {
@@ -288,6 +291,33 @@ func canCreate(ctx context.Context, k8s client.Client, namespace, group, resourc
 	return allowed(ctx, k8s, &authv1.ResourceAttributes{
 		Namespace: namespace, Group: group, Resource: resource, Verb: "create",
 	})
+}
+
+// changeAccess asks, for each kind the GUI changes, whether the user may both
+// update and delete its objects in the project namespace. The row actions edit,
+// grow, trash and delete, so a member who cannot do both sees none of them.
+func changeAccess(ctx context.Context, k8s client.Client, namespace string) ChangeAccess {
+	return ChangeAccess{
+		Jobs:             canChange(ctx, k8s, namespace, kf.TrainJobGVK.Group, "trainjobs"),
+		JobTemplates:     canChange(ctx, k8s, namespace, kf.TrainingRuntimeGVK.Group, "trainingruntimes"),
+		Volumes:          canChange(ctx, k8s, namespace, "", "persistentvolumeclaims"),
+		Inference:        canChange(ctx, k8s, namespace, v1.GroupVersion.Group, "inferenceservices"),
+		Sandboxes:        canChange(ctx, k8s, namespace, sandbox.Group, "sandboxes"),
+		SandboxTemplates: canChange(ctx, k8s, namespace, sandbox.ExtensionsGroup, "sandboxtemplates"),
+	}
+}
+
+// canChange reports whether the user may both update and delete resource of
+// group in namespace.
+func canChange(ctx context.Context, k8s client.Client, namespace, group, resource string) bool {
+	for _, verb := range []string{"update", "delete"} {
+		if !allowed(ctx, k8s, &authv1.ResourceAttributes{
+			Namespace: namespace, Group: group, Resource: resource, Verb: verb,
+		}) {
+			return false
+		}
+	}
+	return true
 }
 
 // allowed asks the API server whether the user may perform the action. A

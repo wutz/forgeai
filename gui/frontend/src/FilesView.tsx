@@ -63,12 +63,15 @@ export function FilesView() {
                     <button className="btn btn-sm" onClick={() => setAttempt(n => n + 1)}>{t('common.retry')}</button>
                   )}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
-      <p className="muted note">
-        {state?.volumes?.length
-          ? t(ready ? 'files.serving' : 'files.servingOnWake', {volumes})
-          : ''}
-        {t('files.note')}
-      </p>
+      {/* A server that cannot be published never starts, so the note would promise access it cannot give. */}
+      {state?.phase !== 'Failed' && (
+        <p className="muted note">
+          {state?.volumes?.length
+            ? t(ready ? 'files.serving' : 'files.servingOnWake', {volumes})
+            : ''}
+          {t('files.note')}
+        </p>
+      )}
       {!state ? (
         // Until the first answer the view says it is opening; a failed first
         // answer says so instead, while the loop keeps polling in the background.

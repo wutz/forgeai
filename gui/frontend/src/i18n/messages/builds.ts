@@ -1,9 +1,11 @@
-// Image builds: the Builds section of the Images view and its create form.
+// Image builds: the Builds view under Images and its create form.
 // Shared words such as Cancel, Delete or Logs come from common.ts.
 
 export const en = {
   'builds.title': 'Builds',
   'builds.subtitle': 'Build an image from a Dockerfile and push it to the project registry.',
+  'builds.unavailableTitle': 'Image builds are not available on this cluster',
+  'builds.unavailableHint': 'The cluster does not run the ImageBuild controller, so images cannot be built here. Push images from a local Docker instead.',
   'builds.new': 'New build',
   'builds.noneTitle': 'No builds yet',
   'builds.noneHint': 'Start a build from a git repository or a Dockerfile. A successful build pushes its tags to the project registry.',
@@ -53,6 +55,8 @@ export const en = {
 export const zh: Record<keyof typeof en, string> = {
   'builds.title': '构建',
   'builds.subtitle': '从 Dockerfile 构建镜像，并推送到项目镜像仓库。',
+  'builds.unavailableTitle': '此集群不支持镜像构建',
+  'builds.unavailableHint': '此集群未运行 ImageBuild 控制器，无法在此构建镜像。可在本地 Docker 中构建后推送。',
   'builds.new': '新建构建',
   'builds.noneTitle': '还没有构建',
   'builds.noneHint': '从 Git 仓库或 Dockerfile 开始构建，构建成功后会把标签推送到项目镜像仓库。',

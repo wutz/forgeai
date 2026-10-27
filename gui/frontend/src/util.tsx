@@ -1,3 +1,4 @@
+import {useRef, useState} from 'react'
 import {app} from '../wailsjs/go/models'
 import {MessageKey, getLocale, t} from './i18n'
 
@@ -37,6 +38,21 @@ function rawMessage(e: unknown): string {
   return typeof e === 'string' ? e
     : e instanceof Error ? e.message
     : (e as { message?: string })?.message || JSON.stringify(e)
+}
+
+// useCopy copies text and reports the key it was copied under for a moment, so
+// the button that copied it can say so. A failed copy goes to onFail.
+export function useCopy(onFail: () => void) {
+  const [copied, setCopied] = useState('')
+  const timer = useRef<number>()
+  const copy = (text: string, key: string) =>
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key)
+      // A second copy restarts the notice, so the earlier timer must not clear it early.
+      window.clearTimeout(timer.current)
+      timer.current = window.setTimeout(() => setCopied(''), 1500)
+    }, onFail)
+  return {copied, copy}
 }
 
 export function errText(e: unknown): string {

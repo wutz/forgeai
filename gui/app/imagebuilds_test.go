@@ -234,8 +234,8 @@ func TestListImageBuildsEmpty(t *testing.T) {
 	}
 }
 
-// TestImageBuildsAvailable checks that the builds card is offered only where
-// the ImageBuild CRD is installed and the user may list builds.
+// TestImageBuildsAvailable checks that the Builds view knows whether the
+// ImageBuild CRD is installed. A user without the grant still sees the view.
 func TestImageBuildsAvailable(t *testing.T) {
 	gk := v1.GroupVersion.WithKind("ImageBuild").GroupKind()
 	cases := map[string]struct {
@@ -244,7 +244,7 @@ func TestImageBuildsAvailable(t *testing.T) {
 	}{
 		"installed":     {err: nil, want: true},
 		"crd missing":   {err: &meta.NoKindMatchError{GroupKind: gk, SearchedVersions: []string{v1.GroupVersion.Version}}, want: false},
-		"not permitted": {err: apierrors.NewForbidden(schema.GroupResource{Group: v1.GroupVersion.Group, Resource: "imagebuilds"}, "", nil), want: false},
+		"not permitted": {err: apierrors.NewForbidden(schema.GroupResource{Group: v1.GroupVersion.Group, Resource: "imagebuilds"}, "", nil), want: true},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

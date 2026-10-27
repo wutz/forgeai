@@ -9,6 +9,7 @@ import {Sandboxes} from './Sandboxes'
 import {Volumes} from './Volumes'
 import {FilesView} from './FilesView'
 import {Images, ImagePush} from './Images'
+import {ImageBuilds} from './ImageBuilds'
 import {Resources} from './Resources'
 import {Admin} from './Admin'
 import {Dependencies} from './Dependencies'
@@ -31,7 +32,7 @@ const NARROW = '(max-width: 820px)'
 const isNarrow = () => window.matchMedia(NARROW).matches
 
 type Area = 'overview' | 'jobs' | 'job-templates' | 'sandboxes' | 'sandbox-templates' | 'inference' | 'volumes'
-  | 'files' | 'images' | 'image-push' | 'resources' | 'admin' | 'dependencies'
+  | 'files' | 'images' | 'image-builds' | 'image-push' | 'resources' | 'admin' | 'dependencies'
 
 // A nav item may fold a child list beneath it; the children are views of their own.
 type NavChild = {area: Area, label: string, icon: IconName}
@@ -228,7 +229,10 @@ export default function App() {
         {area: 'volumes', label: t('nav.volumes'), icon: 'database'},
         {area: 'files', label: t('nav.files'), icon: 'folder'},
         {area: 'images', label: t('nav.images'), icon: 'image',
-          children: [{area: 'image-push', label: t('images.pushTitle'), icon: 'upload'}]},
+          children: [
+            {area: 'image-builds', label: t('builds.title'), icon: 'layers'},
+            {area: 'image-push', label: t('images.pushTitle'), icon: 'upload'},
+          ]},
       ],
     },
     {
@@ -325,7 +329,8 @@ export default function App() {
                   {shown('inference', <Inference/>)}
                   {shown('volumes', <Volumes/>)}
                   {shown('files', <FilesView/>)}
-                  {shown('images', <Images buildsAvailable={!!conn?.imageBuilds}/>)}
+                  {shown('images', <Images/>)}
+                  {shown('image-builds', <ImageBuilds available={!!conn?.imageBuilds}/>)}
                   {shown('image-push', <ImagePush/>)}
                   {shown('resources', <Resources/>)}
                   {shown('admin', <Admin onProjectsChanged={refreshProjects}/>)}

@@ -257,12 +257,13 @@ func inferenceAvailable(ctx context.Context, k8s client.Client, namespace string
 	return k8s.List(ctx, list, client.InNamespace(namespace), client.Limit(1)) == nil
 }
 
-// imageBuildsAvailable reports whether the ImageBuild CRD is installed and the
-// user may list builds in the project namespace; the GUI hides the image builds
-// card when it is not. Clusters without user namespaces have no ImageBuild CRD.
+// imageBuildsAvailable reports whether the ImageBuild CRD is installed. A user
+// who may not list builds still gets true: the Builds view says so itself, so
+// it is only the installation that the view depends on.
 func imageBuildsAvailable(ctx context.Context, k8s client.Client, namespace string) bool {
 	list := &v1.ImageBuildList{}
-	return k8s.List(ctx, list, client.InNamespace(namespace), client.Limit(1)) == nil
+	err := k8s.List(ctx, list, client.InNamespace(namespace), client.Limit(1))
+	return err == nil || apierrors.IsForbidden(err)
 }
 
 // mustBeAdmin reports whether the user may create Projects; the admin area

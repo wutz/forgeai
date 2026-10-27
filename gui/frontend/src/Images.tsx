@@ -1,37 +1,19 @@
-import {useEffect, useRef, useState} from 'react'
-import {DeleteImage, DeleteImageBuild, DeleteImageRepo, DeleteImageTag, ListImageBuilds, ListImages, Registry} from '../wailsjs/go/app/App'
+import {useEffect, useState} from 'react'
+import {DeleteImage, DeleteImageRepo, DeleteImageTag, ListImages, Registry} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
-import {errText, everyWhileVisible, fmtDate, Status, tagCount} from './util'
+import {errText, everyWhileVisible, fmtDate, tagCount, useCopy} from './util'
 import {t} from './i18n'
-import {Badge, Card, Empty, HintButton, Icon, PageHeader, RefreshButton, Spinner, useActive, useConfirm} from './ui'
-import {ImageBuildCreateDialog} from './ImageBuildCreateDialog'
-import {ImageBuildLogsDialog} from './ImageBuildLogsDialog'
+import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Spinner, useActive, useConfirm} from './ui'
 
 // countImages and countTags name a count in a sentence, with the singular
 // form of one ("1 image") as the messages do for jobs.
 const countImages = (n: number) => n === 1 ? t('images.imagesOne') : t('images.imagesMany', {count: n})
 const countTags = (n: number) => n === 1 ? t('images.tagsOne') : t('images.tagsMany', {count: n})
 
-// useCopy copies text and reports the key it was copied under for a moment, so
-// the button that copied it can say so. A failed copy goes to onFail.
-function useCopy(onFail: () => void) {
-  const [copied, setCopied] = useState('')
-  const timer = useRef<number>()
-  const copy = (text: string, key: string) =>
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(key)
-      // A second copy restarts the notice, so the earlier timer must not clear it early.
-      window.clearTimeout(timer.current)
-      timer.current = window.setTimeout(() => setCopied(''), 1500)
-    }, onFail)
-  return {copied, copy}
-}
-
 // Images shows the project registry's repositories: the pushed tags with delete
-// buttons. How to push is in ImagePush, which sits under it in the sidebar.
-// buildsAvailable says the cluster has the ImageBuild CRD; without it the builds
-// card is left out and its list is never read.
-export function Images({buildsAvailable}: {buildsAvailable: boolean}) {
+// buttons. How to push is in ImagePush and how to build is in ImageBuilds, which
+// sit under it in the sidebar.
+export function Images() {
   // repos is null until the first list answers, so the empty state does not show while it loads.
   const [repos, setRepos] = useState<app.ImageRepo[] | null>(null)
   const list = repos ?? []
@@ -41,12 +23,6 @@ export function Images({buildsAvailable}: {buildsAvailable: boolean}) {
   const {copied, copy} = useCopy(() => setError(t('images.copyFailed')))
   const confirm = useConfirm()
   const active = useActive()
-  // builds is null until the first list answers. Builds are read only when the account can push:
-  // a view-only member is not offered the list.
-  const [builds, setBuilds] = useState<app.ImageBuild[] | null>(null)
-  const [buildError, setBuildError] = useState('')
-  const [creating, setCreating] = useState(false)
-  const [logsOf, setLogsOf] = useState('')
 
   const refresh = () => Promise.all([
     Registry().then(setReg),
@@ -62,31 +38,6 @@ export function Images({buildsAvailable}: {buildsAvailable: boolean}) {
     poll()
     return everyWhileVisible(poll, 60000)
   }, [active])
-
-  // Listing builds needs read access only; starting one needs the robot credentials.
-  const canList = buildsAvailable && !!reg?.enabled
-  const canBuild = canList && !!reg.credentials
-  const refreshBuilds = () => ListImageBuilds().then(list => {
-    setBuilds(list)
-    setBuildError('')
-  }, e => {
-    setBuildError(errText(e))
-    throw e
-  })
-  const building = builds?.some(b => b.phase === 'Pending' || b.phase === 'Running') ?? false
-  // A running build is read every few seconds so its status shows without a reload; otherwise the page's slower beat.
-  useEffect(() => {
-    if (!active || !canList) return
-    const poll = () => refreshBuilds().catch(() => {})
-    poll()
-    return everyWhileVisible(poll, building ? 5000 : 60000)
-  }, [active, canList, building])
-  // A build that just finished has pushed its images, so the repositories are read again too.
-  const wasBuilding = useRef(false)
-  useEffect(() => {
-    if (wasBuilding.current && !building) refresh().catch(() => {})
-    wasBuilding.current = building
-  }, [building])
 
   const address = (repo: string, tag: string) => reg ? `${reg.url}/${repo}:${tag}` : ''
   const totalTags = list.reduce((n, r) => n + tagCount(r), 0)
@@ -126,13 +77,6 @@ export function Images({buildsAvailable}: {buildsAvailable: boolean}) {
     })
   }
 
-  const deleteBuild = (b: app.ImageBuild) => confirm.ask({
-    title: t('builds.deleteTitle', {name: b.name}),
-    message: t('builds.deleteMessage'),
-    action: t('common.delete'), danger: true,
-    run: () => DeleteImageBuild(b.name).then(refreshBuilds).catch(e => setBuildError(errText(e))),
-  })
-
   return (
     <div className="page">
       <PageHeader eyebrow={t('storage.eyebrow')} title={t('images.title')}
@@ -143,82 +87,6 @@ export function Images({buildsAvailable}: {buildsAvailable: boolean}) {
                   actions={<RefreshButton onRefresh={refresh}/>}/>
       {error && <div className="banner banner-error" role="alert">{error}</div>}
       {confirm.dialog}
-      {creating && reg && <ImageBuildCreateDialog registry={reg.url} onClose={() => setCreating(false)}
-        onCreated={() => {
-          setCreating(false)
-          refreshBuilds().catch(() => {})
-        }}/>}
-      {logsOf && <ImageBuildLogsDialog name={logsOf} running={!!builds?.some(b => b.name === logsOf && (b.phase === 'Pending' || b.phase === 'Running'))}
-        onClose={() => setLogsOf('')}/>}
-
-      {reg && buildsAvailable && (
-        <Card title={t('builds.title')} subtitle={t('builds.subtitle')} className="card-spaced"
-              actions={<HintButton className="btn btn-sm" disabled={!canBuild}
-                                  reason={reg.enabled ? t('builds.needCredentials') : t('builds.needRegistry')}
-                                  onClick={() => setCreating(true)}>
-                <Icon name="plus" size={13}/>{t('builds.new')}
-              </HintButton>}>
-          {!reg.enabled && <Empty icon="image" title={t('builds.needRegistry')}/>}
-          {canList && <>
-            {buildError && <div className="banner banner-error" role="alert">{buildError}</div>}
-            {builds === null && !buildError && <Spinner label={t('common.loading')}/>}
-            {builds !== null && builds.length === 0 && <Empty icon="image" title={t('builds.noneTitle')}>
-              {canBuild && t('builds.noneHint')}
-            </Empty>}
-            {builds !== null && builds.length > 0 && <table className="table">
-              <thead><tr>
-                <th>{t('builds.name')}</th><th>{t('builds.image')}</th><th>{t('builds.source')}</th>
-                <th>{t('common.status')}</th><th>{t('builds.pushed')}</th><th>{t('common.created')}</th><th/>
-              </tr></thead>
-              <tbody>
-              {builds.map(b => (
-                <tr key={b.name}>
-                  <td data-label={t('builds.name')} className="mono trunc" title={b.name}>{b.name}</td>
-                  <td data-label={t('builds.image')}>
-                    <div style={{display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center'}}>
-                      <span className="mono">{b.repository}</span>
-                      {b.tags.map(tag => <Badge key={tag}>{tag}</Badge>)}
-                    </div>
-                  </td>
-                  <td data-label={t('builds.source')} className="muted">
-                    {b.source === 'git' ? t('builds.sourceGit') : t('builds.sourceDockerfile')}
-                  </td>
-                  <td data-label={t('common.status')}>
-                    <Status phase={b.phase}/>
-                    {b.phase === 'Failed' && b.message && <div className="hint hint-error">{b.message}</div>}
-                  </td>
-                  <td data-label={t('builds.pushed')}>
-                    {b.images?.length
-                      ? <div style={{display: 'flex', flexWrap: 'wrap', gap: 6}}>
-                        {b.images.map(image => {
-                          const key = `build-${b.name}-${image}`
-                          // The name is shown without the project registry prefix; the full address is copied.
-                          const short = reg.url ? image.replace(`${reg.url}/`, '') : image
-                          return (
-                            <button key={image} className="btn btn-sm mono" title={image}
-                                    aria-label={`${t('builds.copyImage')}: ${image}`}
-                                    onClick={() => copy(image, key)}>
-                              <Icon name={copied === key ? 'check' : 'copy'} size={12}/>{short}
-                            </button>
-                          )
-                        })}
-                      </div>
-                      : <span className="muted">{t('builds.notPushed')}</span>}
-                  </td>
-                  <td data-label={t('common.created')} className="muted">{fmtDate(b.createdAt)}</td>
-                  <td>
-                    <div className="actions">
-                      <button className="btn btn-sm" onClick={() => setLogsOf(b.name)}>{t('common.logs')}</button>
-                      <button className="btn btn-sm btn-danger" onClick={() => deleteBuild(b)}>{t('common.delete')}</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              </tbody>
-            </table>}
-          </>}
-        </Card>
-      )}
 
       {/* A failed first read leaves no list, so the card is left out rather than drawn empty under the banner. */}
       {(repos || !error) && <Card title={t('images.repositories')} className="card-spaced">

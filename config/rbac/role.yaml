@@ -147,14 +147,6 @@ rules:
   - update
   - watch
 - apiGroups:
-  - workspace.wutz.dev
-  resources:
-  - instancetypes
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
   - rbac.authorization.k8s.io
   resources:
   - rolebindings
@@ -177,4 +169,12 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - workspace.wutz.dev
+  resources:
+  - instancetypes
+  verbs:
+  - get
+  - list
   - watch

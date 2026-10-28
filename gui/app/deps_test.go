@@ -137,7 +137,7 @@ func TestAssess(t *testing.T) {
 	bundled := Dependency{Name: "kueue", Pinned: "v0.20.2", Installable: true}
 	operator := Dependency{Name: "forgeai", Installable: true, Pinned: forgeaiChartVersion}
 	sshGateway := Dependency{Name: "sshgateway", Installable: true, Pinned: sshGatewayChartVersion}
-	project := Dependency{Name: "project", Installable: true, Pinned: projectChartVersion}
+	project := Dependency{Name: "workspace", Installable: true, Pinned: projectChartVersion}
 	sandbox := Dependency{Name: "agent-sandbox", Pinned: "v1.0.7", Installable: true}
 	gatewayAPI := Dependency{Name: "gateway-api-inference-extension", Pinned: "v1.6.2", Installable: true}
 	tests := []struct {
@@ -176,11 +176,11 @@ func TestAssess(t *testing.T) {
 			deployments: []appsv1.Deployment{testDeployment("", true)}}, "unmanaged", ""},
 		{"Project operator from its chart", project, depHealth{crdsWanted: 2, crdsFound: 2,
 			chart: projectSpec, deployments: []appsv1.Deployment{
-				helmChartDeployment("project", projectChartVersion, true)}},
+				helmChartDeployment("workspace", projectChartVersion, true)}},
 			"ready", projectChartVersion},
 		{"older Project operator chart", project, depHealth{crdsWanted: 2, crdsFound: 2,
 			chart: projectSpec, deployments: []appsv1.Deployment{
-				helmChartDeployment("project", "0.0.9", true)}}, "outdated", "0.0.9"},
+				helmChartDeployment("workspace", "0.0.9", true)}}, "outdated", "0.0.9"},
 		{"Project operator deployed outside Helm", project, depHealth{crdsWanted: 2, crdsFound: 2,
 			chart: projectSpec, deployments: []appsv1.Deployment{testDeployment("", true)}}, "unmanaged", ""},
 		{"runs where the config expects", sandbox, depHealth{crdsWanted: 1, crdsFound: 1,
@@ -530,7 +530,7 @@ func TestDependencyCatalogOrder(t *testing.T) {
 		t.Fatalf("catalog lacks %s", name)
 		return -1
 	}
-	if pos("project") > pos("forgeai") {
+	if pos("workspace") > pos("forgeai") {
 		t.Errorf("project is listed after forgeai")
 	}
 }

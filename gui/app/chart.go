@@ -141,21 +141,37 @@ func fileServerValues(platformCfg *platform.Config) map[string]any {
 	}}
 }
 
-// The project operator is installed from its own Helm chart into the platform
+// The workspace operator is installed from its own Helm chart into the platform
 // namespace. It owns the Project and InstanceType CRDs, and the InstanceTypes
 // that forgeai reads come from it, so it installs before forgeai. Its platform
 // config ConfigMap is rendered by the forgeai chart; until that is installed the
 // operator waits for it.
 const (
-	projectChart        = "oci://ghcr.io/wutz/charts/project"
-	projectChartVersion = "0.5.0"
-	projectRelease      = "project"
-	projectDeployment   = "project-controller-manager"
+	projectChart        = "oci://ghcr.io/wutz/charts/workspace"
+	projectChartVersion = "0.5.2"
+	projectRelease      = "workspace"
+	projectDeployment   = "workspace-controller-manager"
 )
 
 var projectSpec = &chartSpec{
-	name: "project", ref: projectChart, version: projectChartVersion, release: projectRelease,
+	name: "workspace", ref: projectChart, version: projectChartVersion, release: projectRelease,
 	deployment: projectDeployment, crds: []string{"projects.workspace.wutz.dev", "instancetypes.workspace.wutz.dev"},
+}
+
+// The imagebuild operator is installed from its own Helm chart into the platform
+// namespace. It owns the ImageBuild CRD and manages container image builds using BuildKit.
+// It installs after the project operator so builds can be created within projects.
+const (
+	imagebuilderChart        = "oci://ghcr.io/wutz/charts/imagebuild"
+	imagebuildChartVersion   = "0.1.1"
+	imagebuildRelease        = "imagebuild"
+	imagebuildDeployment     = "imagebuild-controller-manager"
+)
+
+var imagebuildSpec = &chartSpec{
+	name: "imagebuild", ref: imagebuilderChart, version: imagebuildChartVersion, release: imagebuildRelease,
+	deployment: imagebuildDeployment, crds: []string{"imagebuilds.imagebuild.wutz.dev"},
+	needs: []string{"projects.workspace.wutz.dev"},
 }
 
 // The volume trash operator is installed from its own Helm chart into the

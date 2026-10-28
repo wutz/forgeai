@@ -27,6 +27,7 @@ import (
 	fsv1 "github.com/wutz/fileserver/api/v1alpha1"
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
 	projectv1 "github.com/wutz/workspace/api/v1alpha1"
+	imagebuildv1 "github.com/wutz/imagebuild/api/v1alpha1"
 )
 
 // ErrNotConnected is returned when no kubeconfig context is selected.
@@ -111,6 +112,9 @@ type ConnInfo struct {
 	// Inference is set when the InferenceService CRD is installed; the
 	// Inference view is hidden otherwise.
 	Inference bool `json:"inference"`
+	// ImageBuilds is set when the ImageBuild CRD is installed; the
+	// ImageBuilds view is hidden otherwise.
+	ImageBuilds bool `json:"imageBuilds"`
 	// Create says which kinds the user may create in the project namespace.
 	Create CreateAccess `json:"create"`
 	// Change says which kinds the user may change and remove in the project namespace.
@@ -150,6 +154,7 @@ func scheme() *runtime.Scheme {
 	_ = v1.AddToScheme(s)
 	_ = projectv1.AddToScheme(s)
 	_ = fsv1.AddToScheme(s)
+	_ = imagebuildv1.AddToScheme(s)
 	return s
 }
 

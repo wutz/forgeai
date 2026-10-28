@@ -13,9 +13,12 @@ require (
 	sigs.k8s.io/controller-runtime v0.25.2
 )
 
-require github.com/wutz/fileserver v0.3.0
+require (
+	github.com/wutz/fileserver v0.3.0
+	github.com/wutz/workspace v0.5.2
+)
 
-require github.com/wutz/imagebuild v0.1.1 // indirect
+require github.com/wutz/imagebuild v0.1.1
 
 require (
 	dario.cat/mergo v1.0.1 // indirect
@@ -120,7 +123,6 @@ require (
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/wailsapp/go-webview2 v1.0.22 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
-	github.com/wutz/workspace v0.5.0
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect

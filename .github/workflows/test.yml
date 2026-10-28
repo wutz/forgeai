@@ -34,3 +34,33 @@ jobs:
       - name: Test the GUI
         working-directory: gui
         run: go test ./app/ -count=1
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Clone the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gui/frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: gui/frontend
+        run: npm ci
+
+      # `npm run build` type-checks before bundling, so a message key that is
+      # not in the catalogue (or a stale wails binding) fails here rather than
+      # in the release build of the desktop client.
+      - name: Type-check and build
+        working-directory: gui/frontend
+        run: npm run build

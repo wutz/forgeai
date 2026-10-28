@@ -42,6 +42,10 @@ export function Contexts() {
   return window['go']['app']['App']['Contexts']();
 }
 
+export function CreateImageBuild(arg1) {
+  return window['go']['app']['App']['CreateImageBuild'](arg1);
+}
+
 export function CreateInferenceService(arg1) {
   return window['go']['app']['App']['CreateInferenceService'](arg1);
 }
@@ -68,6 +72,10 @@ export function CreateVolume(arg1, arg2, arg3) {
 
 export function DeleteImage(arg1, arg2) {
   return window['go']['app']['App']['DeleteImage'](arg1, arg2);
+}
+
+export function DeleteImageBuild(arg1) {
+  return window['go']['app']['App']['DeleteImageBuild'](arg1);
 }
 
 export function DeleteImageRepo(arg1) {
@@ -126,6 +134,10 @@ export function GetSandbox(arg1) {
   return window['go']['app']['App']['GetSandbox'](arg1);
 }
 
+export function ImageBuildLogs(arg1, arg2) {
+  return window['go']['app']['App']['ImageBuildLogs'](arg1, arg2);
+}
+
 export function InferenceAPIKey(arg1) {
   return window['go']['app']['App']['InferenceAPIKey'](arg1);
 }
@@ -144,6 +156,10 @@ export function KeepSandboxAwake(arg1) {
 
 export function ListDependencies() {
   return window['go']['app']['App']['ListDependencies']();
+}
+
+export function ListImageBuilds() {
+  return window['go']['app']['App']['ListImageBuilds']();
 }
 
 export function ListImages() {

@@ -159,6 +159,33 @@ var projectSpec = &chartSpec{
 	deployment: projectDeployment, crds: []string{"projects.project.wutz.dev", "instancetypes.project.wutz.dev"},
 }
 
+// The volume trash operator is installed from its own Helm chart into the
+// platform namespace. It purges trashed volumes once their retention has passed,
+// and reads the Project CRD for each project's retention, so it installs after the
+// project operator. It reads the platform config that forgeai renders, so it is
+// pointed at the same ConfigMap.
+const (
+	volumetrashChart        = "oci://ghcr.io/wutz/charts/volumetrash"
+	volumetrashChartVersion = "0.1.0"
+	volumetrashRelease      = "volumetrash"
+	volumetrashDeployment   = "volumetrash"
+)
+
+var volumetrashSpec = &chartSpec{
+	name: "volumetrash", ref: volumetrashChart, version: volumetrashChartVersion,
+	release: volumetrashRelease, deployment: volumetrashDeployment,
+	needs:  []string{"projects.project.wutz.dev"},
+	values: volumetrashValues,
+}
+
+// volumetrashValues points the operator at the platform config ConfigMap, which
+// lives in the namespace the chart is installed into.
+func volumetrashValues(_ *platform.Config) map[string]any {
+	return map[string]any{"platform": map[string]any{
+		"namespace": platform.Namespace(), "configMap": platform.ConfigMapName,
+	}}
+}
+
 // installChart installs the chart of spec into its namespace, or upgrades the
 // release already there. The chart is pulled from the OCI registry at the
 // pinned version and waited on until its Deployment is up.

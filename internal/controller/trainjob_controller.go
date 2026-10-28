@@ -58,6 +58,8 @@ type TrainJobReconciler struct {
 // +kubebuilder:rbac:groups=trainer.kubeflow.org,resources=trainjobs,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=kueue.x-k8s.io,resources=workloads,verbs=get;list;watch;update;patch
 // +kubebuilder:rbac:groups="",resources=nodes;pods;namespaces,verbs=get;list;watch
+// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
+// +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;patch
 
 func (r *TrainJobReconciler) now() time.Time {
 	if r.Now != nil {

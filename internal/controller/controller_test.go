@@ -19,7 +19,6 @@ import (
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
 	"github.com/wutz/forgeai/pkg/training"
-	"github.com/wutz/forgeai/pkg/volumes"
 	projectv1 "github.com/wutz/project/api/v1alpha1"
 )
 
@@ -118,30 +117,6 @@ var _ = Describe("forgeai operator", Ordered, func() {
 		Expect(k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
 			Name: ns, Labels: map[string]string{naming.LabelProject: project},
 		}})).To(Succeed())
-	})
-
-	It("purges expired volumes from the trash", func() {
-		pcfg, err := platform.Parse([]byte(testPlatformConfig))
-		Expect(err).NotTo(HaveOccurred())
-		vc := &volumes.Client{K8s: k8sClient, Namespace: ns}
-		_, err = vc.Create(ctx, pcfg, "keep", "", 10)
-		Expect(err).NotTo(HaveOccurred())
-		_, err = vc.Create(ctx, pcfg, "scratch", "", 10)
-		Expect(err).NotTo(HaveOccurred())
-		_, err = vc.Trash(ctx, "keep", time.Hour)
-		Expect(err).NotTo(HaveOccurred())
-		_, err = vc.Trash(ctx, "scratch", time.Second)
-		Expect(err).NotTo(HaveOccurred())
-		Eventually(func() bool {
-			pvc := &corev1.PersistentVolumeClaim{}
-			err := get(pvc, ns, "scratch")()
-			// envtest has no PVC protection controller, but kube-controller-manager
-			// would add a finalizer; either way deletion has been requested.
-			return apierrors.IsNotFound(err) || (err == nil && !pvc.DeletionTimestamp.IsZero())
-		}, timeout, interval).Should(BeTrue())
-		Consistently(get(&corev1.PersistentVolumeClaim{}, ns, "keep"), 2*time.Second, interval).Should(Succeed())
-		_, err = vc.Restore(ctx, "keep")
-		Expect(err).NotTo(HaveOccurred())
 	})
 
 	It("classifies a failed TrainJob and retries infrastructure failures", func() {

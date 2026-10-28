@@ -14,7 +14,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
-	fsv1 "github.com/wutz/fileserver-operator/api/v1alpha1"
+	fsv1 "github.com/wutz/fileserver/api/v1alpha1"
 )
 
 // viewerApp is an App whose client refuses the calls a view member has no

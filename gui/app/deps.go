@@ -108,9 +108,9 @@ var depCatalog = []depInfo{
 	{name: "gateway-api-inference-extension", title: "Gateway API Inference Extension", description: "InferencePool CRD that the llm-d routers of InferenceServices use"},
 	{name: "project", title: "Project operator", description: "Project namespaces, quotas, members and registries, and the InstanceTypes derived from GPU nodes", chart: projectSpec},
 	{name: "forgeai", title: "forgeai operator", description: "Inference services and sandboxes", chart: forgeaiSpec},
-	{name: "fileserver-operator", title: "FileServer operator", description: "On-demand file servers for the project volumes", chart: fileServerSpec},
+	{name: "fileserver", title: "FileServer operator", description: "On-demand file servers for the project volumes", chart: fileServerSpec},
 	{name: "sshpiper", title: "sshpiper Pipe CRD", description: "Pipe CRD that the SSH gateway routes logins with"},
-	{name: "sshgateway", title: "SSH gateway", description: "SSHGateways and SSHRoutes that serve sandbox SSH logins", chart: sshGatewaySpec},
+	{name: "sshgateway", title: "SSH gateway", description: "SSHGateways and SSHRoutes that serve SSH logins to backend Services", chart: sshGatewaySpec},
 }
 
 // depInfoByName returns the catalog entry of a component.
@@ -694,10 +694,11 @@ func readRecords(ctx context.Context, k8s client.Reader) (map[string]depRecord, 
 }
 
 // writeRecord stores the record of a component's install, creating the record
-// ConfigMap on first use. Other components' entries are left as they are. The
-// platform namespace is created when it is missing: the first component
-// installed on a cluster, a bundle, has no chart to create it.
-func writeRecord(ctx context.Context, k8s client.Client, name string, r depRecord) error {
+// ConfigMap on first use. Other components' entries are left as they are, but
+// the entries named in replaces are dropped: they recorded the component under
+// its former name. The platform namespace is created when it is missing: the
+// first component installed on a cluster, a bundle, has no chart to create it.
+func writeRecord(ctx context.Context, k8s client.Client, name string, r depRecord, replaces ...string) error {
 	raw, err := json.Marshal(r)
 	if err != nil {
 		return err
@@ -729,6 +730,9 @@ func writeRecord(ctx context.Context, k8s client.Client, name string, r depRecor
 			cm.Data = map[string]string{}
 		}
 		cm.Data[name] = string(raw)
+		for _, old := range replaces {
+			delete(cm.Data, old)
+		}
 		return k8s.Update(ctx, cm)
 	})
 }
@@ -797,7 +801,11 @@ func (a *App) InstallDependency(name string) error {
 			progress(stepRecord)
 			rec.AppliedBy = currentUser(ctx, c.k8s)
 			rec.AppliedAt = time.Now().UTC().Format(time.RFC3339)
-			err = writeRecord(ctx, c.k8s, name, rec)
+			var replaces []string
+			if info.chart != nil && info.chart.legacy != "" {
+				replaces = []string{info.chart.legacy}
+			}
+			err = writeRecord(ctx, c.k8s, name, rec, replaces...)
 		}
 		if err == nil && name == "agent-sandbox" {
 			progress(stepRestart)
@@ -821,6 +829,11 @@ func installComponent(ctx context.Context, c *Connection, info depInfo, b *depBu
 	if info.chart != nil {
 		spec := info.chart
 		rec := depRecord{Version: spec.version, Namespace: spec.installNamespace(), Source: spec.ref}
+		if spec.legacy != "" {
+			if err := replaceLegacy(ctx, c, spec); err != nil {
+				return rec, err
+			}
+		}
 		return rec, installChart(ctx, c, spec, platformCfg, progress)
 	}
 	rec := depRecord{Version: b.Version, Namespace: bundleNamespace(b), ManifestSHA256: b.SHA256}

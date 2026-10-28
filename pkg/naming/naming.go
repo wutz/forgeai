@@ -19,8 +19,13 @@ const (
 	// LabelMember is set on member ServiceAccounts and token Secrets.
 	LabelMember = "project.wutz.dev/member"
 
-	// LabelTrash marks a volume (PVC) in the trash.
-	LabelTrash = "forgeai.wutz.dev/trash"
+	// LabelFileServerIgnore marks a volume (PVC) in the trash. The fileserver
+	// operator does not serve a volume with it, so forgeai sets it when it
+	// trashes one.
+	LabelFileServerIgnore = "fileserver.wutz.dev/ignore"
+	// LabelTrashLegacy is the trash label before fileserver 0.3.0. Volumes that
+	// still carry it are moved to LabelFileServerIgnore.
+	LabelTrashLegacy = "forgeai.wutz.dev/trash"
 	// AnnotationTrashedAt is when the volume was moved to the trash (RFC3339).
 	AnnotationTrashedAt = "forgeai.wutz.dev/trashed-at"
 	// AnnotationExpireAt is when a trashed volume is purged (RFC3339).
@@ -108,7 +113,7 @@ func SSHHostKeySecret(service string) string { return service + "-hostkey" }
 // SSHServiceName is the Service that exposes the sshd of a sandbox.
 func SSHServiceName(sandbox string) string { return sandbox + "-ssh" }
 
-// SSHGatewayName is the name of the sshpiperd Deployment, Service and
+// SSHGatewayName is the name of the sshpiper Deployment, Service and
 // ConfigMap of an SSHGateway.
 func SSHGatewayName(gateway string) string { return "sshgateway-" + gateway }
 

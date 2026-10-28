@@ -55,7 +55,7 @@ fetch "https://github.com/kubernetes-sigs/agent-sandbox/releases/download/$SANDB
 # The InferencePool CRD the llm-d routers of InferenceServices need.
 fetch "https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/$GAIE_VERSION/v1-manifests.yaml" \
   "$GAIE_SHA256" "$dir/gateway-api-inference-extension.yaml"
-# The Pipe CRD the SSH gateway's sshpiperd routes logins with.
+# The Pipe CRD the SSH gateway's sshpiper routes logins with.
 fetch "https://raw.githubusercontent.com/tg123/sshpiper/$SSHPIPER_VERSION/plugin/kubernetes/crd.yaml" \
   "$SSHPIPER_SHA256" "$dir/sshpiper.yaml"
 

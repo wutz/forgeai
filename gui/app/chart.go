@@ -26,7 +26,9 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
+	"github.com/wutz/forgeai/pkg/volumes"
 )
 
 // chartSpec is a component installed from a Helm chart: where the chart is, the
@@ -45,6 +47,10 @@ type chartSpec struct {
 	needs []string
 	// values returns the chart values of the install, nil for the chart's defaults.
 	values func(platformCfg *platform.Config) map[string]any
+	// legacy is the release an earlier version of this component was installed
+	// as, when this chart cannot take it over. It is uninstalled first (see
+	// replaceLegacy).
+	legacy string
 }
 
 // Helm bookkeeping on the objects a release owns.
@@ -102,18 +108,21 @@ var sshGatewaySpec = &chartSpec{
 // namespace. Its file servers are published under the platform ingress, so the
 // chart takes the platform's ingress and file server settings. Its CRD is in the
 // fileserver.wutz.dev group, which forgeai never shipped, so there is nothing to
-// adopt; the 0.1.0 CRD in the forgeai.wutz.dev group is removed by the upgrade.
+// adopt. Before 0.3.0 the chart was fileserver-operator, whose release owns the
+// CRD, so that release is uninstalled first.
 const (
-	fileServerChart        = "oci://ghcr.io/wutz/charts/fileserver-operator"
-	fileServerChartVersion = "0.2.0"
-	fileServerRelease      = "fileserver-operator"
-	fileServerDeployment   = "fileserver-operator"
+	fileServerChart         = "oci://ghcr.io/wutz/charts/fileserver"
+	fileServerChartVersion  = "0.3.0"
+	fileServerRelease       = "fileserver"
+	fileServerLegacyRelease = "fileserver-operator"
+	fileServerDeployment    = "fileserver"
 )
 
 var fileServerSpec = &chartSpec{
-	name: "fileserver-operator", ref: fileServerChart, version: fileServerChartVersion,
+	name: "fileserver", ref: fileServerChart, version: fileServerChartVersion,
 	release: fileServerRelease, deployment: fileServerDeployment,
 	crds:   []string{"fileservers.fileserver.wutz.dev"},
+	legacy: fileServerLegacyRelease,
 	values: fileServerValues,
 }
 
@@ -159,15 +168,10 @@ func installChart(ctx context.Context, c *Connection, spec *chartSpec, platformC
 	if err := ensureNamespace(ctx, c.k8s, ns); err != nil {
 		return err
 	}
-	registryClient, err := registry.NewClient(registry.ClientOptWriter(io.Discard))
+	cfg, err := helmConfig(c, ns)
 	if err != nil {
 		return err
 	}
-	cfg := new(action.Configuration)
-	if err := cfg.Init(restGetter{rest: c.rest, namespace: ns}, ns, "secret", func(string, ...any) {}); err != nil {
-		return err
-	}
-	cfg.RegistryClient = registryClient
 	up := action.NewUpgrade(cfg)
 	up.Namespace = ns
 	up.Version = spec.version
@@ -203,6 +207,56 @@ func installChart(ctx context.Context, c *Connection, spec *chartSpec, platformC
 	}
 	_, err = up.RunWithContext(ctx, spec.release, chrt, values)
 	return err
+}
+
+// helmConfig returns the Helm configuration that acts on the releases of the
+// namespace ns over the connection.
+func helmConfig(c *Connection, ns string) (*action.Configuration, error) {
+	registryClient, err := registry.NewClient(registry.ClientOptWriter(io.Discard))
+	if err != nil {
+		return nil, err
+	}
+	cfg := new(action.Configuration)
+	if err := cfg.Init(restGetter{rest: c.rest, namespace: ns}, ns, "secret", func(string, ...any) {}); err != nil {
+		return nil, err
+	}
+	cfg.RegistryClient = registryClient
+	return cfg, nil
+}
+
+// replaceLegacy uninstalls the release spec was installed as before its chart
+// was renamed. Uninstalling its chart deletes its CRD, which deletes the
+// FileServers, and their objects are garbage-collected with them. Then the
+// volumes trashed under the old label move to the label the new operator reads.
+// That waits for the old operator to be gone: moved first, it would serve them.
+func replaceLegacy(ctx context.Context, c *Connection, spec *chartSpec) error {
+	cfg, err := helmConfig(c, spec.installNamespace())
+	if err != nil {
+		return err
+	}
+	if _, err := cfg.Releases.Last(spec.legacy); err == nil {
+		if _, err := action.NewUninstall(cfg).Run(spec.legacy); err != nil {
+			return err
+		}
+	} else if !errors.Is(err, driver.ErrReleaseNotFound) {
+		return err
+	}
+	return migrateTrashLabels(ctx, c.k8s)
+}
+
+// migrateTrashLabels moves the volumes trashed before fileserver 0.3.0 to the
+// ignore label, so the file servers do not serve them.
+func migrateTrashLabels(ctx context.Context, k8s client.Client) error {
+	list := &corev1.PersistentVolumeClaimList{}
+	if err := k8s.List(ctx, list, client.MatchingLabels{naming.LabelTrashLegacy: naming.LiteralTrue}); err != nil {
+		return err
+	}
+	for i := range list.Items {
+		if err := volumes.MigrateLegacyTrash(ctx, k8s, &list.Items[i]); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // checkChartTarget refuses an install that the cluster cannot take: a needed

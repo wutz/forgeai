@@ -535,3 +535,32 @@ func TestDependencyCatalogOrder(t *testing.T) {
 		t.Errorf("project is listed after forgeai")
 	}
 }
+
+func TestRecordReplacesLegacyName(t *testing.T) {
+	s := runtime.NewScheme()
+	if err := clientgoscheme.AddToScheme(s); err != nil {
+		t.Fatal(err)
+	}
+	k8s := fake.NewClientBuilder().WithScheme(s).Build()
+	ctx := context.Background()
+
+	old := depRecord{Version: "0.2.0", Namespace: platform.Namespace(), AppliedAt: "2026-10-27T00:00:00Z"}
+	kueue := depRecord{Version: "v0.20.2", Namespace: "kueue-system", AppliedAt: "2026-10-22T01:00:00Z"}
+	if err := writeRecord(ctx, k8s, "fileserver-operator", old); err != nil {
+		t.Fatalf("create legacy record: %v", err)
+	}
+	if err := writeRecord(ctx, k8s, "kueue", kueue); err != nil {
+		t.Fatalf("add record: %v", err)
+	}
+	fs := depRecord{Version: "0.3.0", Namespace: platform.Namespace(), AppliedAt: "2026-10-28T00:00:00Z"}
+	if err := writeRecord(ctx, k8s, "fileserver", fs, "fileserver-operator"); err != nil {
+		t.Fatalf("replace record: %v", err)
+	}
+	got, err := readRecords(ctx, k8s)
+	if err != nil {
+		t.Fatalf("readRecords: %v", err)
+	}
+	if want := map[string]depRecord{"fileserver": fs, "kueue": kueue}; !reflect.DeepEqual(got, want) {
+		t.Errorf("records = %+v, want %+v", got, want)
+	}
+}

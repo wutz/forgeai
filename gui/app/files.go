@@ -13,7 +13,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	fsv1 "github.com/wutz/fileserver-operator/api/v1alpha1"
+	fsv1 "github.com/wutz/fileserver/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/naming"
 )
 

@@ -6,7 +6,7 @@ forgeai is a Kubernetes-native AI platform covering development, training, RL an
 |---|---|---|
 | Operator | `api/`, `internal/`, `cmd/` | `InferenceService` CRD; adds stop/resume, failure classification and retries to `TrainJob`s; purges trashed volumes |
 | Project operator | [wutz/project](https://github.com/wutz/project) | Separate repository and Helm chart: the `Project` and `InstanceType` CRDs (`project.wutz.dev`), their namespaces, quotas, queues, network policies, members and the InstanceTypes derived from GPU nodes. Installed before this operator |
-| FileServer operator | [wutz/fileserver-operator](https://github.com/wutz/fileserver-operator) | Separate repository and Helm chart: the `FileServer` CRD and the on-demand file servers of project volumes. Installed next to this operator |
+| FileServer operator | [wutz/fileserver](https://github.com/wutz/fileserver) | Separate repository and Helm chart: the `FileServer` CRD and the on-demand file servers of project volumes. Installed next to this operator |
 | GUI | `gui/` | [Wails](https://wails.io) desktop client that talks to Kubernetes directly through a kubeconfig context |
 | Website | `website/` | Official site ([Astro](https://astro.build)), deployed to Cloudflare Workers at https://forgeai.wutz.dev |
 | Shared library | `pkg/` | Naming, platform config, instance types, job rendering and status, sandboxes, volumes, Harbor client, kubeconfig export |
@@ -99,7 +99,7 @@ Members create, stop, start and delete sandboxes in their namespace with the `pr
 
 A sandbox labelled `forgeai.wutz.dev/ssh: "true"` (the create form's "SSH" switch) gets an sshd sidecar and a Service on port 22. An SSH session reaches only what the sidecar mounts: the project volumes it shares with the agent, not the agent's container image or its processes.
 
-Entry is through sshpiperd. The [SSH gateway operator](https://github.com/wutz/sshgateway) runs it as an SSH gateway modelled on the Gateway API; the sshd sidecar of each sandbox stays in forgeai:
+Entry is through sshpiper. The [SSH gateway operator](https://github.com/wutz/sshgateway) runs it as an SSH gateway modelled on the Gateway API. It is generic: a backend is any Service that exposes an sshd. The sshd sidecar of each sandbox, and the Service that exposes it, stay in forgeai:
 
 ```yaml
 apiVersion: sshgateway.wutz.dev/v1alpha1
@@ -124,16 +124,16 @@ spec:
   rules:
     - matches: [{username: alice}]
       authorizedKeys: ["ssh-ed25519 AAAA... alice@example.com"]
-      backendRefs: [{name: agent}]
+      backendRefs: [{name: agent, username: sandbox}]
 ```
 
-`SSHGatewayClass` `sshgateway` names the controller (`sshgateway.wutz.dev/ssh-gateway`). Only the gateway of the platform namespace is served, and only one of them exists: a second one there is rejected. Each rule of a route becomes one sshpiperd `Pipe` that accepts the keys of `authorizedKeys` for the listed usernames and forwards to the `SSHService` of the named sandbox, logging in as `sandbox` with the platform identity key.
+`SSHGatewayClass` `sshgateway` names the controller (`sshgateway.wutz.dev/ssh-gateway`). Only the gateway of the platform namespace is served, and only one of them exists: a second one there is rejected. Each rule of a route becomes one sshpiper `Pipe` that accepts the keys of `authorizedKeys` for the listed usernames and forwards to the backend Service named by `backendRefs`, logging in as the ref's `username` with the platform identity key. For a sandbox the Service is the sandbox's SSH Service and the username is `sandbox`, the account its sshd allows.
 
 - The gateway needs the sshpiper `Pipe` CRD (`pipes.sshpiper.com`, served by the sshpiper kubernetes plugin) installed in the cluster. The Dependencies view installs it as the `sshpiper` component, before the SSH gateway. Without it the SSH gateway operator starts without its gateway controllers, and the SSHGateway and SSHRoute stay without status.
 - A username is claimed by the first route that matches it; keep login names unique.
 - Keys are the only way in. Passwords, keyboard interaction, agent and TCP forwarding, tunnels and X11 are all off, at the gateway and at the sidecar.
 - The gateway host key is generated once per gateway and kept in the Secret `forgeai-system/sshgateway-main-hostkey`; pin it with `known_hosts` rather than trusting on first use.
-- The sshd sidecar image is `sandbox.sshImage` (default `ghcr.io/wutz/forgeai-sshd:0.1.0`, built by `make sshd-image`); sshpiperd is the `gateway.image` value of the SSH gateway chart (default `ghcr.io/tg123/sshpiperd:v1.6.1`).
+- The sshd sidecar image is `sandbox.sshImage` (default `ghcr.io/wutz/forgeai-sshd:0.1.0`, built by `make sshd-image`); sshpiper is the `gateway.image` value of the SSH gateway chart (default `ghcr.io/tg123/sshpiperd:v1.6.1`).
 
 Route conditions are reported in `status.parents` (`Accepted`, `ResolvedRefs`); gateway conditions in `status.conditions` (`Accepted`, `Programmed`, `Ready`).
 
@@ -141,15 +141,15 @@ Route conditions are reported in `status.parents` (`Accepted`, `ResolvedRefs`); 
 
 Volumes are PVCs in the project namespace, created from the platform `storageTypes` (ReadWriteMany by default) and limited by the project quota. Volumes can be resized (grow only) and moved to the trash:
 
-- Trashing sets the label `forgeai.wutz.dev/trash` and `forgeai.wutz.dev/expire-at`; volumes mounted by running pods cannot be trashed, except by the file server: it is rebuilt without trashed volumes.
+- Trashing sets the label `fileserver.wutz.dev/ignore` and the annotation `forgeai.wutz.dev/expire-at`; the FileServer operator does not serve a volume with the ignore label. Volumes mounted by running pods cannot be trashed, except by the file server: it is rebuilt without trashed volumes. Volumes trashed before FileServer 0.3.0 carry `forgeai.wutz.dev/trash`; the operator and the Dependencies install move that label to `fileserver.wutz.dev/ignore`.
 - Trashed volumes can be restored, purged, or have their expiry changed until they expire.
 - The operator purges expired volumes, postponing while a pod still mounts them. A volume trashed without an expiry (e.g. labelled with `kubectl`) expires after the project `trashRetention` (default: platform `trashRetention`).
 
 ## FileServer
 
-The file servers that browse and transfer the files of a project's volumes are run by [fileserver-operator](https://github.com/wutz/fileserver-operator), a separate project with its own Helm chart. It serves a `FileServer` (short name `ffs`) per namespace with [dufs](https://github.com/sigoden/dufs), scaled to zero when idle. forgeai only creates the `default` `FileServer` on first use of the Files view and keeps it awake by updating the `forgeai.wutz.dev/last-active` annotation; the operator does the rest.
+The file servers that browse and transfer the files of a project's volumes are run by [fileserver](https://github.com/wutz/fileserver), a separate project with its own Helm chart. It serves a `FileServer` (short name `ffs`) per namespace with [dufs](https://github.com/sigoden/dufs), scaled to zero when idle. forgeai only creates the `default` `FileServer` on first use of the Files view and keeps it awake by updating the `forgeai.wutz.dev/last-active` annotation; the operator does the rest.
 
-The Dependencies view installs the operator from `oci://ghcr.io/wutz/charts/fileserver-operator` at the pinned chart version, as release `fileserver-operator` in `forgeai-system`. It maps the platform config into the chart values: `ingress` (class, domain, port, TLS secret) and `fileServer` (dufs image, idle timeout, host prefix). Until the operator is installed, the Files view has no server to show.
+The Dependencies view installs the operator from `oci://ghcr.io/wutz/charts/fileserver` at the pinned chart version, as release `fileserver` in `forgeai-system`. Before 0.3.0 the release was `fileserver-operator`, and its CRD blocks the new release, so the install first uninstalls that release. This deletes its FileServers, and their Deployments, Services, Ingresses and Secrets with them; the `default` FileServer is created again on the next use of the Files view. Then the install moves the volumes trashed under `forgeai.wutz.dev/trash` to `fileserver.wutz.dev/ignore`, so the new operator does not serve them. It maps the platform config into the chart values: `ingress` (class, domain, port, TLS secret) and `fileServer` (dufs image, idle timeout, host prefix). Until the operator is installed, the Files view has no server to show.
 
 The FileServer operator's API group is `fileserver.wutz.dev` from chart 0.2.0. Upgrading from forgeai 0.4.0 leaves the old `fileservers.forgeai.wutz.dev` CRD and its `FileServer` objects in place, because the forgeai chart stopped shipping the CRD and it carries the `helm.sh/resource-policy: keep` annotation. Once the FileServer operator is at 0.2.0, the Files view creates a new `default` `FileServer` in the new group; the old CRD is not used and can be deleted by hand. Upgrading the FileServer operator from 0.1.0 to 0.2.0 removes the old CRD and the `FileServer` objects it held. Uninstalling the FileServer operator chart deletes its CRD, and with it every `FileServer`.
 
@@ -229,11 +229,11 @@ helm install project oci://ghcr.io/wutz/charts/project --version 0.5.0 \
   --namespace forgeai-system --create-namespace
 helm install forgeai oci://ghcr.io/wutz/charts/forgeai --version 0.5.0 \
   --namespace forgeai-system
-helm install fileserver-operator oci://ghcr.io/wutz/charts/fileserver-operator --version 0.2.0 \
+helm install fileserver oci://ghcr.io/wutz/charts/fileserver --version 0.3.0 \
   --namespace forgeai-system
 ```
 
-forgeai reads the InstanceTypes that the project operator creates. The project operator is [wutz/project](https://github.com/wutz/project). It runs in the platform namespace and reads the `project-platform` ConfigMap from its own namespace (`PROJECT_NAMESPACE`), which the forgeai chart renders. The FileServer operator is [wutz/fileserver-operator](https://github.com/wutz/fileserver-operator), see [FileServer](#fileserver).
+forgeai reads the InstanceTypes that the project operator creates. The project operator is [wutz/project](https://github.com/wutz/project). It runs in the platform namespace and reads the `project-platform` ConfigMap from its own namespace (`PROJECT_NAMESPACE`), which the forgeai chart renders. The FileServer operator is [wutz/fileserver](https://github.com/wutz/fileserver), see [FileServer](#fileserver).
 
 Earlier releases served Projects and InstanceTypes from the `forgeai.wutz.dev` group (`projects.forgeai.wutz.dev`, `instancetypes.forgeai.wutz.dev`), and the InstanceType operator was a separate chart. The project chart serves them from `project.wutz.dev`, so the new CRDs do not clash with the old ones and nothing moves over by itself. The old CRDs carry `helm.sh/resource-policy: keep`, so they and their objects stay until removed. To move a cluster, uninstall the `forgeai-instancetype-operator` release, relabel each project namespace from `forgeai.wutz.dev/project` to `project.wutz.dev/project` (the GUI lists only namespaces with the new label), recreate each Project as a `project.wutz.dev/v1alpha1` object, then delete the `forgeai.wutz.dev` CRDs. This path is not verified on a live cluster.
 

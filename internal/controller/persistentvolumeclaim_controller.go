@@ -74,6 +74,10 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 	if err := r.Get(ctx, req.NamespacedName, pvc); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
+	// Until this label moves, the file server would serve the trashed volume.
+	if err := volumes.MigrateLegacyTrash(ctx, r.Client, pvc); err != nil {
+		return ctrl.Result{}, err
+	}
 	if !volumes.InTrash(pvc) || !pvc.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, nil
 	}
@@ -124,7 +128,8 @@ func (r *PersistentVolumeClaimReconciler) Reconcile(ctx context.Context, req ctr
 // SetupWithManager sets up the controller with the Manager.
 func (r *PersistentVolumeClaimReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	trashed := predicate.NewPredicateFuncs(func(o client.Object) bool {
-		return o.GetLabels()[naming.LabelTrash] == naming.LiteralTrue
+		return o.GetLabels()[naming.LabelFileServerIgnore] == naming.LiteralTrue ||
+			o.GetLabels()[naming.LabelTrashLegacy] == naming.LiteralTrue
 	})
 	// A finished pod may unblock a postponed purge.
 	byClaims := handler.EnqueueRequestsFromMapFunc(func(_ context.Context, o client.Object) []reconcile.Request {

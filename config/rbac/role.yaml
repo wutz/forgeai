@@ -147,7 +147,7 @@ rules:
   - update
   - watch
 - apiGroups:
-  - project.wutz.dev
+  - workspace.wutz.dev
   resources:
   - instancetypes
   verbs:

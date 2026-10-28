@@ -155,7 +155,7 @@ const (
 
 var projectSpec = &chartSpec{
 	name: "project", ref: projectChart, version: projectChartVersion, release: projectRelease,
-	deployment: projectDeployment, crds: []string{"projects.project.wutz.dev", "instancetypes.project.wutz.dev"},
+	deployment: projectDeployment, crds: []string{"projects.workspace.wutz.dev", "instancetypes.workspace.wutz.dev"},
 }
 
 // The imagebuild operator is installed from its own Helm chart into the platform
@@ -189,7 +189,7 @@ const (
 var volumetrashSpec = &chartSpec{
 	name: "volumetrash", ref: volumetrashChart, version: volumetrashChartVersion,
 	release: volumetrashRelease, deployment: volumetrashDeployment,
-	needs:  []string{"projects.project.wutz.dev"},
+	needs:  []string{"projects.workspace.wutz.dev"},
 	values: volumetrashValues,
 }
 

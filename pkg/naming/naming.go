@@ -15,9 +15,9 @@ const (
 
 	// LabelProject is set on project namespaces and every object forgeai
 	// creates for a project (value = Project name).
-	LabelProject = "project.wutz.dev/project"
+	LabelProject = "workspace.wutz.dev/project"
 	// LabelMember is set on member ServiceAccounts and token Secrets.
-	LabelMember = "project.wutz.dev/member"
+	LabelMember = "workspace.wutz.dev/member"
 
 	// LabelFileServerIgnore marks a volume (PVC) in the trash. The fileserver
 	// operator does not serve a volume with it, so forgeai sets it when it
@@ -79,7 +79,7 @@ const (
 	AnnotationRetriedAs = "forgeai.wutz.dev/retried-as"
 
 	// LabelGPUClass is set on generated InstanceTypes and ResourceFlavors.
-	LabelGPUClass = "project.wutz.dev/gpu-class"
+	LabelGPUClass = "workspace.wutz.dev/gpu-class"
 
 	// Node labels from NVIDIA GPU feature discovery.
 	LabelGPUProduct = "nvidia.com/gpu.product"

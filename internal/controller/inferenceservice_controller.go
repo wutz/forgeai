@@ -67,7 +67,7 @@ type InferenceServiceReconciler struct {
 // +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=inferenceservices,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=inferenceservices/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=inferenceservices/finalizers,verbs=update
-// +kubebuilder:rbac:groups=project.wutz.dev,resources=instancetypes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=workspace.wutz.dev,resources=instancetypes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services;serviceaccounts;configmaps;secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch

@@ -73,7 +73,7 @@ func TestEnvtestWrites(t *testing.T) {
 		t.Fatal(err)
 	}
 	it := &unstructured.Unstructured{Object: map[string]any{
-		"apiVersion": "project.wutz.dev/v1alpha1", "kind": "InstanceType",
+		"apiVersion": "workspace.wutz.dev/v1alpha1", "kind": "InstanceType",
 		"metadata": map[string]any{"name": "cpu.small"},
 		"spec":     map[string]any{"cpu": "2", "memory": "8Gi", "gpu": map[string]any{"class": "", "count": int64(0), "product": ""}, "nodeSelector": map[string]any{}},
 	}}

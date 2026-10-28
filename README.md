@@ -5,7 +5,7 @@ forgeai is a Kubernetes-native AI platform covering development, training, RL an
 | Component | Path | Description |
 |---|---|---|
 | Operator | `api/`, `internal/`, `cmd/` | `InferenceService` CRD; adds stop/resume, failure classification and retries to `TrainJob`s; purges trashed volumes |
-| Project operator | [wutz/project](https://github.com/wutz/project) | Separate repository and Helm chart: the `Project` and `InstanceType` CRDs (`project.wutz.dev`), their namespaces, quotas, queues, network policies, members and the InstanceTypes derived from GPU nodes. Installed before this operator |
+| Project operator | [wutz/project](https://github.com/wutz/project) | Separate repository and Helm chart: the `Project` and `InstanceType` CRDs (`workspace.wutz.dev`), their namespaces, quotas, queues, network policies, members and the InstanceTypes derived from GPU nodes. Installed before this operator |
 | FileServer operator | [wutz/fileserver](https://github.com/wutz/fileserver) | Separate repository and Helm chart: the `FileServer` CRD and the on-demand file servers of project volumes. Installed next to this operator |
 | GUI | `gui/` | [Wails](https://wails.io) desktop client that talks to Kubernetes directly through a kubeconfig context |
 | Website | `website/` | Official site ([Astro](https://astro.build)), deployed to Cloudflare Workers at https://forgeai.wutz.dev |
@@ -15,23 +15,23 @@ There is no API server of its own: the operator reconciles Kubernetes objects an
 
 ## Projects
 
-A `Project` (cluster-scoped, short name `fproj`, API group `project.wutz.dev`) is a tenant. Its CRD and controller live in [wutz/project](https://github.com/wutz/project), which is installed separately (see [Helm charts](#helm-charts)). forgeai relies on these objects that the project operator creates:
+A `Project` (cluster-scoped, short name `fproj`, API group `workspace.wutz.dev`) is a tenant. Its CRD and controller live in [wutz/project](https://github.com/wutz/project), which is installed separately (see [Helm charts](#helm-charts)). forgeai relies on these objects that the project operator creates:
 
 | Object | Name | Used by |
 |---|---|---|
-| Namespace | `<namespacePrefix><project>` (e.g. `forge-demo`), labelled `project.wutz.dev/project` | Every namespaced view. The GUI only accepts namespaces with that label |
+| Namespace | `<namespacePrefix><project>` (e.g. `forge-demo`), labelled `workspace.wutz.dev/project` | Every namespaced view. The GUI only accepts namespaces with that label |
 | Kueue LocalQueue | `default` in the project namespace, when Kueue is installed | Training jobs are submitted to it |
 | ClusterRole | `project:project:<project>` | Members' read access to the Project, its ClusterQueue, InstanceTypes and ClusterTrainingRuntimes |
 | Member ServiceAccount | `project-members/<project>.<member>` | Member kubeconfigs exported from the Projects view |
 | Harbor project | named like the namespace, e.g. `forge-demo` | Images view |
 
-This operator adds its own kinds to the project roles: the `forgeai-member-edit` and `forgeai-member-view` ClusterRoles grant InferenceServices and are aggregated into the project operator's `project-edit` and `project-view` through the label `project.wutz.dev/aggregate-to-member`.
+This operator adds its own kinds to the project roles: the `forgeai-member-edit` and `forgeai-member-view` ClusterRoles grant InferenceServices and are aggregated into the project operator's `project-edit` and `project-view` through the label `workspace.wutz.dev/aggregate-to-member`.
 
 Admins manage projects and members from the GUI's Projects view. What the Project controller creates, how quotas and network isolation work, and how deletion is handled are documented in the project README.
 
 ## InstanceType
 
-`InstanceType`s (`project.wutz.dev`, cluster-scoped, short name `fit`) are derived from GPU nodes by the project operator, together with the Kueue ResourceFlavors behind them when Kueue is installed. forgeai only reads them: the GUI lists instance types to offer GPU classes and sizes, and the member RBAC grants read access to them. Install the project chart before using instance types.
+`InstanceType`s (`workspace.wutz.dev`, cluster-scoped, short name `fit`) are derived from GPU nodes by the project operator, together with the Kueue ResourceFlavors behind them when Kueue is installed. forgeai only reads them: the GUI lists instance types to offer GPU classes and sizes, and the member RBAC grants read access to them. Install the project chart before using instance types.
 
 ```sh
 kubectl get fit
@@ -71,7 +71,7 @@ metadata:
   name: agent
   namespace: forge-demo
   labels:
-    project.wutz.dev/project: demo
+    workspace.wutz.dev/project: demo
 spec:
   operatingMode: Running          # Suspended keeps the object, deletes the pod
   podTemplate:
@@ -222,7 +222,7 @@ make deploy-dev                # ko build -> ghcr.io/wutz/forgeai (public), kube
 
 ### Helm charts
 
-The forgeai operator ships as a Helm chart in `charts/chart`: the InferenceService CRD, RBAC and the controller Deployment, with the platform config under `platform.config`. The project operator (`project.wutz.dev`, see [Projects](#projects) and [InstanceType](#instancetype)) and the FileServer operator are separate projects with their own charts. The Dependencies view installs three charts into `forgeai-system` at their pinned versions, in this order. The same installs from the CLI:
+The forgeai operator ships as a Helm chart in `charts/chart`: the InferenceService CRD, RBAC and the controller Deployment, with the platform config under `platform.config`. The project operator (`workspace.wutz.dev`, see [Projects](#projects) and [InstanceType](#instancetype)) and the FileServer operator are separate projects with their own charts. The Dependencies view installs three charts into `forgeai-system` at their pinned versions, in this order. The same installs from the CLI:
 
 ```sh
 helm install project oci://ghcr.io/wutz/charts/project --version 0.5.0 \
@@ -235,7 +235,7 @@ helm install fileserver oci://ghcr.io/wutz/charts/fileserver --version 0.3.0 \
 
 forgeai reads the InstanceTypes that the project operator creates. The project operator is [wutz/project](https://github.com/wutz/project). It runs in the platform namespace and reads the `project-platform` ConfigMap from its own namespace (`PROJECT_NAMESPACE`), which the forgeai chart renders. The FileServer operator is [wutz/fileserver](https://github.com/wutz/fileserver), see [FileServer](#fileserver).
 
-Earlier releases served Projects and InstanceTypes from the `forgeai.wutz.dev` group (`projects.forgeai.wutz.dev`, `instancetypes.forgeai.wutz.dev`), and the InstanceType operator was a separate chart. The project chart serves them from `project.wutz.dev`, so the new CRDs do not clash with the old ones and nothing moves over by itself. The old CRDs carry `helm.sh/resource-policy: keep`, so they and their objects stay until removed. To move a cluster, uninstall the `forgeai-instancetype-operator` release, relabel each project namespace from `forgeai.wutz.dev/project` to `project.wutz.dev/project` (the GUI lists only namespaces with the new label), recreate each Project as a `project.wutz.dev/v1alpha1` object, then delete the `forgeai.wutz.dev` CRDs. This path is not verified on a live cluster.
+Earlier releases served Projects and InstanceTypes from the `forgeai.wutz.dev` group (`projects.forgeai.wutz.dev`, `instancetypes.forgeai.wutz.dev`), and the InstanceType operator was a separate chart. The project chart serves them from `workspace.wutz.dev`, so the new CRDs do not clash with the old ones and nothing moves over by itself. The old CRDs carry `helm.sh/resource-policy: keep`, so they and their objects stay until removed. To move a cluster, uninstall the `forgeai-instancetype-operator` release, relabel each project namespace from `forgeai.wutz.dev/project` to `workspace.wutz.dev/project` (the GUI lists only namespaces with the new label), recreate each Project as a `workspace.wutz.dev/v1alpha1` object, then delete the `forgeai.wutz.dev` CRDs. This path is not verified on a live cluster.
 
 Pushing a `v<version>` tag runs `.github/workflows/helm-release.yml`, which publishes the operator image (`ghcr.io/wutz/forgeai:<version>`) and the chart (`oci://ghcr.io/wutz/charts/forgeai:<version>`). `make helm-lint` lints and renders the chart; `make helm-package CHART_VERSION=<version>` writes the package to `dist/`.
 

@@ -1,13 +1,13 @@
 # Member access to the InferenceServices of forgeai. The project operator's
 # project-edit and project-view roles aggregate every ClusterRole labelled
-# project.wutz.dev/aggregate-to-member, so these fragments add forgeai's kinds
+# workspace.wutz.dev/aggregate-to-member, so these fragments add forgeai's kinds
 # to them without the operator knowing about forgeai.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: forgeai-member-edit
   labels:
-    project.wutz.dev/aggregate-to-member: edit
+    workspace.wutz.dev/aggregate-to-member: edit
 rules:
 - apiGroups:
   - forgeai.wutz.dev
@@ -27,7 +27,7 @@ kind: ClusterRole
 metadata:
   name: forgeai-member-view
   labels:
-    project.wutz.dev/aggregate-to-member: view
+    workspace.wutz.dev/aggregate-to-member: view
 rules:
 - apiGroups:
   - forgeai.wutz.dev

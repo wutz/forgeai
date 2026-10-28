@@ -20,5 +20,5 @@ spec:
         from: Selector
         selector:
           matchExpressions:
-          - key: project.wutz.dev/project
+          - key: workspace.wutz.dev/project
             operator: Exists

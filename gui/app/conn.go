@@ -261,7 +261,7 @@ func inferenceAvailable(ctx context.Context, k8s client.Client, namespace string
 // is hidden when this is false.
 func mustBeAdmin(ctx context.Context, k8s client.Client) bool {
 	return allowed(ctx, k8s, &authv1.ResourceAttributes{
-		Group: "project.wutz.dev", Resource: "projects", Verb: "create",
+		Group: "workspace.wutz.dev", Resource: "projects", Verb: "create",
 	})
 }
 

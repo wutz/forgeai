@@ -107,6 +107,25 @@ func TestSSHGatewaySpec(t *testing.T) {
 	}
 }
 
+// TestImagebuildSpec checks that the imagebuild chart is told the registry the
+// platform config names: the chart's own default is empty, and a build against
+// an empty registry fails.
+func TestImagebuildSpec(t *testing.T) {
+	cfg := &platform.Config{}
+	cfg.Registry.Domain = "harbor.example.com:7443"
+	cfg.Registry.Insecure = true
+	values := imagebuildSpec.values(cfg)
+	for key, want := range map[string]any{"registry": "harbor.example.com:7443", "registryInsecure": true} {
+		got, _, _ := unstructured.NestedFieldNoCopy(values, "config", key)
+		if got != want {
+			t.Errorf("config.%s = %v, want %v", key, got, want)
+		}
+	}
+	if !slices.Equal(imagebuildSpec.needs, []string{"projects.workspace.wutz.dev"}) {
+		t.Errorf("needs = %v, want the project CRD", imagebuildSpec.needs)
+	}
+}
+
 // TestSSHPiperBundle checks that the sshpiper component is a CRD-only bundle
 // of the Pipe CRD the SSH gateway needs.
 func TestSSHPiperBundle(t *testing.T) {

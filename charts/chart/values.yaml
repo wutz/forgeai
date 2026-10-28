@@ -113,14 +113,23 @@ manager:
   #   annotations: {}
 
 ## Platform configuration, rendered into the ConfigMaps forgeai-system/forgeai-platform and workspace-platform
-## (key config.yaml) that the operator reads. Leave empty to keep the ConfigMap
-## managed outside the chart (the operator then runs with the platform defaults).
+## (key config.yaml) that the operators read. Both operators read the ConfigMap
+## and fail without it, so the chart always renders one: the keys below are the
+## ones the two of them would otherwise default differently. The workspace
+## operator reads the same ConfigMap and ignores the keys it does not use.
 ## See pkg/platform/config.go for the fields and deploy/dev/platform/config.yaml for an example.
 ##
 platform:
-  config: {}
+  config:
+    # Both operators prepend this to a project's name to name its namespace;
+    # this is forgeai's documented default.
+    namespacePrefix: forge-
+    registry:
+      # The Harbor admin Secret in the platform namespace, under the name
+      # forgeai's own default uses. The workspace operator defaults to another
+      # name, so setting it here is what makes its Harbor project creation work.
+      adminSecret: forgeai-harbor
   # config:
-  #   namespacePrefix: forge-
   #   ingress:
   #     domain: example.com
 

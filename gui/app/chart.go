@@ -171,7 +171,19 @@ const (
 var imagebuildSpec = &chartSpec{
 	name: "imagebuild", ref: imagebuilderChart, version: imagebuildChartVersion, release: imagebuildRelease,
 	deployment: imagebuildDeployment, crds: []string{"imagebuilds.imagebuild.wutz.dev"},
-	needs: []string{"projects.workspace.wutz.dev"},
+	needs:  []string{"projects.workspace.wutz.dev"},
+	values: imagebuildValues,
+}
+
+// imagebuildValues tells the chart which registry the builds push to. Without
+// it every build fails with a message saying the registry is not set: the
+// chart's own default is empty, and the platform config is where the domain and
+// its scheme are configured.
+func imagebuildValues(platformCfg *platform.Config) map[string]any {
+	return map[string]any{"config": map[string]any{
+		"registry":         platformCfg.Registry.Domain,
+		"registryInsecure": platformCfg.Registry.Insecure,
+	}}
 }
 
 // The volume trash operator is installed from its own Helm chart into the
@@ -181,7 +193,7 @@ var imagebuildSpec = &chartSpec{
 // pointed at the same ConfigMap.
 const (
 	volumetrashChart        = "oci://ghcr.io/wutz/charts/volumetrash"
-	volumetrashChartVersion = "0.1.0"
+	volumetrashChartVersion = "0.2.0"
 	volumetrashRelease      = "volumetrash"
 	volumetrashDeployment   = "volumetrash"
 )

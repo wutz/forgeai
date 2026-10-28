@@ -226,15 +226,13 @@ func TestJobFromRepository(t *testing.T) {
 	if got := envMap(b.Env)["BUILDKITD_FLAGS"]; got != "--oci-worker-no-process-sandbox" {
 		t.Errorf("BUILDKITD_FLAGS = %q", got)
 	}
-	if v, ok := envMap(b.Env)["ROOTLESSKIT"]; !ok || v != "" {
-		t.Errorf("ROOTLESSKIT = %q (present %v), want set and empty", v, ok)
-	}
-	if !hasMount(b, volState, builderState) {
-		t.Errorf("builder has no %s mount at %s", volState, builderState)
+	// Without ROOTLESSKIT, buildctl-daemonless.sh runs buildkitd under rootlesskit.
+	if v, ok := envMap(b.Env)["ROOTLESSKIT"]; ok {
+		t.Errorf("ROOTLESSKIT = %q, want unset", v)
 	}
 	assertBuilderSecurity(t, b)
-	if hu := job.Spec.Template.Spec.HostUsers; hu == nil || *hu {
-		t.Errorf("HostUsers = %v, want false for the unmasked /proc", hu)
+	if hu := job.Spec.Template.Spec.HostUsers; hu != nil {
+		t.Errorf("HostUsers = %v, want unset so the builder's rootlesskit has its subuid range", *hu)
 	}
 	assertNoVolume(t, job, volDockerfile)
 	if cm := DockerfileConfigMap(o); cm != nil {
@@ -307,27 +305,22 @@ func assertBuilderSecurity(t *testing.T, c corev1.Container) {
 	if sc == nil || sc.SeccompProfile == nil || sc.SeccompProfile.Type != corev1.SeccompProfileTypeUnconfined {
 		t.Errorf("builder seccomp = %+v, want Unconfined", sc)
 	}
-	if sc == nil || sc.AppArmorProfile == nil || sc.AppArmorProfile.Type != corev1.AppArmorProfileTypeUnconfined {
-		t.Errorf("builder apparmor = %+v, want Unconfined", sc)
+	if sc == nil || sc.AppArmorProfile != nil {
+		t.Errorf("builder apparmor = %+v, want unset", sc)
 	}
-	if sc == nil || sc.ProcMount == nil || *sc.ProcMount != corev1.UnmaskedProcMount {
-		t.Errorf("builder procMount = %+v, want Unmasked", sc)
+	if sc == nil || sc.ProcMount != nil {
+		t.Errorf("builder procMount = %+v, want unset", sc)
 	}
 	if sc == nil || sc.RunAsUser == nil || *sc.RunAsUser != builderUID {
 		t.Errorf("builder runAsUser = %+v, want %d", sc, builderUID)
 	}
-	if sc == nil || sc.Capabilities == nil || !slices.Contains(sc.Capabilities.Add, "SYS_ADMIN") {
-		t.Errorf("builder capabilities = %+v, want SYS_ADMIN", sc)
+	if sc == nil || sc.AllowPrivilegeEscalation == nil || !*sc.AllowPrivilegeEscalation {
+		t.Errorf("builder allowPrivilegeEscalation = %+v, want true for newuidmap", sc)
 	}
-}
-
-func hasMount(c corev1.Container, name, path string) bool {
-	for _, m := range c.VolumeMounts {
-		if m.Name == name && m.MountPath == path {
-			return true
-		}
+	if sc == nil || sc.Capabilities == nil || !slices.Equal(sc.Capabilities.Drop, []corev1.Capability{"ALL"}) ||
+		!slices.Equal(sc.Capabilities.Add, []corev1.Capability{"SETUID", "SETGID"}) {
+		t.Errorf("builder capabilities = %+v, want drop ALL and add SETUID, SETGID", sc)
 	}
-	return false
 }
 
 func assertNoVolume(t *testing.T, job *batchv1.Job, name string) {

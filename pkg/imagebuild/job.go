@@ -27,18 +27,15 @@ const (
 	workspaceSrc    = "/workspace/src"
 	dockerfileMount = "/workspace/dockerfile"
 	dockerConfigDir = "/var/run/forgeai/docker"
-	// builderUID is root inside the user namespace of the pod. HostUsers false maps
-	// it to an unprivileged uid on the node. The image's rootlesskit cannot map
-	// its subuid range inside a 65536-id user namespace, so it is not used.
-	builderUID   = 0
+	// builderUID runs the rootless BuildKit of the image. Its rootlesskit maps this
+	// uid to root in a user namespace of its own; the pod stays in the host user
+	// namespace, because hostUsers false leaves no subuid range for that mapping.
+	builderUID   = 1000
 	metadataFile = "/tmp/metadata.json"
-	// builderState is where BuildKit keeps its state when it runs as root.
-	builderState = "/var/lib/buildkit"
 
 	volSrc        = "src"
 	volDockerfile = "dockerfile"
 	volRegistry   = "registry"
-	volState      = "buildkit"
 )
 
 // cloneScript fetches the revision into the working directory. The URL and the
@@ -213,8 +210,6 @@ func Job(o Options) (*batchv1.Job, error) {
 	}
 	volumes := []corev1.Volume{
 		{Name: volSrc, VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
-		// The state is written by the builder only, so it is not shared with the clone.
-		{Name: volState, VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
 		{Name: volRegistry, VolumeSource: corev1.VolumeSource{Secret: &corev1.SecretVolumeSource{
 			SecretName: naming.RegistrySecretName,
 			Items:      []corev1.KeyToPath{{Key: corev1.DockerConfigJsonKey, Path: "config.json"}},
@@ -264,22 +259,26 @@ func Job(o Options) (*batchv1.Job, error) {
 			"--output=" + outputValue(refs, o.Config.RegistryInsecure),
 		},
 		Env: []corev1.EnvVar{
+			// NoProcessSandbox is accepted only in rootless mode. Rootless mode runs
+			// without cgroups, so it does not need the writable /sys that the pod lacks.
 			{Name: "BUILDKITD_FLAGS", Value: "--oci-worker-no-process-sandbox"},
-			// An empty ROOTLESSKIT makes buildctl-daemonless.sh run buildkitd directly.
-			{Name: "ROOTLESSKIT", Value: ""},
+			// ROOTLESSKIT is not set, so buildctl-daemonless.sh starts buildkitd under rootlesskit.
 			{Name: "DOCKER_CONFIG", Value: dockerConfigDir},
 		},
-		VolumeMounts: append(mounts, corev1.VolumeMount{Name: volState, MountPath: builderState}),
-		// BuildKit needs these profiles and an unmasked /proc, which the baseline
-		// Pod Security level rejects; the build namespace is privileged. SYS_ADMIN
-		// only applies inside the user namespace of the pod.
+		VolumeMounts: mounts,
+		// rootlesskit runs newuidmap, a setuid binary, so escalation stays allowed.
+		// SETUID and SETGID let it write the uid map. Seccomp stays Unconfined because
+		// the default profile blocks the namespace calls rootlesskit makes. The
+		// baseline Pod Security level rejects Unconfined, so the build namespace is privileged.
 		SecurityContext: &corev1.SecurityContext{
-			RunAsUser:       ptrTo(int64(builderUID)),
-			RunAsGroup:      ptrTo(int64(builderUID)),
-			SeccompProfile:  &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeUnconfined},
-			AppArmorProfile: &corev1.AppArmorProfile{Type: corev1.AppArmorProfileTypeUnconfined},
-			ProcMount:       ptrTo(corev1.UnmaskedProcMount),
-			Capabilities:    &corev1.Capabilities{Add: []corev1.Capability{"SYS_ADMIN"}},
+			RunAsUser:                ptrTo(int64(builderUID)),
+			RunAsGroup:               ptrTo(int64(builderUID)),
+			AllowPrivilegeEscalation: ptrTo(true),
+			SeccompProfile:           &corev1.SeccompProfile{Type: corev1.SeccompProfileTypeUnconfined},
+			Capabilities: &corev1.Capabilities{
+				Drop: []corev1.Capability{"ALL"},
+				Add:  []corev1.Capability{"SETUID", "SETGID"},
+			},
 		},
 	}
 
@@ -293,11 +292,9 @@ func Job(o Options) (*batchv1.Job, error) {
 				Spec: corev1.PodSpec{
 					RestartPolicy:                corev1.RestartPolicyNever,
 					AutomountServiceAccountToken: ptrTo(false),
-					// The API accepts an unmasked /proc only in a user namespace.
-					HostUsers:      ptrTo(false),
-					InitContainers: inits,
-					Containers:     []corev1.Container{builder},
-					Volumes:        volumes,
+					InitContainers:               inits,
+					Containers:                   []corev1.Container{builder},
+					Volumes:                      volumes,
 				},
 			},
 		},

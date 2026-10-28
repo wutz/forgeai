@@ -97,7 +97,7 @@ Members create, stop, start and delete sandboxes in their namespace with the `wo
 
 ### SSH
 
-A sandbox labelled `forgeai.wutz.dev/ssh: "true"` (the create form's "SSH" switch) gets an sshd sidecar and a Service on port 22. An SSH session reaches only what the sidecar mounts: the project volumes it shares with the agent, not the agent's container image or its processes.
+A sandbox labelled `forgeai.wutz.dev/ssh: "true"` (the create form's "SSH" switch) gets a Service on port 22 and the Secret its sshd reads. The create form renders the sshd sidecar too, so its sandboxes are reachable at once; the operator wires the Service for the label alone, so a sandbox created with `kubectl` starts without a sidecar and needs one added to its pod template. An SSH session reaches only what the sidecar mounts: the project volumes it shares with the agent, not the agent's container image or its processes.
 
 Entry is through sshpiper. The [SSH gateway operator](https://github.com/wutz/sshgateway) runs it as an SSH gateway modelled on the Gateway API. It is generic: a backend is any Service that exposes an sshd. The sshd sidecar of each sandbox, and the Service that exposes it, stay in forgeai:
 
@@ -147,7 +147,7 @@ Volumes are PVCs in the project namespace, created from the platform `storageTyp
 
 ## FileServer
 
-The file servers that browse and transfer the files of a project's volumes are run by [fileserver](https://github.com/wutz/fileserver), a separate project with its own Helm chart. It serves a `FileServer` (short name `ffs`) per namespace with [dufs](https://github.com/sigoden/dufs), scaled to zero when idle. forgeai only creates the `default` `FileServer` on first use of the Files view and keeps it awake by updating the `forgeai.wutz.dev/last-active` annotation; the operator does the rest.
+The file servers that browse and transfer the files of a project's volumes are run by [fileserver](https://github.com/wutz/fileserver), a separate project with its own Helm chart. It serves a `FileServer` (short name `ffs`) per namespace with [dufs](https://github.com/sigoden/dufs), scaled to zero when idle. forgeai only creates the `default` `FileServer` on first use of the Files view and keeps it awake by updating the `fileserver.wutz.dev/last-active` annotation the FileServer operator reads; the operator does the rest.
 
 The Dependencies view installs the operator from `oci://ghcr.io/wutz/charts/fileserver` at the pinned chart version, as release `fileserver` in `forgeai-system`. Before 0.3.0 the release was `fileserver-operator`, and its CRD blocks the new release, so the install first uninstalls that release. This deletes its FileServers, and their Deployments, Services, Ingresses and Secrets with them; the `default` FileServer is created again on the next use of the Files view. Then the install moves the volumes trashed under `forgeai.wutz.dev/trash` to `fileserver.wutz.dev/ignore`, so the new operator does not serve them. It maps the platform config into the chart values: `ingress` (class, domain, port, TLS secret) and `fileServer` (dufs image, idle timeout, host prefix). Until the operator is installed, the Files view has no server to show.
 
@@ -155,7 +155,7 @@ The FileServer operator's API group is `fileserver.wutz.dev` from chart 0.2.0. U
 
 ## Platform config
 
-Platform settings live in the ConfigMap `forgeai-system/forgeai-platform` (`config.yaml`). The forgeai chart renders the same settings into `forgeai-system/workspace-platform` for the workspace operator, which ignores the keys it does not use. See `pkg/platform/config.go` for defaults and `deploy/dev/platform/config.yaml` for an example:
+Platform settings live in the ConfigMap `forgeai-system/forgeai-platform` (`config.yaml`). The forgeai chart renders the same settings into `forgeai-system/workspace-platform` for the workspace operator, which ignores the keys it does not use. Both operators fail to reconcile while the ConfigMap is missing, so the chart always renders one: its defaults set `namespacePrefix` and `registry.adminSecret` to the values below, which the workspace operator would otherwise default differently (`project-` and `project-registry-admin`). See `pkg/platform/config.go` for defaults and `deploy/dev/platform/config.yaml` for an example:
 
 | Key | Description |
 |---|---|

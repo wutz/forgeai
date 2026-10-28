@@ -18,6 +18,13 @@ import (
 // only point at a Service forgeai creates.
 const gatewaySuffix = "-gw"
 
+// gatewayHostLimit is the DNS label limit the host name and the Service name of
+// a published sandbox both have to fit in.
+const gatewayHostLimit = 63
+
+// fieldName is the key of the name of an unstructured object and of a parentRef.
+const fieldName = "name"
+
 // GatewayServiceName is the Service that routes to a published sandbox.
 func GatewayServiceName(name string) string { return name + gatewaySuffix }
 
@@ -34,11 +41,13 @@ func CheckGateway(name, namespace string, cfg *platform.Config) error {
 	if !cfg.Gateway.Enabled() {
 		return fmt.Errorf("gateway access is not configured on the platform")
 	}
-	if l := len(name) + len(namespace) + 1; l > 63 {
-		return fmt.Errorf("sandbox %q is too long to publish through the gateway: its name and namespace must fit in 63 characters together, got %d", name, l)
+	if l := len(name) + len(namespace) + 1; l > gatewayHostLimit {
+		return fmt.Errorf("sandbox %q is too long to publish through the gateway: "+
+			"its name and namespace must fit in %d characters together, got %d", name, gatewayHostLimit, l)
 	}
-	if l := len(GatewayServiceName(name)); l > 63 {
-		return fmt.Errorf("sandbox %q is too long to publish through the gateway: at most %d characters", name, 63-len(gatewaySuffix))
+	if l := len(GatewayServiceName(name)); l > gatewayHostLimit {
+		return fmt.Errorf("sandbox %q is too long to publish through the gateway: at most %d characters",
+			name, gatewayHostLimit-len(gatewaySuffix))
 	}
 	return nil
 }
@@ -75,18 +84,18 @@ func GatewayService(sb *Sandbox, selector map[string]string, port int) *corev1.S
 // GatewayRoute is the HTTPRoute that publishes a sandbox on its host name
 // through the platform gateway, to the sandbox's gateway Service.
 func GatewayRoute(sb *Sandbox, host string, port int, gw platform.Gateway) *unstructured.Unstructured {
-	parent := map[string]any{"name": gw.Name, "namespace": gw.Namespace}
+	parent := map[string]any{fieldName: gw.Name, "namespace": gw.Namespace}
 	if gw.SectionName != "" {
 		parent["sectionName"] = gw.SectionName
 	}
 	u := &unstructured.Unstructured{Object: map[string]any{
-		"metadata": map[string]any{"name": sb.Name, "namespace": sb.Namespace},
+		"metadata": map[string]any{fieldName: sb.Name, "namespace": sb.Namespace},
 		"spec": map[string]any{
 			"parentRefs": []any{parent},
 			"hostnames":  []any{host},
 			"rules": []any{map[string]any{
 				"backendRefs": []any{map[string]any{
-					"name": GatewayServiceName(sb.Name), "port": int64(port),
+					fieldName: GatewayServiceName(sb.Name), "port": int64(port),
 				}},
 			}},
 		},

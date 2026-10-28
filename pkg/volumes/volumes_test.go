@@ -254,9 +254,9 @@ func TestMountable(t *testing.T) {
 	}
 }
 
-// trainJob returns a TrainJob mounting the named volume, as the GUI renders it,
-// stored the way the cluster client reads it.
-func trainJob(t *testing.T, name, volume string, conditions ...metav1.Condition) *unstructured.Unstructured {
+// trainJob returns a TrainJob mounting the "data" volume, as the GUI renders
+// it, stored the way the cluster client reads it.
+func trainJob(t *testing.T, name string, conditions ...metav1.Condition) *unstructured.Unstructured {
 	t.Helper()
 	cfg, err := platform.Parse([]byte("storageTypes: {shared: {storageClass: sc}}\ndefaultStorageType: shared"))
 	if err != nil {
@@ -264,7 +264,7 @@ func trainJob(t *testing.T, name, volume string, conditions ...metav1.Condition)
 	}
 	form := training.Form{
 		Name: name, Image: "img:1", InstanceType: "cpu.small", Workers: 1,
-		Volumes: []training.VolumeMount{{Volume: volume, MountPath: "/data"}},
+		Volumes: []training.VolumeMount{{Volume: "data", MountPath: "/data"}},
 	}
 	it := &projectv1.InstanceType{ObjectMeta: metav1.ObjectMeta{Name: "cpu.small"}}
 	tj, err := training.TrainJob(&form, training.Context{Namespace: "forge-a", InstanceType: it, Config: cfg})
@@ -297,10 +297,10 @@ func TestTrashWaitsForUnfinishedJobs(t *testing.T) {
 		job     *unstructured.Unstructured
 		blocked bool
 	}{
-		{"queued", trainJob(t, "queued", "data", suspended), true},
-		{"pending", trainJob(t, "pending", "data"), true},
-		{"succeeded", trainJob(t, "done", "data", complete), false},
-		{"failed", trainJob(t, "broken", "data", failed), false},
+		{"queued", trainJob(t, "queued", suspended), true},
+		{"pending", trainJob(t, "pending"), true},
+		{"succeeded", trainJob(t, "done", complete), false},
+		{"failed", trainJob(t, "broken", failed), false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			k8s := fake.NewClientBuilder().WithScheme(scheme.Scheme).Build()

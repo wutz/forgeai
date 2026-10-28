@@ -237,7 +237,8 @@ func main() {
 		setupLog.Info("agent-sandbox CRDs are not installed; the Sandbox controller is off")
 	} else {
 		routes := false
-		if _, err := mgr.GetRESTMapper().RESTMapping(sandbox.HTTPRouteGVK.GroupKind(), sandbox.HTTPRouteGVK.Version); err != nil {
+		if _, err := mgr.GetRESTMapper().RESTMapping(
+			sandbox.HTTPRouteGVK.GroupKind(), sandbox.HTTPRouteGVK.Version); err != nil {
 			setupLog.Info("Gateway API HTTPRoute CRD is not installed; sandboxes are not published through the gateway")
 		} else {
 			routes = true

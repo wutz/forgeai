@@ -86,8 +86,25 @@ func (c *Client) now() time.Time {
 
 func gib(q resource.Quantity) int64 { return (q.Value() + (1 << 30) - 1) >> 30 }
 
-// InTrash reports whether a PVC is in the trash.
-func InTrash(pvc *corev1.PersistentVolumeClaim) bool { return pvc.Labels[naming.LabelTrash] == "true" }
+// InTrash reports whether a PVC is in the trash. A volume trashed before
+// fileserver 0.3.0 counts as trashed until MigrateLegacyTrash moves its label.
+func InTrash(pvc *corev1.PersistentVolumeClaim) bool {
+	return pvc.Labels[naming.LabelFileServerIgnore] == naming.LiteralTrue ||
+		pvc.Labels[naming.LabelTrashLegacy] == naming.LiteralTrue
+}
+
+// MigrateLegacyTrash moves a volume trashed before fileserver 0.3.0 from the
+// legacy trash label to the ignore label the file server reads. Other volumes
+// are left alone.
+func MigrateLegacyTrash(ctx context.Context, k8s client.Client, pvc *corev1.PersistentVolumeClaim) error {
+	if pvc.Labels[naming.LabelTrashLegacy] != naming.LiteralTrue {
+		return nil
+	}
+	patch := client.MergeFrom(pvc.DeepCopy())
+	pvc.Labels[naming.LabelFileServerIgnore] = naming.LiteralTrue
+	delete(pvc.Labels, naming.LabelTrashLegacy)
+	return k8s.Patch(ctx, pvc, patch)
+}
 
 // ExpireAt returns when a trashed PVC is purged.
 func ExpireAt(pvc *corev1.PersistentVolumeClaim) (time.Time, bool) {
@@ -407,7 +424,7 @@ func (c *Client) Trash(ctx context.Context, name string, retention time.Duration
 	if pvc.Annotations == nil {
 		pvc.Annotations = map[string]string{}
 	}
-	pvc.Labels[naming.LabelTrash] = "true"
+	pvc.Labels[naming.LabelFileServerIgnore] = naming.LiteralTrue
 	pvc.Annotations[naming.AnnotationTrashedAt] = now.Format(time.RFC3339)
 	pvc.Annotations[naming.AnnotationExpireAt] = now.Add(retention).Format(time.RFC3339)
 	if err := c.K8s.Patch(ctx, pvc, patch); err != nil {
@@ -478,7 +495,8 @@ func (c *Client) Restore(ctx context.Context, name string) (*Volume, error) {
 		return nil, fmt.Errorf("volume %s is not in the trash", name)
 	}
 	patch := client.MergeFrom(pvc.DeepCopy())
-	delete(pvc.Labels, naming.LabelTrash)
+	delete(pvc.Labels, naming.LabelFileServerIgnore)
+	delete(pvc.Labels, naming.LabelTrashLegacy)
 	delete(pvc.Annotations, naming.AnnotationTrashedAt)
 	delete(pvc.Annotations, naming.AnnotationExpireAt)
 	if err := c.K8s.Patch(ctx, pvc, patch); err != nil {

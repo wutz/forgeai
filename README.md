@@ -6,7 +6,7 @@ forgeai is a Kubernetes-native AI platform covering development, training, RL an
 |---|---|---|
 | Operator | `api/`, `internal/`, `cmd/` | `InferenceService` CRD; adds stop/resume, failure classification and retries to `TrainJob`s; purges trashed volumes |
 | Project operator | [wutz/project-operator](https://github.com/wutz/project-operator) | Separate repository and Helm chart: the `Project` CRD and its namespaces, quotas, queues, network policies and members. Installed next to this operator |
-| FileServer operator | [wutz/fileserver-operator](https://github.com/wutz/fileserver-operator) | Separate repository and Helm chart: the `FileServer` CRD and the on-demand file servers of project volumes. Installed next to this operator |
+| FileServer operator | [wutz/fileserver](https://github.com/wutz/fileserver) | Separate repository and Helm chart: the `FileServer` CRD and the on-demand file servers of project volumes. Installed next to this operator |
 | GUI | `gui/` | [Wails](https://wails.io) desktop client that talks to Kubernetes directly through a kubeconfig context |
 | Website | `website/` | Official site ([Astro](https://astro.build)), deployed to Cloudflare Workers at https://forgeai.wutz.dev |
 | Shared library | `pkg/` | Naming, platform config, instance types, job rendering and status, sandboxes, volumes, Harbor client, kubeconfig export |
@@ -139,15 +139,15 @@ Route conditions are reported in `status.parents` (`Accepted`, `ResolvedRefs`); 
 
 Volumes are PVCs in the project namespace, created from the platform `storageTypes` (ReadWriteMany by default) and limited by the project quota. Volumes can be resized (grow only) and moved to the trash:
 
-- Trashing sets the label `forgeai.wutz.dev/trash` and `forgeai.wutz.dev/expire-at`; volumes mounted by running pods cannot be trashed, except by the file server: it is rebuilt without trashed volumes.
+- Trashing sets the label `fileserver.wutz.dev/ignore` and the annotation `forgeai.wutz.dev/expire-at`; the FileServer operator does not serve a volume with the ignore label. Volumes mounted by running pods cannot be trashed, except by the file server: it is rebuilt without trashed volumes. Volumes trashed before FileServer 0.3.0 carry `forgeai.wutz.dev/trash`; the operator and the Dependencies install move that label to `fileserver.wutz.dev/ignore`.
 - Trashed volumes can be restored, purged, or have their expiry changed until they expire.
 - The operator purges expired volumes, postponing while a pod still mounts them. A volume trashed without an expiry (e.g. labelled with `kubectl`) expires after the project `trashRetention` (default: platform `trashRetention`).
 
 ## FileServer
 
-The file servers that browse and transfer the files of a project's volumes are run by [fileserver-operator](https://github.com/wutz/fileserver-operator), a separate project with its own Helm chart. It serves a `FileServer` (short name `ffs`) per namespace with [dufs](https://github.com/sigoden/dufs), scaled to zero when idle. forgeai only creates the `default` `FileServer` on first use of the Files view and keeps it awake by updating the `forgeai.wutz.dev/last-active` annotation; the operator does the rest.
+The file servers that browse and transfer the files of a project's volumes are run by [fileserver](https://github.com/wutz/fileserver), a separate project with its own Helm chart. It serves a `FileServer` (short name `ffs`) per namespace with [dufs](https://github.com/sigoden/dufs), scaled to zero when idle. forgeai only creates the `default` `FileServer` on first use of the Files view and keeps it awake by updating the `forgeai.wutz.dev/last-active` annotation; the operator does the rest.
 
-The Dependencies view installs the operator from `oci://ghcr.io/wutz/charts/fileserver-operator` at the pinned chart version, as release `fileserver-operator` in `forgeai-system`. It maps the platform config into the chart values: `ingress` (class, domain, port, TLS secret) and `fileServer` (dufs image, idle timeout, host prefix). Until the operator is installed, the Files view has no server to show.
+The Dependencies view installs the operator from `oci://ghcr.io/wutz/charts/fileserver` at the pinned chart version, as release `fileserver` in `forgeai-system`. Before 0.3.0 the release was `fileserver-operator`, and its CRD blocks the new release, so the install first uninstalls that release. This deletes its FileServers, and their Deployments, Services, Ingresses and Secrets with them; the `default` FileServer is created again on the next use of the Files view. Then the install moves the volumes trashed under `forgeai.wutz.dev/trash` to `fileserver.wutz.dev/ignore`, so the new operator does not serve them. It maps the platform config into the chart values: `ingress` (class, domain, port, TLS secret) and `fileServer` (dufs image, idle timeout, host prefix). Until the operator is installed, the Files view has no server to show.
 
 The FileServer operator's API group is `fileserver.wutz.dev` from chart 0.2.0. Upgrading from forgeai 0.4.0 leaves the old `fileservers.forgeai.wutz.dev` CRD and its `FileServer` objects in place, because the forgeai chart stopped shipping the CRD and it carries the `helm.sh/resource-policy: keep` annotation. Once the FileServer operator is at 0.2.0, the Files view creates a new `default` `FileServer` in the new group; the old CRD is not used and can be deleted by hand. Upgrading the FileServer operator from 0.1.0 to 0.2.0 removes the old CRD and the `FileServer` objects it held. Uninstalling the FileServer operator chart deletes its CRD, and with it every `FileServer`.
 
@@ -230,11 +230,11 @@ helm install forgeai oci://ghcr.io/wutz/charts/forgeai --version 0.5.0 \
   --namespace forgeai-system
 helm install project-operator oci://ghcr.io/wutz/charts/project-operator --version 0.4.1 \
   --namespace forgeai-system
-helm install fileserver-operator oci://ghcr.io/wutz/charts/fileserver-operator --version 0.2.0 \
+helm install fileserver oci://ghcr.io/wutz/charts/fileserver --version 0.3.0 \
   --namespace forgeai-system
 ```
 
-forgeai reads the InstanceTypes that the InstanceType operator creates. project-operator is [wutz/project-operator](https://github.com/wutz/project-operator). It must run in the namespace of forgeai, because it reads the platform ConfigMap from its own namespace (`FORGEAI_NAMESPACE`). fileserver-operator is [wutz/fileserver-operator](https://github.com/wutz/fileserver-operator), see [FileServer](#fileserver).
+forgeai reads the InstanceTypes that the InstanceType operator creates. project-operator is [wutz/project-operator](https://github.com/wutz/project-operator). It must run in the namespace of forgeai, because it reads the platform ConfigMap from its own namespace (`FORGEAI_NAMESPACE`). The FileServer operator is [wutz/fileserver](https://github.com/wutz/fileserver), see [FileServer](#fileserver).
 
 Releases up to 0.3.1 installed the `projects.forgeai.wutz.dev` CRD as part of the forgeai release. Upgrading keeps that CRD and its Projects, because the CRD carries `helm.sh/resource-policy: keep`. While forgeai owns the CRD, Helm refuses to install project-operator (`invalid ownership metadata`). Hand the CRD to the new release before installing it:
 

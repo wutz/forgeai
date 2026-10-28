@@ -19,8 +19,13 @@ const (
 	// LabelMember is set on member ServiceAccounts and token Secrets.
 	LabelMember = "forgeai.wutz.dev/member"
 
-	// LabelTrash marks a volume (PVC) in the trash.
-	LabelTrash = "forgeai.wutz.dev/trash"
+	// LabelFileServerIgnore marks a volume (PVC) in the trash. The fileserver
+	// operator does not serve a volume with it, so forgeai sets it when it
+	// trashes one.
+	LabelFileServerIgnore = "fileserver.wutz.dev/ignore"
+	// LabelTrashLegacy is the trash label before fileserver 0.3.0. Volumes that
+	// still carry it are moved to LabelFileServerIgnore.
+	LabelTrashLegacy = "forgeai.wutz.dev/trash"
 	// AnnotationTrashedAt is when the volume was moved to the trash (RFC3339).
 	AnnotationTrashedAt = "forgeai.wutz.dev/trashed-at"
 	// AnnotationExpireAt is when a trashed volume is purged (RFC3339).

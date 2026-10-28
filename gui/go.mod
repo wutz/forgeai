@@ -5,7 +5,6 @@ go 1.26.0
 require (
 	github.com/go-logr/logr v1.4.4
 	github.com/wailsapp/wails/v2 v2.16.0
-	github.com/wutz/fileserver-operator v0.2.0
 	github.com/wutz/forgeai v0.0.0-00010101000000-000000000000
 	github.com/wutz/forgeai-instancetype-operator v0.1.0
 	helm.sh/helm/v3 v3.22.1
@@ -14,6 +13,8 @@ require (
 	k8s.io/client-go v0.37.1
 	sigs.k8s.io/controller-runtime v0.25.2
 )
+
+require github.com/wutz/fileserver v0.3.0
 
 require (
 	dario.cat/mergo v1.0.1 // indirect

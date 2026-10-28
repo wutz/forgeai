@@ -23,13 +23,18 @@ const (
 	// operator does not serve a volume with it, so forgeai sets it when it
 	// trashes one.
 	LabelFileServerIgnore = "fileserver.wutz.dev/ignore"
-	// LabelTrashLegacy is the trash label before fileserver 0.3.0. Volumes that
-	// still carry it are moved to LabelFileServerIgnore.
+	// LabelTrashLegacy is the trash label from forgeai before the trash logic was
+	// separated into volumetrash. Volumes that still carry it are automatically
+	// migrated to LabelFileServerIgnore by the volumetrash operator.
 	LabelTrashLegacy = "forgeai.wutz.dev/trash"
 	// AnnotationTrashedAt is when the volume was moved to the trash (RFC3339).
-	AnnotationTrashedAt = "forgeai.wutz.dev/trashed-at"
+	// Set by forgeai; read and migrated from pre-split forgeai.wutz.dev/trashed-at
+	// by the volumetrash operator.
+	AnnotationTrashedAt = "volumetrash.wutz.dev/trashed-at"
 	// AnnotationExpireAt is when a trashed volume is purged (RFC3339).
-	AnnotationExpireAt = "forgeai.wutz.dev/expire-at"
+	// Set by forgeai; read and migrated from pre-split forgeai.wutz.dev/expire-at
+	// by the volumetrash operator.
+	AnnotationExpireAt = "volumetrash.wutz.dev/expire-at"
 	// LabelVolumeType is the platform storage type of a volume.
 	LabelVolumeType = "forgeai.wutz.dev/volume-type"
 

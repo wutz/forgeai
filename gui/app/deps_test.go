@@ -426,9 +426,8 @@ func TestCheckChartTarget(t *testing.T) {
 			withObjects(deployment(forgeaiSpec, map[string]string{helmChartLabel: "forgeai-" + forgeaiChartVersion})), false},
 		{"deployed outside Helm", forgeaiSpec,
 			withObjects(deployment(forgeaiSpec, map[string]string{"app": "forgeai"})), true},
-		{"SSH gateway without the Pipe CRD", sshGatewaySpec, withObjects(), true},
-		{"SSH gateway with the Pipe CRD", sshGatewaySpec, withObjects(pipeCRD), false},
-		{"SSH gateway installed from another chart", sshGatewaySpec, withObjects(pipeCRD,
+		{"SSH gateway without the Pipe CRD", sshGatewaySpec, withObjects(), false},
+		{"SSH gateway installed from another chart", sshGatewaySpec, withObjects(
 			deployment(sshGatewaySpec, map[string]string{helmChartLabel: "forgeai-" + forgeaiChartVersion})), true},
 	}
 	for _, tt := range tests {

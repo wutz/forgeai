@@ -216,7 +216,7 @@ func TestMountable(t *testing.T) {
 			Status:     corev1.PersistentVolumeClaimStatus{Phase: phase},
 		}
 		if trashed {
-			p.Labels = map[string]string{naming.LabelTrash: "true"}
+			p.Labels = map[string]string{naming.LabelFileServerIgnore: "true"}
 		}
 		return p
 	}
@@ -398,5 +398,42 @@ func TestResizeNamesNonExpandableClass(t *testing.T) {
 	}
 	if _, err := c.Resize(ctx, "data", 20); !errors.Is(err, ErrNotExpandable) {
 		t.Fatalf("resize on a class without expansion: %v", err)
+	}
+}
+
+func TestLegacyTrashMigrates(t *testing.T) {
+	ctx := context.Background()
+	legacy := &corev1.PersistentVolumeClaim{ObjectMeta: metav1.ObjectMeta{
+		Name: "old", Namespace: "forge-a", Labels: map[string]string{naming.LabelTrashLegacy: "true"},
+	}}
+	k8s := fake.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(legacy).Build()
+	c := &Client{K8s: k8s, Namespace: "forge-a"}
+	key := client.ObjectKey{Namespace: "forge-a", Name: "old"}
+
+	pvc := &corev1.PersistentVolumeClaim{}
+	if err := k8s.Get(ctx, key, pvc); err != nil {
+		t.Fatal(err)
+	}
+	if !InTrash(pvc) {
+		t.Fatal("a volume with the legacy label must count as trashed")
+	}
+	if err := MigrateLegacyTrash(ctx, k8s, pvc); err != nil {
+		t.Fatal(err)
+	}
+	if _, legacyLeft := pvc.Labels[naming.LabelTrashLegacy]; legacyLeft || pvc.Labels[naming.LabelFileServerIgnore] != "true" {
+		t.Fatalf("labels after migration = %v", pvc.Labels)
+	}
+	if err := MigrateLegacyTrash(ctx, k8s, pvc); err != nil {
+		t.Fatalf("migrating twice: %v", err)
+	}
+
+	if _, err := c.Restore(ctx, "old"); err != nil {
+		t.Fatal(err)
+	}
+	if err := k8s.Get(ctx, key, pvc); err != nil {
+		t.Fatal(err)
+	}
+	if InTrash(pvc) {
+		t.Fatalf("restore must clear both labels, got %v", pvc.Labels)
 	}
 }

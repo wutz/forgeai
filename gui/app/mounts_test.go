@@ -26,7 +26,7 @@ func mountFixtures() []client.Object {
 			Status:     corev1.PersistentVolumeClaimStatus{Phase: corev1.ClaimBound},
 		}
 		if trashed {
-			p.Labels = map[string]string{naming.LabelTrash: "true"}
+			p.Labels = map[string]string{naming.LabelFileServerIgnore: "true"}
 		}
 		return p
 	}

@@ -97,7 +97,7 @@ Members create, stop, start and delete sandboxes in their namespace with the `fo
 
 A sandbox labelled `forgeai.wutz.dev/ssh: "true"` (the create form's "SSH" switch) gets an sshd sidecar and a Service on port 22. An SSH session reaches only what the sidecar mounts: the project volumes it shares with the agent, not the agent's container image or its processes.
 
-Entry is through sshpiperd. The [SSH gateway operator](https://github.com/wutz/ssh-operator) runs it as an SSH gateway modelled on the Gateway API; the sshd sidecar of each sandbox stays in forgeai:
+Entry is through sshpiperd. The [SSH gateway operator](https://github.com/wutz/sshgateway) runs it as an SSH gateway modelled on the Gateway API; the sshd sidecar of each sandbox stays in forgeai:
 
 ```yaml
 apiVersion: sshgateway.wutz.dev/v1alpha1
@@ -258,7 +258,7 @@ The CRD carries `helm.sh/resource-policy: keep`, so the later upgrade of `forgea
 
 Pushing a `v<version>` tag runs `.github/workflows/helm-release.yml`, which publishes the operator image (`ghcr.io/wutz/forgeai:<version>`) and the chart (`oci://ghcr.io/wutz/charts/forgeai:<version>`). `make helm-lint` lints and renders the chart; `make helm-package CHART_VERSION=<version>` writes the package to `dist/`.
 
-The SSH gateway operator is a separate project, [wutz/ssh-operator](https://github.com/wutz/ssh-operator), published as the chart `oci://ghcr.io/wutz/charts/sshgateway`. The Dependencies view installs the sshpiper `Pipe` CRD, then the pinned chart version (0.2.0) as release `sshgateway` in `sshgateway-system`, with `gateway.namespace` set to the platform namespace. The same install from the CLI, once the Pipe CRD is in the cluster:
+The SSH gateway operator is a separate project, [wutz/sshgateway](https://github.com/wutz/sshgateway), published as the chart `oci://ghcr.io/wutz/charts/sshgateway`. The Dependencies view installs the sshpiper `Pipe` CRD, then the pinned chart version (0.2.0) as release `sshgateway` in `sshgateway-system`, with `gateway.namespace` set to the platform namespace. The same install from the CLI, once the Pipe CRD is in the cluster:
 
 ```sh
 helm install sshgateway oci://ghcr.io/wutz/charts/sshgateway --version 0.2.0 \
@@ -278,4 +278,4 @@ Prerequisites (the Dependencies view installs Kubeflow Trainer, agent-sandbox, K
 - InstanceType operator (`forgeai-instancetype-operator` chart), which creates the InstanceTypes and Kueue ResourceFlavors from GPU nodes
 - NVIDIA GPU operator (GPU feature discovery labels and the `nvidia.com/gpu` resource); not installed from the GUI
 - A CNI that enforces NetworkPolicies, an ingress controller and Harbor
-- For SSH sandboxes only: the sshpiper `Pipe` CRD and the [SSH gateway operator](https://github.com/wutz/ssh-operator), see [SSH](#ssh)
+- For SSH sandboxes only: the sshpiper `Pipe` CRD and the [SSH gateway operator](https://github.com/wutz/sshgateway), see [SSH](#ssh)

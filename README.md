@@ -5,7 +5,7 @@ forgeai is a Kubernetes-native AI platform covering development, training, RL an
 | Component | Path | Description |
 |---|---|---|
 | Operator | `api/`, `internal/`, `cmd/` | `InferenceService` CRD; adds stop/resume, failure classification and retries to `TrainJob`s; purges trashed volumes |
-| Project operator | [wutz/project](https://github.com/wutz/project) | Separate repository and Helm chart: the `Project` and `InstanceType` CRDs (`workspace.wutz.dev`), their namespaces, quotas, queues, network policies, members and the InstanceTypes derived from GPU nodes. Installed before this operator |
+| Project operator | [wutz/project](https://github.com/wutz/workspace) | Separate repository and Helm chart: the `Project` and `InstanceType` CRDs (`workspace.wutz.dev`), their namespaces, quotas, queues, network policies, members and the InstanceTypes derived from GPU nodes. Installed before this operator |
 | FileServer operator | [wutz/fileserver](https://github.com/wutz/fileserver) | Separate repository and Helm chart: the `FileServer` CRD and the on-demand file servers of project volumes. Installed next to this operator |
 | GUI | `gui/` | [Wails](https://wails.io) desktop client that talks to Kubernetes directly through a kubeconfig context |
 | Website | `website/` | Official site ([Astro](https://astro.build)), deployed to Cloudflare Workers at https://forgeai.wutz.dev |
@@ -15,7 +15,7 @@ There is no API server of its own: the operator reconciles Kubernetes objects an
 
 ## Projects
 
-A `Project` (cluster-scoped, short name `fproj`, API group `workspace.wutz.dev`) is a tenant. Its CRD and controller live in [wutz/project](https://github.com/wutz/project), which is installed separately (see [Helm charts](#helm-charts)). forgeai relies on these objects that the project operator creates:
+A `Project` (cluster-scoped, short name `fproj`, API group `workspace.wutz.dev`) is a tenant. Its CRD and controller live in [wutz/project](https://github.com/wutz/workspace), which is installed separately (see [Helm charts](#helm-charts)). forgeai relies on these objects that the project operator creates:
 
 | Object | Name | Used by |
 |---|---|---|
@@ -233,7 +233,7 @@ helm install fileserver oci://ghcr.io/wutz/charts/fileserver --version 0.3.0 \
   --namespace forgeai-system
 ```
 
-forgeai reads the InstanceTypes that the project operator creates. The project operator is [wutz/project](https://github.com/wutz/project). It runs in the platform namespace and reads the `project-platform` ConfigMap from its own namespace (`PROJECT_NAMESPACE`), which the forgeai chart renders. The FileServer operator is [wutz/fileserver](https://github.com/wutz/fileserver), see [FileServer](#fileserver).
+forgeai reads the InstanceTypes that the project operator creates. The project operator is [wutz/project](https://github.com/wutz/workspace). It runs in the platform namespace and reads the `project-platform` ConfigMap from its own namespace (`PROJECT_NAMESPACE`), which the forgeai chart renders. The FileServer operator is [wutz/fileserver](https://github.com/wutz/fileserver), see [FileServer](#fileserver).
 
 Earlier releases served Projects and InstanceTypes from the `forgeai.wutz.dev` group (`projects.forgeai.wutz.dev`, `instancetypes.forgeai.wutz.dev`), and the InstanceType operator was a separate chart. The project chart serves them from `workspace.wutz.dev`, so the new CRDs do not clash with the old ones and nothing moves over by itself. The old CRDs carry `helm.sh/resource-policy: keep`, so they and their objects stay until removed. To move a cluster, uninstall the `forgeai-instancetype-operator` release, relabel each project namespace from `forgeai.wutz.dev/project` to `workspace.wutz.dev/project` (the GUI lists only namespaces with the new label), recreate each Project as a `workspace.wutz.dev/v1alpha1` object, then delete the `forgeai.wutz.dev` CRDs. This path is not verified on a live cluster.
 

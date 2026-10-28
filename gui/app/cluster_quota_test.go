@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/wutz/forgeai/pkg/naming"
-	"github.com/wutz/project/pkg/instancetype"
+	"github.com/wutz/workspace/pkg/instancetype"
 )
 
 func quotaApp(t *testing.T, objs ...*corev1.Pod) *App {

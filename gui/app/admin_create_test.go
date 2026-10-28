@@ -8,7 +8,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	projectv1 "github.com/wutz/project/api/v1alpha1"
+	projectv1 "github.com/wutz/workspace/api/v1alpha1"
 )
 
 // TestSaveProjectCreatesProjectFromForm checks a new project from the admin

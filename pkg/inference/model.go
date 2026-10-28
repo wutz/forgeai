@@ -17,8 +17,8 @@ import (
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
-	projectv1 "github.com/wutz/project/api/v1alpha1"
-	"github.com/wutz/project/pkg/instancetype"
+	projectv1 "github.com/wutz/workspace/api/v1alpha1"
+	"github.com/wutz/workspace/pkg/instancetype"
 )
 
 const (

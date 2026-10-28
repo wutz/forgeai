@@ -8,8 +8,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/wutz/forgeai/pkg/naming"
-	projectv1 "github.com/wutz/project/api/v1alpha1"
-	"github.com/wutz/project/pkg/instancetype"
+	projectv1 "github.com/wutz/workspace/api/v1alpha1"
+	"github.com/wutz/workspace/pkg/instancetype"
 )
 
 // InstanceType is the view model of a GPU instance type.

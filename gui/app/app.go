@@ -26,7 +26,7 @@ import (
 
 	fsv1 "github.com/wutz/fileserver/api/v1alpha1"
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
-	projectv1 "github.com/wutz/project/api/v1alpha1"
+	projectv1 "github.com/wutz/workspace/api/v1alpha1"
 )
 
 // ErrNotConnected is returned when no kubeconfig context is selected.

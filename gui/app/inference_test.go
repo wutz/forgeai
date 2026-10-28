@@ -15,7 +15,7 @@ import (
 
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/naming"
-	projectv1 "github.com/wutz/project/api/v1alpha1"
+	projectv1 "github.com/wutz/workspace/api/v1alpha1"
 )
 
 func testInferenceForm() InferenceForm {

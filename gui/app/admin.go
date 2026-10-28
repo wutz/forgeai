@@ -18,7 +18,7 @@ import (
 
 	"github.com/wutz/forgeai/pkg/kubeconfig"
 	"github.com/wutz/forgeai/pkg/platform"
-	projectv1 "github.com/wutz/project/api/v1alpha1"
+	projectv1 "github.com/wutz/workspace/api/v1alpha1"
 )
 
 // Project is the admin view of a Project.

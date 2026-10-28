@@ -22,7 +22,7 @@ import (
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
 	"github.com/wutz/forgeai/pkg/training"
-	projectv1 "github.com/wutz/project/api/v1alpha1"
+	projectv1 "github.com/wutz/workspace/api/v1alpha1"
 )
 
 func TestLifecycle(t *testing.T) {

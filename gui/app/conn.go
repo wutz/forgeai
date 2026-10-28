@@ -20,7 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
-	projectv1 "github.com/wutz/project/api/v1alpha1"
+	projectv1 "github.com/wutz/workspace/api/v1alpha1"
 	imagebuildv1 "github.com/wutz/imagebuild/api/v1alpha1"
 
 	"github.com/wutz/forgeai/pkg/kf"

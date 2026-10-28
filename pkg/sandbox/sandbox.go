@@ -17,8 +17,8 @@ import (
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
 	"github.com/wutz/forgeai/pkg/sshgateway"
-	projectv1 "github.com/wutz/project/api/v1alpha1"
-	"github.com/wutz/project/pkg/instancetype"
+	projectv1 "github.com/wutz/workspace/api/v1alpha1"
+	"github.com/wutz/workspace/pkg/instancetype"
 )
 
 // MaxNameLength keeps the name usable as a Service name (the controller

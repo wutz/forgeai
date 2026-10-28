@@ -41,7 +41,7 @@ import (
 
 	forgeaiv1alpha1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/platform"
-	projectv1 "github.com/wutz/project/api/v1alpha1"
+	projectv1 "github.com/wutz/workspace/api/v1alpha1"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -52,7 +52,7 @@ const configNamespace = "forgeai-system"
 // projectModule is the module of the project operator. It owns the Project and
 // InstanceType CRDs, and its reconcilers are not run here: the tests create the
 // InstanceType objects they need.
-const projectModule = "github.com/wutz/project"
+const projectModule = "github.com/wutz/workspace"
 
 // projectCRDDir returns the CRD directory of the project module this build depends on.
 func projectCRDDir() (string, error) {

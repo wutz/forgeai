@@ -13,7 +13,7 @@ import (
 	"github.com/wutz/forgeai/pkg/sandbox"
 	"github.com/wutz/forgeai/pkg/training"
 	"github.com/wutz/forgeai/pkg/volumes"
-	projectv1 "github.com/wutz/project/api/v1alpha1"
+	projectv1 "github.com/wutz/workspace/api/v1alpha1"
 )
 
 // mountFixtures returns a platform config, a bound volume that is shared, a

@@ -41,7 +41,7 @@ import (
 	"github.com/wutz/forgeai/pkg/inference"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
-	projectv1 "github.com/wutz/project/api/v1alpha1"
+	projectv1 "github.com/wutz/workspace/api/v1alpha1"
 )
 
 // Reasons of the Ready condition of an InferenceService.

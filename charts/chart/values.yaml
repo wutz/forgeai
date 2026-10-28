@@ -112,7 +112,7 @@ manager:
   #   labels: {}
   #   annotations: {}
 
-## Platform configuration, rendered into the ConfigMaps forgeai-system/forgeai-platform and project-platform
+## Platform configuration, rendered into the ConfigMaps forgeai-system/forgeai-platform and workspace-platform
 ## (key config.yaml) that the operator reads. Leave empty to keep the ConfigMap
 ## managed outside the chart (the operator then runs with the platform defaults).
 ## See pkg/platform/config.go for the fields and deploy/dev/platform/config.yaml for an example.

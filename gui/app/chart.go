@@ -123,11 +123,12 @@ var instanceTypeOperatorSpec = &chartSpec{
 
 // The FileServer operator is installed from its own Helm chart into the platform
 // namespace. Its file servers are published under the platform ingress, so the
-// chart takes the platform's ingress and file server settings. Its CRD shipped
-// with the forgeai chart before the split, so the install adopts it.
+// chart takes the platform's ingress and file server settings. Its CRD is in the
+// fileserver.wutz.dev group, which forgeai never shipped, so there is nothing to
+// adopt; the 0.1.0 CRD in the forgeai.wutz.dev group is removed by the upgrade.
 const (
 	fileServerChart        = "oci://ghcr.io/wutz/charts/fileserver-operator"
-	fileServerChartVersion = "0.1.0"
+	fileServerChartVersion = "0.2.0"
 	fileServerRelease      = "fileserver-operator"
 	fileServerDeployment   = "fileserver-operator"
 )
@@ -135,9 +136,8 @@ const (
 var fileServerSpec = &chartSpec{
 	name: "fileserver-operator", ref: fileServerChart, version: fileServerChartVersion,
 	release: fileServerRelease, deployment: fileServerDeployment,
-	crds:      []string{"fileservers.forgeai.wutz.dev"},
-	adoptFrom: forgeaiRelease,
-	values:    fileServerValues,
+	crds:   []string{"fileservers.fileserver.wutz.dev"},
+	values: fileServerValues,
 }
 
 // fileServerValues maps the platform config onto the operator config the chart

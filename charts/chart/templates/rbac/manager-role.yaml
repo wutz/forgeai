@@ -108,9 +108,20 @@ rules:
   - update
   - watch
 - apiGroups:
-  - forgeai.wutz.dev
+  - fileserver.wutz.dev
   resources:
   - fileservers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - forgeai.wutz.dev
+  resources:
   - inferenceservices
   verbs:
   - create

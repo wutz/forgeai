@@ -149,7 +149,7 @@ The file servers that browse and transfer the files of a project's volumes are r
 
 The Dependencies view installs the operator from `oci://ghcr.io/wutz/charts/fileserver-operator` at the pinned chart version, as release `fileserver-operator` in `forgeai-system`. It maps the platform config into the chart values: `ingress` (class, domain, port, TLS secret) and `fileServer` (dufs image, idle timeout, host prefix). Until the operator is installed, the Files view has no server to show.
 
-Upgrading from forgeai 0.4.0 keeps the `FileServer` CRD and the file servers in it. The forgeai chart stops shipping the CRD, but the CRD carries the `helm.sh/resource-policy: keep` annotation (the `crd.keep` value, on by default), so the upgrade leaves it in place. Install the FileServer operator from the Dependencies view afterwards: its chart adopts the CRD, and the existing file servers keep running under it. Uninstalling the FileServer operator chart deletes its CRD, and with it every `FileServer`. The upgrade path is not verified on a cluster.
+The FileServer operator's API group is `fileserver.wutz.dev` from chart 0.2.0. Upgrading from forgeai 0.4.0 leaves the old `fileservers.forgeai.wutz.dev` CRD and its `FileServer` objects in place, because the forgeai chart stopped shipping the CRD and it carries the `helm.sh/resource-policy: keep` annotation. Once the FileServer operator is at 0.2.0, the Files view creates a new `default` `FileServer` in the new group; the old CRD is not used and can be deleted by hand. Upgrading the FileServer operator from 0.1.0 to 0.2.0 removes the old CRD and the `FileServer` objects it held. Uninstalling the FileServer operator chart deletes its CRD, and with it every `FileServer`.
 
 ## Platform config
 
@@ -230,7 +230,7 @@ helm install forgeai oci://ghcr.io/wutz/charts/forgeai --version 0.5.0 \
   --namespace forgeai-system
 helm install project-operator oci://ghcr.io/wutz/charts/project-operator --version 0.4.1 \
   --namespace forgeai-system
-helm install fileserver-operator oci://ghcr.io/wutz/charts/fileserver-operator --version 0.1.0 \
+helm install fileserver-operator oci://ghcr.io/wutz/charts/fileserver-operator --version 0.2.0 \
   --namespace forgeai-system
 ```
 

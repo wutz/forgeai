@@ -102,8 +102,8 @@ func TestSSHGatewaySpec(t *testing.T) {
 	if ns != platform.Namespace() {
 		t.Errorf("gateway.namespace = %q, want %s", ns, platform.Namespace())
 	}
-	if !slices.Contains(sshGatewaySpec.needs, "pipes.sshpiper.com") {
-		t.Errorf("needs = %v, want the sshpiper Pipe CRD", sshGatewaySpec.needs)
+	if len(sshGatewaySpec.needs) != 0 {
+		t.Errorf("needs = %v, want empty (sshgateway v0.4.0 uses yaml plugin instead of Pipe CRD)", sshGatewaySpec.needs)
 	}
 }
 

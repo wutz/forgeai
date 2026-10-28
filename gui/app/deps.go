@@ -110,7 +110,6 @@ var depCatalog = []depInfo{
 	{name: "forgeai", title: "forgeai operator", description: "Inference services and sandboxes", chart: forgeaiSpec},
 	{name: "fileserver", title: "FileServer operator", description: "On-demand file servers for the project volumes", chart: fileServerSpec},
 	{name: "volumetrash", title: "Volume trash operator", description: "Purges trashed project volumes once their retention has passed", chart: volumetrashSpec},
-	{name: "sshpiper", title: "sshpiper Pipe CRD", description: "Pipe CRD that the SSH gateway routes logins with"},
 	{name: "sshgateway", title: "SSH gateway", description: "SSHGateways and SSHRoutes that serve SSH logins to backend Services", chart: sshGatewaySpec},
 }
 

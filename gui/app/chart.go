@@ -84,11 +84,10 @@ var forgeaiSpec = &chartSpec{
 
 // The SSH gateway operator is installed from its own Helm chart into its
 // namespace. Its SSHGateways are served in the platform namespace, which the
-// chart is told, and it needs the Pipe CRD of sshpiper, a bundled component
-// installed first.
+// chart is told.
 const (
 	sshGatewayChart        = "oci://ghcr.io/wutz/charts/sshgateway"
-	sshGatewayChartVersion = "0.3.0"
+	sshGatewayChartVersion = "0.4.0"
 	sshGatewayRelease      = "sshgateway"
 	sshGatewayNamespace    = "sshgateway-system"
 	sshGatewayDeployment   = "sshgateway-controller-manager"
@@ -98,7 +97,7 @@ var sshGatewaySpec = &chartSpec{
 	name: "sshgateway", ref: sshGatewayChart, version: sshGatewayChartVersion, release: sshGatewayRelease,
 	namespace: sshGatewayNamespace, deployment: sshGatewayDeployment,
 	crds:  []string{"sshgatewayclasses.sshgateway.wutz.dev", "sshgateways.sshgateway.wutz.dev", "sshroutes.sshgateway.wutz.dev"},
-	needs: []string{"pipes.sshpiper.com"},
+	needs: []string{},
 	values: func(*platform.Config) map[string]any {
 		return map[string]any{"gateway": map[string]any{"namespace": platform.Namespace()}}
 	},

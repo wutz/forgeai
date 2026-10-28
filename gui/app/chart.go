@@ -73,7 +73,7 @@ func (s *chartSpec) installNamespace() string {
 // image tag, so a release bumps both together.
 const (
 	forgeaiChart        = "oci://ghcr.io/wutz/charts/forgeai"
-	forgeaiChartVersion = "0.5.0"
+	forgeaiChartVersion = "0.6.0"
 	forgeaiRelease      = "forgeai"
 )
 

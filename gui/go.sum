@@ -333,10 +333,12 @@ github.com/wailsapp/mimetype v1.4.1 h1:pQN9ycO7uo4vsUUuPeHEYoUkLVkaRntMnHJxVwYhw
 github.com/wailsapp/mimetype v1.4.1/go.mod h1:9aV5k31bBOv5z6u+QP8TltzvNGJPmNJD4XlAL3U+j3o=
 github.com/wailsapp/wails/v2 v2.16.0 h1:hLYrSHUUq6hRXl3rWT9ZXiyFIgM94nVN9Ns6iEJzxyw=
 github.com/wailsapp/wails/v2 v2.16.0/go.mod h1:scxrgwfsv6yR6fE6cCF+Flfl+JeU+SR87T9x4kILJ6M=
-github.com/wutz/project v0.5.0 h1:E0vfJ3N67M2LLdfN3sgrIAJgx95/c0qWKnQnFXM7ZKY=
-github.com/wutz/project v0.5.0/go.mod h1:kej5CweYKOsofYJ2m79+UVWX9mSMb33mwltnyASUHwI=
 github.com/wutz/fileserver v0.3.0 h1:IQxRmJes/op38usgpgXK14043PwQPALEcyj/yPrVDGU=
 github.com/wutz/fileserver v0.3.0/go.mod h1:R/6Qcv5XMjZtoCl8PJcYpzwYBjE0UBOE/isyJ/kZdNU=
+github.com/wutz/imagebuild v0.1.1 h1:BiGVKLNQOAQk7bPC6bBL/vRbxwNShxMyT5psHM/k9Xk=
+github.com/wutz/imagebuild v0.1.1/go.mod h1:mnSb6wIEjfdoj/7D/I6H5WG8GGlvykirh1jjxBf+YYk=
+github.com/wutz/project v0.5.0 h1:E0vfJ3N67M2LLdfN3sgrIAJgx95/c0qWKnQnFXM7ZKY=
+github.com/wutz/project v0.5.0/go.mod h1:kej5CweYKOsofYJ2m79+UVWX9mSMb33mwltnyASUHwI=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
 github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=
 github.com/xlab/treeprint v1.2.0 h1:HzHnuAF1plUN2zGlAFHbSQP2qJ0ZAD3XF5XD7OesXRQ=

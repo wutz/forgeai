@@ -107,6 +107,7 @@ var depCatalog = []depInfo{
 	{name: "agent-sandbox", title: "agent-sandbox", description: "Sandbox controller and CRDs for the Sandboxes view"},
 	{name: "gateway-api-inference-extension", title: "Gateway API Inference Extension", description: "InferencePool CRD that the llm-d routers of InferenceServices use"},
 	{name: "project", title: "Project operator", description: "Project namespaces, quotas, members and registries, and the InstanceTypes derived from GPU nodes", chart: projectSpec},
+	{name: "imagebuild", title: "ImageBuild operator", description: "Container image builds using Rootless BuildKit", chart: imagebuildSpec},
 	{name: "forgeai", title: "forgeai operator", description: "Inference services and sandboxes", chart: forgeaiSpec},
 	{name: "fileserver", title: "FileServer operator", description: "On-demand file servers for the project volumes", chart: fileServerSpec},
 	{name: "volumetrash", title: "Volume trash operator", description: "Purges trashed project volumes once their retention has passed", chart: volumetrashSpec},

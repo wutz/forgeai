@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -20,6 +21,7 @@ import (
 
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
 	projectv1 "github.com/wutz/project/api/v1alpha1"
+	imagebuildv1 "github.com/wutz/imagebuild/api/v1alpha1"
 
 	"github.com/wutz/forgeai/pkg/kf"
 	"github.com/wutz/forgeai/pkg/naming"
@@ -205,6 +207,7 @@ func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
 		Admin: admin, ClusterAdmin: clusterAdmin, Forgeai: forgeai,
 		Sandboxes: namespace != "" && sandboxesAvailable(ctx, k8s, namespace),
 		Inference: namespace != "" && inferenceAvailable(ctx, k8s, namespace),
+		ImageBuilds: namespace != "" && imageBuildsAvailable(ctx, k8s, namespace),
 		Create:    create,
 		Change:    change,
 	}
@@ -255,6 +258,29 @@ func sandboxesAvailable(ctx context.Context, k8s client.Client, namespace string
 func inferenceAvailable(ctx context.Context, k8s client.Client, namespace string) bool {
 	list := &v1.InferenceServiceList{}
 	return k8s.List(ctx, list, client.InNamespace(namespace), client.Limit(1)) == nil
+}
+
+// imageBuildsAvailable reports whether the ImageBuild CRD is installed and
+// the user may list them in the project namespace; the GUI hides the ImageBuild
+// view when it is not.
+func imageBuildsAvailable(ctx context.Context, k8s client.Client, namespace string) bool {
+	list := &imagebuildv1.ImageBuildList{}
+	err := k8s.List(ctx, list, client.InNamespace(namespace), client.Limit(1))
+	if err == nil {
+		return true
+	}
+	// If the error is Forbidden, the CRD exists but the user lacks permission.
+	// The view should still be shown; permission is checked when the user tries to use it.
+	if apierrors.IsForbidden(err) {
+		return true
+	}
+	// If the error is NoKindMatchError, the CRD is not installed.
+	var noKindErr *meta.NoKindMatchError
+	if errors.As(err, &noKindErr) {
+		return false
+	}
+	// For other errors, conservatively assume the CRD is not available.
+	return false
 }
 
 // mustBeAdmin reports whether the user may create Projects; the admin area

@@ -158,6 +158,22 @@ var projectSpec = &chartSpec{
 	deployment: projectDeployment, crds: []string{"projects.project.wutz.dev", "instancetypes.project.wutz.dev"},
 }
 
+// The imagebuild operator is installed from its own Helm chart into the platform
+// namespace. It owns the ImageBuild CRD and manages container image builds using BuildKit.
+// It installs after the project operator so builds can be created within projects.
+const (
+	imagebuilderChart        = "oci://ghcr.io/wutz/charts/imagebuild"
+	imagebuildChartVersion   = "0.1.1"
+	imagebuildRelease        = "imagebuild"
+	imagebuildDeployment     = "imagebuild-controller-manager"
+)
+
+var imagebuildSpec = &chartSpec{
+	name: "imagebuild", ref: imagebuilderChart, version: imagebuildChartVersion, release: imagebuildRelease,
+	deployment: imagebuildDeployment, crds: []string{"imagebuilds.imagebuild.wutz.dev"},
+	needs: []string{"projects.project.wutz.dev"},
+}
+
 // The volume trash operator is installed from its own Helm chart into the
 // platform namespace. It purges trashed volumes once their retention has passed,
 // and reads the Project CRD for each project's retention, so it installs after the

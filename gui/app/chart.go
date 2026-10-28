@@ -45,10 +45,6 @@ type chartSpec struct {
 	needs []string
 	// values returns the chart values of the install, nil for the chart's defaults.
 	values func(platformCfg *platform.Config) map[string]any
-	// adoptFrom is a release whose chart shipped crds before they moved to this
-	// chart. Helm refuses to install objects another release owns, so the
-	// install hands them over first (see adoptCRDs).
-	adoptFrom string
 }
 
 // Helm bookkeeping on the objects a release owns.
@@ -102,26 +98,6 @@ var sshGatewaySpec = &chartSpec{
 	},
 }
 
-// The InstanceType operator is installed from its own Helm chart. It derives the
-// InstanceTypes and Kueue ResourceFlavors that forgeai reads. Its CRD was shipped
-// by the forgeai chart before the split, so the install adopts it from forgeai.
-const (
-	instanceTypeOperatorChart        = "oci://ghcr.io/wutz/charts/forgeai-instancetype-operator"
-	instanceTypeOperatorChartVersion = "0.1.1"
-	instanceTypeOperatorRelease      = "forgeai-instancetype-operator"
-	instanceTypeOperatorDeployment   = "forgeai-instancetype-operator-controller-manager"
-)
-
-var instanceTypeOperatorSpec = &chartSpec{
-	name: "forgeai-instancetype-operator", ref: instanceTypeOperatorChart, version: instanceTypeOperatorChartVersion,
-	release: instanceTypeOperatorRelease, deployment: instanceTypeOperatorDeployment,
-	crds:      []string{"instancetypes.forgeai.wutz.dev"},
-	adoptFrom: forgeaiRelease,
-	values: func(*platform.Config) map[string]any {
-		return map[string]any{"platform": map[string]any{"namespace": platform.Namespace()}}
-	},
-}
-
 // The FileServer operator is installed from its own Helm chart into the platform
 // namespace. Its file servers are published under the platform ingress, so the
 // chart takes the platform's ingress and file server settings. Its CRD is in the
@@ -157,21 +133,21 @@ func fileServerValues(platformCfg *platform.Config) map[string]any {
 	}}
 }
 
-// The Project operator is installed from its own Helm chart into the platform
-// namespace. It reads the platform config that the forgeai chart installs, so
-// it installs second. Its CRD shipped with the forgeai chart before the split,
-// so the install adopts it.
+// The project operator is installed from its own Helm chart into the platform
+// namespace. It owns the Project and InstanceType CRDs, and the InstanceTypes
+// that forgeai reads come from it, so it installs before forgeai. Its platform
+// config ConfigMap is rendered by the forgeai chart; until that is installed the
+// operator waits for it.
 const (
-	projectOperatorChart        = "oci://ghcr.io/wutz/charts/project-operator"
-	projectOperatorChartVersion = "0.4.1"
-	projectOperatorRelease      = "project-operator"
-	projectOperatorDeployment   = "project-operator-controller-manager"
+	projectChart        = "oci://ghcr.io/wutz/charts/project"
+	projectChartVersion = "0.5.0"
+	projectRelease      = "project"
+	projectDeployment   = "project-controller-manager"
 )
 
-var projectOperatorSpec = &chartSpec{
-	name: "project-operator", ref: projectOperatorChart, version: projectOperatorChartVersion, release: projectOperatorRelease,
-	deployment: projectOperatorDeployment, crds: []string{"projects.forgeai.wutz.dev"},
-	adoptFrom: forgeaiRelease,
+var projectSpec = &chartSpec{
+	name: "project", ref: projectChart, version: projectChartVersion, release: projectRelease,
+	deployment: projectDeployment, crds: []string{"projects.project.wutz.dev", "instancetypes.project.wutz.dev"},
 }
 
 // installChart installs the chart of spec into its namespace, or upgrades the
@@ -212,11 +188,6 @@ func installChart(ctx context.Context, c *Connection, spec *chartSpec, platformC
 	if spec.values != nil {
 		values = spec.values(platformCfg)
 	}
-	if spec.adoptFrom != "" {
-		if err := adoptCRDs(ctx, c.k8s, spec, ns); err != nil {
-			return err
-		}
-	}
 	progress(stepChartInstall)
 	// Upgrade refuses a release that does not exist and does not install one by
 	// itself, so a first install takes the Install action.
@@ -232,40 +203,6 @@ func installChart(ctx context.Context, c *Connection, spec *chartSpec, platformC
 	}
 	_, err = up.RunWithContext(ctx, spec.release, chrt, values)
 	return err
-}
-
-// adoptCRDs hands the CRDs of spec from the release adoptFrom to spec's release,
-// so Helm accepts them as the new chart's. The keep policy on the CRDs keeps them
-// when the old release lets go of them. CRDs of other releases are left alone.
-func adoptCRDs(ctx context.Context, k8s client.Client, spec *chartSpec, ns string) error {
-	for _, name := range spec.crds {
-		u := &unstructured.Unstructured{}
-		u.SetGroupVersionKind(crdGVK)
-		err := k8s.Get(ctx, client.ObjectKey{Name: name}, u)
-		if apierrors.IsNotFound(err) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-		anns := u.GetAnnotations()
-		if anns[helmReleaseNameKey] != spec.adoptFrom {
-			continue
-		}
-		anns[helmReleaseNameKey] = spec.release
-		anns[helmReleaseNamespaceKey] = ns
-		u.SetAnnotations(anns)
-		labels := u.GetLabels()
-		if labels == nil {
-			labels = map[string]string{}
-		}
-		labels[helmManagedByKey] = "Helm"
-		u.SetLabels(labels)
-		if err := k8s.Update(ctx, u); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // checkChartTarget refuses an install that the cluster cannot take: a needed

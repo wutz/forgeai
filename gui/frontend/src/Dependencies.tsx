@@ -245,7 +245,7 @@ function copy(key: string, fallback: string): string {
 // isChart reports whether a component is installed from a Helm chart (see
 // helmChart in app/chart.go) rather than from an embedded bundle.
 function isChart(name: string): boolean {
-  return name === 'forgeai' || name === 'instancetype-operator'
+  return ['project', 'forgeai', 'fileserver-operator', 'sshgateway'].includes(name)
 }
 
 function title(name: string, fallback = name): string {

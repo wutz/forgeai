@@ -48,7 +48,7 @@ type PersistentVolumeClaimReconciler struct {
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=namespaces,verbs=get;list;watch
 // Trash retention is read from the Project of a namespace, which the project operator owns.
-// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=projects,verbs=get;list;watch
+// +kubebuilder:rbac:groups=project.wutz.dev,resources=projects,verbs=get;list;watch
 // +kubebuilder:rbac:groups="",resources=events,verbs=create;patch
 // +kubebuilder:rbac:groups=events.k8s.io,resources=events,verbs=create;patch
 

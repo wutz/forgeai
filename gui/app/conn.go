@@ -18,8 +18,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
+	projectv1 "github.com/wutz/project/api/v1alpha1"
 
 	"github.com/wutz/forgeai/pkg/kf"
 	"github.com/wutz/forgeai/pkg/naming"
@@ -227,7 +227,7 @@ func (a *App) Connect(contextName, namespace string) (ConnInfo, error) {
 // cluster admin may connect to a cluster without the forgeai CRDs, to install
 // them from the Dependencies view; it reports whether they are installed.
 func isolate(ctx context.Context, k8s client.Client, clusterAdmin bool) (bool, error) {
-	list := &instancetypev1.InstanceTypeList{}
+	list := &projectv1.InstanceTypeList{}
 	if err := k8s.List(ctx, list); err != nil {
 		if clusterAdmin && meta.IsNoMatchError(err) {
 			return false, nil
@@ -261,7 +261,7 @@ func inferenceAvailable(ctx context.Context, k8s client.Client, namespace string
 // is hidden when this is false.
 func mustBeAdmin(ctx context.Context, k8s client.Client) bool {
 	return allowed(ctx, k8s, &authv1.ResourceAttributes{
-		Group: "forgeai.wutz.dev", Resource: "projects", Verb: "create",
+		Group: "project.wutz.dev", Resource: "projects", Verb: "create",
 	})
 }
 

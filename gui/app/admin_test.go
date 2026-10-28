@@ -7,7 +7,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	projectv1 "github.com/wutz/project-operator/api/v1alpha1"
+	projectv1 "github.com/wutz/project/api/v1alpha1"
 )
 
 // The admin list shows Ready only once the controller reports the Ready condition.

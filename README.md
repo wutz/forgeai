@@ -5,7 +5,7 @@ forgeai is a Kubernetes-native AI platform covering development, training, RL an
 | Component | Path | Description |
 |---|---|---|
 | Operator | `api/`, `internal/`, `cmd/` | `InferenceService` CRD; adds stop/resume, failure classification and retries to `TrainJob`s; purges trashed volumes |
-| Project operator | [wutz/project-operator](https://github.com/wutz/project-operator) | Separate repository and Helm chart: the `Project` CRD and its namespaces, quotas, queues, network policies and members. Installed next to this operator |
+| Project operator | [wutz/project](https://github.com/wutz/project) | Separate repository and Helm chart: the `Project` and `InstanceType` CRDs (`project.wutz.dev`), their namespaces, quotas, queues, network policies, members and the InstanceTypes derived from GPU nodes. Installed before this operator |
 | FileServer operator | [wutz/fileserver-operator](https://github.com/wutz/fileserver-operator) | Separate repository and Helm chart: the `FileServer` CRD and the on-demand file servers of project volumes. Installed next to this operator |
 | GUI | `gui/` | [Wails](https://wails.io) desktop client that talks to Kubernetes directly through a kubeconfig context |
 | Website | `website/` | Official site ([Astro](https://astro.build)), deployed to Cloudflare Workers at https://forgeai.wutz.dev |
@@ -15,21 +15,23 @@ There is no API server of its own: the operator reconciles Kubernetes objects an
 
 ## Projects
 
-A `Project` (cluster-scoped, short name `fproj`) is a tenant. Its CRD and controller live in [wutz/project-operator](https://github.com/wutz/project-operator), which is installed separately (see [Helm charts](#helm-charts)). forgeai relies on these objects that the project operator creates:
+A `Project` (cluster-scoped, short name `fproj`, API group `project.wutz.dev`) is a tenant. Its CRD and controller live in [wutz/project](https://github.com/wutz/project), which is installed separately (see [Helm charts](#helm-charts)). forgeai relies on these objects that the project operator creates:
 
 | Object | Name | Used by |
 |---|---|---|
-| Namespace | `<namespacePrefix><project>` (e.g. `forge-demo`), labelled `forgeai.wutz.dev/project` | Every namespaced view. The GUI only accepts namespaces with that label |
-| Kueue LocalQueue | `default` in the project namespace | Training jobs are submitted to it |
-| ClusterRole | `forgeai:project:<project>` | Members' read access to the Project, its ClusterQueue, InstanceTypes and ClusterTrainingRuntimes |
-| Member ServiceAccount | `forgeai-members/<project>.<member>` | Member kubeconfigs exported from the Projects view |
+| Namespace | `<namespacePrefix><project>` (e.g. `forge-demo`), labelled `project.wutz.dev/project` | Every namespaced view. The GUI only accepts namespaces with that label |
+| Kueue LocalQueue | `default` in the project namespace, when Kueue is installed | Training jobs are submitted to it |
+| ClusterRole | `project:project:<project>` | Members' read access to the Project, its ClusterQueue, InstanceTypes and ClusterTrainingRuntimes |
+| Member ServiceAccount | `project-members/<project>.<member>` | Member kubeconfigs exported from the Projects view |
 | Harbor project | named like the namespace, e.g. `forge-demo` | Images view |
 
-Admins manage projects and members from the GUI's Projects view. What the Project controller creates, how quotas and network isolation work, and how deletion is handled are documented in the project-operator README.
+This operator adds its own kinds to the project roles: the `forgeai-member-edit` and `forgeai-member-view` ClusterRoles grant InferenceServices and are aggregated into the project operator's `project-edit` and `project-view` through the label `project.wutz.dev/aggregate-to-member`.
+
+Admins manage projects and members from the GUI's Projects view. What the Project controller creates, how quotas and network isolation work, and how deletion is handled are documented in the project README.
 
 ## InstanceType
 
-`InstanceType`s (cluster-scoped, short name `fit`) and the Kueue ResourceFlavors behind them are provided by a separate project, [forgeai-instancetype-operator](https://github.com/wutz/forgeai-instancetype-operator), which has its own Helm chart and release. forgeai only reads them: the GUI lists instance types to offer GPU classes and sizes, and the member RBAC grants read access to them. Install that operator's chart before using instance types.
+`InstanceType`s (`project.wutz.dev`, cluster-scoped, short name `fit`) are derived from GPU nodes by the project operator, together with the Kueue ResourceFlavors behind them when Kueue is installed. forgeai only reads them: the GUI lists instance types to offer GPU classes and sizes, and the member RBAC grants read access to them. Install the project chart before using instance types.
 
 ```sh
 kubectl get fit
@@ -69,7 +71,7 @@ metadata:
   name: agent
   namespace: forge-demo
   labels:
-    forgeai.wutz.dev/project: demo
+    project.wutz.dev/project: demo
 spec:
   operatingMode: Running          # Suspended keeps the object, deletes the pod
   podTemplate:
@@ -91,7 +93,7 @@ The GUI renders the same object from a form (`pkg/sandbox`): image, bash command
 | Templates | `SandboxTemplate`s are listed by the GUI; members create templates, claims and warm pools with `kubectl` (the edit role allows it) |
 | Gateway access | the annotation `forgeai.wutz.dev/gateway-port: "8080"` (the form's `gatewayPort`) publishes the sandbox's HTTP port through the Gateway API: the operator owns a ClusterIP Service `<name>-gw` selecting the sandbox pod on that port and an HTTPRoute for host `<name>-<namespace>.<ingress domain>` on the platform's `gateway`. Clearing the annotation removes both |
 
-Members create, stop, start and delete sandboxes in their namespace with the `forgeai-project-edit` role; `view` members see them read-only. Edit members also open a shell in a running sandbox from the GUI terminal tab (`pods/exec` on the sandbox container, with their own credentials). Project network policies, created by project-operator, admit the agent-sandbox controller in `sandbox.namespace`, so sandbox API servers reachable from the pod stay reachable in isolated projects.
+Members create, stop, start and delete sandboxes in their namespace with the `project-edit` role (and `forgeai-member-edit` for InferenceServices); `view` members see them read-only through `project-view`. Edit members also open a shell in a running sandbox from the GUI terminal tab (`pods/exec` on the sandbox container, with their own credentials). Project network policies, created by the project operator, admit the agent-sandbox controller in `sandbox.namespace`, so sandbox API servers reachable from the pod stay reachable in isolated projects.
 
 ### SSH
 
@@ -153,18 +155,17 @@ The FileServer operator's API group is `fileserver.wutz.dev` from chart 0.2.0. U
 
 ## Platform config
 
-Platform settings live in the ConfigMap `forgeai-system/forgeai-platform` (`config.yaml`), see `pkg/platform/config.go` for defaults and `deploy/dev/platform/config.yaml` for an example:
+Platform settings live in the ConfigMap `forgeai-system/forgeai-platform` (`config.yaml`). The forgeai chart renders the same settings into `forgeai-system/project-platform` for the project operator, which ignores the keys it does not use. See `pkg/platform/config.go` for defaults and `deploy/dev/platform/config.yaml` for an example:
 
 | Key | Description |
 |---|---|
 | `namespacePrefix` | Prefix of project namespaces (default `forge-`) |
 | `apiServer` | API server URL written into member kubeconfigs |
-| `membersNamespace` | Namespace of member ServiceAccounts (default `forgeai-members`) |
 | `ingress` | Ingress class, wildcard domain, external port and optional TLS secret for the file server |
 | `gateway` | Gateway API Gateway the published sandbox routes attach to (`name`, `namespace`, optional `sectionName`); its listeners must admit routes from the project namespaces (`allowedRoutes`). `scheme` and `port` describe the listener from outside, for the URLs. The gateway does not authenticate published sandboxes: anything that reaches the host reaches the sandbox's port |
 | `registry` | Harbor domain, API URL, `insecure`, and the admin Secret in `forgeai-system` (default `forgeai-harbor`, keys `username` and `password`) |
 | `storageTypes`, `defaultStorageType` | Volume types mapped to StorageClasses |
-| `instanceTypes` | Read by the InstanceType operator, not by forgeai: per-node `reserved` CPU and memory, and offered `sizes` (see its README) |
+| `instanceTypes` | Read by the project operator, not by forgeai: per-node `reserved` CPU and memory, and offered `sizes` (see its README) |
 | `defaultQuota` | Default project quota: `gpus` per class (`"*"` for others), `storage`, `volumes`, `pods`, `headroom` |
 | `network` | `systemNamespaces` allowed into isolated projects, `dnsNamespace` |
 | `fileServer` | dufs `image`, `idleTimeout`, `hostPrefix` |
@@ -173,7 +174,7 @@ Platform settings live in the ConfigMap `forgeai-system/forgeai-platform` (`conf
 | `trashRetention` | Default retention of trashed volumes |
 | `templates` | `source` of the public template source the create dialogs offer: an `https://` base URL, a `file://` directory with `index.yaml`, or an `oci://` reference to a published source (default: [wutz/forgeai-templates](https://github.com/wutz/forgeai-templates) on its `main` branch) |
 
-The forgeai operator rereads the config every 15 seconds. project-operator reads the project keys (`namespacePrefix`, `registry`, `ingress`, `storageTypes`, `defaultQuota`) from the same ConfigMap and reloads it when it changes.
+The forgeai operator rereads the config every 15 seconds. The project operator reads the project keys (`namespacePrefix`, `registry`, `ingress`, `storageTypes`, `defaultQuota`) from the same ConfigMap and reloads it when it changes.
 
 ## GUI
 
@@ -217,44 +218,24 @@ kubectl -n forgeai-system create secret generic forgeai-harbor \
 make deploy-dev                # ko build -> ghcr.io/wutz/forgeai (public), kubectl apply --server-side
 ```
 
-`deploy/dev` combines `config/default` with the platform ConfigMap. It does not include the Project CRD or controller: install project-operator for Projects (see below). `make render-dev` only renders `dist/dev.yaml`; `make undeploy-dev` removes everything, including the CRDs.
+`deploy/dev` combines `config/default` with the platform ConfigMap. It does not include the Project CRD or controller: install the project chart for Projects (see below). `make render-dev` only renders `dist/dev.yaml`; `make undeploy-dev` removes everything, including the CRDs.
 
 ### Helm charts
 
-The forgeai operator ships as a Helm chart in `charts/chart`: the InferenceService CRD, RBAC and the controller Deployment, with the platform config under `platform.config`. The InstanceType, Project and FileServer operators are separate projects with their own charts (see [InstanceType](#instancetype)). The Dependencies view installs four charts into `forgeai-system` at their pinned versions, in this order. The same installs from the CLI:
+The forgeai operator ships as a Helm chart in `charts/chart`: the InferenceService CRD, RBAC and the controller Deployment, with the platform config under `platform.config`. The project operator (`project.wutz.dev`, see [Projects](#projects) and [InstanceType](#instancetype)) and the FileServer operator are separate projects with their own charts. The Dependencies view installs three charts into `forgeai-system` at their pinned versions, in this order. The same installs from the CLI:
 
 ```sh
-helm install forgeai-instancetype-operator oci://ghcr.io/wutz/charts/forgeai-instancetype-operator --version 0.1.1 \
+helm install project oci://ghcr.io/wutz/charts/project --version 0.5.0 \
   --namespace forgeai-system --create-namespace
 helm install forgeai oci://ghcr.io/wutz/charts/forgeai --version 0.5.0 \
-  --namespace forgeai-system
-helm install project-operator oci://ghcr.io/wutz/charts/project-operator --version 0.4.1 \
   --namespace forgeai-system
 helm install fileserver-operator oci://ghcr.io/wutz/charts/fileserver-operator --version 0.2.0 \
   --namespace forgeai-system
 ```
 
-forgeai reads the InstanceTypes that the InstanceType operator creates. project-operator is [wutz/project-operator](https://github.com/wutz/project-operator). It must run in the namespace of forgeai, because it reads the platform ConfigMap from its own namespace (`FORGEAI_NAMESPACE`). fileserver-operator is [wutz/fileserver-operator](https://github.com/wutz/fileserver-operator), see [FileServer](#fileserver).
+forgeai reads the InstanceTypes that the project operator creates. The project operator is [wutz/project](https://github.com/wutz/project). It runs in the platform namespace and reads the `project-platform` ConfigMap from its own namespace (`PROJECT_NAMESPACE`), which the forgeai chart renders. The FileServer operator is [wutz/fileserver-operator](https://github.com/wutz/fileserver-operator), see [FileServer](#fileserver).
 
-Releases up to 0.3.1 installed the `projects.forgeai.wutz.dev` CRD as part of the forgeai release. Upgrading keeps that CRD and its Projects, because the CRD carries `helm.sh/resource-policy: keep`. While forgeai owns the CRD, Helm refuses to install project-operator (`invalid ownership metadata`). Hand the CRD to the new release before installing it:
-
-```sh
-kubectl annotate crd projects.forgeai.wutz.dev \
-  meta.helm.sh/release-name=project-operator \
-  meta.helm.sh/release-namespace=forgeai-system --overwrite
-kubectl label crd projects.forgeai.wutz.dev app.kubernetes.io/managed-by=Helm --overwrite
-```
-
-Upgrading a cluster that runs forgeai 0.3.x: there the `forgeai` release owns the InstanceType CRD `instancetypes.forgeai.wutz.dev`. Helm refuses to install a CRD that another release owns, so before the operator chart is installed the CRD is handed over to the `forgeai-instancetype-operator` release. The Dependencies view does this itself; from the CLI:
-
-```sh
-kubectl annotate crd instancetypes.forgeai.wutz.dev \
-  meta.helm.sh/release-name=forgeai-instancetype-operator \
-  meta.helm.sh/release-namespace=forgeai-system --overwrite
-kubectl label crd instancetypes.forgeai.wutz.dev app.kubernetes.io/managed-by=Helm --overwrite
-```
-
-The CRD carries `helm.sh/resource-policy: keep`, so the later upgrade of `forgeai` to 0.4.0, which no longer ships it, leaves the CRD and its InstanceTypes in place.
+Earlier releases served Projects and InstanceTypes from the `forgeai.wutz.dev` group (`projects.forgeai.wutz.dev`, `instancetypes.forgeai.wutz.dev`), and the InstanceType operator was a separate chart. The project chart serves them from `project.wutz.dev`, so the new CRDs do not clash with the old ones and nothing moves over by itself. The old CRDs carry `helm.sh/resource-policy: keep`, so they and their objects stay until removed. To move a cluster, uninstall the `forgeai-instancetype-operator` release, relabel each project namespace from `forgeai.wutz.dev/project` to `project.wutz.dev/project` (the GUI lists only namespaces with the new label), recreate each Project as a `project.wutz.dev/v1alpha1` object, then delete the `forgeai.wutz.dev` CRDs. This path is not verified on a live cluster.
 
 Pushing a `v<version>` tag runs `.github/workflows/helm-release.yml`, which publishes the operator image (`ghcr.io/wutz/forgeai:<version>`) and the chart (`oci://ghcr.io/wutz/charts/forgeai:<version>`). `make helm-lint` lints and renders the chart; `make helm-package CHART_VERSION=<version>` writes the package to `dist/`.
 
@@ -270,12 +251,12 @@ A cluster that ran the SSH gateway from an earlier forgeai release has the `SSHG
 
 A cluster set up with `make deploy-dev` runs the operator outside Helm. Helm does not adopt objects it did not create, so the Dependencies view reports that operator as deployed outside Helm and refuses the chart install. Move such a cluster by removing the dev deployment with `make undeploy-dev` (this deletes the forgeai CRDs and all forgeai objects, so back them up first) and then installing the charts.
 
-Prerequisites (the Dependencies view installs Kubeflow Trainer, agent-sandbox, Kueue, the InstanceType operator, the forgeai, Project and FileServer operators, the sshpiper Pipe CRD and the SSH gateway into a cluster; `make gui-deps` refreshes the pinned manifests embedded in the GUI):
+Prerequisites (the Dependencies view installs Kubeflow Trainer, agent-sandbox, Kueue, the project, forgeai and FileServer operators, the sshpiper Pipe CRD and the SSH gateway into a cluster; `make gui-deps` refreshes the pinned manifests embedded in the GUI):
 
 - Kubeflow Trainer v2 (with JobSet) and a `ClusterTrainingRuntime` named after `training.defaultRuntime`
 - agent-sandbox v1.0 or later (CRDs `agents.x-k8s.io/v1beta1`), for the Sandboxes view; the isolation RuntimeClasses (`gvisor`, `kata`) come from the node runtimes
-- Kueue, with the `trainer.kubeflow.org/trainjob` integration enabled (the bundled Kueue config enables it)
-- InstanceType operator (`forgeai-instancetype-operator` chart), which creates the InstanceTypes and Kueue ResourceFlavors from GPU nodes
+- Kueue (optional), with the `trainer.kubeflow.org/trainjob` integration enabled (the bundled Kueue config enables it). Without Kueue there is no queue, and stopping a TrainJob sets its `spec.suspend` flag instead
+- Project operator (`project` chart), which creates the InstanceTypes and, when Kueue is installed, its ResourceFlavors from GPU nodes
 - NVIDIA GPU operator (GPU feature discovery labels and the `nvidia.com/gpu` resource); not installed from the GUI
 - A CNI that enforces NetworkPolicies, an ingress controller and Harbor
 - For SSH sandboxes only: the sshpiper `Pipe` CRD and the [SSH gateway operator](https://github.com/wutz/sshgateway), see [SSH](#ssh)

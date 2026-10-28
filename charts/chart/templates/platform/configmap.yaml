@@ -12,4 +12,20 @@ metadata:
 data:
   config.yaml: |
     {{- toYaml .Values.platform.config | nindent 4 }}
+---
+# The project operator reads the same platform settings from its own ConfigMap.
+# It ignores the keys it does not use, so the forgeai settings can be shared.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: {{ include "forgeai.name" . }}
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  name: project-platform
+  namespace: {{ .Release.Namespace }}
+data:
+  config.yaml: |
+    {{- toYaml .Values.platform.config | nindent 4 }}
 {{- end }}

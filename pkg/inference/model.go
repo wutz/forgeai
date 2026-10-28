@@ -14,11 +14,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
-	"github.com/wutz/forgeai-instancetype-operator/pkg/instancetype"
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
+	projectv1 "github.com/wutz/project/api/v1alpha1"
+	"github.com/wutz/project/pkg/instancetype"
 )
 
 const (
@@ -44,7 +44,7 @@ const (
 // is above zero. The API key Secret is not among them: it is created once and
 // kept (see naming.InferenceAPIKeySecret).
 func Objects(
-	svc *v1.InferenceService, cfg *platform.Config, it *instancetypev1.InstanceType, replicas int32,
+	svc *v1.InferenceService, cfg *platform.Config, it *projectv1.InstanceType, replicas int32,
 ) ([]client.Object, error) {
 	if it.Spec.GPU.Count < 1 {
 		return nil, fmt.Errorf("InstanceType %s has no GPU", it.Name)
@@ -127,7 +127,7 @@ func ServedName(svc *v1.InferenceService) string {
 // modelDeployment runs vllm serve with the GPUs of it. The tensor parallel size
 // is the GPU count, so one replica shards the model over its GPUs.
 func modelDeployment(
-	svc *v1.InferenceService, cfg *platform.Config, it *instancetypev1.InstanceType, replicas int32,
+	svc *v1.InferenceService, cfg *platform.Config, it *projectv1.InstanceType, replicas int32,
 ) *appsv1.Deployment {
 	name := ModelName(svc)
 	labels := map[string]string{
@@ -231,7 +231,7 @@ func modelDeployment(
 // nodeSelector places the model server pods: the labels of the InstanceType,
 // which pick the GPU product, and on top of them the ones the service asks for,
 // which can tell two nodes of the same product apart.
-func nodeSelector(svc *v1.InferenceService, it *instancetypev1.InstanceType) map[string]string {
+func nodeSelector(svc *v1.InferenceService, it *projectv1.InstanceType) map[string]string {
 	sel := maps.Clone(it.Spec.NodeSelector)
 	if len(svc.Spec.NodeSelector) == 0 {
 		return sel

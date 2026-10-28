@@ -39,11 +39,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
-	operatorcontroller "github.com/wutz/forgeai-instancetype-operator/pkg/controller"
-	operatorplatform "github.com/wutz/forgeai-instancetype-operator/pkg/platform"
 	forgeaiv1alpha1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/platform"
+	projectv1 "github.com/wutz/project/api/v1alpha1"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
@@ -51,15 +49,16 @@ import (
 
 const configNamespace = "forgeai-system"
 
-// operatorModule is the module of the InstanceType operator, which runs the
-// InstanceType reconciler in these tests and owns the InstanceType CRD.
-const operatorModule = "github.com/wutz/forgeai-instancetype-operator"
+// projectModule is the module of the project operator. It owns the Project and
+// InstanceType CRDs, and its reconcilers are not run here: the tests create the
+// InstanceType objects they need.
+const projectModule = "github.com/wutz/project"
 
-// operatorCRDDir returns the CRD directory of the operator module this build depends on.
-func operatorCRDDir() (string, error) {
-	out, err := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", operatorModule).Output()
+// projectCRDDir returns the CRD directory of the project module this build depends on.
+func projectCRDDir() (string, error) {
+	out, err := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", projectModule).Output()
 	if err != nil {
-		return "", fmt.Errorf("locate %s: %w", operatorModule, err)
+		return "", fmt.Errorf("locate %s: %w", projectModule, err)
 	}
 	return filepath.Join(strings.TrimSpace(string(out)), "config", "crd", "bases"), nil
 }
@@ -110,17 +109,17 @@ var _ = BeforeSuite(func() {
 	var err error
 	err = forgeaiv1alpha1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
-	err = instancetypev1.AddToScheme(scheme.Scheme)
+	err = projectv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	operatorCRDs, err := operatorCRDDir()
+	projectCRDs, err := projectCRDDir()
 	Expect(err).NotTo(HaveOccurred())
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "..", "config", "crd", "bases"),
-			operatorCRDs,
+			projectCRDs,
 			// Trainer and Kueue CRDs exported from the dev cluster.
 			filepath.Join("testdata", "crds"),
 		},
@@ -153,10 +152,6 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	loader := &platform.Loader{Reader: mgr.GetAPIReader(), Namespace: configNamespace}
 	for _, r := range []interface{ SetupWithManager(ctrl.Manager) error }{
-		&operatorcontroller.InstanceTypeReconciler{
-			Client: mgr.GetClient(),
-			Config: &operatorplatform.Loader{Reader: mgr.GetAPIReader(), Namespace: configNamespace},
-		},
 		&PersistentVolumeClaimReconciler{Client: mgr.GetClient(), Config: loader},
 		&TrainJobReconciler{Client: mgr.GetClient(), Config: loader, Recorder: mgr.GetEventRecorder("forgeai-test")},
 		&InferenceServiceReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: loader},

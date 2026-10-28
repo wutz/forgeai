@@ -8,12 +8,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
 	"github.com/wutz/forgeai/pkg/sandbox"
 	"github.com/wutz/forgeai/pkg/training"
 	"github.com/wutz/forgeai/pkg/volumes"
+	projectv1 "github.com/wutz/project/api/v1alpha1"
 )
 
 // mountFixtures returns a platform config, a bound volume that is shared, a
@@ -35,7 +35,7 @@ func mountFixtures() []client.Object {
 			ObjectMeta: metav1.ObjectMeta{Name: platform.ConfigMapName, Namespace: testNamespace},
 			Data:       map[string]string{platform.ConfigKey: ""},
 		},
-		&instancetypev1.InstanceType{ObjectMeta: metav1.ObjectMeta{Name: "cpu.small"}},
+		&projectv1.InstanceType{ObjectMeta: metav1.ObjectMeta{Name: "cpu.small"}},
 		pvc("shared", corev1.ReadWriteMany, false),
 		pvc("local", corev1.ReadWriteOnce, false),
 		pvc("old", corev1.ReadWriteMany, true),

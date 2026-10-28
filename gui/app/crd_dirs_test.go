@@ -10,8 +10,8 @@ import (
 // operatorModules are the operator modules this build depends on. Each owns
 // the CRDs of its operator, which envtest must load next to forgeai's own.
 var operatorModules = []string{
-	"github.com/wutz/forgeai-instancetype-operator", // InstanceType
-	"github.com/wutz/fileserver",                    // FileServer
+	"github.com/wutz/project",    // Project and InstanceType
+	"github.com/wutz/fileserver", // FileServer
 }
 
 // crdDirs returns the CRD directories for envtest: forgeai's own CRDs and the

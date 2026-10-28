@@ -15,9 +15,9 @@ const (
 
 	// LabelProject is set on project namespaces and every object forgeai
 	// creates for a project (value = Project name).
-	LabelProject = "forgeai.wutz.dev/project"
+	LabelProject = "project.wutz.dev/project"
 	// LabelMember is set on member ServiceAccounts and token Secrets.
-	LabelMember = "forgeai.wutz.dev/member"
+	LabelMember = "project.wutz.dev/member"
 
 	// LabelFileServerIgnore marks a volume (PVC) in the trash. The fileserver
 	// operator does not serve a volume with it, so forgeai sets it when it
@@ -74,7 +74,7 @@ const (
 	AnnotationRetriedAs = "forgeai.wutz.dev/retried-as"
 
 	// LabelGPUClass is set on generated InstanceTypes and ResourceFlavors.
-	LabelGPUClass = "forgeai.wutz.dev/gpu-class"
+	LabelGPUClass = "project.wutz.dev/gpu-class"
 
 	// Node labels from NVIDIA GPU feature discovery.
 	LabelGPUProduct = "nvidia.com/gpu.product"
@@ -132,28 +132,11 @@ const (
 	LimitRangeName     = "forgeai-defaults"
 )
 
-// ClusterRolePrefix + role (edit, view) is bound per member in the project
-// namespace (see config/rbac/project_roles.yaml).
-const ClusterRolePrefix = "forgeai-project-"
-
 // Namespace is the namespace of a project.
 func Namespace(prefix, project string) string { return prefix + project }
 
 // ClusterQueue is the Kueue ClusterQueue of a project.
 func ClusterQueue(namespace string) string { return namespace }
-
-// ProjectClusterRole is the per-project ClusterRole (and binding) granting
-// members read access to the Project, its ClusterQueue and cluster-wide
-// catalogues.
-func ProjectClusterRole(project string) string { return "forgeai:project:" + project }
-
-// MemberServiceAccount is the ServiceAccount of a member in the members
-// namespace. Project and member names are DNS labels, so the dot keeps
-// names unique.
-func MemberServiceAccount(project, member string) string { return project + "." + member }
-
-// MemberTokenSecret is the long-lived token Secret of a member.
-func MemberTokenSecret(project, member string) string { return project + "." + member + ".token" }
 
 // MemberRoleBinding binds a member to its role in the project namespace.
 func MemberRoleBinding(member string) string { return "forgeai-member-" + member }

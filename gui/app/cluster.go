@@ -7,9 +7,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
-	"github.com/wutz/forgeai-instancetype-operator/pkg/instancetype"
 	"github.com/wutz/forgeai/pkg/naming"
+	projectv1 "github.com/wutz/project/api/v1alpha1"
+	"github.com/wutz/project/pkg/instancetype"
 )
 
 // InstanceType is the view model of a GPU instance type.
@@ -33,7 +33,7 @@ func (a *App) ListInstanceTypes() ([]InstanceType, error) {
 	}
 	ctx, cancel := a.call()
 	defer cancel()
-	list := &instancetypev1.InstanceTypeList{}
+	list := &projectv1.InstanceTypeList{}
 	if err := c.k8s.List(ctx, list); err != nil {
 		return nil, err
 	}

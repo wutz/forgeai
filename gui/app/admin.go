@@ -16,9 +16,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	projectv1 "github.com/wutz/project-operator/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/kubeconfig"
 	"github.com/wutz/forgeai/pkg/platform"
+	projectv1 "github.com/wutz/project/api/v1alpha1"
 )
 
 // Project is the admin view of a Project.
@@ -34,9 +34,9 @@ type Project struct {
 	Ready          bool            `json:"ready"`
 	// Deleting is set once the Project is being deleted and its finalizer has not
 	// finished yet; the object stays listed until then.
-	Deleting bool `json:"deleting"`
-	Registry       string          `json:"registry"`
-	Created        string          `json:"created"`
+	Deleting bool   `json:"deleting"`
+	Registry string `json:"registry"`
+	Created  string `json:"created"`
 	// ResourceVersion is the version the form was read at; a save over a newer
 	// version is refused so a concurrent change is not overwritten.
 	ResourceVersion string `json:"resourceVersion,omitempty"`

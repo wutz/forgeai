@@ -13,9 +13,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/naming"
+	projectv1 "github.com/wutz/project/api/v1alpha1"
 )
 
 func testInferenceForm() InferenceForm {
@@ -24,10 +24,10 @@ func testInferenceForm() InferenceForm {
 	}
 }
 
-func testGPUInstanceType() *instancetypev1.InstanceType {
-	return &instancetypev1.InstanceType{
+func testGPUInstanceType() *projectv1.InstanceType {
+	return &projectv1.InstanceType{
 		ObjectMeta: metav1.ObjectMeta{Name: "rtx-5090.x2"},
-		Spec:       instancetypev1.InstanceTypeSpec{GPU: instancetypev1.InstanceTypeGPU{Class: "rtx-5090", Count: 2}},
+		Spec:       projectv1.InstanceTypeSpec{GPU: projectv1.InstanceTypeGPU{Class: "rtx-5090", Count: 2}},
 	}
 }
 

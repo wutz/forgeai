@@ -14,11 +14,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 
-	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
-	"github.com/wutz/forgeai-instancetype-operator/pkg/instancetype"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
 	"github.com/wutz/forgeai/pkg/sshgateway"
+	projectv1 "github.com/wutz/project/api/v1alpha1"
+	"github.com/wutz/project/pkg/instancetype"
 )
 
 // MaxNameLength keeps the name usable as a Service name (the controller
@@ -189,7 +189,7 @@ const maxDuration = 365 * 24 * time.Hour
 type Context struct {
 	Namespace    string
 	Project      string
-	InstanceType *instancetypev1.InstanceType
+	InstanceType *projectv1.InstanceType
 	Platform     *platform.Config
 	// RegistrySecret is added to imagePullSecrets when set.
 	RegistrySecret string
@@ -220,7 +220,7 @@ func env(in []EnvVar) []corev1.EnvVar {
 	return out
 }
 
-func resources(it *instancetypev1.InstanceType) corev1.ResourceRequirements {
+func resources(it *projectv1.InstanceType) corev1.ResourceRequirements {
 	var rl corev1.ResourceList
 	if it == nil {
 		rl = corev1.ResourceList{

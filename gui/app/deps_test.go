@@ -137,7 +137,7 @@ func TestAssess(t *testing.T) {
 	bundled := Dependency{Name: "kueue", Pinned: "v0.20.2", Installable: true}
 	operator := Dependency{Name: "forgeai", Installable: true, Pinned: forgeaiChartVersion}
 	sshGateway := Dependency{Name: "sshgateway", Installable: true, Pinned: sshGatewayChartVersion}
-	instanceTypes := Dependency{Name: "instancetype-operator", Installable: true, Pinned: instanceTypeOperatorChartVersion}
+	project := Dependency{Name: "project", Installable: true, Pinned: projectChartVersion}
 	sandbox := Dependency{Name: "agent-sandbox", Pinned: "v1.0.7", Installable: true}
 	gatewayAPI := Dependency{Name: "gateway-api-inference-extension", Pinned: "v1.6.2", Installable: true}
 	tests := []struct {
@@ -174,15 +174,15 @@ func TestAssess(t *testing.T) {
 			deployments: []appsv1.Deployment{helmDeployment("0.0.9", true)}}, "outdated", "0.0.9"},
 		{"SSH gateway deployed outside Helm", sshGateway, depHealth{crdsWanted: 3, crdsFound: 3, chart: sshGatewaySpec,
 			deployments: []appsv1.Deployment{testDeployment("", true)}}, "unmanaged", ""},
-		{"InstanceType operator from its chart", instanceTypes, depHealth{crdsWanted: 1, crdsFound: 1,
-			chart: instanceTypeOperatorSpec, deployments: []appsv1.Deployment{
-				helmChartDeployment("forgeai-instancetype-operator", instanceTypeOperatorChartVersion, true)}},
-			"ready", instanceTypeOperatorChartVersion},
-		{"older InstanceType operator chart", instanceTypes, depHealth{crdsWanted: 1, crdsFound: 1,
-			chart: instanceTypeOperatorSpec, deployments: []appsv1.Deployment{
-				helmChartDeployment("forgeai-instancetype-operator", "0.0.9", true)}}, "outdated", "0.0.9"},
-		{"InstanceType operator deployed outside Helm", instanceTypes, depHealth{crdsWanted: 1, crdsFound: 1,
-			chart: instanceTypeOperatorSpec, deployments: []appsv1.Deployment{testDeployment("", true)}}, "unmanaged", ""},
+		{"Project operator from its chart", project, depHealth{crdsWanted: 2, crdsFound: 2,
+			chart: projectSpec, deployments: []appsv1.Deployment{
+				helmChartDeployment("project", projectChartVersion, true)}},
+			"ready", projectChartVersion},
+		{"older Project operator chart", project, depHealth{crdsWanted: 2, crdsFound: 2,
+			chart: projectSpec, deployments: []appsv1.Deployment{
+				helmChartDeployment("project", "0.0.9", true)}}, "outdated", "0.0.9"},
+		{"Project operator deployed outside Helm", project, depHealth{crdsWanted: 2, crdsFound: 2,
+			chart: projectSpec, deployments: []appsv1.Deployment{testDeployment("", true)}}, "unmanaged", ""},
 		{"runs where the config expects", sandbox, depHealth{crdsWanted: 1, crdsFound: 1,
 			deployments: []appsv1.Deployment{testDeployment("v1.0.7", true)},
 			namespace:   "agent-sandbox-system", expectNamespace: "agent-sandbox-system"}, "ready", "v1.0.7"},
@@ -516,6 +516,23 @@ func TestProbeCRDOnlyBundleVersion(t *testing.T) {
 	}
 	if dep.Status != "ready" || dep.Installed != b.Version {
 		t.Errorf("probe = status %q installed %q, want ready at %q (message %q)", dep.Status, dep.Installed, b.Version, dep.Message)
+	}
+}
+
+// TestDependencyCatalogOrder checks that the project operator is installed
+// before the forgeai operator, which reads the InstanceTypes it derives.
+func TestDependencyCatalogOrder(t *testing.T) {
+	pos := func(name string) int {
+		for i, d := range depCatalog {
+			if d.name == name {
+				return i
+			}
+		}
+		t.Fatalf("catalog lacks %s", name)
+		return -1
+	}
+	if pos("project") > pos("forgeai") {
+		t.Errorf("project is listed after forgeai")
 	}
 }
 

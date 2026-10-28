@@ -174,7 +174,7 @@ const en = {
       ['ResourceQuota', 'forgeai-quota', 'Backstop for workloads that bypass Kueue: GPUs, CPU, memory, storage, volumes and pods.'],
       ['NetworkPolicy', 'forgeai-isolation', 'Ingress only from the namespace and platform namespaces; optional internet egress block.'],
       ['Registry project + robot', 'forge-<project>', 'Harbor project with a pull secret and push credentials, plus a storage quota.'],
-      ['Member ServiceAccount', 'forgeai-members/<project>.<member>', 'A token bound to the project edit or view role. Removing the member revokes it.'],
+      ['Member ServiceAccount', 'project-members/<project>.<member>', 'A token bound to the project edit or view role. Removing the member revokes it.'],
     ] as [string, string, string][],
   },
 
@@ -456,7 +456,7 @@ const zh: Messages = {
       ['ResourceQuota', 'forgeai-quota', '兜底限制，针对绕过 Kueue 的负载：GPU、CPU、内存、存储、卷和 Pod 数量。'],
       ['NetworkPolicy', 'forgeai-isolation', '仅允许来自命名空间和平台命名空间的入站流量；可选择阻断出站的互联网访问。'],
       ['Registry project + robot', 'forge-<project>', 'Harbor 项目，附带拉取 Secret 和推送凭据，并设置存储配额。'],
-      ['Member ServiceAccount', 'forgeai-members/<project>.<member>', '绑定到项目 edit 或 view 角色的令牌。移除成员即撤销其令牌。'],
+      ['Member ServiceAccount', 'project-members/<project>.<member>', '绑定到项目 edit 或 view 角色的令牌。移除成员即撤销其令牌。'],
     ] as [string, string, string][],
   },
 

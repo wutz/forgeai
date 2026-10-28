@@ -45,7 +45,8 @@ import (
 )
 
 // TrainJobReconciler adds what Trainer and Kueue lack for project jobs:
-// stopping and resuming (through the Kueue Workload), failure detection
+// stopping and resuming (through the Kueue Workload, or the job's suspend flag
+// without Kueue), failure detection
 // (including pods stuck on image pulls or crash loops) and retries.
 type TrainJobReconciler struct {
 	client.Client
@@ -175,16 +176,21 @@ func (r *TrainJobReconciler) annotate(ctx context.Context, tj *kf.TrainJob, ann 
 }
 
 // syncActive deactivates the Kueue Workload of a stopped job (Kueue then
-// suspends it and deletes its pods) and reactivates it on resume.
+// suspends it and deletes its pods) and reactivates it on resume. Without
+// Kueue there is no Workload, so the job's own suspend flag does the same.
 func (r *TrainJobReconciler) syncActive(ctx context.Context, tj *kf.TrainJob) error {
 	want := tj.Annotations[training.AnnotationStopped] != naming.LiteralTrue
+	installed, err := kf.Installed(r.RESTMapper(), kf.WorkloadGVK)
+	if err != nil {
+		return err
+	}
+	if !installed {
+		return r.syncSuspend(ctx, tj, !want)
+	}
 	wls := &unstructured.UnstructuredList{}
 	wls.SetGroupVersionKind(kf.WorkloadGVK.GroupVersion().WithKind("WorkloadList"))
 	if err := r.List(ctx, wls, client.InNamespace(tj.Namespace),
 		client.MatchingLabels{kf.LabelKueueJobUID: string(tj.UID)}); err != nil {
-		if meta.IsNoMatchError(err) {
-			return nil
-		}
 		return err
 	}
 	for i := range wls.Items {
@@ -205,6 +211,32 @@ func (r *TrainJobReconciler) syncActive(ctx context.Context, tj *kf.TrainJob) er
 		} else {
 			r.event(tj, corev1.EventTypeNormal, "Stopped", "Deactivated Workload %s", wl.GetName())
 		}
+	}
+	return nil
+}
+
+// syncSuspend sets the job's suspend flag to suspend when Kueue is absent. With
+// Kueue the flag belongs to Kueue, which sets it on admission, so it is only
+// written here when no Kueue is installed.
+func (r *TrainJobReconciler) syncSuspend(ctx context.Context, tj *kf.TrainJob, suspend bool) error {
+	if (tj.Spec.Suspend != nil && *tj.Spec.Suspend) == suspend {
+		return nil
+	}
+	u := &unstructured.Unstructured{}
+	u.SetGroupVersionKind(kf.TrainJobGVK)
+	u.SetNamespace(tj.Namespace)
+	u.SetName(tj.Name)
+	data, err := json.Marshal(map[string]any{naming.KeySpec: map[string]any{"suspend": suspend}})
+	if err != nil {
+		return err
+	}
+	if err := r.Patch(ctx, u, client.RawPatch(types.MergePatchType, data)); err != nil && !apierrors.IsNotFound(err) {
+		return err
+	}
+	if suspend {
+		r.event(tj, corev1.EventTypeNormal, "Stopped", "Suspended TrainJob")
+	} else {
+		r.event(tj, corev1.EventTypeNormal, "Resumed", "Unsuspended TrainJob")
 	}
 	return nil
 }
@@ -358,12 +390,20 @@ func (r *TrainJobReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		}
 		return nil
 	})
-	return ctrl.NewControllerManagedBy(mgr).
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(tj).
-		Watches(&corev1.Pod{}, byJobSet).
-		Watches(wl, byOwner).
-		Named("trainjob").
-		Complete(r)
+		Watches(&corev1.Pod{}, byJobSet)
+	// Kueue is optional. Its Workload kind cannot be watched when it is not
+	// installed, and the controller then stops jobs through their suspend flag.
+	// The check runs at startup, so installing Kueue later needs a restart.
+	installed, err := kf.Installed(mgr.GetRESTMapper(), kf.WorkloadGVK)
+	if err != nil {
+		return err
+	}
+	if installed {
+		b = b.Watches(wl, byOwner)
+	}
+	return b.Named("trainjob").Complete(r)
 }
 
 func nodeReady(n *corev1.Node) bool {

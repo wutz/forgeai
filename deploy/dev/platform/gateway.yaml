@@ -20,5 +20,5 @@ spec:
         from: Selector
         selector:
           matchExpressions:
-          - key: forgeai.wutz.dev/project
+          - key: project.wutz.dev/project
             operator: Exists

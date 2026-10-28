@@ -98,16 +98,16 @@ type depInfo struct {
 }
 
 // depCatalog lists the components in install order: Kueue's TrainJob
-// integration needs the Trainer CRDs, so Trainer comes first, and the SSH
-// operator needs the sshpiper Pipe CRD.
+// integration needs the Trainer CRDs, so Trainer comes first, the SSH operator
+// needs the sshpiper Pipe CRD, and the project operator comes before forgeai,
+// which reads the InstanceTypes it derives.
 var depCatalog = []depInfo{
 	{name: "trainer", title: "Kubeflow Trainer v2", description: "TrainJobs and the ClusterTrainingRuntimes, with JobSet"},
 	{name: "kueue", title: "Kueue", description: "GPU quota queues that admit TrainJobs"},
 	{name: "agent-sandbox", title: "agent-sandbox", description: "Sandbox controller and CRDs for the Sandboxes view"},
 	{name: "gateway-api-inference-extension", title: "Gateway API Inference Extension", description: "InferencePool CRD that the llm-d routers of InferenceServices use"},
-	{name: "instancetype-operator", title: "InstanceType operator", description: "InstanceTypes and Kueue ResourceFlavors derived from GPU nodes", chart: instanceTypeOperatorSpec},
+	{name: "project", title: "Project operator", description: "Project namespaces, quotas, members and registries, and the InstanceTypes derived from GPU nodes", chart: projectSpec},
 	{name: "forgeai", title: "forgeai operator", description: "Inference services and sandboxes", chart: forgeaiSpec},
-	{name: "project-operator", title: "Project operator", description: "Project namespaces, quotas, members and registries", chart: projectOperatorSpec},
 	{name: "fileserver", title: "FileServer operator", description: "On-demand file servers for the project volumes", chart: fileServerSpec},
 	{name: "sshpiper", title: "sshpiper Pipe CRD", description: "Pipe CRD that the SSH gateway routes logins with"},
 	{name: "sshgateway", title: "SSH gateway", description: "SSHGateways and SSHRoutes that serve SSH logins to backend Services", chart: sshGatewaySpec},

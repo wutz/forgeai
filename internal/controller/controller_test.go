@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -16,12 +15,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/kf"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
 	"github.com/wutz/forgeai/pkg/training"
 	"github.com/wutz/forgeai/pkg/volumes"
+	projectv1 "github.com/wutz/project/api/v1alpha1"
 )
 
 const (
@@ -30,6 +29,26 @@ const (
 	gpuProduct = "NVIDIA-GeForce-RTX-5090"
 )
 
+// createInstanceType creates an InstanceType as the project operator would
+// derive it from GPU nodes. The operator's reconciler does not run in these
+// tests, so the object and its availability are written directly.
+func createInstanceType(name string, count int32, cpu, memory string, total int32) {
+	it := &projectv1.InstanceType{
+		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Spec: projectv1.InstanceTypeSpec{
+			GPU:          projectv1.InstanceTypeGPU{Class: "rtx-5090", Product: gpuProduct, Count: count, MemoryMiB: 32607},
+			CPU:          resource.MustParse(cpu),
+			Memory:       resource.MustParse(memory),
+			NodeSelector: map[string]string{naming.LabelGPUProduct: gpuProduct},
+		},
+	}
+	Expect(k8sClient.Create(ctx, it)).To(Succeed())
+	it.Status = projectv1.InstanceTypeStatus{Total: total, Free: total}
+	Expect(k8sClient.Status().Update(ctx, it)).To(Succeed())
+}
+
+// createGPUNode creates a Ready node with the GPU labels and capacity of a
+// worker, so pods scheduled to it are not reported as lost with their node.
 func createGPUNode(name string) {
 	n := &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{
 		naming.LabelGPUProduct: gpuProduct, naming.LabelGPUMemory: "32607",
@@ -87,6 +106,11 @@ var _ = Describe("forgeai operator", Ordered, func() {
 	ns := "forge-" + project
 
 	BeforeAll(func() {
+		// Two workers per instance type; 8 GPUs across the two GPU nodes.
+		createInstanceType("rtx-5090.x1", 1, "14", "117Gi", 16)
+		createInstanceType("rtx-5090.x2", 2, "28", "234Gi", 8)
+		// Pods of the failure cases run on these nodes; a missing node would
+		// read as a node failure.
 		createGPUNode("gn-1")
 		createGPUNode("gn-2")
 		// The project operator creates this namespace from a Project; the
@@ -94,35 +118,6 @@ var _ = Describe("forgeai operator", Ordered, func() {
 		Expect(k8sClient.Create(ctx, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{
 			Name: ns, Labels: map[string]string{naming.LabelProject: project},
 		}})).To(Succeed())
-	})
-
-	It("derives instance types and resource flavors from GPU nodes", func() {
-		it := &instancetypev1.InstanceType{}
-		Eventually(get(it, "", "rtx-5090.x2"), timeout, interval).Should(Succeed())
-		// (128 - 8) / 8 = 15 cores, (1024 - 64) / 8 = 120 GiB per GPU.
-		Expect(it.Spec.CPU.String()).To(Equal("30"))
-		Expect(it.Spec.Memory.String()).To(Equal("240Gi"))
-		Expect(it.Spec.NodeSelector).To(HaveKeyWithValue(naming.LabelGPUProduct, gpuProduct))
-		Eventually(func() int32 {
-			_ = k8sClient.Get(ctx, client.ObjectKeyFromObject(it), it)
-			return it.Status.Total
-		}, timeout, interval).Should(Equal(int32(8)), func() string {
-			n := &corev1.Node{}
-			_ = get(n, "", "gn-1")()
-			return fmt.Sprintf("%+v\n%+v\n%+v", it.Status, n.Status.Conditions, n.Spec.Taints)
-		})
-		Expect(it.Status.Free).To(Equal(int32(8)))
-
-		rf := &unstructured.Unstructured{}
-		rf.SetGroupVersionKind(kf.ResourceFlavorGVK)
-		Eventually(get(rf, "", "forgeai-rtx-5090"), timeout, interval).Should(Succeed())
-
-		// Manually deleted instance types come back.
-		Expect(k8sClient.Delete(ctx, it)).To(Succeed())
-		Eventually(func() bool {
-			cur := &instancetypev1.InstanceType{}
-			return k8sClient.Get(ctx, client.ObjectKeyFromObject(it), cur) == nil && cur.UID != it.UID
-		}, timeout, interval).Should(BeTrue())
 	})
 
 	It("purges expired volumes from the trash", func() {
@@ -151,7 +146,7 @@ var _ = Describe("forgeai operator", Ordered, func() {
 
 	It("classifies a failed TrainJob and retries infrastructure failures", func() {
 		f := &training.Form{Name: "train", Image: "img", InstanceType: "rtx-5090.x1", Workers: 1, MaxRetries: 1}
-		it := &instancetypev1.InstanceType{}
+		it := &projectv1.InstanceType{}
 		Expect(get(it, "", "rtx-5090.x1")()).To(Succeed())
 		pcfg, _ := platform.Parse([]byte(testPlatformConfig))
 		tj, err := training.TrainJob(f, training.Context{Namespace: ns, InstanceType: it, Config: pcfg})
@@ -192,7 +187,7 @@ var _ = Describe("forgeai operator", Ordered, func() {
 
 	It("fails jobs stuck on image pulls without retrying them", func() {
 		f := &training.Form{Name: "stuck", Image: "nope", InstanceType: "rtx-5090.x1", Workers: 1, MaxRetries: 3, RetryOn: training.RetryAny}
-		it := &instancetypev1.InstanceType{}
+		it := &projectv1.InstanceType{}
 		Expect(get(it, "", "rtx-5090.x1")()).To(Succeed())
 		pcfg, _ := platform.Parse([]byte(testPlatformConfig))
 		tj, _ := training.TrainJob(f, training.Context{Namespace: ns, InstanceType: it, Config: pcfg})
@@ -227,7 +222,7 @@ var _ = Describe("forgeai operator", Ordered, func() {
 
 	It("keeps the worker failure seen while a TrainJob ran once its pods are gone", func() {
 		f := &training.Form{Name: "gone", Image: "img", InstanceType: "rtx-5090.x1", Workers: 1}
-		it := &instancetypev1.InstanceType{}
+		it := &projectv1.InstanceType{}
 		Expect(get(it, "", "rtx-5090.x1")()).To(Succeed())
 		pcfg, _ := platform.Parse([]byte(testPlatformConfig))
 		tj, err := training.TrainJob(f, training.Context{Namespace: ns, InstanceType: it, Config: pcfg})
@@ -268,7 +263,7 @@ var _ = Describe("forgeai operator", Ordered, func() {
 
 	It("deactivates the Kueue Workload of a stopped TrainJob and reactivates it on resume", func() {
 		f := &training.Form{Name: "pause", Image: "img", InstanceType: "rtx-5090.x1", Workers: 1}
-		it := &instancetypev1.InstanceType{}
+		it := &projectv1.InstanceType{}
 		Expect(get(it, "", "rtx-5090.x1")()).To(Succeed())
 		pcfg, _ := platform.Parse([]byte(testPlatformConfig))
 		tj, err := training.TrainJob(f, training.Context{Namespace: ns, InstanceType: it, Config: pcfg})

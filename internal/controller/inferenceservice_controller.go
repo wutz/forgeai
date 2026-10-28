@@ -37,11 +37,11 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	instancetypev1 "github.com/wutz/forgeai-instancetype-operator/api/v1alpha1"
 	v1 "github.com/wutz/forgeai/api/v1alpha1"
 	"github.com/wutz/forgeai/pkg/inference"
 	"github.com/wutz/forgeai/pkg/naming"
 	"github.com/wutz/forgeai/pkg/platform"
+	projectv1 "github.com/wutz/project/api/v1alpha1"
 )
 
 // Reasons of the Ready condition of an InferenceService.
@@ -67,7 +67,7 @@ type InferenceServiceReconciler struct {
 // +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=inferenceservices,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=inferenceservices/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=inferenceservices/finalizers,verbs=update
-// +kubebuilder:rbac:groups=forgeai.wutz.dev,resources=instancetypes,verbs=get;list;watch
+// +kubebuilder:rbac:groups=project.wutz.dev,resources=instancetypes,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services;serviceaccounts;configmaps;secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
@@ -94,7 +94,7 @@ func (r *InferenceServiceReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	}
 	orig := svc.DeepCopy()
 
-	it := &instancetypev1.InstanceType{}
+	it := &projectv1.InstanceType{}
 	if err := r.Get(ctx, types.NamespacedName{Name: svc.Spec.InstanceType}, it); err != nil {
 		if !apierrors.IsNotFound(err) {
 			return ctrl.Result{}, err

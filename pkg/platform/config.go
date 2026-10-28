@@ -268,9 +268,6 @@ type Config struct {
 	NamespacePrefix string `json:"namespacePrefix,omitempty"`
 	// APIServer is the URL written into member kubeconfigs.
 	APIServer string `json:"apiServer,omitempty"`
-	// MembersNamespace holds member ServiceAccounts and tokens, out of reach
-	// of project members.
-	MembersNamespace string `json:"membersNamespace,omitempty"`
 
 	Ingress  Ingress  `json:"ingress"`
 	Gateway  Gateway  `json:"gateway,omitzero"`
@@ -326,9 +323,6 @@ func Parse(data []byte) (*Config, error) {
 	}
 	if c.NamespacePrefix == "" {
 		c.NamespacePrefix = "forge-"
-	}
-	if c.MembersNamespace == "" {
-		c.MembersNamespace = "forgeai-members"
 	}
 	if c.Ingress.Port == 0 {
 		c.Ingress.Port = 443

@@ -6,7 +6,6 @@ require (
 	github.com/go-logr/logr v1.4.4
 	github.com/wailsapp/wails/v2 v2.16.0
 	github.com/wutz/forgeai v0.0.0-00010101000000-000000000000
-	github.com/wutz/forgeai-instancetype-operator v0.1.0
 	helm.sh/helm/v3 v3.22.1
 	k8s.io/api v0.37.1
 	k8s.io/apimachinery v0.37.1
@@ -119,7 +118,7 @@ require (
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	github.com/wailsapp/go-webview2 v1.0.22 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
-	github.com/wutz/project-operator v0.4.1
+	github.com/wutz/project v0.5.0
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xlab/treeprint v1.2.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
@@ -136,7 +135,7 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.37.1
+	k8s.io/apiextensions-apiserver v0.37.1 // indirect
 	k8s.io/apiserver v0.37.1 // indirect
 	k8s.io/cli-runtime v0.37.1 // indirect
 	k8s.io/component-base v0.37.1 // indirect

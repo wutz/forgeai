@@ -121,9 +121,9 @@ func testDeployment(version string, available bool) appsv1.Deployment {
 	return d
 }
 
-// helmDeployment returns a Deployment installed by the SSH operator chart at chartVersion.
+// helmDeployment returns a Deployment installed by the SSH gateway chart at chartVersion.
 func helmDeployment(chartVersion string, available bool) appsv1.Deployment {
-	return helmChartDeployment("ssh-operator", chartVersion, available)
+	return helmChartDeployment("sshgateway", chartVersion, available)
 }
 
 // helmChartDeployment returns a Deployment installed by the chart chart at chartVersion.
@@ -136,7 +136,7 @@ func helmChartDeployment(chart, chartVersion string, available bool) appsv1.Depl
 func TestAssess(t *testing.T) {
 	bundled := Dependency{Name: "kueue", Pinned: "v0.20.2", Installable: true}
 	operator := Dependency{Name: "forgeai", Installable: true, Pinned: forgeaiChartVersion}
-	sshOperator := Dependency{Name: "ssh-operator", Installable: true, Pinned: sshOperatorChartVersion}
+	sshGateway := Dependency{Name: "sshgateway", Installable: true, Pinned: sshGatewayChartVersion}
 	instanceTypes := Dependency{Name: "instancetype-operator", Installable: true, Pinned: instanceTypeOperatorChartVersion}
 	sandbox := Dependency{Name: "agent-sandbox", Pinned: "v1.0.7", Installable: true}
 	gatewayAPI := Dependency{Name: "gateway-api-inference-extension", Pinned: "v1.6.2", Installable: true}
@@ -168,11 +168,11 @@ func TestAssess(t *testing.T) {
 			deployments: []appsv1.Deployment{testDeployment("0.0.9", true)}}, "outdated", "0.0.9"},
 		{"operator deployed outside Helm", operator, depHealth{crdsWanted: 2, crdsFound: 2, chart: forgeaiSpec,
 			deployments: []appsv1.Deployment{testDeployment("", true)}}, "unmanaged", ""},
-		{"SSH operator from its chart", sshOperator, depHealth{crdsWanted: 3, crdsFound: 3, chart: sshOperatorSpec,
-			deployments: []appsv1.Deployment{helmDeployment(sshOperatorChartVersion, true)}}, "ready", sshOperatorChartVersion},
-		{"older SSH operator chart", sshOperator, depHealth{crdsWanted: 3, crdsFound: 3, chart: sshOperatorSpec,
+		{"SSH gateway from its chart", sshGateway, depHealth{crdsWanted: 3, crdsFound: 3, chart: sshGatewaySpec,
+			deployments: []appsv1.Deployment{helmDeployment(sshGatewayChartVersion, true)}}, "ready", sshGatewayChartVersion},
+		{"older SSH gateway chart", sshGateway, depHealth{crdsWanted: 3, crdsFound: 3, chart: sshGatewaySpec,
 			deployments: []appsv1.Deployment{helmDeployment("0.0.9", true)}}, "outdated", "0.0.9"},
-		{"SSH operator deployed outside Helm", sshOperator, depHealth{crdsWanted: 3, crdsFound: 3, chart: sshOperatorSpec,
+		{"SSH gateway deployed outside Helm", sshGateway, depHealth{crdsWanted: 3, crdsFound: 3, chart: sshGatewaySpec,
 			deployments: []appsv1.Deployment{testDeployment("", true)}}, "unmanaged", ""},
 		{"InstanceType operator from its chart", instanceTypes, depHealth{crdsWanted: 1, crdsFound: 1,
 			chart: instanceTypeOperatorSpec, deployments: []appsv1.Deployment{
@@ -426,10 +426,10 @@ func TestCheckChartTarget(t *testing.T) {
 			withObjects(deployment(forgeaiSpec, map[string]string{helmChartLabel: "forgeai-" + forgeaiChartVersion})), false},
 		{"deployed outside Helm", forgeaiSpec,
 			withObjects(deployment(forgeaiSpec, map[string]string{"app": "forgeai"})), true},
-		{"SSH operator without the Pipe CRD", sshOperatorSpec, withObjects(), true},
-		{"SSH operator with the Pipe CRD", sshOperatorSpec, withObjects(pipeCRD), false},
-		{"SSH operator installed from another chart", sshOperatorSpec, withObjects(pipeCRD,
-			deployment(sshOperatorSpec, map[string]string{helmChartLabel: "forgeai-" + forgeaiChartVersion})), true},
+		{"SSH gateway without the Pipe CRD", sshGatewaySpec, withObjects(), true},
+		{"SSH gateway with the Pipe CRD", sshGatewaySpec, withObjects(pipeCRD), false},
+		{"SSH gateway installed from another chart", sshGatewaySpec, withObjects(pipeCRD,
+			deployment(sshGatewaySpec, map[string]string{helmChartLabel: "forgeai-" + forgeaiChartVersion})), true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -110,7 +110,7 @@ var depCatalog = []depInfo{
 	{name: "project-operator", title: "Project operator", description: "Project namespaces, quotas, members and registries", chart: projectOperatorSpec},
 	{name: "fileserver-operator", title: "FileServer operator", description: "On-demand file servers for the project volumes", chart: fileServerSpec},
 	{name: "sshpiper", title: "sshpiper Pipe CRD", description: "Pipe CRD that the SSH gateway routes logins with"},
-	{name: "ssh-operator", title: "SSH operator", description: "SSHGateways and SSHRoutes that serve sandbox SSH logins", chart: sshOperatorSpec},
+	{name: "sshgateway", title: "SSH gateway", description: "SSHGateways and SSHRoutes that serve sandbox SSH logins", chart: sshGatewaySpec},
 }
 
 // depInfoByName returns the catalog entry of a component.

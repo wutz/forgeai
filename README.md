@@ -97,22 +97,22 @@ Members create, stop, start and delete sandboxes in their namespace with the `fo
 
 A sandbox labelled `forgeai.wutz.dev/ssh: "true"` (the create form's "SSH" switch) gets an sshd sidecar and a Service on port 22. An SSH session reaches only what the sidecar mounts: the project volumes it shares with the agent, not the agent's container image or its processes.
 
-Entry is through sshpiperd. The [SSH operator](https://github.com/wutz/ssh-operator) runs it as an SSH gateway modelled on the Gateway API; the sshd sidecar of each sandbox stays in forgeai:
+Entry is through sshpiperd. The [SSH gateway operator](https://github.com/wutz/sshgateway) runs it as an SSH gateway modelled on the Gateway API; the sshd sidecar of each sandbox stays in forgeai:
 
 ```yaml
-apiVersion: forgeai.wutz.dev/v1alpha1
+apiVersion: sshgateway.wutz.dev/v1alpha1
 kind: SSHGateway
 metadata:
   name: main
   namespace: forgeai-system
 spec:
-  gatewayClassName: forgeai-ssh
+  gatewayClassName: sshgateway
   listeners:
     - name: ssh
       port: 2222
       allowedRoutes: {namespaces: {from: All}}
 ---
-apiVersion: forgeai.wutz.dev/v1alpha1
+apiVersion: sshgateway.wutz.dev/v1alpha1
 kind: SSHRoute
 metadata:
   name: agent-login
@@ -125,13 +125,13 @@ spec:
       backendRefs: [{name: agent}]
 ```
 
-`SSHGatewayClass` names the controller (`forgeai.wutz.dev/ssh-gateway`). Only the gateway of the platform namespace is served, and only one of them exists: a second one there is rejected. Each rule of a route becomes one sshpiperd `Pipe` that accepts the keys of `authorizedKeys` for the listed usernames and forwards to the `SSHService` of the named sandbox, logging in as `sandbox` with the platform identity key.
+`SSHGatewayClass` `sshgateway` names the controller (`sshgateway.wutz.dev/ssh-gateway`). Only the gateway of the platform namespace is served, and only one of them exists: a second one there is rejected. Each rule of a route becomes one sshpiperd `Pipe` that accepts the keys of `authorizedKeys` for the listed usernames and forwards to the `SSHService` of the named sandbox, logging in as `sandbox` with the platform identity key.
 
-- The gateway needs the sshpiper `Pipe` CRD (`pipes.sshpiper.com`, served by the sshpiper kubernetes plugin) installed in the cluster. The Dependencies view installs it as the `sshpiper` component, before the SSH operator. Without it the SSH operator starts without its gateway controllers, and the SSHGateway and SSHRoute stay without status.
+- The gateway needs the sshpiper `Pipe` CRD (`pipes.sshpiper.com`, served by the sshpiper kubernetes plugin) installed in the cluster. The Dependencies view installs it as the `sshpiper` component, before the SSH gateway. Without it the SSH gateway operator starts without its gateway controllers, and the SSHGateway and SSHRoute stay without status.
 - A username is claimed by the first route that matches it; keep login names unique.
 - Keys are the only way in. Passwords, keyboard interaction, agent and TCP forwarding, tunnels and X11 are all off, at the gateway and at the sidecar.
 - The gateway host key is generated once per gateway and kept in the Secret `forgeai-system/sshgateway-main-hostkey`; pin it with `known_hosts` rather than trusting on first use.
-- The sshd sidecar image is `sandbox.sshImage` (default `ghcr.io/wutz/forgeai-sshd:0.1.0`, built by `make sshd-image`); sshpiperd is the `gateway.image` value of the SSH operator chart (default `ghcr.io/tg123/sshpiperd:v1.6.1`).
+- The sshd sidecar image is `sandbox.sshImage` (default `ghcr.io/wutz/forgeai-sshd:0.1.0`, built by `make sshd-image`); sshpiperd is the `gateway.image` value of the SSH gateway chart (default `ghcr.io/tg123/sshpiperd:v1.6.1`).
 
 Route conditions are reported in `status.parents` (`Accepted`, `ResolvedRefs`); gateway conditions in `status.conditions` (`Accepted`, `Programmed`, `Ready`).
 
@@ -258,19 +258,19 @@ The CRD carries `helm.sh/resource-policy: keep`, so the later upgrade of `forgea
 
 Pushing a `v<version>` tag runs `.github/workflows/helm-release.yml`, which publishes the operator image (`ghcr.io/wutz/forgeai:<version>`) and the chart (`oci://ghcr.io/wutz/charts/forgeai:<version>`). `make helm-lint` lints and renders the chart; `make helm-package CHART_VERSION=<version>` writes the package to `dist/`.
 
-The SSH operator is a separate project, [wutz/ssh-operator](https://github.com/wutz/ssh-operator), published as the chart `oci://ghcr.io/wutz/charts/ssh-operator`. The Dependencies view installs the sshpiper `Pipe` CRD, then the pinned chart version (0.1.1) as release `ssh-operator` in `ssh-operator-system`, with `platform.namespace` set to the platform namespace. The same install from the CLI, once the Pipe CRD is in the cluster:
+The SSH gateway operator is a separate project, [wutz/sshgateway](https://github.com/wutz/sshgateway), published as the chart `oci://ghcr.io/wutz/charts/sshgateway`. The Dependencies view installs the sshpiper `Pipe` CRD, then the pinned chart version (0.2.0) as release `sshgateway` in `sshgateway-system`, with `gateway.namespace` set to the platform namespace. The same install from the CLI, once the Pipe CRD is in the cluster:
 
 ```sh
-helm install ssh-operator oci://ghcr.io/wutz/charts/ssh-operator --version 0.1.1 \
-  --namespace ssh-operator-system --create-namespace \
-  --set platform.namespace=forgeai-system
+helm install sshgateway oci://ghcr.io/wutz/charts/sshgateway --version 0.2.0 \
+  --namespace sshgateway-system --create-namespace \
+  --set gateway.namespace=forgeai-system
 ```
 
-A cluster that ran the SSH gateway from an earlier forgeai release has the `SSHGatewayClass`, `SSHGateway` and `SSHRoute` CRDs of `forgeai.wutz.dev` installed without Helm, and Helm does not adopt them. Back up their objects first (`kubectl get sshgatewayclasses,sshgateways,sshroutes -A -o yaml > ssh-backup.yaml`), delete the three CRDs, install the chart, and apply the backup again. This path is not verified on a cluster that ran the earlier release.
+A cluster that ran the SSH gateway from an earlier forgeai release has the `SSHGatewayClass`, `SSHGateway` and `SSHRoute` CRDs of the `forgeai.wutz.dev` group, installed by the `ssh-operator` release. The new chart serves `sshgateway.wutz.dev` and does not remove them. Back up the objects first (`kubectl get sshgatewayclasses,sshgateways,sshroutes -A -o yaml > ssh-backup.yaml`), uninstall the `ssh-operator` release, delete the three `forgeai.wutz.dev` CRDs, install the chart, and recreate the objects as `sshgateway.wutz.dev/v1alpha1`. Gateway Deployments are selected by a label that changed, so recreate them too. This path is not verified on a cluster that ran the earlier release.
 
 A cluster set up with `make deploy-dev` runs the operator outside Helm. Helm does not adopt objects it did not create, so the Dependencies view reports that operator as deployed outside Helm and refuses the chart install. Move such a cluster by removing the dev deployment with `make undeploy-dev` (this deletes the forgeai CRDs and all forgeai objects, so back them up first) and then installing the charts.
 
-Prerequisites (the Dependencies view installs Kubeflow Trainer, agent-sandbox, Kueue, the InstanceType operator, the forgeai, Project and FileServer operators, the sshpiper Pipe CRD and the SSH operator into a cluster; `make gui-deps` refreshes the pinned manifests embedded in the GUI):
+Prerequisites (the Dependencies view installs Kubeflow Trainer, agent-sandbox, Kueue, the InstanceType operator, the forgeai, Project and FileServer operators, the sshpiper Pipe CRD and the SSH gateway into a cluster; `make gui-deps` refreshes the pinned manifests embedded in the GUI):
 
 - Kubeflow Trainer v2 (with JobSet) and a `ClusterTrainingRuntime` named after `training.defaultRuntime`
 - agent-sandbox v1.0 or later (CRDs `agents.x-k8s.io/v1beta1`), for the Sandboxes view; the isolation RuntimeClasses (`gvisor`, `kata`) come from the node runtimes
@@ -278,4 +278,4 @@ Prerequisites (the Dependencies view installs Kubeflow Trainer, agent-sandbox, K
 - InstanceType operator (`forgeai-instancetype-operator` chart), which creates the InstanceTypes and Kueue ResourceFlavors from GPU nodes
 - NVIDIA GPU operator (GPU feature discovery labels and the `nvidia.com/gpu` resource); not installed from the GUI
 - A CNI that enforces NetworkPolicies, an ingress controller and Harbor
-- For SSH sandboxes only: the sshpiper `Pipe` CRD and the [SSH operator](https://github.com/wutz/ssh-operator), see [SSH](#ssh)
+- For SSH sandboxes only: the sshpiper `Pipe` CRD and the [SSH gateway operator](https://github.com/wutz/sshgateway), see [SSH](#ssh)

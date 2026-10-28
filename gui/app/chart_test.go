@@ -92,23 +92,23 @@ func TestForgeaiChartRenders(t *testing.T) {
 	}
 }
 
-// TestSSHOperatorSpec checks what the GUI tells the SSH operator chart: the
+// TestSSHGatewaySpec checks what the GUI tells the SSH gateway chart: the
 // platform namespace its gateways are served in, and the Pipe CRD it needs.
-func TestSSHOperatorSpec(t *testing.T) {
-	if got := sshOperatorSpec.installNamespace(); got != sshOperatorNamespace {
-		t.Errorf("installNamespace = %s, want %s", got, sshOperatorNamespace)
+func TestSSHGatewaySpec(t *testing.T) {
+	if got := sshGatewaySpec.installNamespace(); got != sshGatewayNamespace {
+		t.Errorf("installNamespace = %s, want %s", got, sshGatewayNamespace)
 	}
-	ns, _, _ := unstructured.NestedString(sshOperatorSpec.values(nil), "platform", "namespace")
+	ns, _, _ := unstructured.NestedString(sshGatewaySpec.values(nil), "gateway", "namespace")
 	if ns != platform.Namespace() {
-		t.Errorf("platform.namespace = %q, want %s", ns, platform.Namespace())
+		t.Errorf("gateway.namespace = %q, want %s", ns, platform.Namespace())
 	}
-	if !slices.Contains(sshOperatorSpec.needs, "pipes.sshpiper.com") {
-		t.Errorf("needs = %v, want the sshpiper Pipe CRD", sshOperatorSpec.needs)
+	if !slices.Contains(sshGatewaySpec.needs, "pipes.sshpiper.com") {
+		t.Errorf("needs = %v, want the sshpiper Pipe CRD", sshGatewaySpec.needs)
 	}
 }
 
 // TestSSHPiperBundle checks that the sshpiper component is a CRD-only bundle
-// of the Pipe CRD the SSH operator needs.
+// of the Pipe CRD the SSH gateway needs.
 func TestSSHPiperBundle(t *testing.T) {
 	b, err := bundleByName("sshpiper")
 	if err != nil || b == nil {

@@ -1,7 +1,7 @@
-import {useEffect, useRef, useState} from 'react'
+import {useEffect, useState} from 'react'
 import {DeleteImage, DeleteImageRepo, DeleteImageTag, ListImages, Registry} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
-import {errText, everyWhileVisible, fmtDate, tagCount} from './util'
+import {errText, everyWhileVisible, fmtDate, tagCount, useCopy} from './util'
 import {t} from './i18n'
 import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Spinner, useActive, useConfirm} from './ui'
 
@@ -9,21 +9,6 @@ import {Badge, Card, Empty, Icon, PageHeader, RefreshButton, Spinner, useActive,
 // form of one ("1 image") as the messages do for jobs.
 const countImages = (n: number) => n === 1 ? t('images.imagesOne') : t('images.imagesMany', {count: n})
 const countTags = (n: number) => n === 1 ? t('images.tagsOne') : t('images.tagsMany', {count: n})
-
-// useCopy copies text and reports the key it was copied under for a moment, so
-// the button that copied it can say so. A failed copy goes to onFail.
-function useCopy(onFail: () => void) {
-  const [copied, setCopied] = useState('')
-  const timer = useRef<number>()
-  const copy = (text: string, key: string) =>
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(key)
-      // A second copy restarts the notice, so the earlier timer must not clear it early.
-      window.clearTimeout(timer.current)
-      timer.current = window.setTimeout(() => setCopied(''), 1500)
-    }, onFail)
-  return {copied, copy}
-}
 
 // Images shows the project registry's repositories: the pushed tags with delete
 // buttons. How to push is in ImagePush, which sits under it in the sidebar.

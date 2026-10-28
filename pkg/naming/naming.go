@@ -99,7 +99,7 @@ const SSHSidecarContainer = "sshd"
 
 // SSHIdentitySecretName is the platform Secret in the platform namespace that
 // holds the key the gateway uses to log in to sandboxes.
-const SSHIdentitySecretName = "forgeai-ssh"
+const SSHIdentitySecretName = "sshgateway-identity"
 
 // SSHHostKeySecret is the Secret of an SSH Service that holds the host key of
 // the sshd behind it. The gateway pins that key from it.

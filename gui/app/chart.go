@@ -80,24 +80,25 @@ var forgeaiSpec = &chartSpec{
 	deployment: forgeaiDeployment, crds: forgeaiCRDs,
 }
 
-// The SSH operator is installed from its own Helm chart into its namespace. Its
-// SSHGateways are served in the platform namespace, which the chart is told, and
-// it needs the Pipe CRD of sshpiper, a bundled component installed first.
+// The SSH gateway operator is installed from its own Helm chart into its
+// namespace. Its SSHGateways are served in the platform namespace, which the
+// chart is told, and it needs the Pipe CRD of sshpiper, a bundled component
+// installed first.
 const (
-	sshOperatorChart        = "oci://ghcr.io/wutz/charts/ssh-operator"
-	sshOperatorChartVersion = "0.1.1"
-	sshOperatorRelease      = "ssh-operator"
-	sshOperatorNamespace    = "ssh-operator-system"
-	sshOperatorDeployment   = "ssh-operator-controller-manager"
+	sshGatewayChart        = "oci://ghcr.io/wutz/charts/sshgateway"
+	sshGatewayChartVersion = "0.2.0"
+	sshGatewayRelease      = "sshgateway"
+	sshGatewayNamespace    = "sshgateway-system"
+	sshGatewayDeployment   = "sshgateway-controller-manager"
 )
 
-var sshOperatorSpec = &chartSpec{
-	name: "ssh-operator", ref: sshOperatorChart, version: sshOperatorChartVersion, release: sshOperatorRelease,
-	namespace: sshOperatorNamespace, deployment: sshOperatorDeployment,
-	crds:  []string{"sshgatewayclasses.forgeai.wutz.dev", "sshgateways.forgeai.wutz.dev", "sshroutes.forgeai.wutz.dev"},
+var sshGatewaySpec = &chartSpec{
+	name: "sshgateway", ref: sshGatewayChart, version: sshGatewayChartVersion, release: sshGatewayRelease,
+	namespace: sshGatewayNamespace, deployment: sshGatewayDeployment,
+	crds:  []string{"sshgatewayclasses.sshgateway.wutz.dev", "sshgateways.sshgateway.wutz.dev", "sshroutes.sshgateway.wutz.dev"},
 	needs: []string{"pipes.sshpiper.com"},
 	values: func(*platform.Config) map[string]any {
-		return map[string]any{"platform": map[string]any{"namespace": platform.Namespace()}}
+		return map[string]any{"gateway": map[string]any{"namespace": platform.Namespace()}}
 	},
 }
 

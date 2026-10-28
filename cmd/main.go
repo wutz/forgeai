@@ -216,7 +216,6 @@ func main() {
 
 	cfg := &platform.Loader{Reader: mgr.GetAPIReader(), Namespace: platform.Namespace()}
 	for name, r := range map[string]interface{ SetupWithManager(ctrl.Manager) error }{
-		"volume-trash": &controller.PersistentVolumeClaimReconciler{Client: mgr.GetClient(), Config: cfg},
 		"inferenceservice": &controller.InferenceServiceReconciler{
 			Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: cfg,
 		},

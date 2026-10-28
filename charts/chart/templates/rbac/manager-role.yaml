@@ -14,7 +14,6 @@ rules:
   - ""
   resources:
   - configmaps
-  - persistentvolumeclaims
   - secrets
   - serviceaccounts
   - services
@@ -212,7 +211,6 @@ rules:
   - project.wutz.dev
   resources:
   - instancetypes
-  - projects
   verbs:
   - get
   - list

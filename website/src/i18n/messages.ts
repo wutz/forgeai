@@ -114,7 +114,7 @@ const en = {
         key: 'volumes',
         tab: 'Volumes',
         title: 'Shared volumes with a safety net',
-        body: 'Create ReadWriteMany volumes from the platform storage types, grow them in place and see which jobs and sandboxes use them. Deleted volumes go to a recycle bin until they expire.',
+        body: 'Create ReadWriteMany volumes from the platform storage types, grow them in place and see which jobs and sandboxes use them. Deleted volumes go to a recycle bin with expiry, then are purged by the separate volumetrash operator.',
         bullets: ['Grow, restore and set an expiry', 'Browse files over HTTPS without mounting', 'Registry images of the project in the same place'],
         alt: 'The Volumes view with the project volumes, the jobs and sandboxes that use them, and the recycle bin',
       },
@@ -201,7 +201,7 @@ const en = {
     bullets: [
       '<strong>Sandboxes</strong> are agent-sandbox resources with gVisor or Kata isolation, a bash command, env, optional GPU placement and project volumes.',
       '<strong>Idle suspend</strong> stops a sandbox nothing has used for its timeout. Open clients send a heartbeat to keep it awake.',
-      '<strong>Volumes</strong> are PVCs from the platform storage types. They can grow and go to a trash with an expiry before they are purged.',
+      '<strong>Volumes</strong> are PVCs from the platform storage types. They can grow, go to a trash with an expiry, and are then purged by the volumetrash operator.',
       '<strong>File server</strong> serves each volume over HTTPS with basic auth and scales to zero when it is not in use.',
     ],
     caption: 'Example Sandbox resource',

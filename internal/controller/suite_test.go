@@ -152,7 +152,6 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	loader := &platform.Loader{Reader: mgr.GetAPIReader(), Namespace: configNamespace}
 	for _, r := range []interface{ SetupWithManager(ctrl.Manager) error }{
-		&PersistentVolumeClaimReconciler{Client: mgr.GetClient(), Config: loader},
 		&TrainJobReconciler{Client: mgr.GetClient(), Config: loader, Recorder: mgr.GetEventRecorder("forgeai-test")},
 		&InferenceServiceReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), Config: loader},
 		&SandboxReconciler{Client: mgr.GetClient(), APIReader: mgr.GetAPIReader(), Config: loader, Gateway: true},

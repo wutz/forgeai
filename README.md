@@ -141,9 +141,9 @@ Route conditions are reported in `status.parents` (`Accepted`, `ResolvedRefs`); 
 
 Volumes are PVCs in the project namespace, created from the platform `storageTypes` (ReadWriteMany by default) and limited by the project quota. Volumes can be resized (grow only) and moved to the trash:
 
-- Trashing sets the label `fileserver.wutz.dev/ignore` and the annotation `forgeai.wutz.dev/expire-at`; the FileServer operator does not serve a volume with the ignore label. Volumes mounted by running pods cannot be trashed, except by the file server: it is rebuilt without trashed volumes. Volumes trashed before FileServer 0.3.0 carry `forgeai.wutz.dev/trash`; the operator and the Dependencies install move that label to `fileserver.wutz.dev/ignore`.
-- Trashed volumes can be restored, purged, or have their expiry changed until they expire.
-- The operator purges expired volumes, postponing while a pod still mounts them. A volume trashed without an expiry (e.g. labelled with `kubectl`) expires after the project `trashRetention` (default: platform `trashRetention`).
+- Trashing sets the label `fileserver.wutz.dev/ignore` and the annotation `forgeai.wutz.dev/expire-at`; the FileServer operator does not serve a volume with the ignore label. Volumes mounted by running pods cannot be trashed, except by the file server: it is rebuilt without trashed volumes. Volumes trashed before FileServer 0.3.0 carry `forgeai.wutz.dev/trash`; the Dependencies install moves that label to `fileserver.wutz.dev/ignore`.
+- Trashed volumes can be restored, have their expiry changed or be manually purged until they expire.
+- The volumetrash operator, installed from the Dependencies view, purges expired volumes, postponing while a pod still mounts them. A volume trashed without an expiry (e.g. labelled with `kubectl`) expires after the project `trashRetention` (default: platform `trashRetention`).
 
 ## FileServer
 

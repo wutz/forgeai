@@ -31,17 +31,6 @@ rules:
   - watch
 - apiGroups:
   - ""
-  resources:
-  - persistentvolumeclaims
-  verbs:
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
   - events.k8s.io
   resources:
   - events
@@ -161,7 +150,6 @@ rules:
   - project.wutz.dev
   resources:
   - instancetypes
-  - projects
   verbs:
   - get
   - list

@@ -108,7 +108,7 @@ func SSHHostKeySecret(service string) string { return service + "-hostkey" }
 // SSHServiceName is the Service that exposes the sshd of a sandbox.
 func SSHServiceName(sandbox string) string { return sandbox + "-ssh" }
 
-// SSHGatewayName is the name of the sshpiperd Deployment, Service and
+// SSHGatewayName is the name of the sshpiper Deployment, Service and
 // ConfigMap of an SSHGateway.
 func SSHGatewayName(gateway string) string { return "sshgateway-" + gateway }
 

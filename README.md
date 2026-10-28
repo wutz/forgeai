@@ -97,7 +97,7 @@ Members create, stop, start and delete sandboxes in their namespace with the `fo
 
 A sandbox labelled `forgeai.wutz.dev/ssh: "true"` (the create form's "SSH" switch) gets an sshd sidecar and a Service on port 22. An SSH session reaches only what the sidecar mounts: the project volumes it shares with the agent, not the agent's container image or its processes.
 
-Entry is through sshpiperd. The [SSH gateway operator](https://github.com/wutz/sshgateway) runs it as an SSH gateway modelled on the Gateway API; the sshd sidecar of each sandbox stays in forgeai:
+Entry is through sshpiper. The [SSH gateway operator](https://github.com/wutz/sshgateway) runs it as an SSH gateway modelled on the Gateway API. It is generic: a backend is any Service that exposes an sshd. The sshd sidecar of each sandbox, and the Service that exposes it, stay in forgeai:
 
 ```yaml
 apiVersion: sshgateway.wutz.dev/v1alpha1
@@ -122,16 +122,16 @@ spec:
   rules:
     - matches: [{username: alice}]
       authorizedKeys: ["ssh-ed25519 AAAA... alice@example.com"]
-      backendRefs: [{name: agent}]
+      backendRefs: [{name: agent, username: sandbox}]
 ```
 
-`SSHGatewayClass` `sshgateway` names the controller (`sshgateway.wutz.dev/ssh-gateway`). Only the gateway of the platform namespace is served, and only one of them exists: a second one there is rejected. Each rule of a route becomes one sshpiperd `Pipe` that accepts the keys of `authorizedKeys` for the listed usernames and forwards to the `SSHService` of the named sandbox, logging in as `sandbox` with the platform identity key.
+`SSHGatewayClass` `sshgateway` names the controller (`sshgateway.wutz.dev/ssh-gateway`). Only the gateway of the platform namespace is served, and only one of them exists: a second one there is rejected. Each rule of a route becomes one sshpiper `Pipe` that accepts the keys of `authorizedKeys` for the listed usernames and forwards to the backend Service named by `backendRefs`, logging in as the ref's `username` with the platform identity key. For a sandbox the Service is the sandbox's SSH Service and the username is `sandbox`, the account its sshd allows.
 
 - The gateway needs the sshpiper `Pipe` CRD (`pipes.sshpiper.com`, served by the sshpiper kubernetes plugin) installed in the cluster. The Dependencies view installs it as the `sshpiper` component, before the SSH gateway. Without it the SSH gateway operator starts without its gateway controllers, and the SSHGateway and SSHRoute stay without status.
 - A username is claimed by the first route that matches it; keep login names unique.
 - Keys are the only way in. Passwords, keyboard interaction, agent and TCP forwarding, tunnels and X11 are all off, at the gateway and at the sidecar.
 - The gateway host key is generated once per gateway and kept in the Secret `forgeai-system/sshgateway-main-hostkey`; pin it with `known_hosts` rather than trusting on first use.
-- The sshd sidecar image is `sandbox.sshImage` (default `ghcr.io/wutz/forgeai-sshd:0.1.0`, built by `make sshd-image`); sshpiperd is the `gateway.image` value of the SSH gateway chart (default `ghcr.io/tg123/sshpiperd:v1.6.1`).
+- The sshd sidecar image is `sandbox.sshImage` (default `ghcr.io/wutz/forgeai-sshd:0.1.0`, built by `make sshd-image`); sshpiper is the `gateway.image` value of the SSH gateway chart (default `ghcr.io/tg123/sshpiperd:v1.6.1`).
 
 Route conditions are reported in `status.parents` (`Accepted`, `ResolvedRefs`); gateway conditions in `status.conditions` (`Accepted`, `Programmed`, `Ready`).
 

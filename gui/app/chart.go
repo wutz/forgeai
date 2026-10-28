@@ -92,7 +92,7 @@ var forgeaiSpec = &chartSpec{
 // installed first.
 const (
 	sshGatewayChart        = "oci://ghcr.io/wutz/charts/sshgateway"
-	sshGatewayChartVersion = "0.2.0"
+	sshGatewayChartVersion = "0.3.0"
 	sshGatewayRelease      = "sshgateway"
 	sshGatewayNamespace    = "sshgateway-system"
 	sshGatewayDeployment   = "sshgateway-controller-manager"

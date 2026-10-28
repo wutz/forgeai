@@ -258,10 +258,10 @@ The CRD carries `helm.sh/resource-policy: keep`, so the later upgrade of `forgea
 
 Pushing a `v<version>` tag runs `.github/workflows/helm-release.yml`, which publishes the operator image (`ghcr.io/wutz/forgeai:<version>`) and the chart (`oci://ghcr.io/wutz/charts/forgeai:<version>`). `make helm-lint` lints and renders the chart; `make helm-package CHART_VERSION=<version>` writes the package to `dist/`.
 
-The SSH gateway operator is a separate project, [wutz/sshgateway](https://github.com/wutz/sshgateway), published as the chart `oci://ghcr.io/wutz/charts/sshgateway`. The Dependencies view installs the sshpiper `Pipe` CRD, then the pinned chart version (0.2.0) as release `sshgateway` in `sshgateway-system`, with `gateway.namespace` set to the platform namespace. The same install from the CLI, once the Pipe CRD is in the cluster:
+The SSH gateway operator is a separate project, [wutz/sshgateway](https://github.com/wutz/sshgateway), published as the chart `oci://ghcr.io/wutz/charts/sshgateway`. The Dependencies view installs the sshpiper `Pipe` CRD, then the pinned chart version (0.3.0) as release `sshgateway` in `sshgateway-system`, with `gateway.namespace` set to the platform namespace. The same install from the CLI, once the Pipe CRD is in the cluster:
 
 ```sh
-helm install sshgateway oci://ghcr.io/wutz/charts/sshgateway --version 0.2.0 \
+helm install sshgateway oci://ghcr.io/wutz/charts/sshgateway --version 0.3.0 \
   --namespace sshgateway-system --create-namespace \
   --set gateway.namespace=forgeai-system
 ```

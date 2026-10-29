@@ -127,9 +127,9 @@ spec:
       backendRefs: [{name: agent, username: sandbox}]
 ```
 
-`SSHGatewayClass` `sshgateway` names the controller (`sshgateway.wutz.dev/ssh-gateway`). Only the gateway of the platform namespace is served, and only one of them exists: a second one there is rejected. Each rule of a route becomes one sshpiper `Pipe` that accepts the keys of `authorizedKeys` for the listed usernames and forwards to the backend Service named by `backendRefs`, logging in as the ref's `username` with the platform identity key. For a sandbox the Service is the sandbox's SSH Service and the username is `sandbox`, the account its sshd allows.
+`SSHGatewayClass` `sshgateway` names the controller (`sshgateway.wutz.dev/ssh-gateway`). Only the gateway of the platform namespace is served, and only one of them exists: a second one there is rejected. Each rule of a route becomes one sshpiper routing entry that accepts the keys of `authorizedKeys` for the listed usernames and forwards to the backend Service named by `backendRefs`, logging in as the ref's `username` with the platform identity key. For a sandbox the Service is the sandbox's SSH Service and the username is `sandbox`, the account its sshd allows.
 
-- The gateway needs the sshpiper `Pipe` CRD (`pipes.sshpiper.com`, served by the sshpiper kubernetes plugin) installed in the cluster. The Dependencies view installs it as the `sshpiper` component, before the SSH gateway. Without it the SSH gateway operator starts without its gateway controllers, and the SSHGateway and SSHRoute stay without status.
+- The gateway runs sshpiper's yaml plugin: the operator renders the routes into a ConfigMap, so sshpiper needs no CRD of its own in the cluster (earlier releases used the `pipes.sshpiper.com` Pipe CRD).
 - A username is claimed by the first route that matches it; keep login names unique.
 - Keys are the only way in. Passwords, keyboard interaction, agent and TCP forwarding, tunnels and X11 are all off, at the gateway and at the sidecar.
 - The gateway host key is generated once per gateway and kept in the Secret `forgeai-system/sshgateway-main-hostkey`; pin it with `known_hosts` rather than trusting on first use.
@@ -191,7 +191,7 @@ The desktop client connects with a kubeconfig context and a project namespace (t
 | Images | Push instructions and robot credentials; list and delete images in the project's Harbor project. Their tags are offered in a dropdown as the image of jobs, sandboxes and their templates, which also accept any other address |
 | Resources | Instance types with availability and the project quota usage |
 | Projects | Admins only (may create Projects): manage projects and members, export member kubeconfigs |
-| Dependencies | Cluster admins only: install or upgrade Kueue, Kubeflow Trainer v2 (with JobSet) and agent-sandbox at the versions pinned in the GUI, install the InstanceType operator, the forgeai, Workspace operator and FileServer operator Helm charts at their pinned versions, install the sshpiper Pipe CRD and the SSH operator from its Helm chart (see [SSH](#ssh)), and see each component's status |
+| Dependencies | Cluster admins only: install or upgrade Kueue, Kubeflow Trainer v2 (with JobSet) and agent-sandbox at the versions pinned in the GUI, install the InstanceType operator, the forgeai, Workspace operator and FileServer operator Helm charts at their pinned versions, install the SSH operator from its Helm chart (see [SSH](#ssh)), and see each component's status |
 
 The New job and New sandbox dialogs also offer template sources: job and sandbox templates from the platform's `templates.source` (default [wutz/forgeai-templates](https://github.com/wutz/forgeai-templates)), grouped apart from the project templates. You can add other published template sources by URL, `file://` directory or `oci://` reference (`oci://registry/repository:tag` or `oci://registry/repository@sha256:…`) under **Template sources** in the sidebar; a source is read before it is added, and its templates are marked as yours in the dialog. Picking a template prefills the form; the name, instance type and volumes stay yours, and the job or sandbox does not reference the template.
 
@@ -239,10 +239,10 @@ Earlier releases served Projects and InstanceTypes from the `forgeai.wutz.dev` g
 
 Pushing a `v<version>` tag runs `.github/workflows/helm-release.yml`, which publishes the operator image (`ghcr.io/wutz/forgeai:<version>`) and the chart (`oci://ghcr.io/wutz/charts/forgeai:<version>`). `make helm-lint` lints and renders the chart; `make helm-package CHART_VERSION=<version>` writes the package to `dist/`.
 
-The SSH gateway operator is a separate project, [wutz/sshgateway](https://github.com/wutz/sshgateway), published as the chart `oci://ghcr.io/wutz/charts/sshgateway`. The Dependencies view installs the sshpiper `Pipe` CRD, then the pinned chart version (0.3.0) as release `sshgateway` in `sshgateway-system`, with `gateway.namespace` set to the platform namespace. The same install from the CLI, once the Pipe CRD is in the cluster:
+The SSH gateway operator is a separate project, [wutz/sshgateway](https://github.com/wutz/sshgateway), published as the chart `oci://ghcr.io/wutz/charts/sshgateway`. The Dependencies view installs the pinned chart version (0.4.0) as release `sshgateway` in `sshgateway-system`, with `gateway.namespace` set to the platform namespace. From 0.4.0 the operator serves gateways with sshpiper's yaml plugin, so there is no separate CRD to install first. The same install from the CLI:
 
 ```sh
-helm install sshgateway oci://ghcr.io/wutz/charts/sshgateway --version 0.3.0 \
+helm install sshgateway oci://ghcr.io/wutz/charts/sshgateway --version 0.4.0 \
   --namespace sshgateway-system --create-namespace \
   --set gateway.namespace=forgeai-system
 ```
@@ -251,7 +251,7 @@ A cluster that ran the SSH gateway from an earlier forgeai release has the `SSHG
 
 A cluster set up with `make deploy-dev` runs the operator outside Helm. Helm does not adopt objects it did not create, so the Dependencies view reports that operator as deployed outside Helm and refuses the chart install. Move such a cluster by removing the dev deployment with `make undeploy-dev` (this deletes the forgeai CRDs and all forgeai objects, so back them up first) and then installing the charts.
 
-Prerequisites (the Dependencies view installs Kubeflow Trainer, agent-sandbox, Kueue, the project, forgeai and FileServer operators, the sshpiper Pipe CRD and the SSH gateway into a cluster; `make gui-deps` refreshes the pinned manifests embedded in the GUI):
+Prerequisites (the Dependencies view installs Kubeflow Trainer, agent-sandbox, Kueue, the project, forgeai and FileServer operators, and the SSH gateway into a cluster; `make gui-deps` refreshes the pinned manifests embedded in the GUI):
 
 - Kubeflow Trainer v2 (with JobSet) and a `ClusterTrainingRuntime` named after `training.defaultRuntime`
 - agent-sandbox v1.0 or later (CRDs `agents.x-k8s.io/v1beta1`), for the Sandboxes view; the isolation RuntimeClasses (`gvisor`, `kata`) come from the node runtimes
@@ -259,4 +259,4 @@ Prerequisites (the Dependencies view installs Kubeflow Trainer, agent-sandbox, K
 - Workspace operator (`workspace` chart), which creates the InstanceTypes and, when Kueue is installed, its ResourceFlavors from GPU nodes
 - NVIDIA GPU operator (GPU feature discovery labels and the `nvidia.com/gpu` resource); not installed from the GUI
 - A CNI that enforces NetworkPolicies, an ingress controller and Harbor
-- For SSH sandboxes only: the sshpiper `Pipe` CRD and the [SSH gateway operator](https://github.com/wutz/sshgateway), see [SSH](#ssh)
+- For SSH sandboxes only: the [SSH gateway operator](https://github.com/wutz/sshgateway), see [SSH](#ssh)

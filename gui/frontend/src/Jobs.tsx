@@ -327,9 +327,6 @@ function JobDetail({name, onDone, onOpen, onDeleted, onClose}: {
       }}/>}
 
       <div className="detail-actions">
-        <button className="btn btn-sm" onClick={() => viewLog(0, t('jobs.workerLabel', {index: 0})).catch(() => {})}>
-          <Icon name="scroll" size={13}/>{t('common.logs')}
-        </button>
         {change.jobs && live && attempt.phase !== 'Stopped' &&
           <button className="btn btn-sm" disabled={!!pending} onClick={() => confirm.ask({
             title: t('jobs.stopTitle', {name: attempt.name}),

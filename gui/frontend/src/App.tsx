@@ -18,7 +18,7 @@ import {errText} from './util'
 import {ChangeAccessContext, CreateAccessContext, Empty, HeaderSlot, Icon, IconName, Pane, Spinner} from './ui'
 import {Preferences} from './Preferences'
 import {TemplateSourcesDialog} from './TemplateSourcesDialog'
-import {UpdateButton, useUpdate} from './Update'
+import {SidebarUpdate, useUpdate} from './Update'
 import {getLocale, subscribeLocale, t} from './i18n'
 
 // PREFS is the last connection. NAMESPACES maps each kubeconfig context to the
@@ -262,7 +262,6 @@ export default function App() {
           </div>
           <div className="header-main">
             <div className="header-slot" ref={setHeaderSlot}/>
-            <UpdateButton update={update}/>
           </div>
         </header>
         <div className={`shell ${collapsed ? 'collapsed' : ''}`}>
@@ -312,7 +311,8 @@ export default function App() {
                 })}
               </div>
             ))}
-            <Preferences update={update} onManageSources={() => setSourcesOpen(true)}/>
+            <SidebarUpdate update={update}/>
+            <Preferences onManageSources={() => setSourcesOpen(true)}/>
           </nav>
           {sourcesOpen && <TemplateSourcesDialog onClose={() => setSourcesOpen(false)}/>}
           <main className="main">

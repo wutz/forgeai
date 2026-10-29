@@ -6,8 +6,6 @@ import {app} from '../models';
 import {volumes} from '../models';
 import {time} from '../models';
 
-export function AppVersion():Promise<string>;
-
 export function CatalogJobForm(arg1:string,arg2:string):Promise<training.Form>;
 
 export function CatalogSandboxForm(arg1:string,arg2:string):Promise<sandbox.TemplateForm>;
@@ -136,7 +134,7 @@ export function SandboxTerminalInput(arg1:string,arg2:string):Promise<void>;
 
 export function SaveProject(arg1:app.Project):Promise<void>;
 
-export function SetMenuLabels(arg1:string,arg2:string):Promise<void>;
+export function SetMenuLabels(arg1:Record<string, string>):Promise<void>;
 
 export function SetVolumeExpiry(arg1:string,arg2:time.Time):Promise<volumes.Volume>;
 

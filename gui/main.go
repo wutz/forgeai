@@ -30,11 +30,6 @@ func main() {
 		// leaves room for the window controls.
 		Mac: &mac.Options{
 			TitleBar: mac.TitleBarHiddenInset(),
-			// The standard About panel shows the version.
-			About: &mac.AboutInfo{
-				Title:   "forgeai",
-				Message: "Version " + app.Version,
-			},
 		},
 		Menu:      app.ApplicationMenu(a),
 		OnStartup: a.Startup,

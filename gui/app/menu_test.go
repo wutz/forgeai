@@ -7,58 +7,73 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/menu"
 )
 
-func helpMenu(t *testing.T, m *menu.Menu) *menu.MenuItem {
-	t.Helper()
-	last := m.Items[len(m.Items)-1]
-	if last.SubMenu == nil {
-		t.Fatalf("last menu item %q has no submenu", last.Label)
+func labelsOf(m *menu.Menu) []string {
+	var out []string
+	for _, it := range m.Items {
+		if it.IsSeparator() {
+			out = append(out, "-")
+		} else {
+			out = append(out, it.Label)
+		}
 	}
-	return last
+	return out
 }
 
-func TestBuildMenuShowsVersionAndChecksForUpdates(t *testing.T) {
-	prev := Version
-	t.Cleanup(func() { Version = prev })
-	Version = "1.2.3"
+func equal(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
 
+func TestBuildMenuMacOSPutsTheUpdateCheckUnderAbout(t *testing.T) {
 	var events []string
 	a := &App{emit: func(_ context.Context, name string, _ ...interface{}) { events = append(events, name) }}
-	help := helpMenu(t, a.buildMenu("linux", menuLabels{help: "Help", checkUpdate: "Check"}))
+	m := a.buildMenu("darwin", defaultMenuLabels)
 
-	if help.Label != "Help" {
-		t.Errorf("menu title = %q", help.Label)
+	if len(m.Items) != 3 {
+		t.Fatalf("macOS menu has %d top-level items, want app, edit, window", len(m.Items))
 	}
-	items := help.SubMenu.Items
-	if len(items) != 3 {
-		t.Fatalf("Help has %d items, want version, separator, update", len(items))
+	appMenu := m.Items[0].SubMenu
+	want := []string{"About forgeai", "Check for Updates…", "-", "Hide forgeai", "-", "Quit forgeai"}
+	if got := labelsOf(appMenu); !equal(got, want) {
+		t.Fatalf("app menu = %q, want %q", got, want)
 	}
-	if items[0].Label != "forgeai v1.2.3" || !items[0].Disabled {
-		t.Errorf("version item = %q disabled=%v", items[0].Label, items[0].Disabled)
-	}
-	if items[2].Label != "Check" {
-		t.Errorf("update item = %q", items[2].Label)
-	}
-	items[2].Click(&menu.CallbackData{})
+	appMenu.Items[1].Click(&menu.CallbackData{})
 	if len(events) != 1 || events[0] != checkUpdateEvent {
 		t.Errorf("events after click = %v", events)
 	}
 }
 
-func TestBuildMenuDevVersionAndPlatforms(t *testing.T) {
-	prev := Version
-	t.Cleanup(func() { Version = prev })
-	Version = devVersion
-
+func TestBuildMenuOtherPlatformsHaveAHelpMenu(t *testing.T) {
 	a := &App{}
-	mac := a.buildMenu("darwin", defaultMenuLabels)
-	if len(mac.Items) != 4 {
-		t.Errorf("macOS menu has %d top-level items, want app, edit, window, help", len(mac.Items))
+	m := a.buildMenu("windows", menuLabels{about: "关于", checkUpdate: "检查更新", help: "帮助"})
+	if len(m.Items) != 1 || m.Items[0].Label != "帮助" {
+		t.Fatalf("menu = %q, want a lone 帮助 menu", labelsOf(m))
 	}
-	other := a.buildMenu("windows", defaultMenuLabels)
-	if len(other.Items) != 1 {
-		t.Errorf("windows menu has %d top-level items, want help only", len(other.Items))
+	if got := labelsOf(m.Items[0].SubMenu); !equal(got, []string{"关于", "检查更新"}) {
+		t.Errorf("help menu = %q", got)
 	}
-	if got := helpMenu(t, other).SubMenu.Items[0].Label; got != "forgeai dev" {
-		t.Errorf("dev version item = %q", got)
+}
+
+func TestSetMenuLabelsKeepsEnglishForMissingKeys(t *testing.T) {
+	a := &App{}
+	a.SetMenuLabels(map[string]string{"help": "帮助"})
+	if a.menu.labels.help != "帮助" || a.menu.labels.about != defaultMenuLabels.about {
+		t.Errorf("labels = %+v", a.menu.labels)
+	}
+}
+
+func TestVersionLabel(t *testing.T) {
+	if got := versionLabel("1.2.3"); got != "v1.2.3" {
+		t.Errorf("release = %q", got)
+	}
+	if got := versionLabel(devVersion); got != "dev" {
+		t.Errorf("dev = %q", got)
 	}
 }

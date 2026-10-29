@@ -41,6 +41,10 @@ export const en = {
   'update.failed': 'Update failed: {error}',
   'version.menu': 'Version',
   'version.upToDate': 'You have the latest version.',
+  'menu.help': 'Help',
+  'menu.checkUpdate': 'Check for Updates…',
+  'update.checkDev': 'This is a development build, which does not update itself.',
+  'update.checkFailed': 'Could not check for updates: {error}',
 }
 
 export const zh: Record<keyof typeof en, string> = {
@@ -86,4 +90,8 @@ export const zh: Record<keyof typeof en, string> = {
   'update.failed': '更新失败：{error}',
   'version.menu': '版本',
   'version.upToDate': '已是最新版本',
+  'menu.help': '帮助',
+  'menu.checkUpdate': '检查更新…',
+  'update.checkDev': '这是开发版本，不会自动更新。',
+  'update.checkFailed': '检查更新失败：{error}',
 }

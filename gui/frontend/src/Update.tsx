@@ -1,10 +1,10 @@
-import {ReactNode, useEffect, useRef, useState} from 'react'
-import {AppVersion, CheckUpdate, InstallUpdate} from '../wailsjs/go/app/App'
+import {ReactNode, useEffect, useRef, useState, useSyncExternalStore} from 'react'
+import {AppVersion, CheckUpdate, InstallUpdate, SetMenuLabels} from '../wailsjs/go/app/App'
 import {app} from '../wailsjs/go/models'
 import {EventsOn} from '../wailsjs/runtime/runtime'
 import {errText} from './util'
 import {Icon, useConfirm} from './ui'
-import {MessageKey, t} from './i18n'
+import {MessageKey, getLocale, subscribeLocale, t} from './i18n'
 
 // recheckEvery is how often a running client asks GitHub for a newer release.
 const recheckEvery = 6 * 60 * 60 * 1000
@@ -22,8 +22,9 @@ function progressLabel(step: string) {
   return t(installSteps[step] ?? 'update.installing')
 }
 
-// Update is the state of the update check and install. The top bar button and
-// the sidebar menu share one of these, so both offer the same release.
+// Update is the state of the update check and install. The top bar button, the
+// sidebar menu and the application menu share one of these, so all offer the
+// same release.
 export type Update = {
   // info is the newest release as of the last check; null until one succeeds.
   info: app.UpdateInfo | null
@@ -36,9 +37,11 @@ export type Update = {
 }
 
 // useUpdate checks for a newer release when the app starts and every few hours
-// after. The check is silent: a failed check (offline, GitHub unreachable) shows
-// nothing. Installation failures are reported through onError.
-export function useUpdate(onError: (message: string) => void): Update {
+// after. That check is silent: a failed check (offline, GitHub unreachable) shows
+// nothing. The application menu's "Check for Updates" asks for a visible answer
+// instead: the confirmation when a release is out, otherwise a notice through
+// onNotice, or the failure through onError. Installation failures go to onError.
+export function useUpdate(onError: (message: string) => void, onNotice: (message: string) => void): Update {
   const [info, setInfo] = useState<app.UpdateInfo | null>(null)
   const [step, setStep] = useState('')
   const confirm = useConfirm()
@@ -52,10 +55,15 @@ export function useUpdate(onError: (message: string) => void): Update {
     return () => window.clearInterval(timer)
   }, [])
 
+  // The application menu is native, so it is given its texts in the UI language.
+  const locale = useSyncExternalStore(subscribeLocale, getLocale)
+  useEffect(() => {
+    SetMenuLabels(t('menu.help'), t('menu.checkUpdate')).catch(() => undefined)
+  }, [locale])
+
   // The install runs in the background; its steps arrive as events.
   useEffect(() => EventsOn('update:progress', (s: string) => setStep(s)), [])
 
-  const latest = info?.latest ?? ''
   const install = () => {
     setStep('download')
     InstallUpdate().catch(e => {
@@ -63,13 +71,23 @@ export function useUpdate(onError: (message: string) => void): Update {
       onError(t('update.failed', {error: errText(e)}))
     })
   }
-  const ask = () => confirm.ask({
-    title: t('update.confirmTitle', {version: latest}),
+  const askFor = (version: string) => confirm.ask({
+    title: t('update.confirmTitle', {version}),
     message: t('update.confirmMessage'),
     action: t('update.install'),
     primary: true,
     run: install,
   })
+  const ask = () => askFor(info?.latest ?? '')
+
+  // "Check for Updates" in the application menu.
+  useEffect(() => EventsOn('update:check', () => {
+    CheckUpdate().then(next => {
+      setInfo(next)
+      if (next.available) askFor(next.latest)
+      else onNotice(next.current === 'dev' ? t('update.checkDev') : t('version.upToDate'))
+    }).catch(e => onError(t('update.checkFailed', {error: errText(e)})))
+  }), [])
 
   return {info, step, ask, dialog: confirm.dialog}
 }

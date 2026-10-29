@@ -136,6 +136,8 @@ export function SandboxTerminalInput(arg1:string,arg2:string):Promise<void>;
 
 export function SaveProject(arg1:app.Project):Promise<void>;
 
+export function SetMenuLabels(arg1:string,arg2:string):Promise<void>;
+
 export function SetVolumeExpiry(arg1:string,arg2:time.Time):Promise<volumes.Volume>;
 
 export function StartInferenceService(arg1:string):Promise<app.InferenceService>;

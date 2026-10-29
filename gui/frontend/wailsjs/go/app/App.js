@@ -262,6 +262,10 @@ export function SaveProject(arg1) {
   return window['go']['app']['App']['SaveProject'](arg1);
 }
 
+export function SetMenuLabels(arg1, arg2) {
+  return window['go']['app']['App']['SetMenuLabels'](arg1, arg2);
+}
+
 export function SetVolumeExpiry(arg1, arg2) {
   return window['go']['app']['App']['SetVolumeExpiry'](arg1, arg2);
 }

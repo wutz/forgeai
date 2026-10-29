@@ -96,8 +96,7 @@ func (a *App) Projects(contextName string) ([]ProjectNamespace, error) {
 // listProjects returns the forgeai project namespaces sorted by name.
 func listProjects(ctx context.Context, k8s client.Client) ([]ProjectNamespace, error) {
 	list := &corev1.NamespaceList{}
-	if err := k8s.List(ctx, list, client.MatchingLabels{naming.LabelManagedBy: naming.ManagedBy},
-		client.HasLabels{naming.LabelProject}); err != nil {
+	if err := k8s.List(ctx, list, client.HasLabels{naming.LabelProject}); err != nil {
 		return nil, err
 	}
 	out := make([]ProjectNamespace, 0, len(list.Items))
@@ -109,14 +108,13 @@ func listProjects(ctx context.Context, k8s client.Client) ([]ProjectNamespace, e
 }
 
 // projectOf returns the forgeai project of a namespace, or "" when the
-// namespace is not a project namespace.
+// namespace is not a project namespace. The project label is the marker: the
+// workspace operator owns the project namespaces and stamps its own
+// app.kubernetes.io/managed-by value on them.
 func projectOf(ctx context.Context, k8s client.Client, namespace string) (string, error) {
 	ns := &corev1.Namespace{}
 	if err := k8s.Get(ctx, client.ObjectKey{Name: namespace}, ns); err != nil {
 		return "", fmt.Errorf("namespace %q: %w", namespace, err)
-	}
-	if ns.Labels[naming.LabelManagedBy] != naming.ManagedBy {
-		return "", nil
 	}
 	return ns.Labels[naming.LabelProject], nil
 }

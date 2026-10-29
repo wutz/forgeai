@@ -48,9 +48,12 @@ func TestConfigExposesNamespacePrefix(t *testing.T) {
 // TestResolveProject checks which project a connection opens, for a user who
 // can read the project namespaces and for one with no project role at all.
 func TestResolveProject(t *testing.T) {
+	// project mirrors a namespace the workspace operator created: it stamps its
+	// own app.kubernetes.io/managed-by value, so the project label is what
+	// tells the GUI the namespace is a project.
 	project := func(name, proj string) *corev1.Namespace {
 		return &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{
-			naming.LabelManagedBy: naming.ManagedBy, naming.LabelProject: proj,
+			naming.LabelManagedBy: "workspace", naming.LabelProject: proj,
 		}}}
 	}
 	plain := &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: "default"}}

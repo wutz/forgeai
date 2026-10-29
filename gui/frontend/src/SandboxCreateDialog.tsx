@@ -215,7 +215,7 @@ export function SandboxCreateDialog({onClose, onCreated}: {
           <div className="field">
             <label htmlFor="s-image">{t('common.image')}</label>
             <ImageField id="s-image" value={f.image} onChange={image => set('image', image)}
-                        offered={opts?.images} placeholder="cr.example.com:7443/forge-myproj/agent:latest" required/>
+                        offered={opts?.images} example="agent:latest" required/>
           </div>
           <div className="row">
             <div className="field">

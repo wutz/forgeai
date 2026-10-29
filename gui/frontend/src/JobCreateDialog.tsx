@@ -211,7 +211,7 @@ export function JobCreateDialog({onClose, onCreated}: {
           <div className="field">
             <label htmlFor="j-image">{t('common.image')}</label>
             <ImageField id="j-image" value={f.image} onChange={image => set('image', image)}
-                        placeholder="cr.example.com:7443/forge-myproj/train:latest" required/>
+                        example="train:latest" required/>
           </div>
           <div className="field">
             <label htmlFor="j-command">{t('jobCreate.command')}</label>

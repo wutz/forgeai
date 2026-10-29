@@ -518,6 +518,44 @@ func TestProbeCRDOnlyBundleVersion(t *testing.T) {
 	}
 }
 
+// TestProbeChartComponent checks that a component installed from its chart reads
+// as ready at the chart's version, and as the operator missing when the
+// Deployment the spec names is not on the cluster.
+func TestProbeChartComponent(t *testing.T) {
+	crd := &unstructured.Unstructured{}
+	crd.SetGroupVersionKind(crdGVK)
+	crd.SetName(imagebuildSpec.crds[0])
+	operator := helmChartDeployment(imagebuildSpec.name, imagebuildSpec.version, true)
+	operator.Namespace, operator.Name = imagebuildSpec.installNamespace(), imagebuildSpec.deployment
+	info, ok := depInfoByName("imagebuild")
+	if !ok {
+		t.Fatal("no catalog entry for imagebuild")
+	}
+	tests := []struct {
+		name   string
+		objs   []client.Object
+		status string
+	}{
+		{"operator from its chart", []client.Object{crd, &operator}, "ready"},
+		{"operator Deployment missing", []client.Object{crd}, "degraded"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			k8s := fake.NewClientBuilder().WithScheme(scheme()).WithObjects(tt.objs...).Build()
+			dep, err := probeDependency(context.Background(), k8s, info, nil, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if dep.Status != tt.status {
+				t.Errorf("probe = status %q (reason %q, message %q), want %q", dep.Status, dep.Reason, dep.Message, tt.status)
+			}
+			if tt.status == "ready" && dep.Installed != imagebuildSpec.version {
+				t.Errorf("probe = installed %q, want %q", dep.Installed, imagebuildSpec.version)
+			}
+		})
+	}
+}
+
 // TestDependencyCatalogOrder checks that the project operator is installed
 // before the forgeai operator, which reads the InstanceTypes it derives.
 func TestDependencyCatalogOrder(t *testing.T) {

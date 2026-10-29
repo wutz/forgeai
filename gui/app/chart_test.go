@@ -124,6 +124,11 @@ func TestImagebuildSpec(t *testing.T) {
 	if !slices.Equal(imagebuildSpec.needs, []string{"projects.workspace.wutz.dev"}) {
 		t.Errorf("needs = %v, want the project CRD", imagebuildSpec.needs)
 	}
+	// The chart names its Deployment after the chart, not <release>-controller-manager
+	// like the other operators; a wrong name leaves the component degraded forever.
+	if imagebuildSpec.deployment != "imagebuild" {
+		t.Errorf("deployment = %q, want the chart's Deployment imagebuild", imagebuildSpec.deployment)
+	}
 }
 
 // TestSSHPiperBundle checks that the sshpiper component is a CRD-only bundle

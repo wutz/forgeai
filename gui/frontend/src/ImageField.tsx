@@ -33,11 +33,19 @@ function splitAddress(address: string): [string, string] {
 // Images view) and the platform's offered images. Any other address can be
 // typed and picked with Enter. The menu is portalled to the body because the
 // dialog body scrolls and clips.
-export function ImageField({id, value, onChange, offered, placeholder, required}: {
+export function ImageField({id, value, onChange, offered, example, required}: {
   id: string, value: string, onChange: (image: string) => void,
   // offered is null when the platform config lists no images (Go nil slice).
-  offered?: string[] | null, placeholder?: string, required?: boolean,
+  offered?: string[] | null,
+  // example is an image name and tag, e.g. "agent:latest"; the placeholder puts
+  // it under the project's own registry path, so the user sees the address
+  // they would push to instead of a made-up one.
+  example?: string, required?: boolean,
 }) {
+  // registryPath is the project's push address (registry host and Harbor
+  // project, which is named after the namespace). It stays empty without a
+  // registry, and the placeholder then falls back to a generic address.
+  const [registryPath, setRegistryPath] = useState('')
   const [open, setOpen] = useState(false)
   // query is what was typed since the menu opened; null lists every image.
   const [query, setQuery] = useState<string | null>(null)
@@ -54,6 +62,13 @@ export function ImageField({id, value, onChange, offered, placeholder, required}
   const wrap = useRef<HTMLDivElement>(null)
   const menu = useRef<HTMLDivElement>(null)
   const requested = useRef(false)
+
+  useEffect(() => {
+    if (!example) return
+    let live = true
+    Registry().then(reg => { if (live && reg.enabled) setRegistryPath(reg.url) }, () => {})
+    return () => { live = false }
+  }, [example])
 
   // Registry and ListImages fail for view-only members (no robot credentials);
   // the menu then offers only the platform images. A failure is retried on the
@@ -223,7 +238,8 @@ export function ImageField({id, value, onChange, offered, placeholder, required}
              autoComplete="off" autoCapitalize="none" autoCorrect="off" spellCheck={false}
              onChange={e => type(e.target.value)} onKeyDown={onKeyDown}
              onClick={() => { if (!open) openMenu() }}
-             placeholder={placeholder} required={required}/>
+             placeholder={example ? `${registryPath || 'registry.example.com/project'}/${example}` : undefined}
+             required={required}/>
       <button type="button" className="icon-btn combo-toggle" tabIndex={-1} aria-label={t('imagePicker.show')}
               aria-expanded={open}
               onClick={() => {

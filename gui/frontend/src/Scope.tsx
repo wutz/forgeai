@@ -28,7 +28,7 @@ export function Scope({contexts, cluster, projects, namespace, connected, busy, 
         {projects.length ? (
           <select id="scope-project" className="select mono" value={namespace} disabled={busy || !connected}
                   title={projectTitle(projects, namespace)} onChange={e => onProject(e.target.value)}>
-            {projects.map(p => <option key={p.namespace} value={p.namespace}>{p.namespace}</option>)}
+            {projects.map(p => <option key={p.namespace} value={p.namespace}>{p.project || p.namespace}</option>)}
           </select>
         ) : (
           // Typing is allowed while not connected: the namespace is how a user whose
@@ -40,11 +40,11 @@ export function Scope({contexts, cluster, projects, namespace, connected, busy, 
   )
 }
 
-// projectTitle is the tooltip of the project select: the namespace with the
-// project it belongs to, which the compact select does not show.
+// projectTitle is the tooltip of the project select: the namespace behind the
+// project name the select shows, which is what kubectl and the registry use.
 function projectTitle(projects: app.ProjectNamespace[], namespace: string): string | undefined {
   const p = projects.find(p => p.namespace === namespace)
-  return p ? `${p.namespace} (${p.project})` : undefined
+  return p ? `${p.project} (${p.namespace})` : undefined
 }
 
 // NamespaceInput is the project field for users that may not list projects:

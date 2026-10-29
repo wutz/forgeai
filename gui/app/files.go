@@ -10,7 +10,10 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	fsv1 "github.com/wutz/fileserver/api/v1alpha1"
@@ -82,6 +85,8 @@ func (a *App) Files() (*Files, error) {
 		// A server the operator has not reconciled yet has no phase; it is still starting.
 		if p := string(fs.Status.Phase); p != "" {
 			out.Phase = p
+		} else if err := removeLegacyFileServer(ctx, c); err != nil {
+			return nil, err
 		}
 		out.Volumes = fs.Status.Volumes
 	}
@@ -133,6 +138,29 @@ func (a *App) Files() (*Files, error) {
 		out.Address = origin + "/"
 	}
 	return out, nil
+}
+
+// legacyFileServerGVK is the FileServer kind forgeai shipped before the file
+// server operator moved to the fileserver.wutz.dev group.
+var legacyFileServerGVK = schema.GroupVersionKind{Group: "forgeai.wutz.dev", Version: "v1alpha1", Kind: "FileServer"}
+
+// removeLegacyFileServer deletes the FileServer of the old API group. Upgrading
+// keeps its CRD and objects, and the Deployment, Service and Ingress it made
+// carry the same names the new operator uses. The new operator cannot adopt
+// them while the old FileServer is their controller, so it fails on every
+// reconcile and the server never starts. Deleting the old object garbage-collects
+// them, and the operator recreates them. A project without the old CRD or object,
+// or a caller that may not delete it, has nothing to clean up.
+func removeLegacyFileServer(ctx context.Context, c *Connection) error {
+	old := &unstructured.Unstructured{}
+	old.SetGroupVersionKind(legacyFileServerGVK)
+	old.SetNamespace(c.namespace())
+	old.SetName(fsv1.DefaultName)
+	err := c.k8s.Delete(ctx, old)
+	if err == nil || isNotFound(err) || apierrors.IsForbidden(err) || meta.IsNoMatchError(err) {
+		return nil
+	}
+	return err
 }
 
 // fileServerTransport is the transport to the file server. The ingress serves

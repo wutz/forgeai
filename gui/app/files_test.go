@@ -9,7 +9,9 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	fsv1 "github.com/wutz/fileserver/api/v1alpha1"
@@ -142,5 +144,24 @@ func TestFilesStaysStartingUntilIngressServes(t *testing.T) {
 	}
 	if got.Phase != string(fsv1.FileServerReady) || got.Address == "" {
 		t.Fatalf("after ingress serves: phase %q address %q; want Ready with address", got.Phase, got.Address)
+	}
+}
+
+// A FileServer of the old API group still controls the objects the new operator
+// wants to own, so Files removes it once the new one stays unreconciled.
+func TestFilesRemovesLegacyFileServer(t *testing.T) {
+	old := &unstructured.Unstructured{}
+	old.SetGroupVersionKind(legacyFileServerGVK)
+	old.SetNamespace(testNamespace)
+	old.SetName(fsv1.DefaultName)
+	fs := &fsv1.FileServer{ObjectMeta: metav1.ObjectMeta{Name: fsv1.DefaultName, Namespace: testNamespace}}
+	a := testApp(t, fs, old)
+
+	if _, err := a.Files(); err != nil {
+		t.Fatal(err)
+	}
+	err := a.conn.k8s.Get(context.Background(), client.ObjectKeyFromObject(old), old)
+	if !apierrors.IsNotFound(err) {
+		t.Fatalf("legacy FileServer after Files: err = %v, want not found", err)
 	}
 }

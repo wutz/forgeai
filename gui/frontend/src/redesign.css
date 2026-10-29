@@ -141,8 +141,19 @@ a { color: inherit; text-decoration: none; }
 .header-toggle { color: var(--body); }
 
 /* Shell + grouped sidebar */
-.shell { grid-template-columns: var(--sidebar-w) minmax(0, 1fr); transition: grid-template-columns 160ms ease; }
-.sidebar { padding: 8px 12px 12px; gap: 2px; background: var(--chrome); border-right-color: var(--chrome-line); }
+/* One row that fills the shell and can shrink: an implicit auto row would grow
+   to its content, so a long page scrolled the whole document — rail included —
+   instead of the content column alone. */
+.shell {
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  transition: grid-template-columns 160ms ease;
+}
+.sidebar {
+  padding: 8px 12px 12px; gap: 2px; background: var(--chrome); border-right-color: var(--chrome-line);
+  /* A window too short for the nav scrolls the rail, not the page. */
+  min-height: 0; overflow-y: auto;
+}
 .shell.collapsed { grid-template-columns: 0 minmax(0, 1fr); }
 .shell.collapsed .sidebar { display: none; }
 .nav-group { display: flex; flex-direction: column; gap: 2px; margin-top: 20px; }
@@ -203,7 +214,8 @@ a { color: inherit; text-decoration: none; }
 /* Pin both to their columns so hiding the sidebar (display: none) does not
    let the content slide into the collapsed first track. */
 .sidebar { grid-column: 1; }
-.main { grid-column: 2; padding: 20px 28px 40px; }
+/* The page scrolls inside this column; the rail and the top bar stay put. */
+.main { grid-column: 2; padding: 20px 28px 40px; min-height: 0; overflow-y: auto; }
 .page { max-width: 1180px; margin: 0 auto; }
 
 /* PageHeader: in the top bar next to the nav toggle, or a band when a view

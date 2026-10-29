@@ -93,7 +93,8 @@ func TestForgeaiChartRenders(t *testing.T) {
 }
 
 // TestSSHGatewaySpec checks what the GUI tells the SSH gateway chart: the
-// platform namespace its gateways are served in, and the Pipe CRD it needs.
+// platform namespace its gateways are served in, and that it needs no CRD of
+// another component (v0.4.0 serves gateways with sshpiper's yaml plugin).
 func TestSSHGatewaySpec(t *testing.T) {
 	if got := sshGatewaySpec.installNamespace(); got != sshGatewayNamespace {
 		t.Errorf("installNamespace = %s, want %s", got, sshGatewayNamespace)
@@ -128,20 +129,5 @@ func TestImagebuildSpec(t *testing.T) {
 	// like the other operators; a wrong name leaves the component degraded forever.
 	if imagebuildSpec.deployment != "imagebuild" {
 		t.Errorf("deployment = %q, want the chart's Deployment imagebuild", imagebuildSpec.deployment)
-	}
-}
-
-// TestSSHPiperBundle checks that the sshpiper component is a CRD-only bundle
-// of the Pipe CRD the SSH gateway needs.
-func TestSSHPiperBundle(t *testing.T) {
-	b, err := bundleByName("sshpiper")
-	if err != nil || b == nil {
-		t.Fatalf("bundleByName(sshpiper) = %v, %v", b, err)
-	}
-	if got := b.crdNames(); !slices.Equal(got, []string{"pipes.sshpiper.com"}) {
-		t.Errorf("crdNames = %v, want the Pipe CRD only", got)
-	}
-	if bundleHasDeployment(b) {
-		t.Error("sshpiper bundle declares a Deployment; it should be CRD-only")
 	}
 }

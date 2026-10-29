@@ -98,9 +98,8 @@ type depInfo struct {
 }
 
 // depCatalog lists the components in install order: Kueue's TrainJob
-// integration needs the Trainer CRDs, so Trainer comes first, the SSH operator
-// needs the sshpiper Pipe CRD, and the project operator comes before forgeai,
-// which reads the InstanceTypes it derives.
+// integration needs the Trainer CRDs, so Trainer comes first, and the project
+// operator comes before forgeai, which reads the InstanceTypes it derives.
 var depCatalog = []depInfo{
 	{name: "trainer", title: "Kubeflow Trainer v2", description: "TrainJobs and the ClusterTrainingRuntimes, with JobSet"},
 	{name: "kueue", title: "Kueue", description: "GPU quota queues that admit TrainJobs"},

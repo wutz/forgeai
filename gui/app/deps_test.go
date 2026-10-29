@@ -37,7 +37,7 @@ func TestEmbeddedBundlesVerify(t *testing.T) {
 		}
 	}
 	// Kueue's TrainJob integration needs the Trainer CRDs, so Trainer comes first.
-	if got, want := strings.Join(names, ","), "trainer,kueue,agent-sandbox,gateway-api-inference-extension,sshpiper"; got != want {
+	if got, want := strings.Join(names, ","), "trainer,kueue,agent-sandbox,gateway-api-inference-extension"; got != want {
 		t.Errorf("bundle order = %s, want %s", got, want)
 	}
 	wantCRDs := map[string]string{
@@ -45,7 +45,6 @@ func TestEmbeddedBundlesVerify(t *testing.T) {
 		"kueue":                           "workloads.kueue.x-k8s.io",
 		"agent-sandbox":                   "sandboxes.agents.x-k8s.io",
 		"gateway-api-inference-extension": "inferencepools.inference.networking.k8s.io",
-		"sshpiper":                        "pipes.sshpiper.com",
 	}
 	for _, b := range bs {
 		if !slices.Contains(b.crdNames(), wantCRDs[b.Name]) {
@@ -412,9 +411,6 @@ func TestCheckChartTarget(t *testing.T) {
 			Namespace: spec.installNamespace(), Name: spec.deployment, Labels: labels,
 		}}
 	}
-	pipeCRD := &unstructured.Unstructured{}
-	pipeCRD.SetGroupVersionKind(crdGVK)
-	pipeCRD.SetName("pipes.sshpiper.com")
 	tests := []struct {
 		name    string
 		spec    *chartSpec
@@ -426,7 +422,7 @@ func TestCheckChartTarget(t *testing.T) {
 			withObjects(deployment(forgeaiSpec, map[string]string{helmChartLabel: "forgeai-" + forgeaiChartVersion})), false},
 		{"deployed outside Helm", forgeaiSpec,
 			withObjects(deployment(forgeaiSpec, map[string]string{"app": "forgeai"})), true},
-		{"SSH gateway without the Pipe CRD", sshGatewaySpec, withObjects(), false},
+		{"SSH gateway not installed", sshGatewaySpec, withObjects(), false},
 		{"SSH gateway installed from another chart", sshGatewaySpec, withObjects(
 			deployment(sshGatewaySpec, map[string]string{helmChartLabel: "forgeai-" + forgeaiChartVersion})), true},
 	}

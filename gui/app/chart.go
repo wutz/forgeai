@@ -162,10 +162,12 @@ var projectSpec = &chartSpec{
 // namespace. It owns the ImageBuild CRD and manages container image builds using BuildKit.
 // It installs after the project operator so builds can be created within projects.
 const (
-	imagebuilderChart        = "oci://ghcr.io/wutz/charts/imagebuild"
-	imagebuildChartVersion   = "0.1.1"
-	imagebuildRelease        = "imagebuild"
-	imagebuildDeployment     = "imagebuild-controller-manager"
+	imagebuilderChart      = "oci://ghcr.io/wutz/charts/imagebuild"
+	imagebuildChartVersion = "0.1.1"
+	imagebuildRelease      = "imagebuild"
+	// The chart names the Deployment after the chart, not <release>-controller-manager
+	// like the other operators: the Dependencies view finds the operator by this name.
+	imagebuildDeployment = "imagebuild"
 )
 
 var imagebuildSpec = &chartSpec{

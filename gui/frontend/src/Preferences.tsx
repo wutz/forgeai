@@ -62,9 +62,15 @@ function PrefMenu<T extends string>({title, value, options, onChange}: {
     }
   }
 
-  // Focus leaving the menu (Tab, or a click on something else) closes it.
+  // Focus leaving the menu (Tab, or a click on something else) closes it. A blur
+  // with no related target is not a departure: WebKit returns focus to the page
+  // body when the mouse is pressed on a button, which is how the packaged app's
+  // webview reports a press on an item. Closing then would unmount the item
+  // before its click arrives, leaving the menu looking unresponsive. Chromium
+  // focuses the button instead, so this never showed up in a browser.
   const leave = (e: ReactFocusEvent<HTMLDivElement>) => {
-    if (open && !root.current?.contains(e.relatedTarget as Node)) setOpen(false)
+    const next = e.relatedTarget as Node | null
+    if (open && next && !root.current?.contains(next)) setOpen(false)
   }
 
   return (

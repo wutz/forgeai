@@ -227,7 +227,7 @@ The forgeai operator ships as a Helm chart in `charts/chart`: the InferenceServi
 ```sh
 helm install workspace oci://ghcr.io/wutz/charts/workspace --version 0.5.2 \
   --namespace forgeai-system --create-namespace
-helm install forgeai oci://ghcr.io/wutz/charts/forgeai --version 0.6.1 \
+helm install forgeai oci://ghcr.io/wutz/charts/forgeai --version 0.6.2 \
   --namespace forgeai-system
 helm install fileserver oci://ghcr.io/wutz/charts/fileserver --version 0.3.0 \
   --namespace forgeai-system

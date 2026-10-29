@@ -51,6 +51,8 @@ type App struct {
 	filesMu sync.Mutex
 	// installs tracks the cluster component installs in progress.
 	installs depInstalls
+	// menu is the language of the application menu.
+	menu menuState
 	// emit replaces the Wails runtime as the event sink when set; see emitEvent.
 	emit func(ctx context.Context, name string, data ...interface{})
 }

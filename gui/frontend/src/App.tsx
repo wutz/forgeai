@@ -18,7 +18,7 @@ import {errText} from './util'
 import {ChangeAccessContext, CreateAccessContext, Empty, HeaderSlot, Icon, IconName, Pane, Spinner} from './ui'
 import {Preferences} from './Preferences'
 import {TemplateSourcesDialog} from './TemplateSourcesDialog'
-import {UpdateButton, useUpdate} from './Update'
+import {SidebarUpdate, useUpdate} from './Update'
 import {getLocale, subscribeLocale, t} from './i18n'
 
 // PREFS is the last connection. NAMESPACES maps each kubeconfig context to the
@@ -105,7 +105,15 @@ export default function App() {
   // first visit and stays mounted after that.
   const [visited, setVisited] = useState<Area[]>([])
   const [error, setError] = useState('')
-  const update = useUpdate(setError)
+  // notice is a short answer to something the user asked for, such as the
+  // update check in the application menu; it clears itself.
+  const [notice, setNotice] = useState('')
+  const update = useUpdate(setError, setNotice)
+  useEffect(() => {
+    if (!notice) return
+    const timer = window.setTimeout(() => setNotice(''), 6000)
+    return () => window.clearTimeout(timer)
+  }, [notice])
   const [loading, setLoading] = useState(false)
   // The rail remembers its state across launches, like the connection does.
   // A narrow window overlays the page with the rail, so it always starts closed.
@@ -254,7 +262,6 @@ export default function App() {
           </div>
           <div className="header-main">
             <div className="header-slot" ref={setHeaderSlot}/>
-            <UpdateButton update={update}/>
           </div>
         </header>
         <div className={`shell ${collapsed ? 'collapsed' : ''}`}>
@@ -304,11 +311,13 @@ export default function App() {
                 })}
               </div>
             ))}
-            <Preferences update={update} onManageSources={() => setSourcesOpen(true)}/>
+            <SidebarUpdate update={update}/>
+            <Preferences onManageSources={() => setSourcesOpen(true)}/>
           </nav>
           {sourcesOpen && <TemplateSourcesDialog onClose={() => setSourcesOpen(false)}/>}
           <main className="main">
             {error && <div className="banner banner-error" role="alert">{error}</div>}
+            {notice && <div className="banner banner-success" role="status">{notice}</div>}
             {conn && nothingOpen(conn) ? (
               <Empty icon="shield" title={t('app.noAccess')}>
                 {t('app.noAccessHint')}

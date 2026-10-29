@@ -31,6 +31,7 @@ func main() {
 		Mac: &mac.Options{
 			TitleBar: mac.TitleBarHiddenInset(),
 		},
+		Menu:      app.ApplicationMenu(a),
 		OnStartup: a.Startup,
 		Bind: []any{
 			a,

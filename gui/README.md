@@ -41,7 +41,7 @@ The tag's version becomes the app version (`info.productVersion` in `wails.json`
 
 ## Updates
 
-The client compares its version with the latest GitHub release (`app.Version`, set by the release workflow with `-ldflags`; a local build is `dev` and never offers an update). Six hours after the start, and on each start, it asks GitHub for the latest release; when that is newer, the top bar shows an update button. Clicking it downloads the release file for the platform, checks it against `SHA256SUMS.txt`, replaces the running app and restarts it:
+The client compares its version with the latest GitHub release (`app.Version`, set by the release workflow with `-ldflags`; a local build is `dev` and never offers an update). Six hours after the start, and on each start, it asks GitHub for the latest release; when that is newer, an "Update version" button floats at the foot of the sidebar. The application menu shows the running version under "About forgeai" and has "Check for Updates…" right below it (in the menu named after the app on macOS, in a Help menu on Windows and Linux); it checks at once and reports the outcome in the window. Installing the update downloads the release file for the platform, checks it against `SHA256SUMS.txt`, replaces the running app and restarts it:
 
 - macOS: the `.dmg` is mounted and its `forgeai.app` replaces the running bundle.
 - Windows: an installed client runs the `-setup.exe` silently (it asks for administrator rights, since the installer is per machine by default); the portable client replaces its executable.

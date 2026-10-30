@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react'
-import {ListInstanceTypes, ListJobs, ListVolumes, ListImages, Quota} from '../wailsjs/go/app/App'
+import {ListInferenceServices, ListInstanceTypes, ListJobs, ListSandboxes, ListVolumes, ListImages, Quota} from '../wailsjs/go/app/App'
 import {app, volumes} from '../wailsjs/go/models'
 import {Card, Icon, MetricTile, Meter, PageHeader, RefreshButton, Spinner, useActive, useCreateAccess} from './ui'
 import {Status, errText, everyWhileVisible, fmtDate, gpuCapacity, jobBucket, latestAttempt, pct, phaseLabel, tagCount, toGiB} from './util'
@@ -8,7 +8,7 @@ import {t} from './i18n'
 // Overview is the landing view of a project: what is running now, the GPU
 // catalogue and the quota it may still use. Every figure is derived from the
 // same list calls the other views use — there is no separate metrics API.
-type Read = 'jobs' | 'types' | 'vols' | 'quota'
+type Read = 'jobs' | 'types' | 'vols' | 'quota' | 'boxes' | 'svcs'
 
 // CardRead is what a card body shows while its list is still loading, or the
 // unavailable note once that list's read has answered without data.
@@ -18,8 +18,11 @@ function CardRead({done, unavailable}: {done: boolean, unavailable: string}) {
     : <Spinner label={t('common.loading')}/>
 }
 
-export function Overview({onOpen, onOpenJob}: {
-  onOpen: (area: 'jobs' | 'volumes' | 'resources' | 'images') => void, onOpenJob: (name: string) => void
+// The sandbox and inference cards appear only when the cluster serves those
+// APIs, as their sidebar entries do.
+export function Overview({sandboxes, inference, onOpen, onOpenJob}: {
+  sandboxes: boolean, inference: boolean,
+  onOpen: (area: 'jobs' | 'volumes' | 'resources' | 'images' | 'sandboxes' | 'inference') => void, onOpenJob: (name: string) => void
 }) {
   // jobs and types are null until their first read, so a failed read is not shown as an empty list.
   const [jobs, setJobs] = useState<app.Job[] | null>(null)
@@ -30,9 +33,11 @@ export function Overview({onOpen, onOpenJob}: {
   const [images, setImages] = useState<app.ImageRepo[] | null>(null)
   const [imagesFailed, setImagesFailed] = useState(false)
   const [quota, setQuota] = useState<app.QuotaUsage | null>(null)
+  const [boxes, setBoxes] = useState<app.Sandbox[] | null>(null)
+  const [svcs, setSvcs] = useState<app.InferenceService[] | null>(null)
   // Each card fills in as its own read answers. settled tells a read still in flight
   // (a card shows a spinner) from one that answered without a list (a card says unavailable).
-  const [settled, setSettled] = useState<Record<Read, boolean>>({jobs: false, types: false, vols: false, quota: false})
+  const [settled, setSettled] = useState<Record<Read, boolean>>({jobs: false, types: false, vols: false, quota: false, boxes: false, svcs: false})
   const [failures, setFailures] = useState<Partial<Record<Read, string>>>({})
   const error = Object.values(failures).find(Boolean) ?? ''
   const onScreen = useActive()
@@ -54,6 +59,8 @@ export function Overview({onOpen, onOpenJob}: {
     track('types', ListInstanceTypes(), setTypes),
     track('vols', ListVolumes(false), setVols),
     track('quota', Quota(), setQuota),
+    ...(sandboxes ? [track('boxes', ListSandboxes(), setBoxes)] : []),
+    ...(inference ? [track('svcs', ListInferenceServices(), setSvcs)] : []),
   ]).then(results => {
     const failed = results.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined
     if (failed) throw failed.reason
@@ -102,6 +109,18 @@ export function Overview({onOpen, onOpenJob}: {
   const gpuUsed = Math.max(0, gpuTotal - gpuFree)
 
   const storageGiB = (vols ?? []).reduce((n, v) => n + (v.capacityGiB || v.requestedGiB || 0), 0)
+  // Sandboxes count as on the Sandboxes view: a pending one already holds its slot.
+  const boxList = boxes ?? []
+  const boxesRunning = boxList.filter(b => b.phase === 'Running' || b.phase === 'Pending').length
+  const boxesStopped = boxList.filter(b => b.phase === 'Stopped' || b.phase === 'Expired').length
+  // Services sort into the states the Inference view shows: stopped, ready, starting, failed.
+  const svcList = svcs ?? []
+  const svcsReady = svcList.filter(s => !s.stopped && s.ready).length
+  const svcsFailed = svcList.filter(s => !s.stopped && !s.ready && s.reason && s.reason !== 'Starting' && s.reason !== 'Stopped').length
+  const svcsStopped = svcList.filter(s => s.stopped).length
+  const replicasReady = svcList.reduce((n, s) => n + (s.stopped ? 0 : s.readyReplicas || 0), 0)
+  const replicasWanted = svcList.reduce((n, s) => n + (s.stopped ? 0 : s.replicas || 0), 0)
+
   const totalTags = images === null ? null : images.reduce((n, r) => n + tagCount(r), 0)
 
   return (
@@ -252,6 +271,58 @@ export function Overview({onOpen, onOpenJob}: {
           </div>
         </Card>
       </div>
+
+      {(sandboxes || inference) && <div className={`overview-grid${sandboxes && inference ? ' overview-grid-even' : ''}`}>
+        {sandboxes && <Card title={t('overview.sandboxes')} subtitle={t('overview.sandboxesSubtitle')}
+              actions={<button className="btn btn-sm btn-ghost" onClick={() => onOpen('sandboxes')}>
+                {t('overview.allSandboxes')}<Icon name="chevron" size={13}/>
+              </button>}>
+          {boxes === null ? <CardRead done={settled.boxes} unavailable={t('overview.sandboxesUnavailable')}/> : (
+            <div className="stat-row">
+              <div className="stat">
+                <div className="stat-label">{t('overview.sandboxesRunning')}</div>
+                <div className="stat-value">{boxesRunning}</div>
+                <div className="stat-detail">{t('overview.ofTotal', {total: boxList.length})}</div>
+              </div>
+              <div className="stat">
+                <div className="stat-label">{t('overview.sandboxesStopped')}</div>
+                <div className="stat-value">{boxesStopped}</div>
+                <div className="stat-detail">{boxesStopped ? t('overview.canRestart') : t('overview.noneYet')}</div>
+              </div>
+              <div className="stat">
+                <div className="stat-label">{phaseLabel('Failed')}</div>
+                <div className="stat-value">{boxList.filter(b => b.phase === 'Failed').length}</div>
+                <div className="stat-detail">{boxList.length ? '' : t('overview.noSandboxes')}</div>
+              </div>
+            </div>
+          )}
+        </Card>}
+
+        {inference && <Card title={t('overview.inference')} subtitle={t('overview.inferenceSubtitle')}
+              actions={<button className="btn btn-sm btn-ghost" onClick={() => onOpen('inference')}>
+                {t('overview.allServices')}<Icon name="chevron" size={13}/>
+              </button>}>
+          {svcs === null ? <CardRead done={settled.svcs} unavailable={t('overview.servicesUnavailable')}/> : (
+            <div className="stat-row">
+              <div className="stat">
+                <div className="stat-label">{t('overview.servicesReady')}</div>
+                <div className="stat-value">{svcsReady}</div>
+                <div className="stat-detail">{t('overview.ofTotal', {total: svcList.length})}</div>
+              </div>
+              <div className="stat">
+                <div className="stat-label">{t('overview.replicas')}</div>
+                <div className="stat-value">{replicasReady}<span className="muted"> / {replicasWanted}</span></div>
+                <div className="stat-detail">{svcsStopped ? t('overview.servicesStopped', {count: svcsStopped}) : t('overview.replicasReady')}</div>
+              </div>
+              <div className="stat">
+                <div className="stat-label">{phaseLabel('Failed')}</div>
+                <div className="stat-value">{svcsFailed}</div>
+                <div className="stat-detail">{svcList.length ? '' : t('overview.noServices')}</div>
+              </div>
+            </div>
+          )}
+        </Card>}
+      </div>}
     </div>
   )
 }

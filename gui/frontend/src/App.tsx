@@ -330,7 +330,7 @@ export default function App() {
               // Keyed by the connection so every view refetches after a switch.
               <CreateAccessContext.Provider key={`${conn.context}/${conn.namespace}`} value={conn.create}>
                 <ChangeAccessContext.Provider value={conn.change}>
-                  {shown('overview', <Overview onOpen={setArea} onOpenJob={name => { setJobFocus({name}); setArea('jobs') }}/>)}
+                  {shown('overview', <Overview sandboxes={conn.sandboxes} inference={conn.inference} onOpen={setArea} onOpenJob={name => { setJobFocus({name}); setArea('jobs') }}/>)}
                   {shown('jobs', <Jobs focus={jobFocus}/>)}
                   {shown('job-templates', <Templates kind="job"/>)}
                   {shown('sandboxes', <Sandboxes/>)}

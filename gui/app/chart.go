@@ -354,23 +354,31 @@ func installChart(ctx context.Context, c *Connection, spec *chartSpec, platformC
 		values = spec.values(platformCfg)
 	}
 	progress(stepChartInstall)
-	// Upgrade refuses a release that does not exist and does not install one by
-	// itself, so a first install takes the Install action.
-	if _, err := cfg.Releases.Last(spec.release); errors.Is(err, driver.ErrReleaseNotFound) {
+	if err := runRelease(ctx, cfg, up, spec, chrt, values); err != nil || !spec.noWait {
+		return err
+	}
+	return waitCRDNames(ctx, c.k8s, spec.crds)
+}
+
+// runRelease installs the release of spec, or upgrades the one already there,
+// and returns the error of that action. Upgrade refuses a release that does not
+// exist and does not install one by itself, so a first install takes the Install
+// action.
+func runRelease(ctx context.Context, cfg *action.Configuration, up *action.Upgrade, spec *chartSpec, chrt *chart.Chart, values map[string]any) error {
+	_, err := cfg.Releases.Last(spec.release)
+	switch {
+	case errors.Is(err, driver.ErrReleaseNotFound):
 		ins := action.NewInstall(cfg)
 		ins.ReleaseName = spec.release
-		ins.Namespace = ns
+		ins.Namespace = spec.installNamespace()
 		ins.Wait = !spec.noWait
 		ins.Atomic = !spec.noWait
 		ins.Timeout = deploymentReadyTimeout
 		_, err = ins.RunWithContext(ctx, chrt, values)
-	} else {
+	case err == nil:
 		_, err = up.RunWithContext(ctx, spec.release, chrt, values)
 	}
-	if err != nil || !spec.noWait {
-		return err
-	}
-	return waitCRDNames(ctx, c.k8s, spec.crds)
+	return err
 }
 
 // maxChartArchive bounds the download of a chart archive.

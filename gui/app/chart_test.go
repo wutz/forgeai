@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"io"
 	"reflect"
 	"slices"
@@ -9,6 +10,7 @@ import (
 	"testing"
 
 	"helm.sh/helm/v3/pkg/action"
+	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/chart/loader"
 	"helm.sh/helm/v3/pkg/chartutil"
 	kubefake "helm.sh/helm/v3/pkg/kube/fake"
@@ -287,4 +289,38 @@ func TestRecreateScopedCRDs(t *testing.T) {
 			t.Errorf("the CRD was deleted: %v", err)
 		}
 	})
+}
+
+// TestRunRelease checks that the error of the install, and of the upgrade of the
+// release it made, reaches the caller. A chart whose template fails to render
+// fails both, against Helm's in-memory storage.
+func TestRunRelease(t *testing.T) {
+	cfg := &action.Configuration{
+		Releases:     storage.Init(driver.NewMemory()),
+		KubeClient:   &kubefake.PrintingKubeClient{Out: io.Discard},
+		Capabilities: chartutil.DefaultCapabilities,
+		Log:          func(string, ...any) {},
+	}
+	spec := &chartSpec{name: "test", release: "spo", namespace: "ns", noWait: true}
+	ok := &chart.Chart{Metadata: &chart.Metadata{APIVersion: "v2", Name: "test", Version: "1.0.0"}}
+	broken := &chart.Chart{
+		Metadata:  &chart.Metadata{APIVersion: "v2", Name: "test", Version: "1.0.0"},
+		Templates: []*chart.File{{Name: "templates/fail.yaml", Data: []byte(`{{ fail "boom" }}`)}},
+	}
+	up := action.NewUpgrade(cfg)
+	up.Namespace = spec.namespace
+	ctx := context.Background()
+
+	if err := runRelease(ctx, cfg, up, spec, broken, nil); err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("install of a broken chart: err = %v, want the render error", err)
+	}
+	if _, err := cfg.Releases.Last(spec.release); !errors.Is(err, driver.ErrReleaseNotFound) {
+		t.Fatalf("failed install left a release: %v", err)
+	}
+	if err := runRelease(ctx, cfg, up, spec, ok, nil); err != nil {
+		t.Fatalf("install of a valid chart: %v", err)
+	}
+	if err := runRelease(ctx, cfg, up, spec, broken, nil); err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Fatalf("upgrade to a broken chart: err = %v, want the render error", err)
+	}
 }

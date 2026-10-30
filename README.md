@@ -164,6 +164,7 @@ Platform settings live in the ConfigMap `forgeai-system/forgeai-platform` (`conf
 | `ingress` | Ingress class, wildcard domain, external port and optional TLS secret for the file server |
 | `gateway` | Gateway API Gateway the published sandbox routes attach to (`name`, `namespace`, optional `sectionName`); its listeners must admit routes from the project namespaces (`allowedRoutes`). `scheme` and `port` describe the listener from outside, for the URLs. The gateway does not authenticate published sandboxes: anything that reaches the host reaches the sandbox's port |
 | `registry` | Harbor domain, API URL, `insecure`, and the admin Secret in `forgeai-system` (default `forgeai-harbor`, keys `username` and `password`) |
+| `build` | Image builds: `registryMirrors` maps a registry domain to the mirror builds pull it through, with the mirror's path prefix (`docker.io: mir.example.com/docker.io`; pushes are not affected), and `excludeNodes` lists nodes build pods must not run on. The GUI passes both to the imagebuild chart when it installs it |
 | `storageTypes`, `defaultStorageType` | Volume types mapped to StorageClasses |
 | `instanceTypes` | Read by the workspace operator, not by forgeai: per-node `reserved` CPU and memory, and offered `sizes` (see its README) |
 | `defaultQuota` | Default project quota: `gpus` per class (`"*"` for others), `storage`, `volumes`, `pods`, `headroom` |

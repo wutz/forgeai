@@ -117,6 +117,17 @@ func (r Registry) APIURL() string {
 	return "https://" + r.Domain
 }
 
+// Build configures the container image builds of the imagebuild operator.
+type Build struct {
+	// RegistryMirrors maps a registry domain the builds pull from to the mirror
+	// that serves it, with the path prefix the mirror needs, for example
+	// docker.io: mir.example.com/docker.io. Pushes do not use them.
+	RegistryMirrors map[string]string `json:"registryMirrors,omitempty"`
+	// ExcludeNodes names the nodes the build pods must not run on, for example
+	// a node that lacks the seccomp profile.
+	ExcludeNodes []string `json:"excludeNodes,omitempty"`
+}
+
 // Quota is the default project quota.
 type Quota struct {
 	// GPUs per GPU class; "*" applies to classes not listed.
@@ -272,6 +283,7 @@ type Config struct {
 	Ingress  Ingress  `json:"ingress"`
 	Gateway  Gateway  `json:"gateway,omitzero"`
 	Registry Registry `json:"registry"`
+	Build    Build    `json:"build,omitzero"`
 
 	// StorageTypes maps a volume type (e.g. shared) to its StorageClass.
 	StorageTypes       map[string]StorageType `json:"storageTypes,omitempty"`

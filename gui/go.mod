@@ -18,7 +18,7 @@ require (
 	github.com/wutz/workspace v0.5.2
 )
 
-require github.com/wutz/imagebuild v0.1.1
+require github.com/wutz/imagebuild v0.2.0
 
 require (
 	dario.cat/mergo v1.0.1 // indirect

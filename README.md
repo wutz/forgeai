@@ -1,15 +1,17 @@
 # forgeai
 
-forgeai is a Kubernetes-native AI platform covering development, training, RL and inference. This first milestone covers **multi-tenant distributed training**: projects are namespaces with quotas, network isolation and member credentials, and jobs are plain Kubeflow Trainer v2 `TrainJob`s admitted by Kueue.
+forgeai is a Kubernetes-native AI platform covering development, training, RL and inference. Its core is **multi-tenant**: projects are namespaces with quotas, network isolation and member credentials, and members run distributed training jobs (plain Kubeflow Trainer v2 `TrainJob`s admitted by Kueue), agent sandboxes, inference services and container image builds in them.
 
 | Component | Path | Description |
 |---|---|---|
-| Operator | `api/`, `internal/`, `cmd/` | `InferenceService` CRD; adds stop/resume, failure classification and retries to `TrainJob`s; purges trashed volumes |
+| Operator | `api/`, `internal/`, `cmd/` | Controllers for `TrainJob`s (stop/resume, failure classification, retries), `Sandbox`es (stop/start, idle suspend, gateway access, SSH) and `InferenceService`s (vLLM behind an llm-d router) |
 | Workspace operator | [wutz/workspace](https://github.com/wutz/workspace) | Separate repository and Helm chart: the `Project` and `InstanceType` CRDs (`workspace.wutz.dev`), their namespaces, quotas, queues, network policies, members and the InstanceTypes derived from GPU nodes. Installed before this operator |
 | FileServer operator | [wutz/fileserver](https://github.com/wutz/fileserver) | Separate repository and Helm chart: the `FileServer` CRD and the on-demand file servers of project volumes. Installed next to this operator |
+| ImageBuild operator | [wutz/imagebuild](https://github.com/wutz/imagebuild) | Separate repository and Helm chart: the `ImageBuild` CRD and the container image builds of the Builds view, run with rootless BuildKit. Installed from the Dependencies view |
+| Volume trash operator | Helm chart `oci://ghcr.io/wutz/charts/volumetrash` | Purges trashed volumes once their retention has passed. Installed from the Dependencies view |
 | GUI | `gui/` | [Wails](https://wails.io) desktop client that talks to Kubernetes directly through a kubeconfig context |
 | Website | `website/` | Official site ([Astro](https://astro.build)), deployed to Cloudflare Workers at https://forgeai.wutz.dev |
-| Shared library | `pkg/` | Naming, platform config, instance types, job rendering and status, sandboxes, volumes, Harbor client, kubeconfig export |
+| Shared library | `pkg/` | Naming, platform config, template catalog, instance types, training jobs, sandboxes, inference services, volumes, SSH gateway routes, Harbor client, kubeconfig export |
 
 There is no API server of its own: the operator reconciles Kubernetes objects and the GUI (or `kubectl`) creates them with the member's own credentials.
 
@@ -137,6 +139,37 @@ spec:
 
 Route conditions are reported in `status.parents` (`Accepted`, `ResolvedRefs`); gateway conditions in `status.conditions` (`Accepted`, `Programmed`, `Ready`).
 
+## Inference services
+
+An `InferenceService` (`forgeai.wutz.dev/v1alpha1`) serves a Hugging Face model with vLLM behind an llm-d router, which balances requests across the replicas. The operator renders the router, the model servers, an Ingress and an API key. The GUI's Inference view creates the object from a form. The Dependencies view installs the Gateway API Inference Extension, whose `InferencePool` CRD the router uses.
+
+```yaml
+apiVersion: forgeai.wutz.dev/v1alpha1
+kind: InferenceService
+metadata:
+  name: qwen
+  namespace: forge-demo
+spec:
+  model: Qwen/Qwen3.8-27B-FP8    # Hugging Face repository
+  instanceType: rtx-5090.x2      # its GPUs are the tensor parallel size of each replica
+  replicas: 1
+  # optional: servedModelName, image, args, huggingFaceSecret, nodeSelector
+```
+
+| Feature | How |
+|---|---|
+| Endpoint | `status.endpoint`: the OpenAI-compatible API, on the host `<name>-<namespace>.<ingress domain>` |
+| API key | the Secret named in `status.apiKeySecret` (key `api-key`), sent as a bearer token. It is kept across reconciles, and the GUI reveals it |
+| Stop | annotation `forgeai.wutz.dev/stopped: "true"` scales the router and the model servers to zero; the object and its API key are kept |
+| Start | remove the annotation |
+| Delete | the router, model servers, Ingress and API key go with the object through their owner references |
+| Weights | with `inference.cache` in the platform config, the weights stay on a PersistentVolumeClaim (default size `200Gi`) and a restart does not download them again; otherwise every start downloads them |
+| Startup | a model server that is not healthy within `inference.startupTimeout` (default 2h) is killed; a cold start downloads the weights before it loads them into the GPUs |
+
+## Image builds
+
+The [ImageBuild operator](https://github.com/wutz/imagebuild) (`imagebuild` chart) builds container images of a project with rootless BuildKit and pushes them to the project's registry (Harbor). The Builds view under Images creates an `ImageBuild` from a Dockerfile pasted into the form, or from a Git repository (URL, revision, context path and Dockerfile path). It lists each build with its phase, message, pushed images, digest and logs. The chart takes the registry domain from the platform config (`registry`). The view is shown when the ImageBuild CRD is installed.
+
 ## Volumes
 
 Volumes are PVCs in the project namespace, created from the platform `storageTypes` (ReadWriteMany by default) and limited by the project quota. Volumes can be resized (grow only) and moved to the trash:
@@ -171,6 +204,7 @@ Platform settings live in the ConfigMap `forgeai-system/forgeai-platform` (`conf
 | `fileServer` | dufs `image`, `idleTimeout`, `hostPrefix` |
 | `training` | `defaultRuntime`, `shmSize`, `stuckTimeout`, `maxRetries` |
 | `sandbox` | agent-sandbox `namespace`, `defaultImage`, offered `images`, `runtimeClasses` and `defaultRuntimeClass`, `shmSize`, `idleTimeout` (default for sandboxes without their own; 0 disables), `sshImage` of the SSH sidecar |
+| `inference` | `image` (the vLLM server, default `vllm/vllm-openai:v0.32.0`), `routerImage` (the llm-d Endpoint Picker, default `ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0`), `shmSize` of the model servers (default `16Gi`), `hfEndpoint` (a Hugging Face mirror such as https://hf-mirror.com for clusters without access to huggingface.co), `cache` (`storageClass` and `size` of the weights volume; see [Inference services](#inference-services)) and `startupTimeout` (default `2h`) |
 | `trashRetention` | Default retention of trashed volumes |
 | `templates` | `source` of the public template source the create dialogs offer: an `https://` base URL, a `file://` directory with `index.yaml`, or an `oci://` reference to a published source (default: [wutz/forgeai-templates](https://github.com/wutz/forgeai-templates) on its `main` branch) |
 
@@ -182,16 +216,17 @@ The desktop client connects with a kubeconfig context and a project namespace (t
 
 | View | Description |
 |---|---|
-| Jobs | Create, stop, start, rerun and delete jobs; worker status and logs; retries nested under their job |
-| Sandboxes | Create, stop, start and delete agent sandboxes; logs, endpoint, resources and idle state (shown when the cluster runs agent-sandbox) |
-| Templates | Sandbox templates (prefill the sandbox form) and job templates (`TrainingRuntime`s, prefill the job form) in one view; create and delete both, each sorted by name |
+| Overview | Project summary: jobs, sandboxes, inference services, volumes, images and the quota usage |
+| Jobs | Create, stop, start, rerun and delete jobs; worker status and logs; retries nested under their job. Job templates (`TrainingRuntime`s, which prefill the job form) are listed under Jobs |
+| Sandboxes | Create, stop, start and delete agent sandboxes; logs, endpoint, resources and idle state (shown when the cluster runs agent-sandbox). Sandbox templates (which prefill the sandbox form) are listed under Sandboxes; create and delete both kinds of template, each sorted by name |
+| Inference | Create, stop, start and delete InferenceServices, with their endpoint and API key (shown when the InferenceService CRD is installed) |
 
 | Volumes | Create, resize, trash, restore and purge volumes |
 | Files | Opens the on-demand file server |
-| Images | Push instructions and robot credentials; list and delete images in the project's Harbor project. Their tags are offered in a dropdown as the image of jobs, sandboxes and their templates, which also accept any other address |
+| Images | Push instructions and robot credentials; list and delete images in the project's Harbor project. Their tags are offered in a dropdown as the image of jobs, sandboxes and their templates, which also accept any other address. Builds lists the image builds (see [Image builds](#image-builds)) |
 | Resources | Instance types with availability and the project quota usage |
 | Projects | Admins only (may create Projects): manage projects and members, export member kubeconfigs |
-| Dependencies | Cluster admins only: install or upgrade Kueue, Kubeflow Trainer v2 (with JobSet) and agent-sandbox at the versions pinned in the GUI, install the InstanceType operator, the forgeai, Workspace operator and FileServer operator Helm charts at their pinned versions, install the SSH operator from its Helm chart (see [SSH](#ssh)), and see each component's status |
+| Dependencies | Cluster admins only: install or upgrade the components at the versions pinned in the GUI, and see each one's status: Kubeflow Trainer v2 (with JobSet), Kueue, agent-sandbox, the Gateway API Inference Extension, the Helm charts of the Workspace, ImageBuild, forgeai, FileServer and volume trash operators (see [Helm charts](#helm-charts)), and the SSH gateway (see [SSH](#ssh)) |
 
 The New job and New sandbox dialogs also offer template sources: job and sandbox templates from the platform's `templates.source` (default [wutz/forgeai-templates](https://github.com/wutz/forgeai-templates)), grouped apart from the project templates. You can add other published template sources by URL, `file://` directory or `oci://` reference (`oci://registry/repository:tag` or `oci://registry/repository@sha256:…`) under **Template sources** in the sidebar; a source is read before it is added, and its templates are marked as yours in the dialog. Picking a template prefills the form; the name, instance type and volumes stay yours, and the job or sandbox does not reference the template.
 
@@ -222,7 +257,7 @@ make deploy-dev                # ko build -> ghcr.io/wutz/forgeai (public), kube
 
 ### Helm charts
 
-The forgeai operator ships as a Helm chart in `charts/chart`: the InferenceService CRD, RBAC and the controller Deployment, with the platform config under `platform.config`. The workspace operator (`workspace.wutz.dev`, see [Projects](#projects) and [InstanceType](#instancetype)) and the FileServer operator are separate projects with their own charts. The Dependencies view installs three charts into `forgeai-system` at their pinned versions, in this order. The same installs from the CLI:
+The forgeai operator ships as a Helm chart in `charts/chart`: the InferenceService CRD, RBAC and the controller Deployment, with the platform config under `platform.config`. The workspace operator (`workspace.wutz.dev`, see [Projects](#projects) and [InstanceType](#instancetype)) and the FileServer operator are separate projects with their own charts. The Dependencies view installs these charts at their pinned versions, in this order, into `forgeai-system`: `workspace` 0.5.2, `forgeai` 0.6.2, `fileserver` 0.3.0, `imagebuild` 0.1.1 and `volumetrash` 0.2.0. The SSH gateway chart `sshgateway` 0.4.0 goes into `sshgateway-system`. The first three can also be installed from the CLI:
 
 ```sh
 helm install workspace oci://ghcr.io/wutz/charts/workspace --version 0.5.2 \
@@ -232,6 +267,8 @@ helm install forgeai oci://ghcr.io/wutz/charts/forgeai --version 0.6.2 \
 helm install fileserver oci://ghcr.io/wutz/charts/fileserver --version 0.3.0 \
   --namespace forgeai-system
 ```
+
+The `imagebuild` chart takes the registry domain and insecure flag of the platform config (`config.registry`, `config.registryInsecure`), and the `volumetrash` chart is pointed at the platform ConfigMap (`platform.namespace`, `platform.configMap`). The GUI sets these values itself.
 
 forgeai reads the InstanceTypes that the workspace operator creates. The workspace operator is [wutz/workspace](https://github.com/wutz/workspace). It runs in the platform namespace and reads the `workspace-platform` ConfigMap from its own namespace (`PROJECT_NAMESPACE`), which the forgeai chart renders. The FileServer operator is [wutz/fileserver](https://github.com/wutz/fileserver), see [FileServer](#fileserver).
 
@@ -251,10 +288,11 @@ A cluster that ran the SSH gateway from an earlier forgeai release has the `SSHG
 
 A cluster set up with `make deploy-dev` runs the operator outside Helm. Helm does not adopt objects it did not create, so the Dependencies view reports that operator as deployed outside Helm and refuses the chart install. Move such a cluster by removing the dev deployment with `make undeploy-dev` (this deletes the forgeai CRDs and all forgeai objects, so back them up first) and then installing the charts.
 
-Prerequisites (the Dependencies view installs Kubeflow Trainer, agent-sandbox, Kueue, the project, forgeai and FileServer operators, and the SSH gateway into a cluster; `make gui-deps` refreshes the pinned manifests embedded in the GUI):
+Prerequisites (the Dependencies view installs the components listed under [GUI](#gui) into a cluster; `make gui-deps` refreshes the pinned manifests embedded in the GUI):
 
 - Kubeflow Trainer v2 (with JobSet) and a `ClusterTrainingRuntime` named after `training.defaultRuntime`
 - agent-sandbox v1.0 or later (CRDs `agents.x-k8s.io/v1beta1`), for the Sandboxes view; the isolation RuntimeClasses (`gvisor`, `kata`) come from the node runtimes
+- Gateway API CRDs (`gateway.networking.k8s.io`) and the platform `gateway`, for published sandbox ports. The Inference Extension's `InferencePool` CRD, which InferenceServices need, is installed from the Dependencies view
 - Kueue (optional), with the `trainer.kubeflow.org/trainjob` integration enabled (the bundled Kueue config enables it). Without Kueue there is no queue, and stopping a TrainJob sets its `spec.suspend` flag instead
 - Workspace operator (`workspace` chart), which creates the InstanceTypes and, when Kueue is installed, its ResourceFlavors from GPU nodes
 - NVIDIA GPU operator (GPU feature discovery labels and the `nvidia.com/gpu` resource); not installed from the GUI

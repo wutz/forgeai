@@ -25,6 +25,8 @@ internal/webhook/<group>/<version>/*   Webhooks by group and version (if present
 
 Multi-group layout organizes APIs by group name (e.g., `batch`, `apps`). Check the `PROJECT` file for `multigroup: true`.
 
+**The repository also contains** `pkg/` (the shared library: naming, platform config, training, sandboxes, inference, volumes), `gui/` (the Wails desktop client, its own Go module), `charts/chart` (the operator's Helm chart), `deploy/dev` (the dev deployment), `images/` (the sshd sidecar image), `hack/` (scripts) and `website/` (the Astro site). `README.md` documents the object model and the operations, `gui/README.md` the desktop client.
+
 **To convert to multi-group layout:**
 1. Run: `kubebuilder edit --multigroup=true`
 2. Move APIs: `mkdir -p api/<group> && mv api/<version> api/<group>/`

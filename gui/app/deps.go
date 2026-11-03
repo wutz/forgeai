@@ -99,13 +99,16 @@ type depInfo struct {
 
 // depCatalog lists the components in install order: Kueue's TrainJob
 // integration needs the Trainer CRDs, so Trainer comes first, and the project
-// operator comes before forgeai, which reads the InstanceTypes it derives.
+// operator comes before forgeai, which reads the InstanceTypes it derives. The
+// Security Profiles Operator comes before imagebuild, whose build pods need the
+// seccomp profile it installs.
 var depCatalog = []depInfo{
 	{name: "trainer", title: "Kubeflow Trainer v2", description: "TrainJobs and the ClusterTrainingRuntimes, with JobSet"},
 	{name: "kueue", title: "Kueue", description: "GPU quota queues that admit TrainJobs"},
 	{name: "agent-sandbox", title: "agent-sandbox", description: "Sandbox controller and CRDs for the Sandboxes view"},
 	{name: "gateway-api-inference-extension", title: "Gateway API Inference Extension", description: "InferencePool CRD that the llm-d routers of InferenceServices use"},
 	{name: "workspace", title: "Workspace operator", description: "Project namespaces, quotas, members and registries, and the InstanceTypes derived from GPU nodes", chart: projectSpec},
+	{name: "security-profiles-operator", title: "Security Profiles Operator", description: "Seccomp profiles installed on the nodes, which the image builds run with", chart: spoSpec},
 	{name: "imagebuild", title: "ImageBuild operator", description: "Container image builds using Rootless BuildKit", chart: imagebuildSpec},
 	{name: "forgeai", title: "forgeai operator", description: "Inference services and sandboxes", chart: forgeaiSpec},
 	{name: "fileserver", title: "FileServer operator", description: "On-demand file servers for the project volumes", chart: fileServerSpec},

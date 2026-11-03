@@ -335,8 +335,8 @@ github.com/wailsapp/wails/v2 v2.16.0 h1:hLYrSHUUq6hRXl3rWT9ZXiyFIgM94nVN9Ns6iEJz
 github.com/wailsapp/wails/v2 v2.16.0/go.mod h1:scxrgwfsv6yR6fE6cCF+Flfl+JeU+SR87T9x4kILJ6M=
 github.com/wutz/fileserver v0.3.0 h1:IQxRmJes/op38usgpgXK14043PwQPALEcyj/yPrVDGU=
 github.com/wutz/fileserver v0.3.0/go.mod h1:R/6Qcv5XMjZtoCl8PJcYpzwYBjE0UBOE/isyJ/kZdNU=
-github.com/wutz/imagebuild v0.1.1 h1:BiGVKLNQOAQk7bPC6bBL/vRbxwNShxMyT5psHM/k9Xk=
-github.com/wutz/imagebuild v0.1.1/go.mod h1:mnSb6wIEjfdoj/7D/I6H5WG8GGlvykirh1jjxBf+YYk=
+github.com/wutz/imagebuild v0.2.0 h1:ol4bMkMnfJRwJ2DNaGGXRLK5vJY+7U/WzFi4CJJYae0=
+github.com/wutz/imagebuild v0.2.0/go.mod h1:mnSb6wIEjfdoj/7D/I6H5WG8GGlvykirh1jjxBf+YYk=
 github.com/wutz/workspace v0.5.2 h1:XKDjtqmylWsfqLzNhadqbO6S5hmWvo+3P1Ud3mQUClw=
 github.com/wutz/workspace v0.5.2/go.mod h1:k3tDLWlZjfaRyKeMQbYHsDYfksbTSXQA19hZxjyzDIY=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=

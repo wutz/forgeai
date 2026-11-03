@@ -29,6 +29,24 @@ func TestParseDevConfig(t *testing.T) {
 	}
 }
 
+func TestParseBuild(t *testing.T) {
+	c, err := Parse([]byte(`
+build:
+  registryMirrors:
+    docker.io: mir.example.com/docker.io
+  excludeNodes: [gn-1]
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.Build.RegistryMirrors["docker.io"] != "mir.example.com/docker.io" || len(c.Build.RegistryMirrors) != 1 {
+		t.Errorf("registryMirrors = %v", c.Build.RegistryMirrors)
+	}
+	if len(c.Build.ExcludeNodes) != 1 || c.Build.ExcludeNodes[0] != "gn-1" {
+		t.Errorf("excludeNodes = %v", c.Build.ExcludeNodes)
+	}
+}
+
 func TestDefaults(t *testing.T) {
 	c, err := Parse(nil)
 	if err != nil {

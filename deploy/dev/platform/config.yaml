@@ -18,6 +18,19 @@ registry:
   domain: cr.dev1.bz1.paratera.com:7443
   insecure: true
   adminSecret: forgeai-harbor
+# bz1-dev1 cannot reach the public registries directly; mir.blsc.cn proxies them
+# as mir.blsc.cn/<registry>. gn-10-243-145-103 has no Security Profiles Operator
+# daemon (its pod sandbox cannot start), so it lacks the build seccomp profile.
+build:
+  registryMirrors:
+    docker.io: mir.blsc.cn/docker.io
+    gcr.io: mir.blsc.cn/gcr.io
+    ghcr.io: mir.blsc.cn/ghcr.io
+    k8s.gcr.io: mir.blsc.cn/k8s.gcr.io
+    registry.k8s.io: mir.blsc.cn/registry.k8s.io
+    nvcr.io: mir.blsc.cn/nvcr.io
+    quay.io: mir.blsc.cn/quay.io
+  excludeNodes: [gn-10-243-145-103]
 storageTypes:
   shared: {storageClass: shared-vast-cs, description: VAST shared filesystem}
   juicefs: {storageClass: shared-juice, description: JuiceFS shared filesystem}
